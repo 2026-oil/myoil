@@ -8,6 +8,7 @@ dataset:
 runtime:
   random_seed: 1
 training:
+  # Learned models are trained separately for each expanding-window TS-CV fold.
   input_size: 48
   season_length: 52
   batch_size: 32
@@ -21,6 +22,8 @@ training:
   early_stop_patience_steps: -1
   loss: mse
 cv:
+  # Time-series cross-validation uses expanding windows:
+  # each fold trains on all data up to the cutoff and forecasts the next horizon.
   horizon: 12
   step_size: 4
   n_windows: 24
