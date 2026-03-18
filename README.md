@@ -1,59 +1,75 @@
 # NeuralForecast wrapper README
 
-이 문서는 `/home/sonet/.openclaw/workspace/research/neuralforecast` 기준의 **커스텀 wrapper 실행 방식**만 설명한다.
-
-이 README는 upstream Nixtla 소개 문서가 아니라, 현재 이 저장소에서 **실제로 동작하는 방식**에 맞춘 운영 문서다.
+이 문서는 이 저장소의 **wrapper 실행 방식과 `config.yaml` 설정**만 다룹니다.
+upstream Nixtla 일반 소개가 아니라, 현재 이 checkout에서 실제로 쓰는 운영 기준 문서입니다.
 
 ---
 
 ## 1. 초기 셋업
 
-처음에는 이 저장소 루트에서 환경부터 맞춘 뒤 실행하는 것을 권장한다.
+### `uv` 설치
 
-경로:
-- `/home/sonet/.openclaw/workspace/research/neuralforecast`
+`uv`가 없다면 먼저 설치합니다.
 
-권장 초기 셋업:
+- macOS / Linux
 
 ```bash
-cd /home/sonet/.openclaw/workspace/research/neuralforecast
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+- Windows (PowerShell)
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+설치 후 새 셸을 열고 확인합니다.
+
+```bash
+uv --version
+```
+
+### 저장소 환경 준비
+
+```bash
+cd neuralforecast
 uv sync --group dev
 ```
 
 최소 실행 확인:
 
 ```bash
-cd /home/sonet/.openclaw/workspace/research/neuralforecast
 uv run python main.py --validate-only
 ```
 
 설명:
-- `uv sync --group dev`로 현재 repo의 Python 환경과 개발 도구를 맞춘다.
-- 이후 실행/테스트/검증은 `uv run ...` 기준으로 보는 것이 가장 안전하다.
-- README에서는 내부 환경 디렉터리 자체를 직접 호출하는 방식보다, `uv` 기반 진입을 기준으로 설명한다.
+
+- `uv sync --group dev`로 현재 repo의 Python 환경과 개발 도구를 맞춥니다.
+- 실행/테스트/검증은 기본적으로 `uv run ...` 기준으로 봅니다.
 
 ---
 
-## 2. `main.py`
+## 2. 실행 진입점
 
-현재 실행 진입점은 루트의 `main.py`다.
+현재 실행 진입점은 루트의 `main.py`입니다.
 
-경로:
-- `neuralforecast/main.py`
+- 엔트리포인트: `main.py`
+- 실제 런타임: `residual/runtime.py`
 
 역할:
-- 현재 repo 루트를 기준으로 bootstrap을 수행한다.
-- `PYTHONPATH`에 현재 repo 루트를 넣는다.
-- bootstrap이 끝나면 `residual.runtime.main()`으로 제어를 넘긴다.
 
-즉, 실제 사용자는 아래처럼 실행하면 된다.
+- 프로젝트 가상환경 Python으로 bootstrap
+- 이후 `residual.runtime.main()`으로 제어 전달
+
+즉, 사용자는 아래처럼 실행하면 됩니다.
 
 ```bash
-cd /home/sonet/.openclaw/workspace/research/neuralforecast
+cd neuralforecast
 uv run python main.py --validate-only
 ```
 
-현재 지원하는 주요 인자:
+주요 인자:
+
 - `--config <path>`
 - `--config-path <path>`
 - `--config-toml <path>`
@@ -64,54 +80,54 @@ uv run python main.py --validate-only
 예시:
 
 ### 전체 config 검증
+
 ```bash
 cd neuralforecast
 uv run python main.py --validate-only --config config.yaml
 ```
 
 ### 특정 job만 실행
+
 ```bash
 cd neuralforecast
-uv run python main.py --config config.yaml --jobs smoke_tft --output-root runs/single-job-smoke
+uv run python main.py --config config.yaml --jobs TFT --output-root runs/single-job-smoke
 ```
 
 ### 멀티 job scheduler 실행
+
 ```bash
 cd neuralforecast
 uv run python main.py --config examples/real_smoke.yaml --output-root runs/two-gpu-smoke
 ```
 
-현재 동작 기준으로:
-- 단일 job 실행은 실제 runtime 경로를 탄다.
-- 다중 job 실행은 scheduler launch plan + subprocess worker 실행 경로를 탄다.
+현재 동작 기준:
+
+- 단일 job 실행은 runtime 경로를 직접 탑니다.
+- 다중 job 실행은 scheduler launch plan + subprocess worker 경로를 탑니다.
 
 ---
 
-## 3. config 작성법
-
-현재 config는 **typed internal config model**로 읽힌다.
+## 3. 설정 파일 개요
 
 지원 형식:
+
 - YAML
 - TOML
 
-주의:
-- `dataset.freq`는 선택 사항이다.
-- 생략하면 runtime이 `dt_col`에서 주기를 자동 추론한다.
-- 자동 추론이 실패하는 비정규 시계열이면 그때만 `freq`를 명시하면 된다.
+우선순위:
 
-우선순위/입력 방식:
-- `--config config.yaml`
-- `--config-path config.yaml`
-- `--config-toml config.toml`
-- 아무 것도 주지 않으면 repo 루트에서 `config.yaml`, `config.yml`, `config.toml` 순으로 찾는다.
+1. `--config`
+2. `--config-path`
+3. `--config-toml`
+4. 미지정 시 repo 루트의 `config.yaml` / `config.yml` / `config.toml`
 
-현재 기본 예시 파일:
-- `neuralforecast/config.yaml`
-- `neuralforecast/examples/real_smoke.yaml`
+현재 대표 예시 파일:
 
-### top-level 구조
-현재 지원하는 top-level section:
+- `config.yaml`
+- `examples/real_smoke.yaml`
+
+top-level section:
+
 - `dataset`
 - `runtime`
 - `training`
@@ -120,207 +136,199 @@ uv run python main.py --config examples/real_smoke.yaml --output-root runs/two-g
 - `residual`
 - `jobs`
 
-### 필수적으로 이해해야 하는 것
+---
 
-#### `dataset`
-예시:
+## 4. `config.yaml` 설정표
+
+### 4.1 `dataset`
+
+| Key | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `path` | string | yes | 입력 CSV 경로 |
+| `target_col` | string | yes | 공통 타깃 컬럼 |
+| `dt_col` | string | no | 시간 컬럼명, 기본값 `dt` |
+| `freq` | string \| null | no | 시계열 주기. 생략 시 runtime이 자동 추론 |
+| `hist_exog_cols` | list[string] | no | 과거 exogenous 컬럼 목록 |
+| `futr_exog_cols` | list[string] | no | 미래 exogenous 컬럼 목록 |
+| `static_exog_cols` | list[string] | no | static exogenous 컬럼 목록 |
+
+### 4.2 `runtime`
+
+| Key | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `random_seed` | int | no | 공통 랜덤 시드 |
+
+### 4.3 `training`
+
+> 현재 learned model은 **expanding-window TS-CV의 각 fold마다 별도로 학습**됩니다.
+
+| Key | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `input_size` | int | no | 모델 입력 길이 |
+| `season_length` | int | no | seasonality 길이 |
+| `batch_size` | int | no | 학습 배치 크기 |
+| `valid_batch_size` | int | no | validation 배치 크기 |
+| `windows_batch_size` | int | no | training windows batch 크기 |
+| `inference_windows_batch_size` | int | no | inference windows batch 크기 |
+| `learning_rate` | float | no | 공통 learning rate |
+| `max_steps` | int | no | 최대 학습 step |
+| `val_size` | int | no | 각 fit에서 내부 validation 길이 |
+| `val_check_steps` | int | no | validation check 주기 |
+| `early_stop_patience_steps` | int | no | early stopping patience |
+| `loss` | string | no | 공통 loss. 현재 `mse`만 지원 |
+
+### 4.4 `cv`
+
+> 현재 CV는 **expanding-window time-series cross-validation**입니다.  
+> 각 fold는 cutoff까지의 전체 이력을 학습에 사용하고, 그 다음 `horizon` 구간을 예측합니다.
+
+| Key | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `horizon` | int | no | 예측 길이 |
+| `step_size` | int | no | fold 간 이동 폭 |
+| `n_windows` | int | no | CV fold 수 |
+| `final_holdout` | int | no | 마지막 holdout 길이 |
+| `overlap_eval_policy` | string | no | 겹치는 예측 구간 집계 정책. 현재 `by_cutoff_mean` |
+
+### 4.5 `scheduler`
+
+| Key | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `gpu_ids` | list[int] | no | 사용할 GPU lane 목록 |
+| `max_concurrent_jobs` | int | no | 동시 실행 가능한 최대 job 수 |
+| `worker_devices` | int | no | worker당 device 수. 현재 `1`만 허용 |
+
+### 4.6 `residual`
+
+| Key | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `enabled` | bool | no | residual 보정 사용 여부 |
+| `train_source` | string | no | residual 학습 소스. `oof_cv` 또는 `insample_backcast` |
+| `model` | string | no | residual 모델명. 현재 `lstm` |
+| `params` | object | no | residual 모델 파라미터 |
+
+### 4.7 `jobs`
+
+`jobs`는 **모델 단위 실행 목록**입니다.
+
+| Key | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `model` | string | yes | 실행할 모델 이름 |
+| `params` | object | no | 해당 모델의 개별 override |
+
+핵심 규칙:
+
+- `dataset.target_col`은 config 전체에서 한 번만 정의합니다.
+- exogenous 컬럼들도 `dataset`에서 한 번만 정의합니다.
+- `jobs`에서는 모델 이름이 유일해야 합니다.
+- README에서는 `params` 내부의 모델별 세부 override는 별도로 풀어쓰지 않습니다.
+
+---
+
+## 5. 현재 `config.yaml` 예시
+
+### 상단 구조 예시
+
 ```yaml
 dataset:
   path: ../df.csv
+  target_col: Com_CrudeOil
   dt_col: dt
-```
+  hist_exog_cols: []
+  futr_exog_cols: []
+  static_exog_cols: []
 
-의미:
-- `path`: 입력 데이터 CSV 경로
-- `target_col`: 모든 모델이 공통으로 다룰 단일 타깃 컬럼
-- `dt_col`: 시간 컬럼 이름
-- `freq`: 시계열 주기 (선택 사항, 생략하면 `dt_col`에서 자동 추론)
+runtime:
+  random_seed: 1
 
-#### `training`
-예시:
-```yaml
 training:
-  input_size: 64
+  input_size: 48
   season_length: 52
   batch_size: 32
   valid_batch_size: 32
   windows_batch_size: 1024
   inference_windows_batch_size: 1024
   learning_rate: 0.001
-  max_steps: 100
+  max_steps: 1000
+  val_size: 12
+  val_check_steps: 100
+  early_stop_patience_steps: -1
   loss: mse
-```
 
-중요:
-- `loss`는 **모든 모델 공통 설정**이다.
-- 현재 v1에서 지원하는 공통 loss는 **`mse` 하나**다.
-- 이 값은 resolved config와 manifest에도 기록된다.
-
-#### `cv`
-예시:
-```yaml
 cv:
   horizon: 12
   step_size: 4
   n_windows: 24
   final_holdout: 12
   overlap_eval_policy: by_cutoff_mean
-```
 
-의미:
-- `horizon`: 예측 길이
-- `step_size`: fold 간 이동 폭
-- `n_windows`: CV fold 수
-- `final_holdout`: 최종 홀드아웃 길이
-- `overlap_eval_policy`: 현재 `by_cutoff_mean` 사용
-
-#### `scheduler`
-예시:
-```yaml
 scheduler:
   gpu_ids: [0, 1]
   max_concurrent_jobs: 2
   worker_devices: 1
+
+residual:
+  enabled: true
+  train_source: oof_cv
+  model: lstm
+  params: { ... }
 ```
 
-의미:
-- `gpu_ids`: 사용할 GPU lane
-- `max_concurrent_jobs`: 동시 실행 job 수
-- `worker_devices`: 현재 **항상 1이어야 함**
+### `jobs` 예시
 
-현재 설계상:
-- worker는 `CUDA_VISIBLE_DEVICES`로 lane을 고정한다.
-- 각 worker는 `devices=1`만 허용한다.
+모델별 상세 `params` 값은 여기서 전부 나열하지 않고, 구조만 유지합니다.
 
-#### `jobs`
-`jobs`는 `model` 단위로만 관리한다.
-
-예시:
 ```yaml
 jobs:
   - model: TFT
+    params: { ... }
+  - model: VanillaTransformer
+    params: { ... }
+  - model: Informer
+    params: { ... }
+  - model: Autoformer
+    params: { ... }
+  - model: FEDformer
+    params: { ... }
+  - model: PatchTST
+    params: { ... }
+  - model: LSTM
+    params: { ... }
+  - model: NHITS
+    params: { ... }
+  - model: Naive
     params: {}
-
+  - model: SeasonalNaive
+    params: {}
+  - model: HistoricAverage
+    params: {}
   - model: iTransformer
-    params: {}
-```
-
-핵심 규칙:
-- `dataset.target_col`은 config 전체에서 한 번만 설정한다.
-- `hist_exog_cols`, `futr_exog_cols`, `static_exog_cols`도 `dataset` 단에서 한 번만 설정한다.
-- `jobs`에서는 모델 이름만 고유하게 적는다.
-- 같은 모델을 두 번 이상 넣으면 안 된다.
-- `params`에는 해당 모델 하이퍼파라미터만 넣는다.
-- `hist_exog_cols`, `futr_exog_cols`, `static_exog_cols`가 모두 비어 있으면 wrapper는 단변량 경로로 처리한다.
-- 셋 중 하나라도 채워져 있으면 외부 변수 포함 경로로 처리한다.
-- 다변량 모델(`iTransformer` 등)은 dataset-level exog를 채널로 해석한다.
-
-### 실제 예시 파일
-현재 real smoke용 예시는 아래다.
-
-```yaml
-dataset:
-  path: ../../df.csv
-  target_col: Com_CrudeOil
-  dt_col: dt
-  hist_exog_cols: []
-  futr_exog_cols: []
-  static_exog_cols: []
-runtime:
-  random_seed: 1
-training:
-  input_size: 8
-  season_length: 52
-  batch_size: 16
-  valid_batch_size: 16
-  windows_batch_size: 32
-  inference_windows_batch_size: 32
-  learning_rate: 0.001
-  max_steps: 1
-  val_size: 0
-  loss: mse
-cv:
-  horizon: 2
-  step_size: 2
-  n_windows: 1
-  final_holdout: 2
-  overlap_eval_policy: by_cutoff_mean
-scheduler:
-  gpu_ids: [0, 1]
-  max_concurrent_jobs: 2
-  worker_devices: 1
-residual:
-  enabled: false
-  train_source: oof_cv
-jobs:
-  - name: smoke_tft
-    model: TFT
-    job_type: univariate_with_exog
-    target_col: Com_CrudeOil
-    hist_exog_cols: []
-    futr_exog_cols: []
-    static_exog_cols: []
-    params: {}
-  - name: smoke_itransformer
-    model: iTransformer
-    job_type: multivariate_channels
-    target_col: Com_CrudeOil
-    channel_cols:
-      - Com_BrentCrudeOil
     params: {}
 ```
 
 ---
 
-## 4. residual 관리
+## 6. residual 관리
 
-현재 residual 관련 코드는 아래에 모여 있다.
+residual 관련 코드는 `residual/` 아래에 모여 있습니다.
 
-경로:
-- `neuralforecast/residual/`
+주요 파일:
 
-파일 역할:
-- `config.py`
-  - YAML/TOML을 typed config로 정규화
-- `adapters.py`
-  - `fit_df`, `futr_df`, `static_df`, `channel_map` 생성
-- `models.py`
-  - 모델 capability 검증
-  - 공통 loss(`mse`) 적용
-- `manifest.py`
-  - manifest / provenance 기록
-- `scheduler.py`
-  - GPU lane 계획 및 subprocess worker 실행
-- `runtime.py`
-  - 전체 실행 진입점
+- `residual/config.py`: YAML/TOML을 typed config로 정규화
+- `residual/adapters.py`: `fit_df`, `futr_df`, `static_df`, `channel_map` 생성
+- `residual/models.py`: 모델 capability 검증 및 공통 설정 적용
+- `residual/manifest.py`: manifest / provenance 기록
+- `residual/scheduler.py`: GPU lane 계획 및 subprocess worker 실행
+- `residual/runtime.py`: 전체 실행 진입점
 
-### residual section 자체
-현재 config에는 아래처럼 들어간다.
+현재 기준으로 README에서 확실히 말할 수 있는 것:
 
-```yaml
-residual:
-  enabled: true
-  train_source: oof_cv
-```
+- residual은 wrapper의 1급 설정 영역입니다.
+- `residual.enabled`, `residual.train_source`, `residual.model`, `residual.params`로 관리합니다.
+- manifest / provenance와 함께 실행 당시 설정을 추적합니다.
 
-현재 실제로 동작하는 수준에서 말하면:
-- `residual` section은 **typed config에 포함**된다.
-- `train_source`는 현재
-  - `insample_backcast`
-  - `oof_cv`
-  중 하나로 정규화된다.
-- 이 값은 runtime config/manifest 관점에서 관리된다.
+manifest에 기록되는 대표 항목:
 
-### 지금 문서화 가능한 현재 상태
-현재 기준으로 README에서 확실히 말할 수 있는 것은:
-- residual 관련 코드의 **관리 단위는 `neuralforecast/residual/`** 이다.
-- config에서 `residual.enabled`, `residual.train_source`를 관리한다.
-- manifest/provenance 체계와 함께 wrapper 설정 일부로 유지된다.
-
-즉, residual은 지금 이 repo에서 **wrapper의 1급 설정 영역**으로 관리되고 있다.
-
-### manifest / provenance
-현재 run manifest에는 다음이 기록된다.
 - `manifest_version`
 - `artifact_schema_version`
 - `evaluation_protocol_version`
@@ -333,56 +341,158 @@ residual:
 - `compat_mode`
 - `training.loss`
 
-즉 residual/평가 방식까지 포함해, 실행 당시 설정을 추적하는 구조다.
+### 새로운 residual 모델 추가 방법
+
+새 residual 모델을 추가할 때는 **기존 base forecast / job / scheduler 구조는 건드리지 않고**
+`residual` 레이어에만 새 플러그인을 붙이면 됩니다.
+
+핵심 수정 지점:
+
+1. `residual/plugins/<new_model>.py`
+   - 새 `ResidualPlugin` 구현 추가
+2. `residual/plugins/__init__.py`
+   - 새 플러그인 export
+3. `residual/registry.py`
+   - `config.residual.model` 값에 따라 플러그인 선택
+4. `residual/config.py`
+   - `SUPPORTED_RESIDUAL_MODELS`에 새 이름 추가
+
+설정 예시:
+
+```yaml
+residual:
+  enabled: true
+  train_source: oof_cv
+  model: mlp
+  params:
+    lookback: 8
+    hidden_size: 32
+    epochs: 50
+    learning_rate: 0.001
+```
+
+스키마 예시:
+
+```python
+from dataclasses import dataclass
+from typing import Any
+
+import pandas as pd
+
+from residual.plugins_base import ResidualContext, ResidualPlugin
+
+
+@dataclass(frozen=True)
+class _MLPConfig:
+    lookback: int = 8
+    hidden_size: int = 32
+    epochs: int = 50
+    learning_rate: float = 0.001
+
+
+class MLPResidualPlugin(ResidualPlugin):
+    name = "mlp"
+
+    def __init__(
+        self,
+        *,
+        lookback: int = 8,
+        hidden_size: int = 32,
+        epochs: int = 50,
+        learning_rate: float = 0.001,
+    ):
+        self.config = _MLPConfig(
+            lookback=lookback,
+            hidden_size=hidden_size,
+            epochs=epochs,
+            learning_rate=learning_rate,
+        )
+
+    def fit(self, train_df: pd.DataFrame, context: ResidualContext) -> None:
+        ...
+
+    def predict_train(self, train_df: pd.DataFrame) -> pd.DataFrame:
+        ...
+
+    def predict_future(self, future_df: pd.DataFrame) -> pd.DataFrame:
+        ...
+
+    def metadata(self) -> dict[str, Any]:
+        return {
+            "plugin": self.name,
+            "lookback": self.config.lookback,
+            "hidden_size": self.config.hidden_size,
+            "epochs": self.config.epochs,
+            "learning_rate": self.config.learning_rate,
+        }
+```
+
+registry 연결 예시:
+
+```python
+from .plugins import LSTMResidualPlugin, MLPResidualPlugin
+
+def build_residual_plugin(config: Any) -> ResidualPlugin:
+    ...
+    if name == "lstm":
+        return LSTMResidualPlugin(...)
+    if name == "mlp":
+        return MLPResidualPlugin(...)
+    raise ValueError(f"Unsupported residual model: {name}")
+```
+
+정리:
+
+- `jobs:`는 그대로 둡니다.
+- 새 residual 모델은 `residual.model`과 `residual.params`만 추가하면 됩니다.
+- 자세한 단계별 문서는 `residual_guide.md`를 참고하세요.
 
 ---
 
-## 5. 현재 확인된 실행 예시
+## 7. 현재 확인된 실행 예시
 
 ### validate-only
+
 ```bash
-cd /home/sonet/.openclaw/workspace/research/neuralforecast
+cd neuralforecast
 uv run python main.py --validate-only
 ```
 
-확인 결과 예:
-```json
-{"ok": true, "jobs": ["crudeoil_tft", "crudeoil_itransformer"]}
-```
-
 ### single job smoke
+
 ```bash
-cd /home/sonet/.openclaw/workspace/research/neuralforecast
-uv run python main.py --config examples/real_smoke.yaml --jobs smoke_tft --output-root runs/single-job-smoke
+cd neuralforecast
+uv run python main.py --config examples/real_smoke.yaml --jobs TFT --output-root runs/single-job-smoke
 ```
 
 ### two-gpu scheduler smoke
+
 ```bash
-cd /home/sonet/.openclaw/workspace/research/neuralforecast
+cd neuralforecast
 uv run python main.py --config examples/real_smoke.yaml --output-root runs/two-gpu-smoke
 ```
 
-확인 결과 예:
-- `smoke_tft` → `gpu_id: 0`, `devices: 1`
-- `smoke_itransformer` → `gpu_id: 1`, `devices: 1`
+관련 산출물 예시:
 
-관련 산출물:
 - `runs/two-gpu-smoke/scheduler/events.jsonl`
 - `runs/two-gpu-smoke/scheduler/workers/*/summary.json`
-- `runs/two-gpu-smoke/scheduler/workers/*/{stdout,stderr}.log`
+- `runs/two-gpu-smoke/scheduler/workers/*/stdout.log`
+- `runs/two-gpu-smoke/scheduler/workers/*/stderr.log`
 
 ---
 
-## 6. 정리
+## 8. 요약
 
-이 저장소에서 지금 기준으로 기억하면 된다.
+이 저장소에서 현재 기억해야 할 핵심은 아래입니다.
 
-- 실행 진입점: `neuralforecast/main.py`
+- 실행 진입점: `main.py`
 - 설정 중심: `config.yaml` / `config.toml`
 - 공통 loss: `training.loss = mse`
-- residual 관리 중심: `neuralforecast/residual/`
+- CV 방식: **expanding-window TS-CV**
+- residual 관리 중심: `residual/`
 - multi-job 실행: scheduler가 GPU lane 분배
 - 각 worker는 `devices=1`만 사용
 
-upstream Nixtla 라이브러리 자체 설명은 필요하면 아래를 참고하면 된다.
+upstream 라이브러리 자체가 필요하면 아래를 참고하면 됩니다.
+
 - https://github.com/Nixtla/neuralforecast
