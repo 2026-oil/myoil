@@ -1,0 +1,45 @@
+dataset:
+  path: ../df.csv
+  dt_col: dt
+  freq: W-MON
+runtime:
+  random_seed: 1
+training:
+  input_size: 64
+  season_length: 52
+  batch_size: 32
+  valid_batch_size: 32
+  windows_batch_size: 1024
+  inference_windows_batch_size: 1024
+  learning_rate: 0.001
+  max_steps: 20
+  loss: mse
+cv:
+  horizon: 12
+  step_size: 4
+  n_windows: 24
+  final_holdout: 12
+  overlap_eval_policy: by_cutoff_mean
+scheduler:
+  gpu_ids: [0, 1]
+  max_concurrent_jobs: 2
+  worker_devices: 1
+residual:
+  enabled: true
+  train_source: oof_cv
+jobs:
+  - name: crudeoil_tft
+    model: TFT
+    job_type: univariate_with_exog
+    target_col: Com_CrudeOil
+    hist_exog_cols: []
+    futr_exog_cols: []
+    static_exog_cols: []
+    params: {}
+  - name: crudeoil_itransformer
+    model: iTransformer
+    job_type: multivariate_channels
+    target_col: Com_CrudeOil
+    channel_cols:
+      - Com_BrentCrudeOil
+    params: {}

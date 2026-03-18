@@ -1,164 +1,395 @@
-# Nixtla 
+# NeuralForecast wrapper README
 
-[![Tweet](https://img.shields.io/twitter/url/http/shields.io.svg?style=social)](https://twitter.com/intent/tweet?text=Statistical%20Forecasting%20Algorithms%20by%20Nixtla%20&url=https://github.com/Nixtla/neuralforecast&via=nixtlainc&hashtags=StatisticalModels,TimeSeries,Forecasting)
-[![Slack](https://img.shields.io/badge/Slack-4A154B?&logo=slack&logoColor=white)](https://join.slack.com/t/nixtlacommunity/shared_invite/zt-1pmhan9j5-F54XR20edHk0UtYAPcW4KQ)
+이 문서는 `/home/sonet/.openclaw/workspace/research/neuralforecast` 기준의 **커스텀 wrapper 실행 방식**만 설명한다.
 
-<div align="center">
-<img src="https://raw.githubusercontent.com/Nixtla/neuralforecast/main/nbs/imgs_indx/logo_new.png" />
-<h1 align="center">Neural 🧠 Forecast</h1>
-<h3 align="center">User friendly state-of-the-art neural forecasting models</h3>
+이 README는 upstream Nixtla 소개 문서가 아니라, 현재 이 저장소에서 **실제로 동작하는 방식**에 맞춘 운영 문서다.
 
-[![pytest](https://github.com/Nixtla/neuralforecast/actions/workflows/pytest.yml/badge.svg)](https://github.com/Nixtla/neuralforecast/actions/workflows/pytest.yml)
-[![Python](https://img.shields.io/pypi/pyversions/neuralforecast)](https://pypi.org/project/neuralforecast/)
-[![PyPi](https://img.shields.io/pypi/v/neuralforecast?color=blue)](https://pypi.org/project/neuralforecast/)
-[![conda-nixtla](https://img.shields.io/conda/vn/conda-forge/neuralforecast?color=seagreen&label=conda)](https://anaconda.org/conda-forge/neuralforecast)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/Nixtla/neuralforecast/blob/main/LICENSE)
-[![docs](https://img.shields.io/website-up-down-green-red/http/nixtla.github.io/neuralforecast.svg?label=docs)](https://nixtla.github.io/neuralforecast/)
-<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-11-orange.svg?style=flat-square)](#contributors-)
-<!-- ALL-CONTRIBUTORS-BADGE:END -->
+---
 
-**NeuralForecast** offers a large collection of neural forecasting models focusing on their performance, usability, and robustness. The models range from classic networks like RNNs to the latest transformers: `MLP`, `LSTM`, `GRU`, `RNN`, `TCN`, `TimesNet`, `BiTCN`, `DeepAR`, `NBEATS`, `NBEATSx`, `NHITS`, `TiDE`, `DeepNPTS`, `TSMixer`, `TSMixerx`, `MLPMultivariate`, `DLinear`, `NLinear`, `TFT`, `Informer`, `AutoFormer`, `FedFormer`, `PatchTST`, `iTransformer`, `StemGNN`, and `TimeLLM`.
-</div>
+## 1. 초기 셋업
 
-## Installation
+처음에는 이 저장소 루트에서 환경부터 맞춘 뒤 실행하는 것을 권장한다.
 
-You can install `NeuralForecast` with:
+경로:
+- `/home/sonet/.openclaw/workspace/research/neuralforecast`
 
-```python
-pip install neuralforecast
+권장 초기 셋업:
+
+```bash
+cd /home/sonet/.openclaw/workspace/research/neuralforecast
+uv sync --group dev
 ```
 
-or
+최소 실행 확인:
 
-```python
-conda install -c conda-forge neuralforecast
+```bash
+cd /home/sonet/.openclaw/workspace/research/neuralforecast
+uv run python main.py --validate-only
 ```
 
-Vist our [Installation Guide](https://nixtlaverse.nixtla.io/neuralforecast/docs/getting-started/installation.html) for further details.
+설명:
+- `uv sync --group dev`로 현재 repo의 Python 환경과 개발 도구를 맞춘다.
+- 이후 실행/테스트/검증은 `uv run ...` 기준으로 보는 것이 가장 안전하다.
+- README에서는 내부 환경 디렉터리 자체를 직접 호출하는 방식보다, `uv` 기반 진입을 기준으로 설명한다.
 
-## Quick Start
+---
 
-**Minimal Example**
+## 2. `main.py`
 
-```python
-from neuralforecast import NeuralForecast
-from neuralforecast.models import NBEATS
-from neuralforecast.utils import AirPassengersDF
+현재 실행 진입점은 루트의 `main.py`다.
 
-nf = NeuralForecast(
-    models = [NBEATS(input_size=24, h=12, max_steps=100)],
-    freq = 'ME'
-)
+경로:
+- `neuralforecast/main.py`
 
-nf.fit(df=AirPassengersDF)
-nf.predict()
+역할:
+- 현재 repo 루트를 기준으로 bootstrap을 수행한다.
+- `PYTHONPATH`에 현재 repo 루트를 넣는다.
+- bootstrap이 끝나면 `residual.runtime.main()`으로 제어를 넘긴다.
+
+즉, 실제 사용자는 아래처럼 실행하면 된다.
+
+```bash
+cd /home/sonet/.openclaw/workspace/research/neuralforecast
+uv run python main.py --validate-only
 ```
 
-**Get Started with this [quick guide](https://nixtlaverse.nixtla.io/neuralforecast/docs/getting-started/quickstart.html).**
+현재 지원하는 주요 인자:
+- `--config <path>`
+- `--config-path <path>`
+- `--config-toml <path>`
+- `--validate-only`
+- `--jobs <job-name...>`
+- `--output-root <path>`
 
-## Why?
+예시:
 
-There is a shared belief in Neural forecasting methods' capacity to improve forecasting pipeline's accuracy and efficiency.
-
-Unfortunately, available implementations and published research are yet to realize neural networks' potential. They are hard to use and continuously fail to improve over statistical methods while being computationally prohibitive. For this reason, we created `NeuralForecast`, a library favoring proven accurate and efficient models focusing on their usability.
-
-## Features
-
-* Fast and accurate implementations of more than 30 state-of-the-art models. See the entire [collection here](https://nixtlaverse.nixtla.io/neuralforecast/docs/capabilities/overview.html).
-* Support for exogenous variables and static covariates.
-* Interpretability methods for trend, seasonality and exogenous components.
-* Probabilistic Forecasting with adapters for quantile losses and parametric distributions.
-* Train and Evaluation Losses with scale-dependent, percentage and scale independent errors, and parametric likelihoods.
-* Automatic Model Selection with distributed automatic hyperparameter tuning.
-* Familiar sklearn syntax: `.fit` and `.predict`.
-
-## Highlights
-
-* Official `NHITS` implementation, published at AAAI 2023. See [paper](https://ojs.aaai.org/index.php/AAAI/article/view/25854) and [experiments](https://github.com/Nixtla/neuralforecast/tree/main/experiments).
-* Official `NBEATSx` implementation, published at the International Journal of Forecasting. See [paper](https://www.sciencedirect.com/science/article/pii/S0169207022000413).
-* Unified with`StatsForecast`, `MLForecast`, and `HierarchicalForecast` interface `NeuralForecast().fit(Y_df).predict()`, inputs and outputs.
-* Built-in integrations with `utilsforecast` and `coreforecast` for visualization and data-wrangling efficient methods.
-* Integrations with `Ray` and `Optuna` for automatic hyperparameter optimization.
-* Predict with little to no history using Transfer learning. Check the experiments [here](https://github.com/Nixtla/transfer-learning-time-series).
-
-Missing something? Please open an issue or write us in [![Slack](https://img.shields.io/badge/Slack-4A154B?&logo=slack&logoColor=white)](https://join.slack.com/t/nixtlaworkspace/shared_invite/zt-135dssye9-fWTzMpv2WBthq8NK0Yvu6A)
-
-## Examples and Guides
-
-The [documentation page](https://nixtlaverse.nixtla.io/neuralforecast/docs/getting-started/introduction.html) contains all the examples and tutorials.
-
-📈 [Automatic Hyperparameter Optimization](https://nixtlaverse.nixtla.io/neuralforecast/docs/capabilities/hyperparameter_tuning.html): Easy and Scalable Automatic Hyperparameter Optimization with `Auto` models on `Ray` or `Optuna`.
-
-🌡️ [Exogenous Regressors](https://nixtlaverse.nixtla.io/neuralforecast/docs/capabilities/exogenous_variables.html): How to incorporate static or temporal exogenous covariates like weather or prices.
-
-🔌 [Transformer Models](https://nixtlaverse.nixtla.io/neuralforecast/docs/tutorials/longhorizon_transformers.html): Learn how to forecast with many state-of-the-art Transformers models.
-
-👑 [Hierarchical Forecasting](https://nixtlaverse.nixtla.io/neuralforecast/docs/tutorials/hierarchical_forecasting.html): forecast series with very few non-zero observations.
-
-👩‍🔬 [Add Your Own Model](https://nixtlaverse.nixtla.io/neuralforecast/docs/tutorials/adding_models.html): Learn how to add a new model to the library.
-
-## Models
-
-See the entire [collection here](https://nixtlaverse.nixtla.io/neuralforecast/docs/capabilities/overview.html).
-
-Missing a model? Please open an issue or write us in [![Slack](https://img.shields.io/badge/Slack-4A154B?&logo=slack&logoColor=white)](https://join.slack.com/t/nixtlaworkspace/shared_invite/zt-135dssye9-fWTzMpv2WBthq8NK0Yvu6A)
-
-## How to contribute
-
-If you wish to contribute to the project, please refer to our [contribution guidelines](https://github.com/Nixtla/neuralforecast/blob/main/CONTRIBUTING.md).
-
-## References
-
-This work is highly influenced by the fantastic work of previous contributors and other scholars on the neural forecasting methods presented here. We want to highlight the work of [Boris Oreshkin](https://arxiv.org/abs/1905.10437), [Slawek Smyl](https://www.sciencedirect.com/science/article/pii/S0169207019301153), [Bryan Lim](https://www.sciencedirect.com/science/article/pii/S0169207021000637), and [David Salinas](https://arxiv.org/abs/1704.04110). We refer to [Benidis et al.](https://arxiv.org/abs/2004.10240) for a comprehensive survey of neural forecasting methods.
-
-## 🙏 How to cite
-
-If you enjoy or benefit from using these Python implementations, a citation to the repository will be greatly appreciated.
-
-```bibtex
-@misc{olivares2022library_neuralforecast,
-    author={Kin G. Olivares and
-            Cristian Challú and
-            Azul Garza and
-            Max Mergenthaler Canseco and
-            Artur Dubrawski},
-    title = {{NeuralForecast}: User friendly state-of-the-art neural forecasting models.},
-    year={2022},
-    howpublished={{PyCon} Salt Lake City, Utah, US 2022},
-    url={https://github.com/Nixtla/neuralforecast}
-}
+### 전체 config 검증
+```bash
+cd neuralforecast
+uv run python main.py --validate-only --config config.yaml
 ```
 
-## Contributors ✨
+### 특정 job만 실행
+```bash
+cd neuralforecast
+uv run python main.py --config config.yaml --jobs smoke_tft --output-root runs/single-job-smoke
+```
 
-Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
-<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- prettier-ignore-start -->
-<!-- markdownlint-disable -->
-<table>
-  <tbody>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/AzulGarza"><img src="https://avatars.githubusercontent.com/u/10517170?v=4?s=100" width="100px;" alt="azul"/><br /><sub><b>azul</b></sub></a><br /><a href="https://github.com/Nixtla/neuralforecast/commits?author=AzulGarza" title="Code">💻</a> <a href="#maintenance-AzulGarza" title="Maintenance">🚧</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/cchallu"><img src="https://avatars.githubusercontent.com/u/31133398?v=4?s=100" width="100px;" alt="Cristian Challu"/><br /><sub><b>Cristian Challu</b></sub></a><br /><a href="https://github.com/Nixtla/neuralforecast/commits?author=cchallu" title="Code">💻</a> <a href="#maintenance-cchallu" title="Maintenance">🚧</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/jmoralez"><img src="https://avatars.githubusercontent.com/u/8473587?v=4?s=100" width="100px;" alt="José Morales"/><br /><sub><b>José Morales</b></sub></a><br /><a href="https://github.com/Nixtla/neuralforecast/commits?author=jmoralez" title="Code">💻</a> <a href="#maintenance-jmoralez" title="Maintenance">🚧</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/mergenthaler"><img src="https://avatars.githubusercontent.com/u/4086186?v=4?s=100" width="100px;" alt="mergenthaler"/><br /><sub><b>mergenthaler</b></sub></a><br /><a href="https://github.com/Nixtla/neuralforecast/commits?author=mergenthaler" title="Documentation">📖</a> <a href="https://github.com/Nixtla/neuralforecast/commits?author=mergenthaler" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/kdgutier"><img src="https://avatars.githubusercontent.com/u/19935241?v=4?s=100" width="100px;" alt="Kin"/><br /><sub><b>Kin</b></sub></a><br /><a href="https://github.com/Nixtla/neuralforecast/commits?author=kdgutier" title="Code">💻</a> <a href="https://github.com/Nixtla/neuralforecast/issues?q=author%3Akdgutier" title="Bug reports">🐛</a> <a href="#data-kdgutier" title="Data">🔣</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/gdevos010"><img src="https://avatars.githubusercontent.com/u/15316026?v=4?s=100" width="100px;" alt="Greg DeVos"/><br /><sub><b>Greg DeVos</b></sub></a><br /><a href="#ideas-gdevos010" title="Ideas, Planning, & Feedback">🤔</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/alejandroxag"><img src="https://avatars.githubusercontent.com/u/64334543?v=4?s=100" width="100px;" alt="Alejandro"/><br /><sub><b>Alejandro</b></sub></a><br /><a href="https://github.com/Nixtla/neuralforecast/commits?author=alejandroxag" title="Code">💻</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="http://lavattiata.com"><img src="https://avatars.githubusercontent.com/u/48966177?v=4?s=100" width="100px;" alt="stefanialvs"/><br /><sub><b>stefanialvs</b></sub></a><br /><a href="#design-stefanialvs" title="Design">🎨</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://bandism.net/"><img src="https://avatars.githubusercontent.com/u/22633385?v=4?s=100" width="100px;" alt="Ikko Ashimine"/><br /><sub><b>Ikko Ashimine</b></sub></a><br /><a href="https://github.com/Nixtla/neuralforecast/issues?q=author%3Aeltociear" title="Bug reports">🐛</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/vglaucus"><img src="https://avatars.githubusercontent.com/u/75549033?v=4?s=100" width="100px;" alt="vglaucus"/><br /><sub><b>vglaucus</b></sub></a><br /><a href="https://github.com/Nixtla/neuralforecast/issues?q=author%3Avglaucus" title="Bug reports">🐛</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/pitmonticone"><img src="https://avatars.githubusercontent.com/u/38562595?v=4?s=100" width="100px;" alt="Pietro Monticone"/><br /><sub><b>Pietro Monticone</b></sub></a><br /><a href="https://github.com/Nixtla/neuralforecast/issues?q=author%3Apitmonticone" title="Bug reports">🐛</a></td>
-    </tr>
-  </tbody>
-</table>
+### 멀티 job scheduler 실행
+```bash
+cd neuralforecast
+uv run python main.py --config examples/real_smoke.yaml --output-root runs/two-gpu-smoke
+```
 
-<!-- markdownlint-restore -->
-<!-- prettier-ignore-end -->
+현재 동작 기준으로:
+- 단일 job 실행은 실제 runtime 경로를 탄다.
+- 다중 job 실행은 scheduler launch plan + subprocess worker 실행 경로를 탄다.
 
-<!-- ALL-CONTRIBUTORS-LIST:END -->
+---
 
-This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
+## 3. config 작성법
+
+현재 config는 **typed internal config model**로 읽힌다.
+
+지원 형식:
+- YAML
+- TOML
+
+우선순위/입력 방식:
+- `--config config.yaml`
+- `--config-path config.yaml`
+- `--config-toml config.toml`
+- 아무 것도 주지 않으면 repo 루트에서 `config.yaml`, `config.yml`, `config.toml` 순으로 찾는다.
+
+현재 기본 예시 파일:
+- `neuralforecast/config.yaml`
+- `neuralforecast/examples/real_smoke.yaml`
+
+### top-level 구조
+현재 지원하는 top-level section:
+- `dataset`
+- `runtime`
+- `training`
+- `cv`
+- `scheduler`
+- `residual`
+- `jobs`
+
+### 필수적으로 이해해야 하는 것
+
+#### `dataset`
+예시:
+```yaml
+dataset:
+  path: ../df.csv
+  dt_col: dt
+  freq: W-MON
+```
+
+의미:
+- `path`: 입력 데이터 CSV 경로
+- `dt_col`: 시간 컬럼 이름
+- `freq`: 시계열 주기
+
+#### `training`
+예시:
+```yaml
+training:
+  input_size: 64
+  season_length: 52
+  batch_size: 32
+  valid_batch_size: 32
+  windows_batch_size: 1024
+  inference_windows_batch_size: 1024
+  learning_rate: 0.001
+  max_steps: 100
+  loss: mse
+```
+
+중요:
+- `loss`는 **모든 모델 공통 설정**이다.
+- 현재 v1에서 지원하는 공통 loss는 **`mse` 하나**다.
+- 이 값은 resolved config와 manifest에도 기록된다.
+
+#### `cv`
+예시:
+```yaml
+cv:
+  horizon: 12
+  step_size: 4
+  n_windows: 24
+  final_holdout: 12
+  overlap_eval_policy: by_cutoff_mean
+```
+
+의미:
+- `horizon`: 예측 길이
+- `step_size`: fold 간 이동 폭
+- `n_windows`: CV fold 수
+- `final_holdout`: 최종 홀드아웃 길이
+- `overlap_eval_policy`: 현재 `by_cutoff_mean` 사용
+
+#### `scheduler`
+예시:
+```yaml
+scheduler:
+  gpu_ids: [0, 1]
+  max_concurrent_jobs: 2
+  worker_devices: 1
+```
+
+의미:
+- `gpu_ids`: 사용할 GPU lane
+- `max_concurrent_jobs`: 동시 실행 job 수
+- `worker_devices`: 현재 **항상 1이어야 함**
+
+현재 설계상:
+- worker는 `CUDA_VISIBLE_DEVICES`로 lane을 고정한다.
+- 각 worker는 `devices=1`만 허용한다.
+
+#### `jobs`
+`jobs`는 **discriminated union** 방식으로 쓴다.
+
+현재 지원하는 `job_type`:
+- `univariate_with_exog`
+- `multivariate_channels`
+- `multivariate_channels_exog`  
+  - 이 타입은 현재 코드상 타입으로는 열려 있지만, 운영상은 확장용으로 보는 게 안전하다.
+
+예시:
+```yaml
+jobs:
+  - name: crudeoil_tft
+    model: TFT
+    job_type: univariate_with_exog
+    target_col: Com_CrudeOil
+    hist_exog_cols: []
+    futr_exog_cols: []
+    static_exog_cols: []
+    params: {}
+
+  - name: crudeoil_itransformer
+    model: iTransformer
+    job_type: multivariate_channels
+    target_col: Com_CrudeOil
+    channel_cols:
+      - Com_BrentCrudeOil
+    params: {}
+```
+
+핵심 규칙:
+- `univariate_with_exog`
+  - `target_col` 중심
+  - exogenous 컬럼은 `hist_exog_cols`, `futr_exog_cols`, `static_exog_cols`
+- `multivariate_channels`
+  - `target_col` + `channel_cols`
+  - 내부에서 `n_series`는 channel 수로 계산됨
+
+### 실제 예시 파일
+현재 real smoke용 예시는 아래다.
+
+```yaml
+dataset:
+  path: ../../df.csv
+  dt_col: dt
+  freq: W-MON
+runtime:
+  random_seed: 1
+training:
+  input_size: 8
+  season_length: 52
+  batch_size: 16
+  valid_batch_size: 16
+  windows_batch_size: 32
+  inference_windows_batch_size: 32
+  learning_rate: 0.001
+  max_steps: 1
+  val_size: 0
+  loss: mse
+cv:
+  horizon: 2
+  step_size: 2
+  n_windows: 1
+  final_holdout: 2
+  overlap_eval_policy: by_cutoff_mean
+scheduler:
+  gpu_ids: [0, 1]
+  max_concurrent_jobs: 2
+  worker_devices: 1
+residual:
+  enabled: false
+  train_source: oof_cv
+jobs:
+  - name: smoke_tft
+    model: TFT
+    job_type: univariate_with_exog
+    target_col: Com_CrudeOil
+    hist_exog_cols: []
+    futr_exog_cols: []
+    static_exog_cols: []
+    params: {}
+  - name: smoke_itransformer
+    model: iTransformer
+    job_type: multivariate_channels
+    target_col: Com_CrudeOil
+    channel_cols:
+      - Com_BrentCrudeOil
+    params: {}
+```
+
+---
+
+## 4. residual 관리
+
+현재 residual 관련 코드는 아래에 모여 있다.
+
+경로:
+- `neuralforecast/residual/`
+
+파일 역할:
+- `config.py`
+  - YAML/TOML을 typed config로 정규화
+- `adapters.py`
+  - `fit_df`, `futr_df`, `static_df`, `channel_map` 생성
+- `models.py`
+  - 모델 capability 검증
+  - 공통 loss(`mse`) 적용
+- `manifest.py`
+  - manifest / provenance 기록
+- `scheduler.py`
+  - GPU lane 계획 및 subprocess worker 실행
+- `runtime.py`
+  - 전체 실행 진입점
+
+### residual section 자체
+현재 config에는 아래처럼 들어간다.
+
+```yaml
+residual:
+  enabled: true
+  train_source: oof_cv
+```
+
+현재 실제로 동작하는 수준에서 말하면:
+- `residual` section은 **typed config에 포함**된다.
+- `train_source`는 현재
+  - `insample_backcast`
+  - `oof_cv`
+  중 하나로 정규화된다.
+- 이 값은 runtime config/manifest 관점에서 관리된다.
+
+### 지금 문서화 가능한 현재 상태
+현재 기준으로 README에서 확실히 말할 수 있는 것은:
+- residual 관련 코드의 **관리 단위는 `neuralforecast/residual/`** 이다.
+- config에서 `residual.enabled`, `residual.train_source`를 관리한다.
+- manifest/provenance 체계와 함께 wrapper 설정 일부로 유지된다.
+
+즉, residual은 지금 이 repo에서 **wrapper의 1급 설정 영역**으로 관리되고 있다.
+
+### manifest / provenance
+현재 run manifest에는 다음이 기록된다.
+- `manifest_version`
+- `artifact_schema_version`
+- `evaluation_protocol_version`
+- `config_source_type`
+- `config_source_path`
+- `config_resolved_path`
+- `config_input_sha256`
+- `config_resolved_sha256`
+- `entrypoint_version`
+- `compat_mode`
+- `training.loss`
+
+즉 residual/평가 방식까지 포함해, 실행 당시 설정을 추적하는 구조다.
+
+---
+
+## 5. 현재 확인된 실행 예시
+
+### validate-only
+```bash
+cd /home/sonet/.openclaw/workspace/research/neuralforecast
+uv run python main.py --validate-only
+```
+
+확인 결과 예:
+```json
+{"ok": true, "jobs": ["crudeoil_tft", "crudeoil_itransformer"]}
+```
+
+### single job smoke
+```bash
+cd /home/sonet/.openclaw/workspace/research/neuralforecast
+uv run python main.py --config examples/real_smoke.yaml --jobs smoke_tft --output-root runs/single-job-smoke
+```
+
+### two-gpu scheduler smoke
+```bash
+cd /home/sonet/.openclaw/workspace/research/neuralforecast
+uv run python main.py --config examples/real_smoke.yaml --output-root runs/two-gpu-smoke
+```
+
+확인 결과 예:
+- `smoke_tft` → `gpu_id: 0`, `devices: 1`
+- `smoke_itransformer` → `gpu_id: 1`, `devices: 1`
+
+관련 산출물:
+- `runs/two-gpu-smoke/scheduler/events.jsonl`
+- `runs/two-gpu-smoke/scheduler/workers/*/summary.json`
+- `runs/two-gpu-smoke/scheduler/workers/*/{stdout,stderr}.log`
+
+---
+
+## 6. 정리
+
+이 저장소에서 지금 기준으로 기억하면 된다.
+
+- 실행 진입점: `neuralforecast/main.py`
+- 설정 중심: `config.yaml` / `config.toml`
+- 공통 loss: `training.loss = mse`
+- residual 관리 중심: `neuralforecast/residual/`
+- multi-job 실행: scheduler가 GPU lane 분배
+- 각 worker는 `devices=1`만 사용
+
+upstream Nixtla 라이브러리 자체 설명은 필요하면 아래를 참고하면 된다.
+- https://github.com/Nixtla/neuralforecast
