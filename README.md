@@ -277,33 +277,12 @@ residual:
 ### `jobs` 예시
 
 모델별 상세 `params` 값은 여기서 전부 나열하지 않고, 구조만 유지합니다.
+예시는 한 개만 둡니다.
 
 ```yaml
 jobs:
   - model: TFT
     params: { ... }
-  - model: VanillaTransformer
-    params: { ... }
-  - model: Informer
-    params: { ... }
-  - model: Autoformer
-    params: { ... }
-  - model: FEDformer
-    params: { ... }
-  - model: PatchTST
-    params: { ... }
-  - model: LSTM
-    params: { ... }
-  - model: NHITS
-    params: { ... }
-  - model: Naive
-    params: {}
-  - model: SeasonalNaive
-    params: {}
-  - model: HistoricAverage
-    params: {}
-  - model: iTransformer
-    params: {}
 ```
 
 ---
