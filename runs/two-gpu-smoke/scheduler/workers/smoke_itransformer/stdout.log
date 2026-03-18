@@ -1,0 +1,15 @@
+Sanity Checking: |          | 0/? [00:00<?, ?it/s]Sanity Checking: |          | 0/? [00:00<?, ?it/s]Sanity Checking DataLoader 0:   0%|          | 0/1 [00:00<?, ?it/s]Sanity Checking DataLoader 0: 100%|██████████| 1/1 [00:00<00:00, 4373.62it/s]                                                                             Training: |          | 0/? [00:00<?, ?it/s]Training: |          | 0/? [00:00<?, ?it/s]Epoch 0:   0%|          | 0/1 [00:00<?, ?it/s]Epoch 0: 100%|██████████| 1/1 [00:00<00:00,  3.12it/s]Epoch 0: 100%|██████████| 1/1 [00:00<00:00,  3.11it/s, v_num=18, train_loss_step=26.40]
+Validation: |          | 0/? [00:00<?, ?it/s][A
+Validation: |          | 0/? [00:00<?, ?it/s][A
+Validation DataLoader 0:   0%|          | 0/1 [00:00<?, ?it/s][A
+Validation DataLoader 0: 100%|██████████| 1/1 [00:00<00:00, 6223.00it/s][A
+                                                                        [AEpoch 0: 100%|██████████| 1/1 [00:00<00:00,  3.10it/s, v_num=18, train_loss_step=26.40]Epoch 0: 100%|██████████| 1/1 [00:00<00:00,  3.10it/s, v_num=18, train_loss_step=26.40, train_loss_epoch=26.40]Epoch 0: 100%|██████████| 1/1 [00:00<00:00,  3.09it/s, v_num=18, train_loss_step=26.40, train_loss_epoch=26.40]
+Predicting: |          | 0/? [00:00<?, ?it/s]Predicting: |          | 0/? [00:00<?, ?it/s]Predicting DataLoader 0:   0%|          | 0/1 [00:00<?, ?it/s]Predicting DataLoader 0: 100%|██████████| 1/1 [00:00<00:00, 162.60it/s]Predicting DataLoader 0: 100%|██████████| 1/1 [00:00<00:00, 155.38it/s]
+Sanity Checking: |          | 0/? [00:00<?, ?it/s]Sanity Checking: |          | 0/? [00:00<?, ?it/s]Sanity Checking DataLoader 0:   0%|          | 0/1 [00:00<?, ?it/s]Sanity Checking DataLoader 0: 100%|██████████| 1/1 [00:00<00:00, 6636.56it/s]                                                                             Training: |          | 0/? [00:00<?, ?it/s]Training: |          | 0/? [00:00<?, ?it/s]Epoch 0:   0%|          | 0/1 [00:00<?, ?it/s]Epoch 0: 100%|██████████| 1/1 [00:00<00:00, 73.41it/s]Epoch 0: 100%|██████████| 1/1 [00:00<00:00, 72.23it/s, v_num=22, train_loss_step=26.90]
+Validation: |          | 0/? [00:00<?, ?it/s][A
+Validation: |          | 0/? [00:00<?, ?it/s][A
+Validation DataLoader 0:   0%|          | 0/1 [00:00<?, ?it/s][A
+Validation DataLoader 0: 100%|██████████| 1/1 [00:00<00:00, 7133.17it/s][A
+                                                                        [AEpoch 0: 100%|██████████| 1/1 [00:00<00:00, 66.66it/s, v_num=22, train_loss_step=26.90]Epoch 0: 100%|██████████| 1/1 [00:00<00:00, 65.25it/s, v_num=22, train_loss_step=26.90, train_loss_epoch=26.90]Epoch 0: 100%|██████████| 1/1 [00:00<00:00, 61.91it/s, v_num=22, train_loss_step=26.90, train_loss_epoch=26.90]
+Predicting: |          | 0/? [00:00<?, ?it/s]Predicting: |          | 0/? [00:00<?, ?it/s]Predicting DataLoader 0:   0%|          | 0/1 [00:00<?, ?it/s]Predicting DataLoader 0: 100%|██████████| 1/1 [00:00<00:00, 436.41it/s]Predicting DataLoader 0: 100%|██████████| 1/1 [00:00<00:00, 404.43it/s]
+{"ok": true, "executed_jobs": ["smoke_itransformer"]}

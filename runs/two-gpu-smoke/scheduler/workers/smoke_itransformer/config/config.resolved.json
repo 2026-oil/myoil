@@ -1,0 +1,71 @@
+{
+  "dataset": {
+    "path": "/home/sonet/.openclaw/workspace/research/df.csv",
+    "dt_col": "dt",
+    "freq": "W-MON"
+  },
+  "runtime": {
+    "random_seed": 1
+  },
+  "training": {
+    "input_size": 8,
+    "season_length": 52,
+    "batch_size": 16,
+    "valid_batch_size": 16,
+    "windows_batch_size": 32,
+    "inference_windows_batch_size": 32,
+    "learning_rate": 0.001,
+    "max_steps": 1,
+    "val_size": 0,
+    "val_check_steps": 100,
+    "early_stop_patience_steps": -1,
+    "loss": "mse"
+  },
+  "cv": {
+    "horizon": 2,
+    "step_size": 2,
+    "n_windows": 1,
+    "final_holdout": 2,
+    "overlap_eval_policy": "by_cutoff_mean"
+  },
+  "scheduler": {
+    "gpu_ids": [
+      0,
+      1
+    ],
+    "max_concurrent_jobs": 2,
+    "worker_devices": 1
+  },
+  "residual": {
+    "enabled": false,
+    "train_source": "oof_cv"
+  },
+  "jobs": [
+    {
+      "name": "smoke_tft",
+      "model": "TFT",
+      "job_type": "univariate_with_exog",
+      "target_col": "Com_CrudeOil",
+      "enabled": true,
+      "params": {},
+      "hist_exog_cols": [],
+      "futr_exog_cols": [],
+      "static_exog_cols": [],
+      "channel_cols": []
+    },
+    {
+      "name": "smoke_itransformer",
+      "model": "iTransformer",
+      "job_type": "multivariate_channels",
+      "target_col": "Com_CrudeOil",
+      "enabled": true,
+      "params": {},
+      "hist_exog_cols": [],
+      "futr_exog_cols": [],
+      "static_exog_cols": [],
+      "channel_cols": [
+        "Com_BrentCrudeOil"
+      ]
+    }
+  ]
+}

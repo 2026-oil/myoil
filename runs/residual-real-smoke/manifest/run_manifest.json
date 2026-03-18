@@ -1,0 +1,19 @@
+{
+  "manifest_version": "1",
+  "artifact_schema_version": "1",
+  "evaluation_protocol_version": "2",
+  "config_source_type": "yaml",
+  "config_source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/examples/real_smoke.yaml",
+  "config_resolved_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/residual-real-smoke/config/config.resolved.json",
+  "config_input_sha256": "02a2eb0ae1bfebfc6f4e0acb08087322f38101d1653fb06103e9cb0238bade7f",
+  "config_resolved_sha256": "dea8d824122615d65a6534a04992924819e06c880f6827eba3d9c2dbb6e1051e",
+  "entrypoint_version": "neuralforecast-residual-v1",
+  "compat_mode": "dual_read",
+  "jobs": [
+    "smoke_tft",
+    "smoke_itransformer"
+  ],
+  "training": {
+    "loss": "mse"
+  }
+}

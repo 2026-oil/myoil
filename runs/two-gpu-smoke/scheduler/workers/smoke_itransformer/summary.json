@@ -1,0 +1,10 @@
+{
+  "job_name": "smoke_itransformer",
+  "gpu_id": 1,
+  "devices": 1,
+  "cuda_visible_devices": "1",
+  "returncode": 0,
+  "stdout_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/two-gpu-smoke/scheduler/workers/smoke_itransformer/stdout.log",
+  "stderr_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/two-gpu-smoke/scheduler/workers/smoke_itransformer/stderr.log",
+  "completed_at": "2026-03-18T11:59:12.763901+00:00"
+}

@@ -1,0 +1,29 @@
+{
+  "manifest_version": "1",
+  "artifact_schema_version": "1",
+  "evaluation_protocol_version": "2",
+  "config_source_type": "yaml",
+  "config_source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/config.yaml",
+  "config_resolved_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/validation/config/config.resolved.json",
+  "config_input_sha256": "44e5134b9b9a984da3821852585e66b17ff81efe401e6a1e64d53cb17a91a235",
+  "config_resolved_sha256": "50c413c26d03b3ac4c38c30b881881dc2dbffc8fcb528f02a5c552cbaada1275",
+  "entrypoint_version": "neuralforecast-residual-v1",
+  "compat_mode": "dual_read",
+  "jobs": [
+    "TFT",
+    "VanillaTransformer",
+    "Informer",
+    "Autoformer",
+    "FEDformer",
+    "PatchTST",
+    "LSTM",
+    "NHITS",
+    "Naive",
+    "SeasonalNaive",
+    "HistoricAverage",
+    "iTransformer"
+  ],
+  "training": {
+    "loss": "mse"
+  }
+}
