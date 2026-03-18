@@ -30,7 +30,7 @@ def build_manifest(
         'config_resolved_sha256': loaded.resolved_hash,
         'entrypoint_version': entrypoint_version,
         'compat_mode': compat_mode,
-        'jobs': [job.name for job in loaded.config.jobs],
+        'jobs': [job.model for job in loaded.config.jobs],
         'training': {'loss': loaded.config.training.loss},
     }
 

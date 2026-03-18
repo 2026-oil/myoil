@@ -1,18 +1,24 @@
 dataset:
   path: ../df.csv
+  target_col: Com_CrudeOil
   dt_col: dt
-  freq: W-MON
+  hist_exog_cols: []
+  futr_exog_cols: []
+  static_exog_cols: []
 runtime:
   random_seed: 1
 training:
-  input_size: 64
+  input_size: 48
   season_length: 52
   batch_size: 32
   valid_batch_size: 32
   windows_batch_size: 1024
   inference_windows_batch_size: 1024
   learning_rate: 0.001
-  max_steps: 20
+  max_steps: 1000
+  val_size: 12
+  val_check_steps: 100
+  early_stop_patience_steps: -1
   loss: mse
 cv:
   horizon: 12
@@ -27,19 +33,103 @@ scheduler:
 residual:
   enabled: true
   train_source: oof_cv
+  model: lstm
+  params:
+    lookback: 2
+    hidden_size: 8
+    num_layers: 1
+    epochs: 1
+    learning_rate: 0.01
 jobs:
-  - name: crudeoil_tft
-    model: TFT
-    job_type: univariate_with_exog
-    target_col: Com_CrudeOil
-    hist_exog_cols: []
-    futr_exog_cols: []
-    static_exog_cols: []
+  - model: TFT
+    params:
+      hidden_size: 128
+      max_steps: 1000
+      early_stop_patience_steps: -1
+      val_check_steps: 100
+      windows_batch_size: 1024
+      inference_windows_batch_size: 1024
+  - model: VanillaTransformer
+    params:
+      hidden_size: 128
+      dropout: 0.05
+      learning_rate: 0.0001
+      max_steps: 5000
+      early_stop_patience_steps: -1
+      val_check_steps: 100
+      windows_batch_size: 1024
+      inference_windows_batch_size: 1024
+      scaler_type: identity
+  - model: Informer
+    params:
+      hidden_size: 128
+      factor: 3
+      dropout: 0.05
+      learning_rate: 0.0001
+      max_steps: 5000
+      early_stop_patience_steps: -1
+      val_check_steps: 100
+      windows_batch_size: 1024
+      inference_windows_batch_size: 1024
+      scaler_type: identity
+  - model: Autoformer
+    params:
+      hidden_size: 128
+      factor: 3
+      dropout: 0.05
+      learning_rate: 0.0001
+      max_steps: 5000
+      early_stop_patience_steps: -1
+      val_check_steps: 100
+      windows_batch_size: 1024
+      inference_windows_batch_size: 1024
+      scaler_type: identity
+  - model: FEDformer
+    params:
+      hidden_size: 128
+      modes: 64
+      dropout: 0.05
+      learning_rate: 0.0001
+      max_steps: 5000
+      early_stop_patience_steps: -1
+      val_check_steps: 100
+      windows_batch_size: 1024
+      inference_windows_batch_size: 1024
+      scaler_type: identity
+  - model: PatchTST
+    params:
+      hidden_size: 128
+      n_heads: 16
+      encoder_layers: 3
+      patch_len: 16
+      dropout: 0.2
+      learning_rate: 0.0001
+      max_steps: 5000
+      early_stop_patience_steps: -1
+      val_check_steps: 100
+      windows_batch_size: 1024
+      inference_windows_batch_size: 1024
+      scaler_type: identity
+  - model: LSTM
+    params:
+      encoder_hidden_size: 128
+      decoder_hidden_size: 128
+      max_steps: 1000
+      early_stop_patience_steps: -1
+      val_check_steps: 100
+      inference_windows_batch_size: 1024
+  - model: NHITS
+    params:
+      mlp_units: [[64, 64], [64, 64], [64, 64]]
+      n_pool_kernel_size: [2, 2, 1]
+      n_freq_downsample: [4, 2, 1]
+      dropout_prob_theta: 0.0
+      activation: ReLU
+  - model: Naive
     params: {}
-  - name: crudeoil_itransformer
-    model: iTransformer
-    job_type: multivariate_channels
-    target_col: Com_CrudeOil
-    channel_cols:
-      - Com_BrentCrudeOil
+  - model: SeasonalNaive
+    params: {}
+  - model: HistoricAverage
+    params: {}
+  - model: iTransformer
     params: {}

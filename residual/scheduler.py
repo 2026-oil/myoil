@@ -22,9 +22,9 @@ class WorkerLaunch:
 def build_launch_plan(config: AppConfig, jobs: Iterable[JobConfig]) -> list[WorkerLaunch]:
     gpu_ids = list(config.scheduler.gpu_ids)
     launches: list[WorkerLaunch] = []
-    for index, job in enumerate(job for job in jobs if job.enabled):
+    for index, job in enumerate(jobs):
         gpu_id = gpu_ids[index % len(gpu_ids)]
-        launches.append(WorkerLaunch(job_name=job.name, gpu_id=gpu_id, devices=1))
+        launches.append(WorkerLaunch(job_name=job.model, gpu_id=gpu_id, devices=1))
     return launches
 
 

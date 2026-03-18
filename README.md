@@ -95,6 +95,11 @@ uv run python main.py --config examples/real_smoke.yaml --output-root runs/two-g
 - YAML
 - TOML
 
+주의:
+- `dataset.freq`는 선택 사항이다.
+- 생략하면 runtime이 `dt_col`에서 주기를 자동 추론한다.
+- 자동 추론이 실패하는 비정규 시계열이면 그때만 `freq`를 명시하면 된다.
+
 우선순위/입력 방식:
 - `--config config.yaml`
 - `--config-path config.yaml`
@@ -123,13 +128,13 @@ uv run python main.py --config examples/real_smoke.yaml --output-root runs/two-g
 dataset:
   path: ../df.csv
   dt_col: dt
-  freq: W-MON
 ```
 
 의미:
 - `path`: 입력 데이터 CSV 경로
+- `target_col`: 모든 모델이 공통으로 다룰 단일 타깃 컬럼
 - `dt_col`: 시간 컬럼 이름
-- `freq`: 시계열 주기
+- `freq`: 시계열 주기 (선택 사항, 생략하면 `dt_col`에서 자동 추론)
 
 #### `training`
 예시:
@@ -188,42 +193,27 @@ scheduler:
 - 각 worker는 `devices=1`만 허용한다.
 
 #### `jobs`
-`jobs`는 **discriminated union** 방식으로 쓴다.
-
-현재 지원하는 `job_type`:
-- `univariate_with_exog`
-- `multivariate_channels`
-- `multivariate_channels_exog`  
-  - 이 타입은 현재 코드상 타입으로는 열려 있지만, 운영상은 확장용으로 보는 게 안전하다.
+`jobs`는 `model` 단위로만 관리한다.
 
 예시:
 ```yaml
 jobs:
-  - name: crudeoil_tft
-    model: TFT
-    job_type: univariate_with_exog
-    target_col: Com_CrudeOil
-    hist_exog_cols: []
-    futr_exog_cols: []
-    static_exog_cols: []
+  - model: TFT
     params: {}
 
-  - name: crudeoil_itransformer
-    model: iTransformer
-    job_type: multivariate_channels
-    target_col: Com_CrudeOil
-    channel_cols:
-      - Com_BrentCrudeOil
+  - model: iTransformer
     params: {}
 ```
 
 핵심 규칙:
-- `univariate_with_exog`
-  - `target_col` 중심
-  - exogenous 컬럼은 `hist_exog_cols`, `futr_exog_cols`, `static_exog_cols`
-- `multivariate_channels`
-  - `target_col` + `channel_cols`
-  - 내부에서 `n_series`는 channel 수로 계산됨
+- `dataset.target_col`은 config 전체에서 한 번만 설정한다.
+- `hist_exog_cols`, `futr_exog_cols`, `static_exog_cols`도 `dataset` 단에서 한 번만 설정한다.
+- `jobs`에서는 모델 이름만 고유하게 적는다.
+- 같은 모델을 두 번 이상 넣으면 안 된다.
+- `params`에는 해당 모델 하이퍼파라미터만 넣는다.
+- `hist_exog_cols`, `futr_exog_cols`, `static_exog_cols`가 모두 비어 있으면 wrapper는 단변량 경로로 처리한다.
+- 셋 중 하나라도 채워져 있으면 외부 변수 포함 경로로 처리한다.
+- 다변량 모델(`iTransformer` 등)은 dataset-level exog를 채널로 해석한다.
 
 ### 실제 예시 파일
 현재 real smoke용 예시는 아래다.
@@ -231,8 +221,11 @@ jobs:
 ```yaml
 dataset:
   path: ../../df.csv
+  target_col: Com_CrudeOil
   dt_col: dt
-  freq: W-MON
+  hist_exog_cols: []
+  futr_exog_cols: []
+  static_exog_cols: []
 runtime:
   random_seed: 1
 training:

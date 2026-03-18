@@ -1,7 +1,10 @@
 dataset:
   path: ../../df.csv
+  target_col: Com_CrudeOil
   dt_col: dt
-  freq: W-MON
+  hist_exog_cols: []
+  futr_exog_cols: []
+  static_exog_cols: []
 runtime:
   random_seed: 1
 training:
@@ -26,21 +29,17 @@ scheduler:
   max_concurrent_jobs: 2
   worker_devices: 1
 residual:
-  enabled: false
+  enabled: true
   train_source: oof_cv
+  model: lstm
+  params:
+    lookback: 2
+    hidden_size: 8
+    num_layers: 1
+    epochs: 1
+    learning_rate: 0.01
 jobs:
-  - name: smoke_tft
-    model: TFT
-    job_type: univariate_with_exog
-    target_col: Com_CrudeOil
-    hist_exog_cols: []
-    futr_exog_cols: []
-    static_exog_cols: []
+  - model: TFT
     params: {}
-  - name: smoke_itransformer
-    model: iTransformer
-    job_type: multivariate_channels
-    target_col: Com_CrudeOil
-    channel_cols:
-      - Com_BrentCrudeOil
+  - model: iTransformer
     params: {}

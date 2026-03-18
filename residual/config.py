@@ -14,13 +14,19 @@ DEFAULT_MANIFEST_VERSION = '1'
 DEFAULT_ARTIFACT_SCHEMA_VERSION = '1'
 DEFAULT_EVALUATION_PROTOCOL_VERSION = '2'
 SUPPORTED_LOSSES = {'mse'}
+SUPPORTED_RESIDUAL_MODELS = {'lstm'}
+SUPPORTED_RESIDUAL_SOURCES = {'insample_backcast', 'oof_cv'}
 
 
 @dataclass(frozen=True)
 class DatasetConfig:
     path: Path
+    target_col: str
     dt_col: str = 'dt'
     freq: str | None = None
+    hist_exog_cols: tuple[str, ...] = field(default_factory=tuple)
+    futr_exog_cols: tuple[str, ...] = field(default_factory=tuple)
+    static_exog_cols: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -64,24 +70,14 @@ class SchedulerConfig:
 class ResidualConfig:
     enabled: bool = True
     train_source: Literal['insample_backcast', 'oof_cv'] = 'oof_cv'
+    model: str = 'lstm'
+    params: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class JobConfig:
-    name: str
     model: str
-    job_type: Literal[
-        'univariate_with_exog',
-        'multivariate_channels',
-        'multivariate_channels_exog',
-    ]
-    target_col: str
-    enabled: bool = True
     params: dict[str, Any] = field(default_factory=dict)
-    hist_exog_cols: tuple[str, ...] = field(default_factory=tuple)
-    futr_exog_cols: tuple[str, ...] = field(default_factory=tuple)
-    static_exog_cols: tuple[str, ...] = field(default_factory=tuple)
-    channel_cols: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -112,6 +108,14 @@ class LoadedConfig:
 
 def _hash_text(text: str) -> str:
     return hashlib.sha256(text.encode('utf-8')).hexdigest()
+
+
+def _as_tuple(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return tuple(part.strip() for part in value.split(',') if part.strip())
+    return tuple(str(item) for item in value)
 
 
 def resolve_config_path(
@@ -149,26 +153,10 @@ def _load_document(path: Path, source_type: str) -> dict[str, Any]:
     return {} if payload is None else payload
 
 
-def _as_tuple(value: Any) -> tuple[str, ...]:
-    if value is None:
-        return ()
-    if isinstance(value, str):
-        return tuple(part.strip() for part in value.split(',') if part.strip())
-    return tuple(str(item) for item in value)
-
-
 def _normalize_job(job: dict[str, Any]) -> JobConfig:
     return JobConfig(
-        name=str(job['name']),
         model=str(job['model']),
-        job_type=str(job['job_type']),
-        target_col=str(job['target_col']),
-        enabled=bool(job.get('enabled', True)),
         params=dict(job.get('params', {})),
-        hist_exog_cols=_as_tuple(job.get('hist_exog_cols')),
-        futr_exog_cols=_as_tuple(job.get('futr_exog_cols')),
-        static_exog_cols=_as_tuple(job.get('static_exog_cols')),
-        channel_cols=_as_tuple(job.get('channel_cols')),
     )
 
 
@@ -179,27 +167,54 @@ def _normalize_payload(payload: dict[str, Any], base_dir: Path) -> AppConfig:
     cv = dict(payload.get('cv', {}))
     scheduler = dict(payload.get('scheduler', {}))
     residual = dict(payload.get('residual', {}))
-    jobs = tuple(_normalize_job(job) for job in payload.get('jobs', []))
-    if not jobs:
-        raise ValueError('Config must define at least one job')
+
+    target_col = str(dataset.get('target_col', '')).strip()
+    if not target_col:
+        raise ValueError('dataset.target_col is required')
+
     dataset_path = Path(dataset.get('path', 'df.csv'))
     if not dataset_path.is_absolute():
         dataset_path = (base_dir / dataset_path).resolve()
+
     training.setdefault('loss', 'mse')
     loss = str(training['loss']).lower()
     if loss not in SUPPORTED_LOSSES:
         raise ValueError(f'Unsupported common loss: {loss}')
     training['loss'] = loss
-    scheduler_gpu_ids = tuple(int(item) for item in scheduler.get('gpu_ids', (0, 1)))
-    scheduler['gpu_ids'] = scheduler_gpu_ids
+
     scheduler.setdefault('worker_devices', 1)
+    scheduler['gpu_ids'] = tuple(int(item) for item in scheduler.get('gpu_ids', (0, 1)))
     if int(scheduler['worker_devices']) != 1:
         raise ValueError('worker_devices must remain 1 for scheduler-launched jobs')
+
+    residual.setdefault('enabled', True)
+    residual.setdefault('train_source', 'oof_cv')
+    residual.setdefault('model', 'lstm')
+    residual.setdefault('params', {})
+    residual_model = str(residual['model']).lower()
+    if residual_model not in SUPPORTED_RESIDUAL_MODELS:
+        raise ValueError(f'Unsupported residual model: {residual_model}')
+    if residual['train_source'] not in SUPPORTED_RESIDUAL_SOURCES:
+        raise ValueError(f'Unsupported residual train_source: {residual["train_source"]}')
+    residual['model'] = residual_model
+    residual['params'] = dict(residual.get('params', {}))
+
+    jobs = tuple(_normalize_job(job) for job in payload.get('jobs', []))
+    if not jobs:
+        raise ValueError('Config must define at least one job')
+    models = [job.model for job in jobs]
+    if len(models) != len(set(models)):
+        raise ValueError('jobs.model values must be unique')
+
     return AppConfig(
         dataset=DatasetConfig(
             path=dataset_path,
+            target_col=target_col,
             dt_col=str(dataset.get('dt_col', 'dt')),
             freq=dataset.get('freq'),
+            hist_exog_cols=_as_tuple(dataset.get('hist_exog_cols')),
+            futr_exog_cols=_as_tuple(dataset.get('futr_exog_cols')),
+            static_exog_cols=_as_tuple(dataset.get('static_exog_cols')),
         ),
         runtime=RuntimeConfig(**runtime),
         training=TrainingConfig(**training),

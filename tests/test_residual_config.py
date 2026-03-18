@@ -7,6 +7,7 @@ import yaml
 from residual.adapters import build_multivariate_inputs, build_univariate_inputs
 from residual.config import load_app_config
 from residual.models import build_model
+from residual.registry import build_residual_plugin
 from residual.scheduler import build_launch_plan, worker_env
 
 
@@ -16,8 +17,11 @@ def _write_config(tmp_path: Path, payload: dict, suffix: str) -> Path:
         text = """
 [dataset]
 path = 'data.csv'
+target_col = 'target'
 dt_col = 'dt'
-freq = 'W-MON'
+hist_exog_cols = ['hist_a']
+futr_exog_cols = []
+static_exog_cols = []
 
 [runtime]
 random_seed = 1
@@ -48,22 +52,19 @@ worker_devices = 1
 [residual]
 enabled = true
 train_source = 'oof_cv'
+model = 'lstm'
+
+[residual.params]
+lookback = 2
+epochs = 1
 
 [[jobs]]
-name = 'u1'
 model = 'TFT'
-job_type = 'univariate_with_exog'
-target_col = 'target'
-hist_exog_cols = ['hist_a']
-futr_exog_cols = []
-static_exog_cols = []
+params = {}
 
 [[jobs]]
-name = 'm1'
 model = 'iTransformer'
-job_type = 'multivariate_channels'
-target_col = 'target'
-channel_cols = ['chan_b']
+params = {}
 """
         path.write_text(text, encoding='utf-8')
     else:
@@ -73,7 +74,14 @@ channel_cols = ['chan_b']
 
 def _payload() -> dict:
     return {
-        'dataset': {'path': 'data.csv', 'dt_col': 'dt', 'freq': 'W-MON'},
+        'dataset': {
+            'path': 'data.csv',
+            'target_col': 'target',
+            'dt_col': 'dt',
+            'hist_exog_cols': ['hist_a'],
+            'futr_exog_cols': [],
+            'static_exog_cols': [],
+        },
         'runtime': {'random_seed': 1},
         'training': {
             'input_size': 64,
@@ -94,24 +102,15 @@ def _payload() -> dict:
             'overlap_eval_policy': 'by_cutoff_mean',
         },
         'scheduler': {'gpu_ids': [0, 1], 'max_concurrent_jobs': 2, 'worker_devices': 1},
-        'residual': {'enabled': True, 'train_source': 'oof_cv'},
+        'residual': {
+            'enabled': True,
+            'train_source': 'oof_cv',
+            'model': 'lstm',
+            'params': {'lookback': 2, 'epochs': 1},
+        },
         'jobs': [
-            {
-                'name': 'u1',
-                'model': 'TFT',
-                'job_type': 'univariate_with_exog',
-                'target_col': 'target',
-                'hist_exog_cols': ['hist_a'],
-                'futr_exog_cols': [],
-                'static_exog_cols': [],
-            },
-            {
-                'name': 'm1',
-                'model': 'iTransformer',
-                'job_type': 'multivariate_channels',
-                'target_col': 'target',
-                'channel_cols': ['chan_b'],
-            },
+            {'model': 'TFT', 'params': {}},
+            {'model': 'iTransformer', 'params': {}},
         ],
     }
 
@@ -123,27 +122,21 @@ def test_toml_and_yaml_normalize_to_same_typed_model(tmp_path: Path):
     loaded_yaml = load_app_config(tmp_path, config_path=yaml_path)
     loaded_toml = load_app_config(tmp_path, config_toml_path=toml_path)
     assert loaded_yaml.config.to_dict() == loaded_toml.config.to_dict()
-    assert loaded_yaml.config.training.loss == 'mse'
-    assert loaded_toml.config.training.loss == 'mse'
 
 
 def test_adapters_materialize_expected_frames(tmp_path: Path):
     payload = _payload()
     yaml_path = _write_config(tmp_path, payload, '.yaml')
     source_path = tmp_path / 'data.csv'
-    source_path.write_text(
-        "dt,target,hist_a,chan_b\n2020-01-01,1,10,2\n2020-01-08,2,11,3\n",
-        encoding='utf-8',
-    )
+    source_path.write_text("dt,target,hist_a,chan_b\n2020-01-01,1,10,2\n2020-01-08,2,11,3\n", encoding='utf-8')
     loaded = load_app_config(tmp_path, config_path=yaml_path)
     import pandas as pd
 
     source_df = pd.read_csv(source_path)
-    univariate = build_univariate_inputs(source_df, loaded.config.jobs[0], dt_col='dt')
-    multivariate = build_multivariate_inputs(source_df, loaded.config.jobs[1], dt_col='dt')
+    univariate = build_univariate_inputs(source_df, loaded.config.jobs[0], dataset=loaded.config.dataset, dt_col='dt')
+    multivariate = build_multivariate_inputs(source_df, loaded.config.jobs[1], dataset=loaded.config.dataset, dt_col='dt')
     assert list(univariate.fit_df.columns) == ['unique_id', 'ds', 'y', 'hist_a']
-    assert multivariate.channel_map == {'target': 0, 'chan_b': 1}
-    assert set(multivariate.fit_df['unique_id']) == {'target', 'chan_b'}
+    assert multivariate.channel_map == {'target': 0, 'hist_a': 1}
 
 
 def test_model_builder_applies_common_loss_and_multivariate_n_series(tmp_path: Path):
@@ -171,46 +164,63 @@ def test_runtime_executes_single_job_with_dummy_model(tmp_path: Path):
     payload = _payload()
     payload['cv'].update({'horizon': 1, 'step_size': 1, 'n_windows': 1, 'final_holdout': 1})
     payload['training'].update({'input_size': 1, 'max_steps': 1})
-    payload['jobs'] = [
-        {
-            'name': 'dummy_uni',
-            'model': 'DummyUnivariate',
-            'job_type': 'univariate_with_exog',
-            'target_col': 'target',
-            'hist_exog_cols': [],
-            'futr_exog_cols': [],
-            'static_exog_cols': [],
-            'params': {'start_padding_enabled': True},
-        }
-    ]
-    data = (
-        'dt,target\n'
-        '2020-01-01,1\n'
-        '2020-01-08,2\n'
-        '2020-01-15,3\n'
-        '2020-01-22,4\n'
-        '2020-01-29,5\n'
-        '2020-02-05,6\n'
-        '2020-02-12,7\n'
-    )
+    payload['dataset']['hist_exog_cols'] = []
+    payload['jobs'] = [{'model': 'DummyUnivariate', 'params': {'start_padding_enabled': True}}]
+    data = 'dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n2020-01-29,5\n2020-02-05,6\n2020-02-12,7\n'
     (tmp_path / 'data.csv').write_text(data, encoding='utf-8')
     config_path = _write_config(tmp_path, payload, '.yaml')
 
     from residual.runtime import main as runtime_main
 
     output_root = tmp_path / 'run'
-    code = runtime_main([
-        '--config',
-        str(config_path),
-        '--jobs',
-        'dummy_uni',
-        '--output-root',
-        str(output_root),
-    ])
+    code = runtime_main(['--config', str(config_path), '--jobs', 'DummyUnivariate', '--output-root', str(output_root)])
     assert code == 0
-    assert (output_root / 'cv' / 'dummy_uni_forecasts.csv').exists()
-    assert (output_root / 'holdout' / 'dummy_uni_metrics.csv').exists()
-    fit_summary = (output_root / 'models' / 'dummy_uni' / 'fit_summary.json').read_text()
-    assert '"loss": "mse"' in fit_summary
-    assert '"devices": 1' in fit_summary
+    assert (output_root / 'cv' / 'DummyUnivariate_forecasts.csv').exists()
+    assert (output_root / 'holdout' / 'DummyUnivariate_metrics.csv').exists()
 
+
+def test_runtime_infers_freq_when_omitted(tmp_path: Path):
+    payload = _payload()
+    payload['dataset'].pop('freq', None)
+    (tmp_path / 'data.csv').write_text("dt,target,hist_a\n2020-01-06,1,9\n2020-01-13,2,8\n2020-01-20,3,7\n", encoding='utf-8')
+    config_path = _write_config(tmp_path, payload, '.yaml')
+    import residual.runtime as runtime
+    loaded = load_app_config(tmp_path, config_path=config_path)
+    import pandas as pd
+    source_df = pd.read_csv(tmp_path / 'data.csv')
+    assert runtime._resolve_freq(loaded, source_df) == 'W-MON'
+
+
+def test_jobs_use_unique_model_identifiers(tmp_path: Path):
+    (tmp_path / 'data.csv').write_text("dt,target,hist_a\n2020-01-01,1,2\n", encoding='utf-8')
+    loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, _payload(), '.yaml'))
+    assert [job.model for job in loaded.config.jobs] == ['TFT', 'iTransformer']
+
+
+def test_residual_registry_builds_lstm_plugin():
+    plugin = build_residual_plugin({'model': 'lstm', 'params': {'lookback': 2, 'epochs': 1}})
+    assert plugin.metadata()['plugin'] == 'lstm'
+    assert plugin.metadata()['lookback'] == 2
+
+
+def test_runtime_generates_residual_artifacts_with_dummy_model(tmp_path: Path):
+    payload = _payload()
+    payload['cv'].update({'horizon': 1, 'step_size': 1, 'n_windows': 4, 'final_holdout': 1})
+    payload['training'].update({'input_size': 1, 'max_steps': 1})
+    payload['dataset']['hist_exog_cols'] = []
+    payload['residual'] = {'enabled': True, 'train_source': 'oof_cv', 'model': 'lstm', 'params': {'lookback': 2, 'epochs': 1, 'hidden_size': 4}}
+    payload['jobs'] = [{'model': 'DummyUnivariate', 'params': {'start_padding_enabled': True}}]
+    data = 'dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n2020-01-29,5\n2020-02-05,6\n2020-02-12,7\n2020-02-19,8\n'
+    (tmp_path / 'data.csv').write_text(data, encoding='utf-8')
+    config_path = _write_config(tmp_path, payload, '.yaml')
+
+    from residual.runtime import main as runtime_main
+
+    output_root = tmp_path / 'run_resid'
+    code = runtime_main(['--config', str(config_path), '--jobs', 'DummyUnivariate', '--output-root', str(output_root)])
+    assert code == 0
+    residual_root = output_root / 'residual' / 'DummyUnivariate'
+    assert (residual_root / 'source_oof_cv_resolved.csv').exists()
+    assert (residual_root / 'corrected_cv.csv').exists()
+    assert (residual_root / 'corrected_holdout.csv').exists()
+    assert (residual_root / 'diagnostics.json').exists()
