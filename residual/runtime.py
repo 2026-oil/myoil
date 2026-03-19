@@ -3,10 +3,11 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 import pandas as pd
 from neuralforecast import NeuralForecast
+from sklearn.model_selection import TimeSeriesSplit
 
 from .adapters import build_multivariate_inputs, build_univariate_inputs
 from .config import JobConfig, LoadedConfig, load_app_config
@@ -151,28 +152,51 @@ def _build_adapter_inputs(
     )
 
 
-def _build_residual_training_panel(cv_rows: list[dict[str, object]]) -> pd.DataFrame:
-    frame = pd.DataFrame(cv_rows)
-    if frame.empty:
-        raise ValueError("No CV rows available for residual training")
-    for column in ("cutoff", "train_end_ds", "ds"):
-        frame[column] = pd.to_datetime(frame[column])
-    frame["y_hat_base"] = frame.pop("y_hat").astype(float)
-    frame["residual_target"] = frame["y"].astype(float) - frame["y_hat_base"]
-    return frame[
-        [
-            "model",
-            "unique_id",
-            "fold_idx",
-            "cutoff",
-            "train_end_ds",
-            "ds",
-            "horizon_step",
-            "y",
-            "y_hat_base",
-            "residual_target",
+def _build_tscv_splits(total_rows: int, cv_config) -> list[tuple[list[int], list[int]]]:
+    if cv_config.n_windows == 1:
+        train_end = total_rows - cv_config.gap - cv_config.horizon
+        if train_end <= 0:
+            raise ValueError(
+                "Dataset is too short for the configured single-split TSCV policy "
+                f"(horizon={cv_config.horizon}, gap={cv_config.gap})"
+            )
+        train_start = 0
+        if cv_config.max_train_size is not None:
+            train_start = max(0, train_end - cv_config.max_train_size)
+        test_start = train_end + cv_config.gap
+        test_end = test_start + cv_config.horizon
+        return [
+            (list(range(train_start, train_end)), list(range(test_start, test_end)))
         ]
-    ].sort_values(["fold_idx", "ds"]).reset_index(drop=True)
+
+    splitter = TimeSeriesSplit(
+        n_splits=cv_config.n_windows,
+        test_size=cv_config.horizon,
+        gap=cv_config.gap,
+        max_train_size=cv_config.max_train_size,
+    )
+    try:
+        return [
+            (train_idx.tolist(), test_idx.tolist())
+            for train_idx, test_idx in splitter.split(range(total_rows))
+        ]
+    except ValueError as exc:
+        raise ValueError(
+            "Dataset is too short for the configured TSCV policy "
+            f"(n_windows={cv_config.n_windows}, horizon={cv_config.horizon}, "
+            f"gap={cv_config.gap}, max_train_size={cv_config.max_train_size})"
+        ) from exc
+
+
+def _iter_backcast_cutoff_indices(
+    train_length: int,
+    input_size: int,
+    horizon: int,
+    step_size: int,
+) -> list[int]:
+    if train_length < input_size + horizon:
+        return []
+    return list(range(input_size - 1, train_length - horizon, step_size))
 
 
 def _build_residual_context(
@@ -190,144 +214,214 @@ def _build_residual_context(
     )
 
 
-def _residual_prediction_input(frame: pd.DataFrame) -> pd.DataFrame:
-    ordered = frame.sort_values(["fold_idx", "ds"]).reset_index(drop=True)
+def _predict_with_fitted_model(nf: NeuralForecast, adapter_inputs) -> pd.DataFrame:
+    predict_kwargs = {
+        "df": adapter_inputs.fit_df,
+        "static_df": adapter_inputs.static_df,
+    }
+    if adapter_inputs.futr_df is not None:
+        predict_kwargs["futr_df"] = adapter_inputs.futr_df
+    return nf.predict(**predict_kwargs)
+
+
+def _canonical_panel_columns(include_target: bool = True) -> list[str]:
     columns = [
-        "model",
-        "unique_id",
+        "model_name",
         "fold_idx",
+        "panel_split",
+        "unique_id",
         "cutoff",
         "train_end_ds",
         "ds",
         "horizon_step",
         "y_hat_base",
     ]
-    if "residual_target" in ordered.columns:
-        columns.append("residual_target")
-    if "y" in ordered.columns:
-        columns.append("y")
-    return ordered[columns].copy()
+    if include_target:
+        columns.extend(["y", "residual_target"])
+    return columns
 
 
-def _fold_checkpoint_dir(residual_root: Path, fold_idx: int) -> Path:
-    return residual_root / "checkpoints" / f"fold_{fold_idx:03d}"
+def _fold_artifact_dir(residual_root: Path, fold_idx: int) -> Path:
+    return residual_root / "folds" / f"fold_{fold_idx:03d}"
 
 
-def _build_holdout_residual_panel(
+def _build_fold_eval_panel(
     job: JobConfig,
-    holdout_df: pd.DataFrame,
-    target_holdout: pd.DataFrame,
-    pred_col: str,
+    fold_idx: int,
+    train_end_ds: object,
+    target_predictions: pd.DataFrame,
+    actuals: pd.Series,
+) -> pd.DataFrame:
+    cutoff = pd.to_datetime(train_end_ds)
+    rows: list[dict[str, object]] = []
+    for row_idx, ds in enumerate(target_predictions["ds"]):
+        y_hat_base = float(target_predictions[job.model].iloc[row_idx])
+        y = float(actuals.iloc[row_idx])
+        rows.append(
+            {
+                "model_name": job.model,
+                "fold_idx": fold_idx,
+                "panel_split": "fold_eval",
+                "unique_id": target_predictions["unique_id"].iloc[row_idx],
+                "cutoff": cutoff,
+                "train_end_ds": cutoff,
+                "ds": pd.to_datetime(ds),
+                "horizon_step": row_idx + 1,
+                "y": y,
+                "y_hat_base": y_hat_base,
+                "residual_target": y - y_hat_base,
+            }
+        )
+    return pd.DataFrame(rows, columns=_canonical_panel_columns()).reset_index(drop=True)
+
+
+def _build_fold_backcast_panel(
+    loaded: LoadedConfig,
+    job: JobConfig,
+    nf: NeuralForecast,
+    train_df: pd.DataFrame,
     dt_col: str,
     target_col: str,
-    train_end_ds: object,
+    fold_idx: int,
 ) -> pd.DataFrame:
-    panel = target_holdout[["unique_id", "ds", pred_col]].rename(
-        columns={pred_col: "y_hat_base"}
+    cutoff_indices = _iter_backcast_cutoff_indices(
+        train_length=len(train_df),
+        input_size=loaded.config.training.input_size,
+        horizon=loaded.config.cv.horizon,
+        step_size=loaded.config.cv.step_size,
     )
-    panel["model"] = job.model
-    panel["fold_idx"] = -1
-    panel["cutoff"] = pd.to_datetime(holdout_df[dt_col].iloc[0])
-    panel["train_end_ds"] = pd.to_datetime(train_end_ds)
-    panel["horizon_step"] = range(1, len(panel) + 1)
-    panel["y"] = holdout_df[target_col].astype(float).values
-    return panel[
-        [
-            "model",
-            "unique_id",
-            "fold_idx",
-            "cutoff",
-            "train_end_ds",
-            "ds",
-            "horizon_step",
-            "y",
-            "y_hat_base",
-        ]
-    ].copy()
+    rows: list[dict[str, object]] = []
+    for cutoff_idx in cutoff_indices:
+        history_df = train_df.iloc[: cutoff_idx + 1].reset_index(drop=True)
+        future_df = train_df.iloc[
+            cutoff_idx + 1 : cutoff_idx + 1 + loaded.config.cv.horizon
+        ].reset_index(drop=True)
+        adapter_inputs = _build_adapter_inputs(
+            loaded,
+            history_df,
+            future_df,
+            job,
+            dt_col,
+        )
+        predictions = _predict_with_fitted_model(nf, adapter_inputs)
+        pred_col = _prediction_column(predictions, job.model)
+        target_predictions = predictions[
+            predictions["unique_id"] == target_col
+        ].reset_index(drop=True)
+        actuals = future_df[target_col].reset_index(drop=True)
+        cutoff = pd.to_datetime(train_df[dt_col].iloc[cutoff_idx])
+        for row_idx, ds in enumerate(target_predictions["ds"]):
+            y_hat_base = float(target_predictions[pred_col].iloc[row_idx])
+            y = float(actuals.iloc[row_idx])
+            rows.append(
+                {
+                    "model_name": job.model,
+                    "fold_idx": fold_idx,
+                    "panel_split": "backcast_train",
+                    "unique_id": target_col,
+                    "cutoff": cutoff,
+                    "train_end_ds": cutoff,
+                    "ds": pd.to_datetime(ds),
+                    "horizon_step": row_idx + 1,
+                    "y": y,
+                    "y_hat_base": y_hat_base,
+                    "residual_target": y - y_hat_base,
+                }
+            )
+    return pd.DataFrame(rows, columns=_canonical_panel_columns()).reset_index(drop=True)
 
 
 def _apply_residual_plugin(
     loaded: LoadedConfig,
     job: JobConfig,
     run_root: Path,
-    cv_rows,
-    holdout_df: pd.DataFrame,
-    target_holdout: pd.DataFrame,
-    pred_col: str,
-    train_end_ds: object,
+    fold_payloads: list[dict[str, Any]],
 ) -> None:
     if job.model in BASELINE_MODEL_NAMES:
         return
     if not loaded.config.residual.enabled:
         return
+
     residual_root = run_root / "residual" / job.model
     residual_root.mkdir(parents=True, exist_ok=True)
-    train_panel = _build_residual_training_panel(cv_rows)
-    train_panel.to_csv(residual_root / "training_panel.csv", index=False)
-
     corrected_groups: list[pd.DataFrame] = []
     checkpoint_metadata: dict[str, dict[str, object]] = {}
-    for fold_idx, fold_panel in train_panel.groupby("fold_idx", sort=True):
+    total_backcast_rows = 0
+
+    for payload in fold_payloads:
+        fold_idx = int(payload["fold_idx"])
+        backcast_panel: pd.DataFrame = payload["backcast_panel"]
+        eval_panel: pd.DataFrame = payload["eval_panel"]
+        base_summary: dict[str, object] = payload["base_summary"]
+        fold_root = _fold_artifact_dir(residual_root, fold_idx)
+        base_checkpoint_dir = fold_root / "base_checkpoint"
+        residual_checkpoint_dir = fold_root / "residual_checkpoint"
+        base_checkpoint_dir.mkdir(parents=True, exist_ok=True)
         plugin = build_residual_plugin(loaded.config.residual)
-        fit_panel = train_panel[train_panel["fold_idx"] < fold_idx].reset_index(
-            drop=True
+
+        backcast_panel.to_csv(fold_root / "backcast_panel.csv", index=False)
+        (base_checkpoint_dir / "fit_summary.json").write_text(
+            json.dumps(base_summary, indent=2),
+            encoding="utf-8",
         )
-        checkpoint_dir = _fold_checkpoint_dir(residual_root, int(fold_idx))
         plugin.fit(
-            fit_panel,
-            _build_residual_context(loaded, job, checkpoint_dir, model_name=job.model),
+            backcast_panel,
+            _build_residual_context(
+                loaded,
+                job,
+                residual_checkpoint_dir,
+                model_name=job.model,
+            ),
         )
-        predicted = plugin.predict(_residual_prediction_input(fold_panel))
-        corrected = fold_panel.reset_index(drop=True).copy()
+        predicted = plugin.predict(eval_panel.copy())
+        corrected = eval_panel.reset_index(drop=True).copy()
         corrected["residual_hat"] = predicted["residual_hat"].astype(float).values
         corrected["y_hat_corrected"] = (
             corrected["y_hat_base"] + corrected["residual_hat"]
         )
         corrected_groups.append(corrected)
+        corrected.to_csv(fold_root / "corrected_eval.csv", index=False)
+        base_metrics = _compute_metrics(corrected["y"], corrected["y_hat_base"])
+        corrected_metrics = _compute_metrics(
+            corrected["y"], corrected["y_hat_corrected"]
+        )
+        (fold_root / "metrics.json").write_text(
+            json.dumps(
+                {
+                    "fold_idx": fold_idx,
+                    "cutoff": str(corrected["cutoff"].iloc[0]),
+                    "train_end_ds": str(corrected["train_end_ds"].iloc[0]),
+                    "backcast_rows": int(len(backcast_panel)),
+                    "base_metrics": base_metrics,
+                    "corrected_metrics": corrected_metrics,
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
         checkpoint_metadata[str(fold_idx)] = plugin.metadata()
+        total_backcast_rows += len(backcast_panel)
 
-    corrected_cv = pd.concat(corrected_groups, ignore_index=True)
-    corrected_cv.to_csv(residual_root / "corrected_cv.csv", index=False)
-
-    holdout_panel = _build_holdout_residual_panel(
-        job,
-        holdout_df,
-        target_holdout,
-        pred_col,
-        loaded.config.dataset.dt_col,
-        loaded.config.dataset.target_col,
-        train_end_ds=train_end_ds,
-    )
-    holdout_plugin = build_residual_plugin(loaded.config.residual)
-    holdout_checkpoint_dir = _fold_checkpoint_dir(residual_root, -1)
-    holdout_plugin.fit(
-        train_panel,
-        _build_residual_context(
-            loaded, job, holdout_checkpoint_dir, model_name=job.model
-        ),
-    )
-    holdout_pred = holdout_plugin.predict(_residual_prediction_input(holdout_panel))
-    holdout_corrected = holdout_panel.copy()
-    holdout_corrected["residual_hat"] = (
-        holdout_pred["residual_hat"].astype(float).values
-    )
-    holdout_corrected["y_hat_corrected"] = (
-        holdout_corrected["y_hat_base"] + holdout_corrected["residual_hat"]
-    )
-    holdout_corrected.to_csv(residual_root / "corrected_holdout.csv", index=False)
-    checkpoint_metadata["-1"] = holdout_plugin.metadata()
+    corrected_folds = pd.concat(corrected_groups, ignore_index=True)
+    corrected_folds.to_csv(residual_root / "corrected_folds.csv", index=False)
     (residual_root / "plugin_metadata.json").write_text(
         json.dumps(checkpoint_metadata, indent=2), encoding="utf-8"
     )
     diagnostics = {
         "model": job.model,
         "residual_model": loaded.config.residual.model,
-        "training_panel_rows": int(len(train_panel)),
-        "corrected_cv_rows": int(len(corrected_cv)),
-        "corrected_holdout_rows": int(len(holdout_corrected)),
-        "corrected_cv_mode": "per_fold_panel_runtime",
-        "holdout_truth_included": False,
-        "checkpoint_layout": "residual/<model>/checkpoints/fold_{fold_idx:03d}/model.ubj",
+        "fold_count": int(len(fold_payloads)),
+        "backcast_rows_total": int(total_backcast_rows),
+        "corrected_eval_rows": int(len(corrected_folds)),
+        "corrected_eval_mode": "per_fold_backcast_runtime",
+        "tscv_policy": {
+            "n_windows": loaded.config.cv.n_windows,
+            "horizon": loaded.config.cv.horizon,
+            "step_size": loaded.config.cv.step_size,
+            "gap": loaded.config.cv.gap,
+            "max_train_size": loaded.config.cv.max_train_size,
+        },
+        "artifact_layout": "residual/<model>/folds/fold_{i:03d}/(backcast_panel.csv, corrected_eval.csv, base_checkpoint/, residual_checkpoint/model.ubj)",
     }
     (residual_root / "diagnostics.json").write_text(
         json.dumps(diagnostics, indent=2), encoding="utf-8"
@@ -336,30 +430,22 @@ def _apply_residual_plugin(
 
 def _baseline_cross_validation(
     train_df: pd.DataFrame,
-    horizon: int,
-    step_size: int,
-    n_windows: int,
+    splits: list[tuple[list[int], list[int]]],
     model_name: str,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     metrics_rows = []
     forecast_rows = []
     values = train_df["y"].reset_index(drop=True)
     dates = pd.to_datetime(train_df["ds"]).reset_index(drop=True)
-    for fold_idx in range(n_windows):
-        train_end = _cutoff_train_end(
-            len(train_df), horizon, step_size, n_windows, fold_idx
-        )
-        history = values.iloc[:train_end]
-        future_actual = values.iloc[train_end : train_end + horizon].reset_index(
-            drop=True
-        )
-        future_dates = dates.iloc[train_end : train_end + horizon].reset_index(
-            drop=True
-        )
+    for fold_idx, (train_idx, test_idx) in enumerate(splits):
+        history = values.iloc[train_idx].reset_index(drop=True)
+        future_actual = values.iloc[test_idx].reset_index(drop=True)
+        future_dates = dates.iloc[test_idx].reset_index(drop=True)
+        train_end_ds = dates.iloc[train_idx[-1]]
         if model_name == "Naive":
             pred_values = pd.Series([float(history.iloc[-1])] * len(future_actual))
         elif model_name == "SeasonalNaive":
-            season = min(len(history), horizon)
+            season = min(len(history), len(future_actual))
             tail = history.iloc[-season:].reset_index(drop=True)
             pred_values = pd.Series(
                 (list(tail) * ((len(future_actual) // len(tail)) + 1))[
@@ -370,41 +456,23 @@ def _baseline_cross_validation(
             pred_values = pd.Series([float(history.mean())] * len(future_actual))
         metrics = _compute_metrics(future_actual, pred_values)
         metrics_rows.append(
-            {"fold_idx": fold_idx, "cutoff": str(future_dates.iloc[0]), **metrics}
+            {"fold_idx": fold_idx, "cutoff": str(train_end_ds), **metrics}
         )
         for idx, ds in enumerate(future_dates):
             forecast_rows.append(
                 {
                     "model": model_name,
                     "fold_idx": fold_idx,
-                    "cutoff": str(future_dates.iloc[0]),
+                    "cutoff": str(train_end_ds),
+                    "train_end_ds": str(train_end_ds),
                     "unique_id": train_df["unique_id"].iloc[0],
                     "ds": str(ds),
+                    "horizon_step": idx + 1,
                     "y": float(future_actual.iloc[idx]),
                     "y_hat": float(pred_values.iloc[idx]),
                 }
             )
     return metrics_rows, forecast_rows
-
-
-def _baseline_holdout(
-    train_df: pd.DataFrame, holdout_df: pd.DataFrame, model_name: str
-) -> tuple[pd.DataFrame, dict[str, float]]:
-    history = train_df["y"].reset_index(drop=True)
-    actual = holdout_df["y"].reset_index(drop=True)
-    if model_name == "Naive":
-        pred_values = pd.Series([float(history.iloc[-1])] * len(actual))
-    elif model_name == "SeasonalNaive":
-        season = min(len(history), len(actual))
-        tail = history.iloc[-season:].reset_index(drop=True)
-        pred_values = pd.Series(
-            (list(tail) * ((len(actual) // len(tail)) + 1))[: len(actual)]
-        )
-    else:
-        pred_values = pd.Series([float(history.mean())] * len(actual))
-    predictions = holdout_df[["unique_id", "ds"]].copy()
-    predictions[model_name] = pred_values.values
-    return predictions, _compute_metrics(actual, pred_values)
 
 
 def _run_single_job(loaded: LoadedConfig, job: JobConfig, run_root: Path) -> None:
@@ -413,52 +481,30 @@ def _run_single_job(loaded: LoadedConfig, job: JobConfig, run_root: Path) -> Non
         drop=True
     )
     freq = _resolve_freq(loaded, source_df)
-    total_rows = len(source_df)
-    holdout = loaded.config.cv.final_holdout
-    horizon = loaded.config.cv.horizon
-    step_size = loaded.config.cv.step_size
-    n_windows = loaded.config.cv.n_windows
-    if total_rows <= holdout + horizon:
-        raise ValueError("Dataset is too short for configured holdout + horizon")
-    pre_holdout = source_df.iloc[:-holdout].reset_index(drop=True)
-    holdout_df_source = source_df.iloc[-holdout:].reset_index(drop=True)
     dt_col = loaded.config.dataset.dt_col
     target_col = loaded.config.dataset.target_col
+    splits = _build_tscv_splits(len(source_df), loaded.config.cv)
 
     cv_rows: list[dict[str, object]] = []
     metrics_rows: list[dict[str, object]] = []
+    fold_payloads: list[dict[str, Any]] = []
 
     if job.model in BASELINE_MODEL_NAMES:
-        train_series = pre_holdout[[dt_col, target_col]].copy()
+        train_series = source_df[[dt_col, target_col]].copy()
         train_series.rename(columns={dt_col: "ds", target_col: "y"}, inplace=True)
         train_series["ds"] = pd.to_datetime(train_series["ds"])
         train_series.insert(0, "unique_id", target_col)
         baseline_metrics, baseline_forecasts = _baseline_cross_validation(
-            train_series, horizon, step_size, n_windows, job.model
+            train_series,
+            splits,
+            job.model,
         )
         metrics_rows.extend(baseline_metrics)
         cv_rows.extend(baseline_forecasts)
-        holdout_series = holdout_df_source[[dt_col, target_col]].copy()
-        holdout_series.rename(columns={dt_col: "ds", target_col: "y"}, inplace=True)
-        holdout_series["ds"] = pd.to_datetime(holdout_series["ds"])
-        holdout_series.insert(0, "unique_id", target_col)
-        holdout_predictions, holdout_metrics = _baseline_holdout(
-            train_series, holdout_series, job.model
-        )
-        pred_col = job.model
-        target_holdout = holdout_predictions.rename(columns={pred_col: job.model})
-        nf = None
     else:
-        for fold_idx in range(n_windows):
-            train_end = _cutoff_train_end(
-                len(pre_holdout), horizon, step_size, n_windows, fold_idx
-            )
-            if train_end <= 0:
-                raise ValueError("Configured CV window exceeds dataset length")
-            train_df = pre_holdout.iloc[:train_end].reset_index(drop=True)
-            future_df = pre_holdout.iloc[train_end : train_end + horizon].reset_index(
-                drop=True
-            )
+        for fold_idx, (train_idx, test_idx) in enumerate(splits):
+            train_df = source_df.iloc[train_idx].reset_index(drop=True)
+            future_df = source_df.iloc[test_idx].reset_index(drop=True)
             adapter_inputs = _build_adapter_inputs(
                 loaded, train_df, future_df, job, dt_col
             )
@@ -471,34 +517,24 @@ def _run_single_job(loaded: LoadedConfig, job: JobConfig, run_root: Path) -> Non
                 static_df=adapter_inputs.static_df,
                 val_size=loaded.config.training.val_size,
             )
-            predictions = (
-                nf.predict(
-                    futr_df=adapter_inputs.futr_df, static_df=adapter_inputs.static_df
-                )
-                if adapter_inputs.futr_df is not None
-                else nf.predict(static_df=adapter_inputs.static_df)
-            )
+            predictions = _predict_with_fitted_model(nf, adapter_inputs)
             pred_col = _prediction_column(predictions, job.model)
             target_predictions = predictions[
                 predictions["unique_id"] == target_col
             ].reset_index(drop=True)
             target_actuals = future_df[target_col].reset_index(drop=True)
+            train_end_ds = pd.to_datetime(train_df[dt_col].iloc[-1])
             metrics = _compute_metrics(target_actuals, target_predictions[pred_col])
             metrics_rows.append(
-                {
-                    "fold_idx": fold_idx,
-                    "cutoff": str(future_df[dt_col].iloc[0]),
-                    "train_end_ds": str(train_df[dt_col].iloc[-1]),
-                    **metrics,
-                }
+                {"fold_idx": fold_idx, "cutoff": str(train_end_ds), **metrics}
             )
             for row_idx, ds in enumerate(target_predictions["ds"]):
                 cv_rows.append(
                     {
                         "model": job.model,
                         "fold_idx": fold_idx,
-                        "cutoff": str(future_df[dt_col].iloc[0]),
-                        "train_end_ds": str(train_df[dt_col].iloc[-1]),
+                        "cutoff": str(train_end_ds),
+                        "train_end_ds": str(train_end_ds),
                         "unique_id": target_col,
                         "ds": str(ds),
                         "horizon_step": row_idx + 1,
@@ -506,63 +542,62 @@ def _run_single_job(loaded: LoadedConfig, job: JobConfig, run_root: Path) -> Non
                         "y_hat": float(target_predictions[pred_col].iloc[row_idx]),
                     }
                 )
-        full_inputs = _build_adapter_inputs(
-            loaded, pre_holdout, holdout_df_source, job, dt_col
-        )
-        model = build_model(
-            loaded.config, job, n_series=full_inputs.metadata.get("n_series")
-        )
-        nf = NeuralForecast(models=[model], freq=freq)
-        nf.fit(
-            full_inputs.fit_df,
-            static_df=full_inputs.static_df,
-            val_size=loaded.config.training.val_size,
-        )
-        holdout_predictions = (
-            nf.predict(futr_df=full_inputs.futr_df, static_df=full_inputs.static_df)
-            if full_inputs.futr_df is not None
-            else nf.predict(static_df=full_inputs.static_df)
-        )
-        pred_col = _prediction_column(holdout_predictions, job.model)
-        target_holdout = holdout_predictions[
-            holdout_predictions["unique_id"] == target_col
-        ].reset_index(drop=True)
-        holdout_metrics = _compute_metrics(
-            holdout_df_source[target_col], target_holdout[pred_col]
-        )
+            if loaded.config.residual.enabled:
+                backcast_panel = _build_fold_backcast_panel(
+                    loaded,
+                    job,
+                    nf,
+                    train_df,
+                    dt_col,
+                    target_col,
+                    fold_idx,
+                )
+                eval_panel = _build_fold_eval_panel(
+                    job,
+                    fold_idx,
+                    train_end_ds,
+                    target_predictions,
+                    target_actuals,
+                )
+                fold_payloads.append(
+                    {
+                        "fold_idx": fold_idx,
+                        "backcast_panel": backcast_panel,
+                        "eval_panel": eval_panel,
+                        "base_summary": {
+                            "model": job.model,
+                            "fold_idx": fold_idx,
+                            "train_rows": int(len(train_df)),
+                            "eval_rows": int(len(future_df)),
+                            "train_end_ds": str(train_end_ds),
+                            "loss": loaded.config.training.loss,
+                        },
+                    }
+                )
 
     cv_dir = run_root / "cv"
-    holdout_dir = run_root / "holdout"
     models_dir = run_root / "models" / job.model
     cv_dir.mkdir(parents=True, exist_ok=True)
-    holdout_dir.mkdir(parents=True, exist_ok=True)
     models_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(cv_rows).to_csv(cv_dir / f"{job.model}_forecasts.csv", index=False)
     pd.DataFrame(metrics_rows).to_csv(
         cv_dir / f"{job.model}_metrics_by_cutoff.csv", index=False
     )
-    pd.DataFrame([{"model": job.model, **holdout_metrics}]).to_csv(
-        holdout_dir / f"{job.model}_metrics.csv", index=False
-    )
-    target_holdout.to_csv(holdout_dir / f"{job.model}_forecasts.csv", index=False)
     (models_dir / "fit_summary.json").write_text(
         json.dumps(
-            {"model": job.model, "devices": 1, "loss": loaded.config.training.loss},
+            {
+                "model": job.model,
+                "devices": 1,
+                "loss": loaded.config.training.loss,
+                "evaluation_policy": "tscv_only",
+                "fold_count": len(splits),
+            },
             indent=2,
         ),
         encoding="utf-8",
     )
     if job.model not in BASELINE_MODEL_NAMES:
-        _apply_residual_plugin(
-            loaded,
-            job,
-            run_root,
-            cv_rows,
-            holdout_df_source,
-            target_holdout,
-            pred_col,
-            pre_holdout[dt_col].iloc[-1],
-        )
+        _apply_residual_plugin(loaded, job, run_root, fold_payloads)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

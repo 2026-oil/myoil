@@ -9,26 +9,26 @@ import tomllib
 
 import yaml
 
-CONFIG_FILENAMES = ('config.yaml', 'config.yml', 'config.toml')
-DEFAULT_MANIFEST_VERSION = '1'
-DEFAULT_ARTIFACT_SCHEMA_VERSION = '1'
-DEFAULT_EVALUATION_PROTOCOL_VERSION = '2'
-SUPPORTED_LOSSES = {'mse'}
-SUPPORTED_RESIDUAL_MODELS = {'xgboost'}
+CONFIG_FILENAMES = ("config.yaml", "config.yml", "config.toml")
+DEFAULT_MANIFEST_VERSION = "1"
+DEFAULT_ARTIFACT_SCHEMA_VERSION = "1"
+DEFAULT_EVALUATION_PROTOCOL_VERSION = "2"
+SUPPORTED_LOSSES = {"mse"}
+SUPPORTED_RESIDUAL_MODELS = {"xgboost"}
 CENTRALIZED_TRAINING_KEYS = {
-    'train_protocol',
-    'input_size',
-    'season_length',
-    'batch_size',
-    'valid_batch_size',
-    'windows_batch_size',
-    'inference_windows_batch_size',
-    'learning_rate',
-    'max_steps',
-    'val_size',
-    'val_check_steps',
-    'early_stop_patience_steps',
-    'loss',
+    "train_protocol",
+    "input_size",
+    "season_length",
+    "batch_size",
+    "valid_batch_size",
+    "windows_batch_size",
+    "inference_windows_batch_size",
+    "learning_rate",
+    "max_steps",
+    "val_size",
+    "val_check_steps",
+    "early_stop_patience_steps",
+    "loss",
 }
 
 
@@ -36,7 +36,7 @@ CENTRALIZED_TRAINING_KEYS = {
 class DatasetConfig:
     path: Path
     target_col: str
-    dt_col: str = 'dt'
+    dt_col: str = "dt"
     freq: str | None = None
     hist_exog_cols: tuple[str, ...] = field(default_factory=tuple)
     futr_exog_cols: tuple[str, ...] = field(default_factory=tuple)
@@ -50,7 +50,7 @@ class RuntimeConfig:
 
 @dataclass(frozen=True)
 class TrainingConfig:
-    train_protocol: str = 'expanding_window_tscv'
+    train_protocol: str = "expanding_window_tscv"
     input_size: int = 64
     season_length: int = 52
     batch_size: int = 32
@@ -62,7 +62,7 @@ class TrainingConfig:
     val_size: int = 0
     val_check_steps: int = 100
     early_stop_patience_steps: int = -1
-    loss: str = 'mse'
+    loss: str = "mse"
 
 
 @dataclass(frozen=True)
@@ -70,8 +70,9 @@ class CVConfig:
     horizon: int = 12
     step_size: int = 4
     n_windows: int = 24
-    final_holdout: int = 12
-    overlap_eval_policy: Literal['by_cutoff_mean'] = 'by_cutoff_mean'
+    gap: int = 0
+    max_train_size: int | None = None
+    overlap_eval_policy: Literal["by_cutoff_mean"] = "by_cutoff_mean"
 
 
 @dataclass(frozen=True)
@@ -84,7 +85,7 @@ class SchedulerConfig:
 @dataclass(frozen=True)
 class ResidualConfig:
     enabled: bool = True
-    model: str = 'xgboost'
+    model: str = "xgboost"
     params: dict[str, Any] = field(default_factory=dict)
 
 
@@ -106,7 +107,7 @@ class AppConfig:
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
-        payload['dataset']['path'] = str(self.dataset.path)
+        payload["dataset"]["path"] = str(self.dataset.path)
         return payload
 
 
@@ -121,14 +122,14 @@ class LoadedConfig:
 
 
 def _hash_text(text: str) -> str:
-    return hashlib.sha256(text.encode('utf-8')).hexdigest()
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _as_tuple(value: Any) -> tuple[str, ...]:
     if value is None:
         return ()
     if isinstance(value, str):
-        return tuple(part.strip() for part in value.split(',') if part.strip())
+        return tuple(part.strip() for part in value.split(",") if part.strip())
     return tuple(str(item) for item in value)
 
 
@@ -141,27 +142,30 @@ def resolve_config_path(
         path = Path(config_toml_path)
         if not path.is_absolute():
             path = repo_root / path
-        return path, 'toml'
+        return path, "toml"
     if config_path is not None:
         path = Path(config_path)
         if not path.is_absolute():
             path = repo_root / path
         suffix = path.suffix.lower()
-        if suffix in {'.yaml', '.yml'}:
-            return path, 'yaml'
-        if suffix == '.toml':
-            return path, 'toml'
-        raise ValueError(f'Unsupported config extension: {path}')
+        if suffix in {".yaml", ".yml"}:
+            return path, "yaml"
+        if suffix == ".toml":
+            return path, "toml"
+        raise ValueError(f"Unsupported config extension: {path}")
     for name in CONFIG_FILENAMES:
         candidate = repo_root / name
         if candidate.exists():
-            return candidate, 'yaml' if candidate.suffix in {'.yaml', '.yml'} else 'toml'
-    raise FileNotFoundError('No config file found in repo root (config.yaml/yml/toml)')
+            return candidate, "yaml" if candidate.suffix in {
+                ".yaml",
+                ".yml",
+            } else "toml"
+    raise FileNotFoundError("No config file found in repo root (config.yaml/yml/toml)")
 
 
 def _load_document(path: Path, source_type: str) -> dict[str, Any]:
-    text = path.read_text(encoding='utf-8')
-    if source_type == 'toml':
+    text = path.read_text(encoding="utf-8")
+    if source_type == "toml":
         return tomllib.loads(text)
     payload = yaml.safe_load(text)
     return {} if payload is None else payload
@@ -169,76 +173,81 @@ def _load_document(path: Path, source_type: str) -> dict[str, Any]:
 
 def _normalize_job(job: dict[str, Any]) -> JobConfig:
     return JobConfig(
-        model=str(job['model']),
-        params=dict(job.get('params', {})),
+        model=str(job["model"]),
+        params=dict(job.get("params", {})),
     )
 
 
 def _normalize_payload(payload: dict[str, Any], base_dir: Path) -> AppConfig:
-    dataset = dict(payload.get('dataset', {}))
-    runtime = dict(payload.get('runtime', {}))
-    training = dict(payload.get('training', {}))
-    cv = dict(payload.get('cv', {}))
-    scheduler = dict(payload.get('scheduler', {}))
-    residual = dict(payload.get('residual', {}))
+    dataset = dict(payload.get("dataset", {}))
+    runtime = dict(payload.get("runtime", {}))
+    training = dict(payload.get("training", {}))
+    cv = dict(payload.get("cv", {}))
+    if "final_holdout" in cv:
+        raise ValueError(
+            "cv.final_holdout has been removed; evaluation now runs entirely through config-driven TSCV folds"
+        )
 
-    target_col = str(dataset.get('target_col', '')).strip()
+    scheduler = dict(payload.get("scheduler", {}))
+    residual = dict(payload.get("residual", {}))
+
+    target_col = str(dataset.get("target_col", "")).strip()
     if not target_col:
-        raise ValueError('dataset.target_col is required')
+        raise ValueError("dataset.target_col is required")
 
-    dataset_path = Path(dataset.get('path', 'df.csv'))
+    dataset_path = Path(dataset.get("path", "df.csv"))
     if not dataset_path.is_absolute():
         dataset_path = (base_dir / dataset_path).resolve()
 
-    training.setdefault('loss', 'mse')
-    loss = str(training['loss']).lower()
+    training.setdefault("loss", "mse")
+    loss = str(training["loss"]).lower()
     if loss not in SUPPORTED_LOSSES:
-        raise ValueError(f'Unsupported common loss: {loss}')
-    training['loss'] = loss
+        raise ValueError(f"Unsupported common loss: {loss}")
+    training["loss"] = loss
 
-    scheduler.setdefault('worker_devices', 1)
-    scheduler['gpu_ids'] = tuple(int(item) for item in scheduler.get('gpu_ids', (0, 1)))
-    if int(scheduler['worker_devices']) != 1:
-        raise ValueError('worker_devices must remain 1 for scheduler-launched jobs')
+    scheduler.setdefault("worker_devices", 1)
+    scheduler["gpu_ids"] = tuple(int(item) for item in scheduler.get("gpu_ids", (0, 1)))
+    if int(scheduler["worker_devices"]) != 1:
+        raise ValueError("worker_devices must remain 1 for scheduler-launched jobs")
 
-    residual.setdefault('enabled', True)
-    residual.setdefault('model', 'xgboost')
-    residual.setdefault('params', {})
-    if 'train_source' in residual:
+    residual.setdefault("enabled", True)
+    residual.setdefault("model", "xgboost")
+    residual.setdefault("params", {})
+    if "train_source" in residual:
         raise ValueError(
-            'residual.train_source has been removed; residual training now '
-            'always uses fold-specific CV residual panels'
+            "residual.train_source has been removed; residual training now "
+            "always uses fold-specific CV residual panels"
         )
-    residual_model = str(residual['model']).lower()
+    residual_model = str(residual["model"]).lower()
     if residual_model not in SUPPORTED_RESIDUAL_MODELS:
-        raise ValueError(f'Unsupported residual model: {residual_model}')
-    residual['model'] = residual_model
-    residual['params'] = dict(residual.get('params', {}))
+        raise ValueError(f"Unsupported residual model: {residual_model}")
+    residual["model"] = residual_model
+    residual["params"] = dict(residual.get("params", {}))
 
-    jobs = tuple(_normalize_job(job) for job in payload.get('jobs', []))
+    jobs = tuple(_normalize_job(job) for job in payload.get("jobs", []))
     if not jobs:
-        raise ValueError('Config must define at least one job')
+        raise ValueError("Config must define at least one job")
     models = [job.model for job in jobs]
     if len(models) != len(set(models)):
-        raise ValueError('jobs.model values must be unique')
+        raise ValueError("jobs.model values must be unique")
     for job in jobs:
         duplicated = CENTRALIZED_TRAINING_KEYS.intersection(job.params)
         if duplicated:
-            duplicated_keys = ', '.join(sorted(duplicated))
+            duplicated_keys = ", ".join(sorted(duplicated))
             raise ValueError(
-                f'jobs[{job.model}] repeats centralized training key(s): {duplicated_keys}. '
-                'Move these settings under training.'
+                f"jobs[{job.model}] repeats centralized training key(s): {duplicated_keys}. "
+                "Move these settings under training."
             )
 
     return AppConfig(
         dataset=DatasetConfig(
             path=dataset_path,
             target_col=target_col,
-            dt_col=str(dataset.get('dt_col', 'dt')),
-            freq=dataset.get('freq'),
-            hist_exog_cols=_as_tuple(dataset.get('hist_exog_cols')),
-            futr_exog_cols=_as_tuple(dataset.get('futr_exog_cols')),
-            static_exog_cols=_as_tuple(dataset.get('static_exog_cols')),
+            dt_col=str(dataset.get("dt_col", "dt")),
+            freq=dataset.get("freq"),
+            hist_exog_cols=_as_tuple(dataset.get("hist_exog_cols")),
+            futr_exog_cols=_as_tuple(dataset.get("futr_exog_cols")),
+            static_exog_cols=_as_tuple(dataset.get("static_exog_cols")),
         ),
         runtime=RuntimeConfig(**runtime),
         training=TrainingConfig(**training),
@@ -260,7 +269,7 @@ def load_app_config(
         config_path=config_path,
         config_toml_path=config_toml_path,
     )
-    raw_text = source_path.read_text(encoding='utf-8')
+    raw_text = source_path.read_text(encoding="utf-8")
     payload = _load_document(source_path, source_type)
     config = _normalize_payload(payload, source_path.parent)
     normalized_payload = config.to_dict()

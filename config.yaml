@@ -39,7 +39,8 @@ cv:
   horizon: 12
   step_size: 4
   n_windows: 24
-  final_holdout: 12
+  gap: 0
+  max_train_size:
   overlap_eval_policy: by_cutoff_mean
 scheduler:
   gpu_ids: [0, 1]

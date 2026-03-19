@@ -65,7 +65,6 @@ class XGBoostResidualPlugin(ResidualPlugin):
         prepared = cls._prepare_panel(panel_df)
         return prepared[
             [
-                "fold_idx",
                 "horizon_step",
                 "y_hat_base",
                 "cutoff_day",
@@ -116,7 +115,9 @@ class XGBoostResidualPlugin(ResidualPlugin):
             return ordered
         if self._trained and self.model is not None:
             features = self._feature_frame(ordered)
-            ordered["residual_hat"] = self.model.predict(DMatrix(features)).astype(float)
+            ordered["residual_hat"] = self.model.predict(DMatrix(features)).astype(
+                float
+            )
         else:
             ordered["residual_hat"] = float(self._fallback_value)
         return ordered
@@ -129,5 +130,7 @@ class XGBoostResidualPlugin(ResidualPlugin):
             "learning_rate": self.config.learning_rate,
             "subsample": self.config.subsample,
             "colsample_bytree": self.config.colsample_bytree,
-            "checkpoint_path": str(self._checkpoint_path) if self._checkpoint_path else None,
+            "checkpoint_path": str(self._checkpoint_path)
+            if self._checkpoint_path
+            else None,
         }

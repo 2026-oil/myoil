@@ -186,9 +186,10 @@ top-level section:
 | Key | Type | Required | Meaning |
 | --- | --- | --- | --- |
 | `horizon` | int | no | 예측 길이 |
-| `step_size` | int | no | fold 간 이동 폭 |
+| `step_size` | int | no | fold 내부 backcast cutoff stride |
 | `n_windows` | int | no | CV fold 수 |
-| `final_holdout` | int | no | 마지막 holdout 길이 |
+| `gap` | int | no | TSCV train/test 사이 gap. 기본 `0` |
+| `max_train_size` | int/null | no | TSCV 최대 train 길이. 기본 `null` |
 | `overlap_eval_policy` | string | no | 겹치는 예측 구간 집계 정책. 현재 `by_cutoff_mean` |
 
 ### 4.5 `scheduler`
@@ -251,7 +252,7 @@ runtime:
 
 training:
   train_protocol: expanding_window_tscv
-  input_size: 48
+  input_size: 64
   season_length: 52
   batch_size: 32
   valid_batch_size: 32
@@ -268,7 +269,8 @@ cv:
   horizon: 12
   step_size: 4
   n_windows: 24
-  final_holdout: 12
+  gap: 0
+  max_train_size:
   overlap_eval_policy: by_cutoff_mean
 
 scheduler:
@@ -307,6 +309,8 @@ residual 관련 코드는 `residual/` 아래에 모여 있습니다.
 - `residual/manifest.py`: manifest / provenance 기록
 - `residual/scheduler.py`: GPU lane 계획 및 subprocess worker 실행
 - `residual/runtime.py`: 전체 실행 진입점
+
+현재 residual 평가는 별도 holdout 없이 **config-driven TSCV fold**만 사용합니다.
 
 현재 기준으로 README에서 확실히 말할 수 있는 것:
 

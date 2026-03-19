@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, TypedDict, cast
 
 import pandas as pd
 import pytest
@@ -48,7 +48,7 @@ loss = 'mse'
 horizon = 12
 step_size = 4
 n_windows = 24
-final_holdout = 12
+gap = 0
 overlap_eval_policy = 'by_cutoff_mean'
 
 [scheduler]
@@ -105,7 +105,7 @@ def _payload() -> dict:
             "horizon": 12,
             "step_size": 4,
             "n_windows": 24,
-            "final_holdout": 12,
+            "gap": 0,
             "overlap_eval_policy": "by_cutoff_mean",
         },
         "scheduler": {"gpu_ids": [0, 1], "max_concurrent_jobs": 2, "worker_devices": 1},
@@ -226,9 +226,7 @@ def test_scheduler_plan_and_worker_env_use_single_device(tmp_path: Path):
 
 def test_runtime_executes_single_job_with_dummy_model(tmp_path: Path):
     payload = _payload()
-    payload["cv"].update(
-        {"horizon": 1, "step_size": 1, "n_windows": 1, "final_holdout": 1}
-    )
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
     payload["training"].update({"input_size": 1, "max_steps": 1})
     payload["dataset"]["hist_exog_cols"] = []
     payload["jobs"] = [
@@ -253,7 +251,7 @@ def test_runtime_executes_single_job_with_dummy_model(tmp_path: Path):
     )
     assert code == 0
     assert (output_root / "cv" / "DummyUnivariate_forecasts.csv").exists()
-    assert (output_root / "holdout" / "DummyUnivariate_metrics.csv").exists()
+    assert not (output_root / "holdout").exists()
 
 
 def test_runtime_infers_freq_when_omitted(tmp_path: Path):
@@ -305,6 +303,17 @@ def test_load_app_config_rejects_removed_residual_train_source(tmp_path: Path):
         load_app_config(tmp_path, config_path=path)
 
 
+def test_load_app_config_rejects_removed_cv_final_holdout(tmp_path: Path):
+    payload = _payload()
+    payload["cv"]["final_holdout"] = 12
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n", encoding="utf-8"
+    )
+    path = _write_config(tmp_path, payload, ".yaml")
+    with pytest.raises(ValueError, match="cv.final_holdout has been removed"):
+        load_app_config(tmp_path, config_path=path)
+
+
 def test_residual_registry_builds_xgboost_plugin():
     plugin = build_residual_plugin(
         {
@@ -316,11 +325,9 @@ def test_residual_registry_builds_xgboost_plugin():
     assert plugin.metadata()["n_estimators"] == 8
 
 
-def test_runtime_generates_residual_artifacts_with_dummy_model(tmp_path: Path):
+def test_runtime_generates_per_fold_residual_artifacts_with_dummy_model(tmp_path: Path):
     payload = _payload()
-    payload["cv"].update(
-        {"horizon": 1, "step_size": 1, "n_windows": 4, "final_holdout": 1}
-    )
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 4, "gap": 0})
     payload["training"].update({"input_size": 1, "max_steps": 1})
     payload["dataset"]["hist_exog_cols"] = []
     payload["residual"] = {
@@ -350,25 +357,24 @@ def test_runtime_generates_residual_artifacts_with_dummy_model(tmp_path: Path):
     )
     assert code == 0
     residual_root = output_root / "residual" / "DummyUnivariate"
-    assert (residual_root / "training_panel.csv").exists()
-    assert (residual_root / "corrected_cv.csv").exists()
-    assert (residual_root / "corrected_holdout.csv").exists()
+    assert not (residual_root / "training_panel.csv").exists()
+    assert not (residual_root / "corrected_holdout.csv").exists()
+    assert (residual_root / "corrected_folds.csv").exists()
     assert (residual_root / "diagnostics.json").exists()
-    assert (residual_root / "checkpoints" / "fold_000").exists()
-    assert (residual_root / "checkpoints" / "fold_001" / "model.ubj").exists()
-    assert (residual_root / "checkpoints" / "fold_-01" / "model.ubj").exists()
-    training_panel = pd.read_csv(residual_root / "training_panel.csv")
-    corrected_holdout = pd.read_csv(residual_root / "corrected_holdout.csv")
-    plugin_metadata = pd.read_json(
-        residual_root / "plugin_metadata.json", typ="series"
-    ).to_dict()
-    assert training_panel["fold_idx"].tolist() == [0, 1, 2, 3]
-    assert corrected_holdout["fold_idx"].tolist() == [-1]
-    assert corrected_holdout["train_end_ds"].tolist() == ["2020-02-12"]
-    assert {str(key) for key in plugin_metadata} == {"0", "1", "2", "3", "-1"}
+    for fold_idx in range(4):
+        fold_root = residual_root / "folds" / f"fold_{fold_idx:03d}"
+        assert (fold_root / "backcast_panel.csv").exists()
+        assert (fold_root / "corrected_eval.csv").exists()
+        assert (fold_root / "residual_checkpoint" / "model.ubj").exists()
+        assert (fold_root / "base_checkpoint" / "fit_summary.json").exists()
+    corrected_folds = pd.read_csv(residual_root / "corrected_folds.csv")
+    assert corrected_folds["fold_idx"].tolist() == [0, 1, 2, 3]
+    assert "panel_split" in corrected_folds.columns
+    assert set(corrected_folds["panel_split"]) == {"fold_eval"}
     diagnostics = pd.read_json(residual_root / "diagnostics.json", typ="series")
-    assert diagnostics["corrected_cv_mode"] == "per_fold_panel_runtime"
-    assert diagnostics["holdout_truth_included"] is False
+    assert diagnostics["corrected_eval_mode"] == "per_fold_backcast_runtime"
+    assert diagnostics["fold_count"] == 4
+    assert diagnostics["tscv_policy"]["gap"] == 0
 
 
 class _RecordingResidualPlugin(ResidualPlugin):
@@ -378,7 +384,7 @@ class _RecordingResidualPlugin(ResidualPlugin):
         self._plugin_log = plugin_log
         self._record: _RecordingLog = {
             "fit_lengths": [],
-            "predict_inputs": [],
+            "predict_panel_splits": [],
         }
         self._plugin_log.append(self._record)
 
@@ -386,9 +392,10 @@ class _RecordingResidualPlugin(ResidualPlugin):
         self._record["fit_lengths"].append(len(panel_df))
 
     def predict(self, panel_df: pd.DataFrame) -> pd.DataFrame:
-        self._record["predict_inputs"].append(list(panel_df.columns))
-        residual_hat = [float(self._record["fit_lengths"][-1])] * len(panel_df)
-        return panel_df.copy().assign(residual_hat=residual_hat)
+        self._record["predict_panel_splits"].append(
+            panel_df["panel_split"].unique().tolist()
+        )
+        return panel_df.copy().assign(residual_hat=0.0)
 
     def metadata(self) -> dict[str, object]:
         return {"plugin": self.name}
@@ -396,10 +403,10 @@ class _RecordingResidualPlugin(ResidualPlugin):
 
 class _RecordingLog(TypedDict):
     fit_lengths: list[int]
-    predict_inputs: list[list[str]]
+    predict_panel_splits: list[list[str]]
 
 
-def test_apply_residual_plugin_builds_per_fold_corrected_cv_and_holdout_panels(
+def test_apply_residual_plugin_uses_fold_local_backcasts_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     from residual import runtime
@@ -413,111 +420,83 @@ def test_apply_residual_plugin_builds_per_fold_corrected_cv_and_holdout_panels(
     loaded = load_app_config(REPO_ROOT, config_path=REPO_ROOT / "config.yaml")
     job = next(job for job in loaded.config.jobs if job.model == "TFT")
     run_root = tmp_path / "run"
-    cv_rows = [
-        {
-            "model": job.model,
-            "fold_idx": 0,
-            "cutoff": "2020-01-08",
-            "train_end_ds": "2020-01-01",
-            "unique_id": "target",
-            "ds": "2020-01-08",
-            "horizon_step": 1,
-            "y": 2.0,
-            "y_hat": 1.5,
-        },
-        {
-            "model": job.model,
-            "fold_idx": 1,
-            "cutoff": "2020-01-15",
-            "train_end_ds": "2020-01-08",
-            "unique_id": "target",
-            "ds": "2020-01-15",
-            "horizon_step": 1,
-            "y": 3.0,
-            "y_hat": 2.5,
-        },
-        {
-            "model": job.model,
-            "fold_idx": 2,
-            "cutoff": "2020-01-22",
-            "train_end_ds": "2020-01-15",
-            "unique_id": "target",
-            "ds": "2020-01-22",
-            "horizon_step": 1,
-            "y": 4.0,
-            "y_hat": 3.5,
-        },
-    ]
-    holdout_df = pd.DataFrame({"dt": ["2020-01-29"], "Com_CrudeOil": [5.0]})
-    target_holdout = pd.DataFrame(
-        {"unique_id": ["target"], "ds": ["2020-01-29"], job.model: [4.5]}
-    )
+    fold_payloads = []
+    for fold_idx, fit_length in enumerate((1, 2, 3)):
+        backcast_panel = pd.DataFrame(
+            {
+                "model_name": [job.model] * fit_length,
+                "fold_idx": [fold_idx] * fit_length,
+                "panel_split": ["backcast_train"] * fit_length,
+                "unique_id": ["target"] * fit_length,
+                "cutoff": pd.to_datetime(["2020-01-08"] * fit_length),
+                "train_end_ds": pd.to_datetime(["2020-01-08"] * fit_length),
+                "ds": pd.to_datetime(["2020-01-15"] * fit_length),
+                "horizon_step": list(range(1, fit_length + 1)),
+                "y_hat_base": [1.0] * fit_length,
+                "y": [1.5] * fit_length,
+                "residual_target": [0.5] * fit_length,
+            }
+        )
+        eval_panel = pd.DataFrame(
+            {
+                "model_name": [job.model],
+                "fold_idx": [fold_idx],
+                "panel_split": ["fold_eval"],
+                "unique_id": ["target"],
+                "cutoff": pd.to_datetime(["2020-01-15"]),
+                "train_end_ds": pd.to_datetime(["2020-01-15"]),
+                "ds": pd.to_datetime(["2020-01-22"]),
+                "horizon_step": [1],
+                "y_hat_base": [2.0],
+                "y": [2.5],
+                "residual_target": [0.5],
+            }
+        )
+        fold_payloads.append(
+            {
+                "fold_idx": fold_idx,
+                "backcast_panel": backcast_panel,
+                "eval_panel": eval_panel,
+                "base_summary": {"fold_idx": fold_idx},
+            }
+        )
 
-    runtime._apply_residual_plugin(
-        loaded,
-        job,
-        run_root,
-        cv_rows,
-        holdout_df,
-        target_holdout,
-        job.model,
-        train_end_ds="2020-01-22",
-    )
+    runtime._apply_residual_plugin(loaded, job, run_root, fold_payloads)
 
+    assert [record["fit_lengths"][0] for record in plugin_log] == [1, 2, 3]
+    assert all(
+        splits == ["fold_eval"]
+        for record in plugin_log
+        for splits in record["predict_panel_splits"]
+    )
     residual_root = run_root / "residual" / job.model
-    corrected_cv = pd.read_csv(residual_root / "corrected_cv.csv")
-    assert corrected_cv["residual_hat"].tolist() == [0.0, 1.0, 2.0]
-    assert corrected_cv["y_hat_corrected"].tolist() == [1.5, 3.5, 5.5]
-    assert [record["fit_lengths"][0] for record in plugin_log[:-1]] == [0, 1, 2]
-    assert plugin_log[0]["predict_inputs"] == [
-        [
-            "model",
-            "unique_id",
-            "fold_idx",
-            "cutoff",
-            "train_end_ds",
-            "ds",
-            "horizon_step",
-            "y_hat_base",
-            "residual_target",
-            "y",
-        ]
-    ]
-    assert plugin_log[-1]["predict_inputs"] == [
-        [
-            "model",
-            "unique_id",
-            "fold_idx",
-            "cutoff",
-            "train_end_ds",
-            "ds",
-            "horizon_step",
-            "y_hat_base",
-            "y",
-        ]
-    ]
+    assert (residual_root / "corrected_folds.csv").exists()
+    assert not (residual_root / "corrected_holdout.csv").exists()
 
 
 def test_xgboost_plugin_predicts_panel_and_writes_checkpoint(tmp_path: Path):
-    plugin = build_residual_plugin(
-        {
-            "model": "xgboost",
-            "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
-        }
+    plugin = cast(
+        Any,
+        build_residual_plugin(
+            {
+                "model": "xgboost",
+                "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+            }
+        ),
     )
     train_df = pd.DataFrame(
         {
-            "model": ["TFT", "TFT", "TFT"],
+            "model_name": ["TFT", "TFT", "TFT"],
+            "fold_idx": [0, 0, 0],
+            "panel_split": ["backcast_train", "backcast_train", "backcast_train"],
             "unique_id": ["target", "target", "target"],
-            "fold_idx": [0, 1, 2],
-            "cutoff": pd.to_datetime(["2020-01-08", "2020-01-15", "2020-01-22"]),
-            "train_end_ds": pd.to_datetime(
-                ["2020-01-01", "2020-01-08", "2020-01-15"]
-            ),
-            "ds": pd.to_datetime(["2020-01-08", "2020-01-15", "2020-01-22"]),
-            "horizon_step": [1, 1, 1],
+            "cutoff": pd.to_datetime(["2020-01-08", "2020-01-08", "2020-01-08"]),
+            "train_end_ds": pd.to_datetime(["2020-01-08", "2020-01-08", "2020-01-08"]),
+            "ds": pd.to_datetime(["2020-01-15", "2020-01-22", "2020-01-29"]),
+            "horizon_step": [1, 2, 3],
             "y_hat_base": [1.5, 2.5, 3.5],
-            "residual_target": [0.5, 0.25, -0.25],
+            "y": [2.0, 3.0, 4.0],
+            "residual_target": [0.5, 0.5, 0.5],
         }
     )
     plugin.fit(
@@ -529,6 +508,8 @@ def test_xgboost_plugin_predicts_panel_and_writes_checkpoint(tmp_path: Path):
             config={},
         ),
     )
+    feature_frame = plugin._feature_frame(train_df)
+    assert "fold_idx" not in feature_frame.columns
     predicted = plugin.predict(train_df.drop(columns=["residual_target"]))
     assert "residual_hat" in predicted.columns
     assert len(predicted) == 3
@@ -537,9 +518,7 @@ def test_xgboost_plugin_predicts_panel_and_writes_checkpoint(tmp_path: Path):
 
 def test_runtime_skips_residual_artifacts_for_baseline_models(tmp_path: Path):
     payload = _payload()
-    payload["cv"].update(
-        {"horizon": 1, "step_size": 1, "n_windows": 2, "final_holdout": 1}
-    )
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
     payload["dataset"]["hist_exog_cols"] = []
     payload["residual"] = {
         "enabled": True,
@@ -566,7 +545,7 @@ def test_runtime_skips_residual_artifacts_for_baseline_models(tmp_path: Path):
     )
     assert code == 0
     assert (output_root / "cv" / "Naive_forecasts.csv").exists()
-    assert (output_root / "holdout" / "Naive_metrics.csv").exists()
+    assert not (output_root / "holdout").exists()
     assert not (output_root / "residual" / "Naive").exists()
 
 
@@ -660,6 +639,9 @@ def test_readme_documents_conservative_fairness_policy():
         "`training:`에 있는 공통 key를 `jobs[*].params`에 다시 쓰면 안 됩니다."
         in readme
     )
-    assert "API가 다른 key들 사이에는 aliasing이나 canonicalization을 하지 않습니다." in readme
+    assert (
+        "API가 다른 key들 사이에는 aliasing이나 canonicalization을 하지 않습니다."
+        in readme
+    )
     assert "PatchTST.n_heads" in readme
     assert "FEDformer.modes" in readme

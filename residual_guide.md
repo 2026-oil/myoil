@@ -63,7 +63,7 @@ class ResidualPlugin(ABC):
 
 `panel_df`는 residual 학습용 panel 데이터입니다. 대표 컬럼:
 
-- `model`
+- `model_name`
 - `unique_id`
 - `fold_idx`
 - `cutoff`
@@ -78,7 +78,7 @@ class ResidualPlugin(ABC):
 
 #### `predict(panel_df)`
 
-fold panel 또는 holdout panel residual 예측입니다.
+fold evaluation panel residual 예측입니다.
 
 반환에는 최소한 아래가 있어야 합니다.
 
@@ -352,8 +352,7 @@ uv run python main.py --config config.yaml --jobs TFT --output-root runs/single-
 확인 포인트:
 
 - `runs/.../residual/<job>/plugin_metadata.json`
-- `runs/.../residual/<job>/corrected_cv.csv`
-- `runs/.../residual/<job>/corrected_holdout.csv`
+- `runs/.../residual/<job>/corrected_folds.csv`
 - `runs/.../residual/<job>/diagnostics.json`
 
 ---
