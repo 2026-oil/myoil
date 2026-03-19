@@ -151,47 +151,28 @@ def _build_adapter_inputs(
     )
 
 
-def _resolve_cv_residual_source(cv_rows: list[dict[str, object]]) -> pd.DataFrame:
+def _build_residual_training_panel(cv_rows: list[dict[str, object]]) -> pd.DataFrame:
     frame = pd.DataFrame(cv_rows)
     if frame.empty:
         raise ValueError("No CV rows available for residual training")
-    frame["ds"] = pd.to_datetime(frame["ds"])
-    grouped = frame.groupby(["model", "unique_id", "ds"], as_index=False).agg(
-        y=("y", "mean"),
-        y_hat_base=("y_hat", "mean"),
-        fold_count=("fold_idx", "nunique"),
-    )
-    grouped["source_type"] = "oof_cv"
-    grouped["residual_target"] = grouped["y"] - grouped["y_hat_base"]
-    return grouped
-
-
-def _resolve_insample_residual_source(
-    nf: NeuralForecast, model_name: str, target_unique_id: str
-) -> pd.DataFrame:
-    insample = nf.predict_insample(step_size=1)
-    pred_col = _prediction_column(insample, model_name)
-    target = insample[insample["unique_id"] == target_unique_id].copy()
-    target["ds"] = pd.to_datetime(target["ds"])
-    target = target[["unique_id", "ds", "y", pred_col]].rename(
-        columns={pred_col: "y_hat_base"}
-    )
-    target["model"] = model_name
-    target["source_type"] = "insample_backcast"
-    target["fold_count"] = 1
-    target["residual_target"] = target["y"] - target["y_hat_base"]
-    return target[
+    for column in ("cutoff", "train_end_ds", "ds"):
+        frame[column] = pd.to_datetime(frame[column])
+    frame["y_hat_base"] = frame.pop("y_hat").astype(float)
+    frame["residual_target"] = frame["y"].astype(float) - frame["y_hat_base"]
+    return frame[
         [
             "model",
             "unique_id",
+            "fold_idx",
+            "cutoff",
+            "train_end_ds",
             "ds",
+            "horizon_step",
             "y",
             "y_hat_base",
-            "fold_count",
-            "source_type",
             "residual_target",
         ]
-    ]
+    ].sort_values(["fold_idx", "ds"]).reset_index(drop=True)
 
 
 def _build_residual_context(
@@ -210,47 +191,59 @@ def _build_residual_context(
 
 
 def _residual_prediction_input(frame: pd.DataFrame) -> pd.DataFrame:
-    ordered = frame.sort_values("ds").reset_index(drop=True)
+    ordered = frame.sort_values(["fold_idx", "ds"]).reset_index(drop=True)
     columns = [
-        column
-        for column in ("model", "unique_id", "ds", "y_hat_base")
-        if column in ordered.columns
+        "model",
+        "unique_id",
+        "fold_idx",
+        "cutoff",
+        "train_end_ds",
+        "ds",
+        "horizon_step",
+        "y_hat_base",
     ]
+    if "residual_target" in ordered.columns:
+        columns.append("residual_target")
+    if "y" in ordered.columns:
+        columns.append("y")
     return ordered[columns].copy()
 
 
-def _build_strict_oof_corrected_cv(
-    loaded: LoadedConfig,
+def _fold_checkpoint_dir(residual_root: Path, fold_idx: int) -> Path:
+    return residual_root / "checkpoints" / f"fold_{fold_idx:03d}"
+
+
+def _build_holdout_residual_panel(
     job: JobConfig,
-    residual_root: Path,
-    train_source: pd.DataFrame,
+    holdout_df: pd.DataFrame,
+    target_holdout: pd.DataFrame,
+    pred_col: str,
+    dt_col: str,
+    target_col: str,
+    train_end_ds: object,
 ) -> pd.DataFrame:
-    corrected_groups: list[pd.DataFrame] = []
-    ordered = train_source.sort_values(["model", "unique_id", "ds"]).reset_index(
-        drop=True
+    panel = target_holdout[["unique_id", "ds", pred_col]].rename(
+        columns={pred_col: "y_hat_base"}
     )
-    for (model_name, unique_id), group in ordered.groupby(
-        ["model", "unique_id"], sort=False
-    ):
-        series = group.sort_values("ds").reset_index(drop=True)
-        corrected_rows: list[pd.DataFrame] = []
-        for idx in range(len(series)):
-            plugin = build_residual_plugin(loaded.config.residual)
-            history = series.iloc[:idx].reset_index(drop=True)
-            plugin.fit(
-                history,
-                _build_residual_context(
-                    loaded, job, residual_root, model_name=model_name
-                ),
-            )
-            future_input = _residual_prediction_input(series.iloc[[idx]])
-            future_pred = plugin.predict_future(future_input)
-            row = series.iloc[[idx]].copy()
-            row["residual_hat"] = future_pred["residual_hat"].astype(float).values
-            row["y_hat_corrected"] = row["y_hat_base"] + row["residual_hat"]
-            corrected_rows.append(row.reset_index(drop=True))
-        corrected_groups.append(pd.concat(corrected_rows, ignore_index=True))
-    return pd.concat(corrected_groups, ignore_index=True)
+    panel["model"] = job.model
+    panel["fold_idx"] = -1
+    panel["cutoff"] = pd.to_datetime(holdout_df[dt_col].iloc[0])
+    panel["train_end_ds"] = pd.to_datetime(train_end_ds)
+    panel["horizon_step"] = range(1, len(panel) + 1)
+    panel["y"] = holdout_df[target_col].astype(float).values
+    return panel[
+        [
+            "model",
+            "unique_id",
+            "fold_idx",
+            "cutoff",
+            "train_end_ds",
+            "ds",
+            "horizon_step",
+            "y",
+            "y_hat_base",
+        ]
+    ].copy()
 
 
 def _apply_residual_plugin(
@@ -261,7 +254,7 @@ def _apply_residual_plugin(
     holdout_df: pd.DataFrame,
     target_holdout: pd.DataFrame,
     pred_col: str,
-    nf: NeuralForecast | None,
+    train_end_ds: object,
 ) -> None:
     if job.model in BASELINE_MODEL_NAMES:
         return
@@ -269,48 +262,72 @@ def _apply_residual_plugin(
         return
     residual_root = run_root / "residual" / job.model
     residual_root.mkdir(parents=True, exist_ok=True)
-    if loaded.config.residual.train_source == "oof_cv":
-        train_source = _resolve_cv_residual_source(cv_rows)
-        source_path = residual_root / "source_oof_cv_resolved.csv"
-    else:
-        if nf is None:
-            raise ValueError(
-                "insample_backcast residual source requires a fitted neuralforecast model"
-            )
-        train_source = _resolve_insample_residual_source(
-            nf, job.model, loaded.config.dataset.target_col
+    train_panel = _build_residual_training_panel(cv_rows)
+    train_panel.to_csv(residual_root / "training_panel.csv", index=False)
+
+    corrected_groups: list[pd.DataFrame] = []
+    checkpoint_metadata: dict[str, dict[str, object]] = {}
+    for fold_idx, fold_panel in train_panel.groupby("fold_idx", sort=True):
+        plugin = build_residual_plugin(loaded.config.residual)
+        fit_panel = train_panel[train_panel["fold_idx"] < fold_idx].reset_index(
+            drop=True
         )
-        source_path = residual_root / "source_insample_backcast.csv"
-    train_source.to_csv(source_path, index=False)
-    corrected_cv = _build_strict_oof_corrected_cv(
-        loaded, job, residual_root, train_source
-    )
+        checkpoint_dir = _fold_checkpoint_dir(residual_root, int(fold_idx))
+        plugin.fit(
+            fit_panel,
+            _build_residual_context(loaded, job, checkpoint_dir, model_name=job.model),
+        )
+        predicted = plugin.predict(_residual_prediction_input(fold_panel))
+        corrected = fold_panel.reset_index(drop=True).copy()
+        corrected["residual_hat"] = predicted["residual_hat"].astype(float).values
+        corrected["y_hat_corrected"] = (
+            corrected["y_hat_base"] + corrected["residual_hat"]
+        )
+        corrected_groups.append(corrected)
+        checkpoint_metadata[str(fold_idx)] = plugin.metadata()
+
+    corrected_cv = pd.concat(corrected_groups, ignore_index=True)
     corrected_cv.to_csv(residual_root / "corrected_cv.csv", index=False)
-    plugin = build_residual_plugin(loaded.config.residual)
-    plugin.fit(train_source, _build_residual_context(loaded, job, residual_root))
+
+    holdout_panel = _build_holdout_residual_panel(
+        job,
+        holdout_df,
+        target_holdout,
+        pred_col,
+        loaded.config.dataset.dt_col,
+        loaded.config.dataset.target_col,
+        train_end_ds=train_end_ds,
+    )
+    holdout_plugin = build_residual_plugin(loaded.config.residual)
+    holdout_checkpoint_dir = _fold_checkpoint_dir(residual_root, -1)
+    holdout_plugin.fit(
+        train_panel,
+        _build_residual_context(
+            loaded, job, holdout_checkpoint_dir, model_name=job.model
+        ),
+    )
+    holdout_pred = holdout_plugin.predict(_residual_prediction_input(holdout_panel))
+    holdout_corrected = holdout_panel.copy()
+    holdout_corrected["residual_hat"] = (
+        holdout_pred["residual_hat"].astype(float).values
+    )
+    holdout_corrected["y_hat_corrected"] = (
+        holdout_corrected["y_hat_base"] + holdout_corrected["residual_hat"]
+    )
+    holdout_corrected.to_csv(residual_root / "corrected_holdout.csv", index=False)
+    checkpoint_metadata["-1"] = holdout_plugin.metadata()
     (residual_root / "plugin_metadata.json").write_text(
-        json.dumps(plugin.metadata(), indent=2), encoding="utf-8"
+        json.dumps(checkpoint_metadata, indent=2), encoding="utf-8"
     )
-    holdout_base = (
-        target_holdout[["unique_id", "ds", pred_col]]
-        .rename(columns={pred_col: "y_hat_base"})
-        .copy()
-    )
-    holdout_base["model"] = job.model
-    holdout_pred = plugin.predict_future(_residual_prediction_input(holdout_base))
-    holdout_pred["y_hat_corrected"] = (
-        holdout_pred["y_hat_base"] + holdout_pred["residual_hat"]
-    )
-    holdout_pred.to_csv(residual_root / "corrected_holdout.csv", index=False)
     diagnostics = {
         "model": job.model,
-        "train_source": loaded.config.residual.train_source,
         "residual_model": loaded.config.residual.model,
-        "train_rows": int(len(train_source)),
+        "training_panel_rows": int(len(train_panel)),
         "corrected_cv_rows": int(len(corrected_cv)),
-        "corrected_holdout_rows": int(len(holdout_pred)),
-        "corrected_cv_mode": "strict_oof_runtime",
+        "corrected_holdout_rows": int(len(holdout_corrected)),
+        "corrected_cv_mode": "per_fold_panel_runtime",
         "holdout_truth_included": False,
+        "checkpoint_layout": "residual/<model>/checkpoints/fold_{fold_idx:03d}/model.ubj",
     }
     (residual_root / "diagnostics.json").write_text(
         json.dumps(diagnostics, indent=2), encoding="utf-8"
@@ -471,6 +488,7 @@ def _run_single_job(loaded: LoadedConfig, job: JobConfig, run_root: Path) -> Non
                 {
                     "fold_idx": fold_idx,
                     "cutoff": str(future_df[dt_col].iloc[0]),
+                    "train_end_ds": str(train_df[dt_col].iloc[-1]),
                     **metrics,
                 }
             )
@@ -480,8 +498,10 @@ def _run_single_job(loaded: LoadedConfig, job: JobConfig, run_root: Path) -> Non
                         "model": job.model,
                         "fold_idx": fold_idx,
                         "cutoff": str(future_df[dt_col].iloc[0]),
+                        "train_end_ds": str(train_df[dt_col].iloc[-1]),
                         "unique_id": target_col,
                         "ds": str(ds),
+                        "horizon_step": row_idx + 1,
                         "y": float(target_actuals.iloc[row_idx]),
                         "y_hat": float(target_predictions[pred_col].iloc[row_idx]),
                     }
@@ -541,7 +561,7 @@ def _run_single_job(loaded: LoadedConfig, job: JobConfig, run_root: Path) -> Non
             holdout_df_source,
             target_holdout,
             pred_col,
-            nf,
+            pre_holdout[dt_col].iloc[-1],
         )
 
 

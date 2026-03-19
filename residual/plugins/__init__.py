@@ -1,3 +1,3 @@
-from .lstm import LSTMResidualPlugin
+from .xgboost import XGBoostResidualPlugin
 
-__all__ = ['LSTMResidualPlugin']
+__all__ = ['XGBoostResidualPlugin']

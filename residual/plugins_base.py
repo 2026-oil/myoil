@@ -20,15 +20,11 @@ class ResidualPlugin(ABC):
     name: str
 
     @abstractmethod
-    def fit(self, train_df: pd.DataFrame, context: ResidualContext) -> None:
+    def fit(self, panel_df: pd.DataFrame, context: ResidualContext) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def predict_train(self, train_df: pd.DataFrame) -> pd.DataFrame:
-        raise NotImplementedError
-
-    @abstractmethod
-    def predict_future(self, future_df: pd.DataFrame) -> pd.DataFrame:
+    def predict(self, panel_df: pd.DataFrame) -> pd.DataFrame:
         raise NotImplementedError
 
     @abstractmethod

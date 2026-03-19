@@ -25,7 +25,7 @@
 
 현재 내장 residual 모델:
 
-- `lstm`
+- `xgboost`
 
 즉 새 모델 추가는 보통 아래 흐름입니다.
 
@@ -45,15 +45,11 @@ class ResidualPlugin(ABC):
     name: str
 
     @abstractmethod
-    def fit(self, train_df: pd.DataFrame, context: ResidualContext) -> None:
+    def fit(self, panel_df: pd.DataFrame, context: ResidualContext) -> None:
         ...
 
     @abstractmethod
-    def predict_train(self, train_df: pd.DataFrame) -> pd.DataFrame:
-        ...
-
-    @abstractmethod
-    def predict_future(self, future_df: pd.DataFrame) -> pd.DataFrame:
+    def predict(self, panel_df: pd.DataFrame) -> pd.DataFrame:
         ...
 
     @abstractmethod
@@ -63,39 +59,26 @@ class ResidualPlugin(ABC):
 
 ### 입력 데이터 의미
 
-#### `fit(train_df, context)`
+#### `fit(panel_df, context)`
 
-`train_df`는 residual 학습용 데이터입니다. 대표 컬럼:
+`panel_df`는 residual 학습용 panel 데이터입니다. 대표 컬럼:
 
 - `model`
 - `unique_id`
+- `fold_idx`
+- `cutoff`
+- `train_end_ds`
 - `ds`
+- `horizon_step`
 - `y`
 - `y_hat_base`
 - `residual_target`
 
 `residual_target = y - y_hat_base`
 
-#### `predict_train(train_df)`
+#### `predict(panel_df)`
 
-학습 데이터 구간에 대한 residual 예측을 반환합니다.
-
-반드시 아래 컬럼이 포함되도록 맞추는 것이 안전합니다.
-
-- 기존 입력 컬럼들
-- `residual_hat`
-
-#### `predict_future(future_df)`
-
-holdout 또는 미래 구간 residual 예측입니다.
-
-입력은 보통:
-
-- `unique_id`
-- `ds`
-- `y_hat_base`
-- `model`
-- 경우에 따라 `y`
+fold panel 또는 holdout panel residual 예측입니다.
 
 반환에는 최소한 아래가 있어야 합니다.
 
@@ -164,22 +147,15 @@ class MLPResidualPlugin(ResidualPlugin):
         )
         self._trained = False
 
-    def fit(self, train_df: pd.DataFrame, context: ResidualContext) -> None:
-        ordered = train_df.sort_values("ds").reset_index(drop=True)
+    def fit(self, panel_df: pd.DataFrame, context: ResidualContext) -> None:
+        ordered = panel_df.sort_values(["fold_idx", "ds"]).reset_index(drop=True)
         # TODO: residual_target 기반 학습 로직 구현
         self._trained = True
 
-    def predict_train(self, train_df: pd.DataFrame) -> pd.DataFrame:
+    def predict(self, panel_df: pd.DataFrame) -> pd.DataFrame:
         if not self._trained:
             raise RuntimeError("Residual plugin is not trained")
-        ordered = train_df.sort_values("ds").reset_index(drop=True).copy()
-        ordered["residual_hat"] = 0.0
-        return ordered
-
-    def predict_future(self, future_df: pd.DataFrame) -> pd.DataFrame:
-        if not self._trained:
-            raise RuntimeError("Residual plugin is not trained")
-        ordered = future_df.sort_values("ds").reset_index(drop=True).copy()
+        ordered = panel_df.sort_values(["fold_idx", "ds"]).reset_index(drop=True).copy()
         ordered["residual_hat"] = 0.0
         return ordered
 
@@ -195,7 +171,7 @@ class MLPResidualPlugin(ResidualPlugin):
 
 주의:
 
-- 최소 구현이라도 `predict_train`, `predict_future`는 **반드시 DataFrame 반환**
+- 최소 구현이라도 `predict`는 **반드시 DataFrame 반환**
 - 결과 컬럼에 `residual_hat` 포함
 - `fit` 호출 전 예측 시 명확히 에러를 내는 편이 안전
 
@@ -210,12 +186,12 @@ class MLPResidualPlugin(ResidualPlugin):
 예:
 
 ```python
-from .lstm import LSTMResidualPlugin
 from .mlp import MLPResidualPlugin
+from .xgboost import XGBoostResidualPlugin
 
 __all__ = [
-    "LSTMResidualPlugin",
     "MLPResidualPlugin",
+    "XGBoostResidualPlugin",
 ]
 ```
 
@@ -230,23 +206,21 @@ __all__ = [
 예시:
 
 ```python
-from .plugins import LSTMResidualPlugin, MLPResidualPlugin
+from .plugins import MLPResidualPlugin, XGBoostResidualPlugin
 
 
 def build_residual_plugin(config: Any) -> ResidualPlugin:
     if is_dataclass(config):
         config = asdict(config)
 
-    name = str(config.get("model", "lstm")).lower()
+    name = str(config.get("model", "xgboost")).lower()
     params = dict(config.get("params", {}))
 
-    if name == "lstm":
-        return LSTMResidualPlugin(
-            lookback=int(params.get("lookback", 4)),
-            hidden_size=int(params.get("hidden_size", 8)),
-            num_layers=int(params.get("num_layers", 1)),
-            epochs=int(params.get("epochs", 20)),
-            learning_rate=float(params.get("learning_rate", 0.01)),
+    if name == "xgboost":
+        return XGBoostResidualPlugin(
+            n_estimators=int(params.get("n_estimators", 32)),
+            max_depth=int(params.get("max_depth", 3)),
+            learning_rate=float(params.get("learning_rate", 0.1)),
         )
 
     if name == "mlp":
@@ -278,7 +252,7 @@ def build_residual_plugin(config: Any) -> ResidualPlugin:
 예:
 
 ```python
-SUPPORTED_RESIDUAL_MODELS = {"lstm", "mlp"}
+SUPPORTED_RESIDUAL_MODELS = {"xgboost", "mlp"}
 ```
 
 이걸 안 바꾸면 config에서 아래처럼 적어도 초기 로딩에서 막힙니다.
@@ -299,7 +273,6 @@ residual:
 ```yaml
 residual:
   enabled: true
-  train_source: oof_cv
   model: mlp
   params:
     lookback: 8
@@ -311,9 +284,6 @@ residual:
 설명:
 
 - `enabled`: residual correction on/off
-- `train_source`:
-  - `oof_cv`: CV out-of-fold residual 기반
-  - `insample_backcast`: insample residual 기반
 - `model`: registry에서 선택할 residual 모델 이름
 - `params`: 해당 residual 모델 전용 하이퍼파라미터
 
@@ -328,9 +298,7 @@ residual:
 
 ## 5. 어떤 컬럼을 기준으로 학습하나
 
-현재 runtime 기준 residual 학습 소스는 2종류입니다.
-
-### `train_source: oof_cv`
+현재 runtime은 fold-specific CV residual panel 하나만 residual 학습에 사용합니다.
 
 runtime이 CV 예측을 모아서 아래 개념의 테이블을 만듭니다.
 
@@ -338,19 +306,8 @@ runtime이 CV 예측을 모아서 아래 개념의 테이블을 만듭니다.
 - `y_hat_base`
 - `residual_target = y - y_hat_base`
 - `fold_count`
-- `source_type = "oof_cv"`
 
-이 소스는 겹치는 시점이 있으면 날짜 단위로 집계된 뒤 residual plugin으로 전달됩니다.
-
-### `train_source: insample_backcast`
-
-학습 완료된 base model의 `predict_insample()` 결과를 residual 학습 소스로 사용합니다.
-
-이 경우도 plugin이 실제로 보는 핵심 컬럼은 비슷합니다.
-
-- `y`
-- `y_hat_base`
-- `residual_target`
+이 panel은 겹치는 시점이 있으면 날짜 단위로 집계된 뒤 residual plugin으로 전달됩니다.
 
 따라서 새 residual 모델은 보통 **`residual_target` 시계열 문제**만 풀면 됩니다.
 
@@ -361,8 +318,7 @@ runtime이 CV 예측을 모아서 아래 개념의 테이블을 만듭니다.
 새 residual 모델을 추가할 때는 아래를 확인하세요.
 
 - [ ] `ResidualPlugin` 4개 메서드 구현
-- [ ] `predict_train` 반환값에 `residual_hat` 포함
-- [ ] `predict_future` 반환값에 `residual_hat` 포함
+- [ ] `predict` 반환값에 `residual_hat` 포함
 - [ ] `metadata()`에 핵심 파라미터 기록
 - [ ] `residual/plugins/__init__.py` export 추가
 - [ ] `residual/registry.py` branch 추가
@@ -407,7 +363,7 @@ uv run python main.py --config config.yaml --jobs TFT --output-root runs/single-
 새 residual 모델을 추가할 때는 아래 원칙이 가장 안전합니다.
 
 1. **config 이름은 짧고 명확하게**
-   - 예: `lstm`, `mlp`, `xgb`
+   - 예: `xgboost`, `mlp`
 2. **registry에서 파라미터 파싱을 명시적으로**
    - 지금 구조와 가장 잘 맞음
 3. **plugin은 residual correction만 책임지게**

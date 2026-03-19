@@ -204,8 +204,7 @@ top-level section:
 | Key | Type | Required | Meaning |
 | --- | --- | --- | --- |
 | `enabled` | bool | no | residual 보정 사용 여부 |
-| `train_source` | string | no | residual 학습 소스. `oof_cv` 또는 `insample_backcast` |
-| `model` | string | no | residual 모델명. 현재 `lstm` |
+| `model` | string | no | residual 모델명. 현재 `xgboost` |
 | `params` | object | no | residual 모델 파라미터 |
 
 ### 4.7 `jobs`
@@ -227,7 +226,9 @@ baseline (`Naive`, `SeasonalNaive`, `HistoricAverage`)은 fairness normalization
 - `jobs`에서는 모델 이름이 유일해야 합니다.
 - `training:`에 있는 공통 key를 `jobs[*].params`에 다시 쓰면 안 됩니다.
 - semantic commonality는 허용하지만, 모델 API가 다르면 key는 각자 유지합니다.
+- API가 다른 key들 사이에는 aliasing이나 canonicalization을 하지 않습니다.
 - 예: transformer 계열 `hidden_size`와 LSTM의 `encoder_hidden_size`/`decoder_hidden_size`는 같은 fairness 축으로 정렬할 수 있지만 하나의 key로 강제 통합하지 않습니다.
+- conservative fairness 기준에서는 직접 대응되는 축만 맞추고, `PatchTST.n_heads`, `PatchTST.patch_len`, `FEDformer.modes`, NHITS 구조 knob들은 모델 로컬 예외로 둡니다.
 - README에서는 `params` 내부의 모델별 세부 override는 별도로 풀어쓰지 않습니다.
 
 ---
@@ -277,8 +278,7 @@ scheduler:
 
 residual:
   enabled: true
-  train_source: oof_cv
-  model: lstm
+  model: xgboost
   params: { ... }
 ```
 
@@ -311,7 +311,7 @@ residual 관련 코드는 `residual/` 아래에 모여 있습니다.
 현재 기준으로 README에서 확실히 말할 수 있는 것:
 
 - residual은 wrapper의 1급 설정 영역입니다.
-- `residual.enabled`, `residual.train_source`, `residual.model`, `residual.params`로 관리합니다.
+- `residual.enabled`, `residual.model`, `residual.params`로 관리합니다.
 - manifest / provenance와 함께 실행 당시 설정을 추적합니다.
 
 manifest에 기록되는 대표 항목:
@@ -349,7 +349,6 @@ manifest에 기록되는 대표 항목:
 ```yaml
 residual:
   enabled: true
-  train_source: oof_cv
   model: mlp
   params:
     lookback: 8
@@ -395,13 +394,10 @@ class MLPResidualPlugin(ResidualPlugin):
             learning_rate=learning_rate,
         )
 
-    def fit(self, train_df: pd.DataFrame, context: ResidualContext) -> None:
+    def fit(self, panel_df: pd.DataFrame, context: ResidualContext) -> None:
         ...
 
-    def predict_train(self, train_df: pd.DataFrame) -> pd.DataFrame:
-        ...
-
-    def predict_future(self, future_df: pd.DataFrame) -> pd.DataFrame:
+    def predict(self, panel_df: pd.DataFrame) -> pd.DataFrame:
         ...
 
     def metadata(self) -> dict[str, Any]:
@@ -417,12 +413,12 @@ class MLPResidualPlugin(ResidualPlugin):
 registry 연결 예시:
 
 ```python
-from .plugins import LSTMResidualPlugin, MLPResidualPlugin
+from .plugins import MLPResidualPlugin, XGBoostResidualPlugin
 
 def build_residual_plugin(config: Any) -> ResidualPlugin:
     ...
-    if name == "lstm":
-        return LSTMResidualPlugin(...)
+    if name == "xgboost":
+        return XGBoostResidualPlugin(...)
     if name == "mlp":
         return MLPResidualPlugin(...)
     raise ValueError(f"Unsupported residual model: {name}")
@@ -451,6 +447,10 @@ uv run python main.py --validate-only
 cd neuralforecast
 uv run python main.py --config examples/real_smoke.yaml --jobs TFT --output-root runs/single-job-smoke
 ```
+
+`examples/real_smoke.yaml` keeps a small `max_steps=10` smoke budget and a tiny
+`xgboost` residual config; non-smoke configs should set their own training
+budget under `training.max_steps`.
 
 ### two-gpu scheduler smoke
 

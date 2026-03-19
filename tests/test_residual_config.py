@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import TypedDict
 
 import pandas as pd
 import pytest
@@ -58,12 +58,12 @@ worker_devices = 1
 
 [residual]
 enabled = true
-train_source = 'oof_cv'
-model = 'lstm'
+model = 'xgboost'
 
 [residual.params]
-lookback = 2
-epochs = 1
+n_estimators = 8
+max_depth = 2
+learning_rate = 0.2
 
 [[jobs]]
 model = 'TFT'
@@ -111,9 +111,8 @@ def _payload() -> dict:
         "scheduler": {"gpu_ids": [0, 1], "max_concurrent_jobs": 2, "worker_devices": 1},
         "residual": {
             "enabled": True,
-            "train_source": "oof_cv",
-            "model": "lstm",
-            "params": {"lookback": 2, "epochs": 1},
+            "model": "xgboost",
+            "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
         },
         "jobs": [
             {"model": "TFT", "params": {}},
@@ -295,12 +294,26 @@ def test_load_app_config_rejects_duplicate_centralized_job_keys(tmp_path: Path):
         load_app_config(tmp_path, config_path=path)
 
 
-def test_residual_registry_builds_lstm_plugin():
-    plugin = build_residual_plugin(
-        {"model": "lstm", "params": {"lookback": 2, "epochs": 1}}
+def test_load_app_config_rejects_removed_residual_train_source(tmp_path: Path):
+    payload = _payload()
+    payload["residual"]["train_source"] = "oof_cv"
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n", encoding="utf-8"
     )
-    assert plugin.metadata()["plugin"] == "lstm"
-    assert plugin.metadata()["lookback"] == 2
+    path = _write_config(tmp_path, payload, ".yaml")
+    with pytest.raises(ValueError, match="residual.train_source has been removed"):
+        load_app_config(tmp_path, config_path=path)
+
+
+def test_residual_registry_builds_xgboost_plugin():
+    plugin = build_residual_plugin(
+        {
+            "model": "xgboost",
+            "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+        }
+    )
+    assert plugin.metadata()["plugin"] == "xgboost"
+    assert plugin.metadata()["n_estimators"] == 8
 
 
 def test_runtime_generates_residual_artifacts_with_dummy_model(tmp_path: Path):
@@ -312,9 +325,8 @@ def test_runtime_generates_residual_artifacts_with_dummy_model(tmp_path: Path):
     payload["dataset"]["hist_exog_cols"] = []
     payload["residual"] = {
         "enabled": True,
-        "train_source": "oof_cv",
-        "model": "lstm",
-        "params": {"lookback": 2, "epochs": 1, "hidden_size": 4},
+        "model": "xgboost",
+        "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
     }
     payload["jobs"] = [
         {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
@@ -338,12 +350,24 @@ def test_runtime_generates_residual_artifacts_with_dummy_model(tmp_path: Path):
     )
     assert code == 0
     residual_root = output_root / "residual" / "DummyUnivariate"
-    assert (residual_root / "source_oof_cv_resolved.csv").exists()
+    assert (residual_root / "training_panel.csv").exists()
     assert (residual_root / "corrected_cv.csv").exists()
     assert (residual_root / "corrected_holdout.csv").exists()
     assert (residual_root / "diagnostics.json").exists()
+    assert (residual_root / "checkpoints" / "fold_000").exists()
+    assert (residual_root / "checkpoints" / "fold_001" / "model.ubj").exists()
+    assert (residual_root / "checkpoints" / "fold_-01" / "model.ubj").exists()
+    training_panel = pd.read_csv(residual_root / "training_panel.csv")
+    corrected_holdout = pd.read_csv(residual_root / "corrected_holdout.csv")
+    plugin_metadata = pd.read_json(
+        residual_root / "plugin_metadata.json", typ="series"
+    ).to_dict()
+    assert training_panel["fold_idx"].tolist() == [0, 1, 2, 3]
+    assert corrected_holdout["fold_idx"].tolist() == [-1]
+    assert corrected_holdout["train_end_ds"].tolist() == ["2020-02-12"]
+    assert {str(key) for key in plugin_metadata} == {"0", "1", "2", "3", "-1"}
     diagnostics = pd.read_json(residual_root / "diagnostics.json", typ="series")
-    assert diagnostics["corrected_cv_mode"] == "strict_oof_runtime"
+    assert diagnostics["corrected_cv_mode"] == "per_fold_panel_runtime"
     assert diagnostics["holdout_truth_included"] is False
 
 
@@ -354,24 +378,17 @@ class _RecordingResidualPlugin(ResidualPlugin):
         self._plugin_log = plugin_log
         self._record: _RecordingLog = {
             "fit_lengths": [],
-            "future_inputs": [],
-            "predict_train_calls": 0,
+            "predict_inputs": [],
         }
         self._plugin_log.append(self._record)
 
-    def fit(self, train_df: pd.DataFrame, context: ResidualContext) -> None:
-        self._record["fit_lengths"].append(len(train_df))
+    def fit(self, panel_df: pd.DataFrame, context: ResidualContext) -> None:
+        self._record["fit_lengths"].append(len(panel_df))
 
-    def predict_train(self, train_df: pd.DataFrame) -> pd.DataFrame:
-        self._record["predict_train_calls"] += 1
-        raise AssertionError(
-            "runtime should not call predict_train for corrected_cv generation"
-        )
-
-    def predict_future(self, future_df: pd.DataFrame) -> pd.DataFrame:
-        self._record["future_inputs"].append(list(future_df.columns))
-        residual_hat = [float(self._record["fit_lengths"][-1])] * len(future_df)
-        return future_df.copy().assign(residual_hat=residual_hat)
+    def predict(self, panel_df: pd.DataFrame) -> pd.DataFrame:
+        self._record["predict_inputs"].append(list(panel_df.columns))
+        residual_hat = [float(self._record["fit_lengths"][-1])] * len(panel_df)
+        return panel_df.copy().assign(residual_hat=residual_hat)
 
     def metadata(self) -> dict[str, object]:
         return {"plugin": self.name}
@@ -379,11 +396,10 @@ class _RecordingResidualPlugin(ResidualPlugin):
 
 class _RecordingLog(TypedDict):
     fit_lengths: list[int]
-    future_inputs: list[list[str]]
-    predict_train_calls: int
+    predict_inputs: list[list[str]]
 
 
-def test_apply_residual_plugin_builds_corrected_cv_in_memory_and_keeps_holdout_truth_out(
+def test_apply_residual_plugin_builds_per_fold_corrected_cv_and_holdout_panels(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     from residual import runtime
@@ -402,8 +418,10 @@ def test_apply_residual_plugin_builds_corrected_cv_in_memory_and_keeps_holdout_t
             "model": job.model,
             "fold_idx": 0,
             "cutoff": "2020-01-08",
+            "train_end_ds": "2020-01-01",
             "unique_id": "target",
             "ds": "2020-01-08",
+            "horizon_step": 1,
             "y": 2.0,
             "y_hat": 1.5,
         },
@@ -411,8 +429,10 @@ def test_apply_residual_plugin_builds_corrected_cv_in_memory_and_keeps_holdout_t
             "model": job.model,
             "fold_idx": 1,
             "cutoff": "2020-01-15",
+            "train_end_ds": "2020-01-08",
             "unique_id": "target",
             "ds": "2020-01-15",
+            "horizon_step": 1,
             "y": 3.0,
             "y_hat": 2.5,
         },
@@ -420,76 +440,99 @@ def test_apply_residual_plugin_builds_corrected_cv_in_memory_and_keeps_holdout_t
             "model": job.model,
             "fold_idx": 2,
             "cutoff": "2020-01-22",
+            "train_end_ds": "2020-01-15",
             "unique_id": "target",
             "ds": "2020-01-22",
+            "horizon_step": 1,
             "y": 4.0,
             "y_hat": 3.5,
         },
     ]
-    holdout_df = pd.DataFrame({"dt": ["2020-01-29"], "target": [5.0]})
+    holdout_df = pd.DataFrame({"dt": ["2020-01-29"], "Com_CrudeOil": [5.0]})
     target_holdout = pd.DataFrame(
         {"unique_id": ["target"], "ds": ["2020-01-29"], job.model: [4.5]}
     )
 
     runtime._apply_residual_plugin(
-        loaded, job, run_root, cv_rows, holdout_df, target_holdout, job.model, nf=None
+        loaded,
+        job,
+        run_root,
+        cv_rows,
+        holdout_df,
+        target_holdout,
+        job.model,
+        train_end_ds="2020-01-22",
     )
 
     residual_root = run_root / "residual" / job.model
     corrected_cv = pd.read_csv(residual_root / "corrected_cv.csv")
     assert corrected_cv["residual_hat"].tolist() == [0.0, 1.0, 2.0]
     assert corrected_cv["y_hat_corrected"].tolist() == [1.5, 3.5, 5.5]
-    assert all(record["predict_train_calls"] == 0 for record in plugin_log)
     assert [record["fit_lengths"][0] for record in plugin_log[:-1]] == [0, 1, 2]
-    assert plugin_log[-1]["future_inputs"] == [
-        ["model", "unique_id", "ds", "y_hat_base"]
+    assert plugin_log[0]["predict_inputs"] == [
+        [
+            "model",
+            "unique_id",
+            "fold_idx",
+            "cutoff",
+            "train_end_ds",
+            "ds",
+            "horizon_step",
+            "y_hat_base",
+            "residual_target",
+            "y",
+        ]
+    ]
+    assert plugin_log[-1]["predict_inputs"] == [
+        [
+            "model",
+            "unique_id",
+            "fold_idx",
+            "cutoff",
+            "train_end_ds",
+            "ds",
+            "horizon_step",
+            "y_hat_base",
+            "y",
+        ]
     ]
 
 
-def test_lstm_plugin_uses_fallback_only_for_short_history(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    plugin = cast(
-        Any,
-        build_residual_plugin(
-            {"model": "lstm", "params": {"lookback": 2, "epochs": 1}}
-        ),
+def test_xgboost_plugin_predicts_panel_and_writes_checkpoint(tmp_path: Path):
+    plugin = build_residual_plugin(
+        {
+            "model": "xgboost",
+            "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+        }
     )
     train_df = pd.DataFrame(
         {
-            "model": ["TFT", "TFT"],
-            "unique_id": ["target", "target"],
-            "ds": pd.to_datetime(["2020-01-08", "2020-01-15"]),
-            "y": [2.0, 3.0],
-            "y_hat_base": [1.5, 2.5],
-            "fold_count": [1, 1],
-            "source_type": ["oof_cv", "oof_cv"],
-            "residual_target": [0.5, 0.5],
+            "model": ["TFT", "TFT", "TFT"],
+            "unique_id": ["target", "target", "target"],
+            "fold_idx": [0, 1, 2],
+            "cutoff": pd.to_datetime(["2020-01-08", "2020-01-15", "2020-01-22"]),
+            "train_end_ds": pd.to_datetime(
+                ["2020-01-01", "2020-01-08", "2020-01-15"]
+            ),
+            "ds": pd.to_datetime(["2020-01-08", "2020-01-15", "2020-01-22"]),
+            "horizon_step": [1, 1, 1],
+            "y_hat_base": [1.5, 2.5, 3.5],
+            "residual_target": [0.5, 0.25, -0.25],
         }
     )
     plugin.fit(
         train_df,
         ResidualContext(
-            job_name="TFT", model_name="TFT", output_dir=Path("."), config={}
+            job_name="TFT",
+            model_name="TFT",
+            output_dir=tmp_path / "checkpoint",
+            config={},
         ),
     )
-
-    def _raise_on_forward(*args, **kwargs):
-        raise AssertionError(
-            "network forward should not be used for short-history fallback"
-        )
-
-    monkeypatch.setattr(plugin.model, "forward", _raise_on_forward)
-    future_df = pd.DataFrame(
-        {
-            "model": ["TFT"],
-            "unique_id": ["target"],
-            "ds": pd.to_datetime(["2020-01-22"]),
-            "y_hat_base": [3.5],
-        }
-    )
-    predicted = plugin.predict_future(future_df)
-    assert predicted["residual_hat"].tolist() == [0.5]
+    predicted = plugin.predict(train_df.drop(columns=["residual_target"]))
+    assert "residual_hat" in predicted.columns
+    assert len(predicted) == 3
+    assert (tmp_path / "checkpoint" / "model.ubj").exists()
 
 
 def test_runtime_skips_residual_artifacts_for_baseline_models(tmp_path: Path):
@@ -500,9 +543,8 @@ def test_runtime_skips_residual_artifacts_for_baseline_models(tmp_path: Path):
     payload["dataset"]["hist_exog_cols"] = []
     payload["residual"] = {
         "enabled": True,
-        "train_source": "oof_cv",
-        "model": "lstm",
-        "params": {"lookback": 2, "epochs": 1},
+        "model": "xgboost",
+        "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
     }
     payload["jobs"] = [{"model": "Naive", "params": {}}]
     data = "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n2020-01-29,5\n"
@@ -545,3 +587,79 @@ def test_repo_config_sets_explicit_itransformer_fairness_target():
         "e_layers": 2,
         "d_ff": 256,
     }
+
+
+def test_repo_config_conservative_fairness_matrix():
+    loaded = load_app_config(REPO_ROOT, config_path=REPO_ROOT / "config.yaml")
+    params_by_model = {job.model: job.params for job in loaded.config.jobs}
+
+    for model_name in (
+        "TFT",
+        "VanillaTransformer",
+        "Informer",
+        "Autoformer",
+        "FEDformer",
+        "PatchTST",
+        "iTransformer",
+    ):
+        assert params_by_model[model_name]["hidden_size"] == 128
+
+    assert params_by_model["LSTM"]["encoder_hidden_size"] == 128
+    assert params_by_model["LSTM"]["decoder_hidden_size"] == 128
+
+    assert params_by_model["PatchTST"]["n_heads"] == 16
+    assert params_by_model["PatchTST"]["patch_len"] == 16
+    assert params_by_model["FEDformer"]["modes"] == 64
+    assert params_by_model["NHITS"] == {
+        "mlp_units": [[64, 64], [64, 64], [64, 64]],
+        "n_pool_kernel_size": [2, 2, 1],
+        "n_freq_downsample": [4, 2, 1],
+        "dropout_prob_theta": 0.0,
+        "activation": "ReLU",
+    }
+
+
+def test_model_builder_does_not_alias_api_distinct_keys(tmp_path: Path):
+    payload = _payload()
+    payload["jobs"] = [
+        {"model": "TFT", "params": {"hidden_size": 32, "encoder_hidden_size": 999}},
+        {
+            "model": "LSTM",
+            "params": {
+                "hidden_size": 999,
+                "encoder_hidden_size": 32,
+                "decoder_hidden_size": 48,
+            },
+        },
+    ]
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n", encoding="utf-8"
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    tft = build_model(loaded.config, loaded.config.jobs[0])
+    lstm = build_model(loaded.config, loaded.config.jobs[1])
+
+    assert tft.hparams.hidden_size == 32
+    assert getattr(tft.hparams, "encoder_hidden_size", 999) == 999
+
+    assert lstm.hparams.encoder_hidden_size == 32
+    assert lstm.hparams.decoder_hidden_size == 48
+    assert getattr(lstm.hparams, "hidden_size", 999) == 999
+
+
+def test_readme_documents_conservative_fairness_policy():
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert (
+        "baseline (`Naive`, `SeasonalNaive`, `HistoricAverage`)은 fairness normalization 대상이 아닙니다."
+        in readme
+    )
+    assert (
+        "`training:`에 있는 공통 key를 `jobs[*].params`에 다시 쓰면 안 됩니다."
+        in readme
+    )
+    assert "API가 다른 key들 사이에는 aliasing이나 canonicalization을 하지 않습니다." in readme
+    assert "PatchTST.n_heads" in readme
+    assert "FEDformer.modes" in readme

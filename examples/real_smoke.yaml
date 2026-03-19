@@ -15,7 +15,7 @@ training:
   windows_batch_size: 32
   inference_windows_batch_size: 32
   learning_rate: 0.001
-  max_steps: 1
+  max_steps: 10
   val_size: 0
   loss: mse
 cv:
@@ -30,14 +30,13 @@ scheduler:
   worker_devices: 1
 residual:
   enabled: true
-  train_source: oof_cv
-  model: lstm
+  model: xgboost
   params:
-    lookback: 2
-    hidden_size: 8
-    num_layers: 1
-    epochs: 1
-    learning_rate: 0.01
+    n_estimators: 8
+    max_depth: 2
+    learning_rate: 0.2
+    subsample: 1.0
+    colsample_bytree: 1.0
 jobs:
   - model: TFT
     params: {}

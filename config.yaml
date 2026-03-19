@@ -21,7 +21,7 @@ runtime:
 training:
   # Learned models are trained separately for each expanding-window TS-CV fold.
   train_protocol: expanding_window_tscv
-  input_size: 48
+  input_size: 64
   season_length: 52
   batch_size: 32
   valid_batch_size: 32
@@ -47,14 +47,13 @@ scheduler:
   worker_devices: 1
 residual:
   enabled: true
-  train_source: oof_cv
-  model: lstm
+  model: xgboost
   params:
-    lookback: 2
-    hidden_size: 8
-    num_layers: 1
-    epochs: 1
-    learning_rate: 0.01
+    n_estimators: 64
+    max_depth: 3
+    learning_rate: 0.1
+    subsample: 1.0
+    colsample_bytree: 1.0
 jobs:
   - model: TFT
     params:
@@ -101,15 +100,15 @@ jobs:
       n_freq_downsample: [4, 2, 1]
       dropout_prob_theta: 0.0
       activation: ReLU
-  - model: Naive
-    params: {}
-  - model: SeasonalNaive
-    params: {}
-  - model: HistoricAverage
-    params: {}
   - model: iTransformer
     params:
       hidden_size: 128
       n_heads: 8
       e_layers: 2
       d_ff: 256
+  - model: Naive
+    params: {}
+  - model: SeasonalNaive
+    params: {}
+  - model: HistoricAverage
+    params: {}

@@ -14,8 +14,7 @@ DEFAULT_MANIFEST_VERSION = '1'
 DEFAULT_ARTIFACT_SCHEMA_VERSION = '1'
 DEFAULT_EVALUATION_PROTOCOL_VERSION = '2'
 SUPPORTED_LOSSES = {'mse'}
-SUPPORTED_RESIDUAL_MODELS = {'lstm'}
-SUPPORTED_RESIDUAL_SOURCES = {'insample_backcast', 'oof_cv'}
+SUPPORTED_RESIDUAL_MODELS = {'xgboost'}
 CENTRALIZED_TRAINING_KEYS = {
     'train_protocol',
     'input_size',
@@ -85,8 +84,7 @@ class SchedulerConfig:
 @dataclass(frozen=True)
 class ResidualConfig:
     enabled: bool = True
-    train_source: Literal['insample_backcast', 'oof_cv'] = 'oof_cv'
-    model: str = 'lstm'
+    model: str = 'xgboost'
     params: dict[str, Any] = field(default_factory=dict)
 
 
@@ -204,14 +202,16 @@ def _normalize_payload(payload: dict[str, Any], base_dir: Path) -> AppConfig:
         raise ValueError('worker_devices must remain 1 for scheduler-launched jobs')
 
     residual.setdefault('enabled', True)
-    residual.setdefault('train_source', 'oof_cv')
-    residual.setdefault('model', 'lstm')
+    residual.setdefault('model', 'xgboost')
     residual.setdefault('params', {})
+    if 'train_source' in residual:
+        raise ValueError(
+            'residual.train_source has been removed; residual training now '
+            'always uses fold-specific CV residual panels'
+        )
     residual_model = str(residual['model']).lower()
     if residual_model not in SUPPORTED_RESIDUAL_MODELS:
         raise ValueError(f'Unsupported residual model: {residual_model}')
-    if residual['train_source'] not in SUPPORTED_RESIDUAL_SOURCES:
-        raise ValueError(f'Unsupported residual train_source: {residual["train_source"]}')
     residual['model'] = residual_model
     residual['params'] = dict(residual.get('params', {}))
 
