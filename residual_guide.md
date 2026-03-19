@@ -85,6 +85,16 @@ fold evaluation panel residual 예측입니다.
 - 기존 입력 컬럼들
 - `residual_hat`
 
+현재 XGBoost residual 모델은 panel 전체 컬럼을 다 feature로 쓰지 않고,
+실질적으로 아래 의미의 입력만 사용합니다.
+
+- `cutoff`
+- `ds`
+- `horizon_step`
+- `y_hat_base`
+
+구현에서는 XGBoost 입력을 위해 `cutoff` / `ds`를 숫자형 날짜 값으로 변환합니다.
+
 #### `metadata()`
 
 run artifact에 남길 설정 요약입니다.

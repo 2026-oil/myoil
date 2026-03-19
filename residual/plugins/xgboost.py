@@ -46,18 +46,12 @@ class XGBoostResidualPlugin(ResidualPlugin):
     @staticmethod
     def _prepare_panel(panel_df: pd.DataFrame) -> pd.DataFrame:
         panel = panel_df.copy()
-        for column in ("cutoff", "train_end_ds", "ds"):
+        for column in ("cutoff", "ds"):
             panel[column] = pd.to_datetime(panel[column])
-        panel["fold_idx"] = panel["fold_idx"].astype(int)
         panel["horizon_step"] = panel["horizon_step"].astype(int)
         panel["y_hat_base"] = panel["y_hat_base"].astype(float)
         panel["cutoff_day"] = panel["cutoff"].astype("int64") // 86_400_000_000_000
-        panel["train_end_day"] = (
-            panel["train_end_ds"].astype("int64") // 86_400_000_000_000
-        )
         panel["ds_day"] = panel["ds"].astype("int64") // 86_400_000_000_000
-        panel["days_since_cutoff"] = panel["ds_day"] - panel["cutoff_day"]
-        panel["days_since_train_end"] = panel["ds_day"] - panel["train_end_day"]
         return panel
 
     @classmethod
@@ -68,10 +62,7 @@ class XGBoostResidualPlugin(ResidualPlugin):
                 "horizon_step",
                 "y_hat_base",
                 "cutoff_day",
-                "train_end_day",
                 "ds_day",
-                "days_since_cutoff",
-                "days_since_train_end",
             ]
         ].astype(float)
 

@@ -510,6 +510,12 @@ def test_xgboost_plugin_predicts_panel_and_writes_checkpoint(tmp_path: Path):
     )
     feature_frame = plugin._feature_frame(train_df)
     assert "fold_idx" not in feature_frame.columns
+    assert list(feature_frame.columns) == [
+        "horizon_step",
+        "y_hat_base",
+        "cutoff_day",
+        "ds_day",
+    ]
     predicted = plugin.predict(train_df.drop(columns=["residual_target"]))
     assert "residual_hat" in predicted.columns
     assert len(predicted) == 3
