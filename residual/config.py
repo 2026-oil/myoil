@@ -16,6 +16,21 @@ DEFAULT_EVALUATION_PROTOCOL_VERSION = '2'
 SUPPORTED_LOSSES = {'mse'}
 SUPPORTED_RESIDUAL_MODELS = {'lstm'}
 SUPPORTED_RESIDUAL_SOURCES = {'insample_backcast', 'oof_cv'}
+CENTRALIZED_TRAINING_KEYS = {
+    'train_protocol',
+    'input_size',
+    'season_length',
+    'batch_size',
+    'valid_batch_size',
+    'windows_batch_size',
+    'inference_windows_batch_size',
+    'learning_rate',
+    'max_steps',
+    'val_size',
+    'val_check_steps',
+    'early_stop_patience_steps',
+    'loss',
+}
 
 
 @dataclass(frozen=True)
@@ -36,6 +51,7 @@ class RuntimeConfig:
 
 @dataclass(frozen=True)
 class TrainingConfig:
+    train_protocol: str = 'expanding_window_tscv'
     input_size: int = 64
     season_length: int = 52
     batch_size: int = 32
@@ -205,6 +221,14 @@ def _normalize_payload(payload: dict[str, Any], base_dir: Path) -> AppConfig:
     models = [job.model for job in jobs]
     if len(models) != len(set(models)):
         raise ValueError('jobs.model values must be unique')
+    for job in jobs:
+        duplicated = CENTRALIZED_TRAINING_KEYS.intersection(job.params)
+        if duplicated:
+            duplicated_keys = ', '.join(sorted(duplicated))
+            raise ValueError(
+                f'jobs[{job.model}] repeats centralized training key(s): {duplicated_keys}. '
+                'Move these settings under training.'
+            )
 
     return AppConfig(
         dataset=DatasetConfig(

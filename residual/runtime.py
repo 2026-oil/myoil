@@ -142,6 +142,8 @@ def _resolve_insample_residual_source(nf: NeuralForecast, model_name: str, targe
 
 
 def _apply_residual_plugin(loaded: LoadedConfig, job: JobConfig, run_root: Path, cv_rows, holdout_df: pd.DataFrame, target_holdout: pd.DataFrame, pred_col: str, nf: NeuralForecast | None) -> None:
+    if job.model in BASELINE_MODEL_NAMES:
+        return
     if not loaded.config.residual.enabled:
         return
     residual_root = run_root / 'residual' / job.model

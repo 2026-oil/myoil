@@ -2,13 +2,25 @@ dataset:
   path: ../df.csv
   target_col: Com_CrudeOil
   dt_col: dt
-  hist_exog_cols: []
+  hist_exog_cols:
+  - Com_BrentCrudeOil
+  - Com_Gasoline
+  - Idx_DxyUSD
+  - EX_USD_CNY
+  - Idx_SnP500
+  - Idx_SnPVIX
+  - Idx_CSI300
+  - Bonds_US_10Y
+  - Bonds_US_2Y
+  - Com_LME_Index
+  - Com_Iron_Ore
   futr_exog_cols: []
   static_exog_cols: []
 runtime:
   random_seed: 1
 training:
   # Learned models are trained separately for each expanding-window TS-CV fold.
+  train_protocol: expanding_window_tscv
   input_size: 48
   season_length: 52
   batch_size: 32
@@ -47,57 +59,28 @@ jobs:
   - model: TFT
     params:
       hidden_size: 128
-      max_steps: 1000
-      early_stop_patience_steps: -1
-      val_check_steps: 100
-      windows_batch_size: 1024
-      inference_windows_batch_size: 1024
   - model: VanillaTransformer
     params:
       hidden_size: 128
       dropout: 0.05
-      learning_rate: 0.0001
-      max_steps: 5000
-      early_stop_patience_steps: -1
-      val_check_steps: 100
-      windows_batch_size: 1024
-      inference_windows_batch_size: 1024
       scaler_type: identity
   - model: Informer
     params:
       hidden_size: 128
       factor: 3
       dropout: 0.05
-      learning_rate: 0.0001
-      max_steps: 5000
-      early_stop_patience_steps: -1
-      val_check_steps: 100
-      windows_batch_size: 1024
-      inference_windows_batch_size: 1024
       scaler_type: identity
   - model: Autoformer
     params:
       hidden_size: 128
       factor: 3
       dropout: 0.05
-      learning_rate: 0.0001
-      max_steps: 5000
-      early_stop_patience_steps: -1
-      val_check_steps: 100
-      windows_batch_size: 1024
-      inference_windows_batch_size: 1024
       scaler_type: identity
   - model: FEDformer
     params:
       hidden_size: 128
       modes: 64
       dropout: 0.05
-      learning_rate: 0.0001
-      max_steps: 5000
-      early_stop_patience_steps: -1
-      val_check_steps: 100
-      windows_batch_size: 1024
-      inference_windows_batch_size: 1024
       scaler_type: identity
   - model: PatchTST
     params:
@@ -106,21 +89,11 @@ jobs:
       encoder_layers: 3
       patch_len: 16
       dropout: 0.2
-      learning_rate: 0.0001
-      max_steps: 5000
-      early_stop_patience_steps: -1
-      val_check_steps: 100
-      windows_batch_size: 1024
-      inference_windows_batch_size: 1024
       scaler_type: identity
   - model: LSTM
     params:
       encoder_hidden_size: 128
       decoder_hidden_size: 128
-      max_steps: 1000
-      early_stop_patience_steps: -1
-      val_check_steps: 100
-      inference_windows_batch_size: 1024
   - model: NHITS
     params:
       mlp_units: [[64, 64], [64, 64], [64, 64]]
@@ -135,4 +108,8 @@ jobs:
   - model: HistoricAverage
     params: {}
   - model: iTransformer
-    params: {}
+    params:
+      hidden_size: 128
+      n_heads: 8
+      e_layers: 2
+      d_ff: 256

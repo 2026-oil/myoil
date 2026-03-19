@@ -164,6 +164,7 @@ top-level section:
 
 | Key | Type | Required | Meaning |
 | --- | --- | --- | --- |
+| `train_protocol` | string | no | 학습/eval 프로토콜 선언값. 현재 `expanding_window_tscv` |
 | `input_size` | int | no | 모델 입력 길이 |
 | `season_length` | int | no | seasonality 길이 |
 | `batch_size` | int | no | 학습 배치 크기 |
@@ -210,6 +211,9 @@ top-level section:
 ### 4.7 `jobs`
 
 `jobs`는 **모델 단위 실행 목록**입니다.
+공통 training control은 `training:`에 두고, `jobs`에는 learned model의
+아키텍처별/가족별로 달라져야 하는 값만 둡니다.
+baseline (`Naive`, `SeasonalNaive`, `HistoricAverage`)은 fairness normalization 대상이 아닙니다.
 
 | Key | Type | Required | Meaning |
 | --- | --- | --- | --- |
@@ -221,6 +225,9 @@ top-level section:
 - `dataset.target_col`은 config 전체에서 한 번만 정의합니다.
 - exogenous 컬럼들도 `dataset`에서 한 번만 정의합니다.
 - `jobs`에서는 모델 이름이 유일해야 합니다.
+- `training:`에 있는 공통 key를 `jobs[*].params`에 다시 쓰면 안 됩니다.
+- semantic commonality는 허용하지만, 모델 API가 다르면 key는 각자 유지합니다.
+- 예: transformer 계열 `hidden_size`와 LSTM의 `encoder_hidden_size`/`decoder_hidden_size`는 같은 fairness 축으로 정렬할 수 있지만 하나의 key로 강제 통합하지 않습니다.
 - README에서는 `params` 내부의 모델별 세부 override는 별도로 풀어쓰지 않습니다.
 
 ---
@@ -242,6 +249,7 @@ runtime:
   random_seed: 1
 
 training:
+  train_protocol: expanding_window_tscv
   input_size: 48
   season_length: 52
   batch_size: 32
@@ -422,7 +430,7 @@ def build_residual_plugin(config: Any) -> ResidualPlugin:
 
 정리:
 
-- `jobs:`는 그대로 둡니다.
+- residual 모델 추가만 할 때는 `jobs:`는 그대로 둡니다.
 - 새 residual 모델은 `residual.model`과 `residual.params`만 추가하면 됩니다.
 - 자세한 단계별 문서는 `residual_guide.md`를 참고하세요.
 

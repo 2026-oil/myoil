@@ -83,6 +83,8 @@ def build_model(config: AppConfig, job: JobConfig, *, n_series: int | None = Non
         'input_size': config.training.input_size,
         'max_steps': config.training.max_steps,
         'learning_rate': config.training.learning_rate,
+        'val_check_steps': config.training.val_check_steps,
+        'early_stop_patience_steps': config.training.early_stop_patience_steps,
         'batch_size': config.training.batch_size,
         'valid_batch_size': config.training.valid_batch_size,
         'windows_batch_size': config.training.windows_batch_size,

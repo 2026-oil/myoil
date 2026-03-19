@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from residual.adapters import build_multivariate_inputs, build_univariate_inputs
@@ -9,6 +10,9 @@ from residual.config import load_app_config
 from residual.models import build_model
 from residual.registry import build_residual_plugin
 from residual.scheduler import build_launch_plan, worker_env
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _write_config(tmp_path: Path, payload: dict, suffix: str) -> Path:
@@ -149,6 +153,35 @@ def test_model_builder_applies_common_loss_and_multivariate_n_series(tmp_path: P
     assert getattr(multivariate_model, 'n_series', 2) == 2
 
 
+def test_model_builder_propagates_centralized_training_controls(tmp_path: Path):
+    payload = _payload()
+    payload['training'].update({
+        'max_steps': 17,
+        'learning_rate': 0.123,
+        'val_check_steps': 7,
+        'early_stop_patience_steps': 11,
+    })
+    payload['jobs'] = [
+        {'model': 'TFT', 'params': {'hidden_size': 32}},
+        {'model': 'LSTM', 'params': {'encoder_hidden_size': 32, 'decoder_hidden_size': 32}},
+        {'model': 'NHITS', 'params': {'mlp_units': [[32, 32], [32, 32], [32, 32]]}},
+        {'model': 'iTransformer', 'params': {'hidden_size': 32, 'n_heads': 4, 'e_layers': 2, 'd_ff': 64}},
+    ]
+    (tmp_path / 'data.csv').write_text("dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n", encoding='utf-8')
+    loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, '.yaml'))
+
+    tft = build_model(loaded.config, loaded.config.jobs[0])
+    lstm = build_model(loaded.config, loaded.config.jobs[1])
+    nhits = build_model(loaded.config, loaded.config.jobs[2])
+    itransformer = build_model(loaded.config, loaded.config.jobs[3], n_series=2)
+
+    for model in (tft, lstm, nhits, itransformer):
+        assert model.hparams.max_steps == 17
+        assert model.hparams.learning_rate == pytest.approx(0.123)
+        assert model.hparams.val_check_steps == 7
+        assert model.hparams.early_stop_patience_steps == 11
+
+
 def test_scheduler_plan_and_worker_env_use_single_device(tmp_path: Path):
     (tmp_path / 'data.csv').write_text("dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n", encoding='utf-8')
     loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, _payload(), '.yaml'))
@@ -197,6 +230,15 @@ def test_jobs_use_unique_model_identifiers(tmp_path: Path):
     assert [job.model for job in loaded.config.jobs] == ['TFT', 'iTransformer']
 
 
+def test_load_app_config_rejects_duplicate_centralized_job_keys(tmp_path: Path):
+    payload = _payload()
+    payload['jobs'] = [{'model': 'TFT', 'params': {'max_steps': 123}}]
+    (tmp_path / 'data.csv').write_text("dt,target,hist_a\n2020-01-01,1,2\n", encoding='utf-8')
+    path = _write_config(tmp_path, payload, '.yaml')
+    with pytest.raises(ValueError, match='repeats centralized training key'):
+        load_app_config(tmp_path, config_path=path)
+
+
 def test_residual_registry_builds_lstm_plugin():
     plugin = build_residual_plugin({'model': 'lstm', 'params': {'lookback': 2, 'epochs': 1}})
     assert plugin.metadata()['plugin'] == 'lstm'
@@ -224,3 +266,42 @@ def test_runtime_generates_residual_artifacts_with_dummy_model(tmp_path: Path):
     assert (residual_root / 'corrected_cv.csv').exists()
     assert (residual_root / 'corrected_holdout.csv').exists()
     assert (residual_root / 'diagnostics.json').exists()
+
+
+def test_runtime_skips_residual_artifacts_for_baseline_models(tmp_path: Path):
+    payload = _payload()
+    payload['cv'].update({'horizon': 1, 'step_size': 1, 'n_windows': 2, 'final_holdout': 1})
+    payload['dataset']['hist_exog_cols'] = []
+    payload['residual'] = {'enabled': True, 'train_source': 'oof_cv', 'model': 'lstm', 'params': {'lookback': 2, 'epochs': 1}}
+    payload['jobs'] = [{'model': 'Naive', 'params': {}}]
+    data = 'dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n2020-01-29,5\n'
+    (tmp_path / 'data.csv').write_text(data, encoding='utf-8')
+    config_path = _write_config(tmp_path, payload, '.yaml')
+
+    from residual.runtime import main as runtime_main
+
+    output_root = tmp_path / 'run_baseline'
+    code = runtime_main(['--config', str(config_path), '--jobs', 'Naive', '--output-root', str(output_root)])
+    assert code == 0
+    assert (output_root / 'cv' / 'Naive_forecasts.csv').exists()
+    assert (output_root / 'holdout' / 'Naive_metrics.csv').exists()
+    assert not (output_root / 'residual' / 'Naive').exists()
+
+
+def test_repo_config_keeps_baseline_jobs_empty():
+    loaded = load_app_config(REPO_ROOT, config_path=REPO_ROOT / 'config.yaml')
+    params_by_model = {job.model: job.params for job in loaded.config.jobs}
+    assert params_by_model['Naive'] == {}
+    assert params_by_model['SeasonalNaive'] == {}
+    assert params_by_model['HistoricAverage'] == {}
+
+
+def test_repo_config_sets_explicit_itransformer_fairness_target():
+    loaded = load_app_config(REPO_ROOT, config_path=REPO_ROOT / 'config.yaml')
+    params_by_model = {job.model: job.params for job in loaded.config.jobs}
+    assert params_by_model['iTransformer'] == {
+        'hidden_size': 128,
+        'n_heads': 8,
+        'e_layers': 2,
+        'd_ff': 256,
+    }
