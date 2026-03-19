@@ -1,0 +1,27 @@
+# Deep Interview Context Snapshot
+
+- Task statement: Combine  and  into a single .
+- Desired outcome: One merged dataset file, likely for downstream NeuralForecast/research use.
+- Stated solution: Merge the two CSV sources and write .
+- Probable intent hypothesis: Create a single modeling-ready weekly dataframe that includes both Tlab weekly features and BlackSwan core index features.
+- Known facts/evidence:
+  - : 584 data rows, 5 columns: , , , , .
+  - : 584 data rows, 86 columns; includes  plus weekly market/macroeconomic columns.
+  - The two files appear to represent the same weekly cadence but use different  string formats ( vs ).
+  - Repository memory notes mention prior use of  in the broader research workspace.
+- Constraints:
+  - User explicitly invoked , so stay in requirements mode and do not implement yet.
+  - Need a single-question Socratic loop.
+  - Workspace currently has unrelated uncommitted changes; avoid touching them.
+- Unknowns/open questions:
+  - Desired merge semantics: join key/strategy ( normalization + inner/left join?)
+  - Output location/overwrite policy for
+  - Desired final column order and date format
+  - Whether any rows/columns should be excluded
+- Decision-boundary unknowns:
+  - Can OMX normalize  and choose the natural all-column merge automatically?
+  - Can OMX overwrite/create  at repo root if absent/present?
+- Likely codebase touchpoints:
+  -
+  - Possibly root-level  or
+  - Minimal one-off script or notebook cell if execution is later approved

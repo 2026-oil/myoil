@@ -1,6 +1,0 @@
-{
-  "job_name": "smoke_tft",
-  "model": "TFT",
-  "devices": 1,
-  "loss": "mse"
-}

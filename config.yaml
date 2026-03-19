@@ -1,3 +1,5 @@
+task:
+  name: semi_test
 dataset:
   path: ../df.csv
   target_col: Com_CrudeOil
@@ -108,8 +110,4 @@ jobs:
       e_layers: 2
       d_ff: 256
   - model: Naive
-    params: {}
-  - model: SeasonalNaive
-    params: {}
-  - model: HistoricAverage
     params: {}

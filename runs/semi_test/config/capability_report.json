@@ -1,0 +1,11 @@
+{
+  "Naive": {
+    "name": "Naive",
+    "multivariate": false,
+    "supports_hist_exog": false,
+    "supports_futr_exog": false,
+    "supports_stat_exog": false,
+    "requires_n_series": false,
+    "single_device_only": true
+  }
+}

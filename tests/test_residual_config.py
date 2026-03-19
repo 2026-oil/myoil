@@ -21,6 +21,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 def _write_config(tmp_path: Path, payload: dict, suffix: str) -> Path:
     path = tmp_path / f"config{suffix}"
     if suffix == ".toml":
+        task_block = ""
+        task_name = payload.get("task", {}).get("name")
+        if task_name:
+            task_block = f"\n[task]\nname = {task_name!r}\n"
         text = """
 [dataset]
 path = 'data.csv'
@@ -73,6 +77,7 @@ params = {}
 model = 'iTransformer'
 params = {}
 """
+        text = f"{task_block}{text}"
         path.write_text(text, encoding="utf-8")
     else:
         path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
@@ -122,14 +127,31 @@ def _payload() -> dict:
 
 
 def test_toml_and_yaml_normalize_to_same_typed_model(tmp_path: Path):
+    payload = _payload()
+    payload["task"] = {"name": "semi_test"}
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n", encoding="utf-8"
     )
-    yaml_path = _write_config(tmp_path, _payload(), ".yaml")
-    toml_path = _write_config(tmp_path, _payload(), ".toml")
+    yaml_path = _write_config(tmp_path, payload, ".yaml")
+    toml_path = _write_config(tmp_path, payload, ".toml")
     loaded_yaml = load_app_config(tmp_path, config_path=yaml_path)
     loaded_toml = load_app_config(tmp_path, config_toml_path=toml_path)
     assert loaded_yaml.config.to_dict() == loaded_toml.config.to_dict()
+
+
+def test_task_name_is_loaded_into_normalized_config(tmp_path: Path):
+    payload = _payload()
+    payload["task"] = {"name": "semi_test"}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n", encoding="utf-8"
+    )
+
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    assert loaded.config.task.name == "semi_test"
+    assert loaded.normalized_payload["task"] == {"name": "semi_test"}
 
 
 def test_adapters_materialize_expected_frames(tmp_path: Path):
@@ -252,6 +274,39 @@ def test_runtime_executes_single_job_with_dummy_model(tmp_path: Path):
     assert code == 0
     assert (output_root / "cv" / "DummyUnivariate_forecasts.csv").exists()
     assert not (output_root / "holdout").exists()
+
+
+def test_runtime_uses_task_name_for_default_run_directory(tmp_path: Path):
+    payload = _payload()
+    payload["task"] = {"name": "pytest_task_default_output"}
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    data = "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n2020-01-29,5\n2020-02-05,6\n2020-02-12,7\n"
+    (tmp_path / "data.csv").write_text(data, encoding="utf-8")
+    config_path = _write_config(tmp_path, payload, ".yaml")
+
+    from residual.runtime import main as runtime_main
+
+    code = runtime_main(["--config", str(config_path), "--jobs", "DummyUnivariate"])
+
+    output_root = REPO_ROOT / "runs" / "pytest_task_default_output"
+    try:
+        assert code == 0
+        assert (output_root / "cv" / "DummyUnivariate_forecasts.csv").exists()
+        resolved_config = output_root / "config" / "config.resolved.json"
+        assert resolved_config.exists()
+        assert "pytest_task_default_output" in resolved_config.read_text(
+            encoding="utf-8"
+        )
+    finally:
+        if output_root.exists():
+            import shutil
+
+            shutil.rmtree(output_root)
 
 
 def test_runtime_infers_freq_when_omitted(tmp_path: Path):
@@ -555,12 +610,12 @@ def test_runtime_skips_residual_artifacts_for_baseline_models(tmp_path: Path):
     assert not (output_root / "residual" / "Naive").exists()
 
 
-def test_repo_config_keeps_baseline_jobs_empty():
+def test_repo_config_keeps_only_naive_baseline_job():
     loaded = load_app_config(REPO_ROOT, config_path=REPO_ROOT / "config.yaml")
     params_by_model = {job.model: job.params for job in loaded.config.jobs}
     assert params_by_model["Naive"] == {}
-    assert params_by_model["SeasonalNaive"] == {}
-    assert params_by_model["HistoricAverage"] == {}
+    assert "SeasonalNaive" not in params_by_model
+    assert "HistoricAverage" not in params_by_model
 
 
 def test_repo_config_sets_explicit_itransformer_fairness_target():

@@ -40,6 +40,16 @@ def _selected_jobs(loaded: LoadedConfig, names: list[str] | None):
     return [job for job in loaded.config.jobs if job.model in allowed]
 
 
+def _default_output_root(repo_root: Path, loaded: LoadedConfig) -> Path:
+    task_name = (loaded.config.task.name or "").strip()
+    if not task_name:
+        return repo_root / "runs" / "validation"
+    safe_name = "".join(
+        char if char.isalnum() or char in {"-", "_", "."} else "-" for char in task_name
+    ).strip(".-")
+    return repo_root / "runs" / (safe_name or "validation")
+
+
 def _build_resolved_artifacts(
     repo_root: Path, loaded: LoadedConfig, output_root: Path
 ) -> dict[str, Path]:
@@ -609,9 +619,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         repo_root, config_path=config_path, config_toml_path=args.config_toml
     )
     output_root = (
-        Path(args.output_root)
-        if args.output_root
-        else repo_root / "runs" / "validation"
+        Path(args.output_root) if args.output_root else _default_output_root(repo_root, loaded)
     )
     paths = _build_resolved_artifacts(repo_root, loaded, output_root)
     selected_jobs = _selected_jobs(loaded, args.jobs)

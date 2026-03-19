@@ -49,6 +49,11 @@ class RuntimeConfig:
 
 
 @dataclass(frozen=True)
+class TaskConfig:
+    name: str | None = None
+
+
+@dataclass(frozen=True)
 class TrainingConfig:
     train_protocol: str = "expanding_window_tscv"
     input_size: int = 64
@@ -97,6 +102,7 @@ class JobConfig:
 
 @dataclass(frozen=True)
 class AppConfig:
+    task: TaskConfig
     dataset: DatasetConfig
     runtime: RuntimeConfig
     training: TrainingConfig
@@ -107,6 +113,8 @@ class AppConfig:
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
+        if self.task.name is None:
+            payload.pop("task", None)
         payload["dataset"]["path"] = str(self.dataset.path)
         return payload
 
@@ -179,6 +187,7 @@ def _normalize_job(job: dict[str, Any]) -> JobConfig:
 
 
 def _normalize_payload(payload: dict[str, Any], base_dir: Path) -> AppConfig:
+    task = dict(payload.get("task", {}))
     dataset = dict(payload.get("dataset", {}))
     runtime = dict(payload.get("runtime", {}))
     training = dict(payload.get("training", {}))
@@ -240,6 +249,9 @@ def _normalize_payload(payload: dict[str, Any], base_dir: Path) -> AppConfig:
             )
 
     return AppConfig(
+        task=TaskConfig(name=str(task["name"]).strip() or None)
+        if "name" in task
+        else TaskConfig(),
         dataset=DatasetConfig(
             path=dataset_path,
             target_col=target_col,

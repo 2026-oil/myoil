@@ -1,9 +1,0 @@
-{
-  "job_name": "smoke_tft",
-  "model": "TFT",
-  "train_source": "oof_cv",
-  "residual_model": "lstm",
-  "train_rows": 2,
-  "corrected_cv_rows": 2,
-  "corrected_holdout_rows": 2
-}

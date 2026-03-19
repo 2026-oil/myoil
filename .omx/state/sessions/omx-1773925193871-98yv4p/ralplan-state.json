@@ -1,0 +1,11 @@
+{
+  "active": true,
+  "started_at": "2026-03-19T13:17:00Z",
+  "current_phase": "planning",
+  "task_description": "Consensus planning for integrating seven external model families into NeuralForecast from .omx/specs/deep-interview-seven-external-model-families.md",
+  "source_spec": ".omx/specs/deep-interview-seven-external-model-families.md",
+  "profile": "consensus",
+  "current_step": "gather_repo_facts",
+  "iteration": 12,
+  "last_turn_at": "2026-03-19T13:19:12.536Z"
+}
