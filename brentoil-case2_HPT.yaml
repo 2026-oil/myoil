@@ -28,7 +28,7 @@ training:
   loss: mse
 cv:
   horizon: 8
-  step_size: 4
+  step_size: 8
   n_windows: 12
   gap: 0
   max_train_size: null

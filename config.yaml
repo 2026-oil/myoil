@@ -29,7 +29,7 @@ cv:
   # Time-series cross-validation uses expanding windows:
   # each fold trains on all data up to the cutoff and forecasts the next horizon.
   horizon: 12
-  step_size: 4
+  step_size: 8
   n_windows: 24
   gap: 0
   max_train_size:
