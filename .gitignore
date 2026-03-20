@@ -43,4 +43,7 @@ nbs/_extensions
 
 *.png
 
+.omx/
+.venv/
+
 CLAUDE.md
