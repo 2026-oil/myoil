@@ -1,0 +1,81 @@
+{
+  "active": false,
+  "mode": "team",
+  "iteration": 0,
+  "max_iterations": 50,
+  "current_phase": "cancelled",
+  "task_description": "Execute PRD /tmp/neuralforecast-seven-team-20260319T132922Z/prd-neuralforecast-seven-model-families-20260319.md in /home/sonet/.openclaw/workspace/research/neuralforecast. Follow /tmp/neuralforecast-seven-team-20260319T132922Z/ralplan-neuralforecast-seven-model-families-20260319-v2.md and /tmp/neuralforecast-seven-team-20260319T132922Z/test-spec-neuralforecast-seven-model-families-20260319.md. Ownership lanes: worker1 Lane A (Nonstationary Transformer + DeepEDM), worker2 Lane B (Mamba + S-Mamba + CMamba), worker3 Lane C (xLSTM-Mixer + DUET), worker4 Lane D shared surfaces/tests/verification harness. Keep models/__init__.py + auto.py + core.py single-owner under worker4. No new dependencies. Repo-native integration. CPU-first verification.",
+  "started_at": "2026-03-19T13:29:37.242Z",
+  "tmux_pane_id": "%216",
+  "tmux_pane_set_at": "2026-03-19T13:29:37.242Z",
+  "linked_ralph": false,
+  "team_name": "execute-prd-tmp-neuralforecast",
+  "agent_count": 4,
+  "agent_types": "executor",
+  "available_agent_types": [
+    "analyst",
+    "api-reviewer",
+    "architect",
+    "build-fixer",
+    "code-reviewer",
+    "code-simplifier",
+    "critic",
+    "debugger",
+    "deep-executor",
+    "dependency-expert",
+    "designer",
+    "executor",
+    "explore",
+    "explore-harness",
+    "git-master",
+    "information-architect",
+    "performance-reviewer",
+    "planner",
+    "product-analyst",
+    "product-manager",
+    "qa-tester",
+    "quality-reviewer",
+    "quality-strategist",
+    "researcher",
+    "scientist",
+    "security-reviewer",
+    "sisyphus-lite",
+    "style-reviewer",
+    "team-executor",
+    "team-orchestrator",
+    "test-engineer",
+    "ux-researcher",
+    "verifier",
+    "vision",
+    "writer"
+  ],
+  "staffing_summary": "test-engineer x1 (primary delivery lane, medium reasoning); test-engineer x1 (verification + regression lane, medium reasoning); architect x1 (specialist support lane, high reasoning); test-engineer x1 (extra implementation capacity, medium reasoning)",
+  "staffing_allocations": [
+    {
+      "role": "test-engineer",
+      "count": 1,
+      "reason": "primary delivery lane",
+      "reasoningEffort": "medium"
+    },
+    {
+      "role": "test-engineer",
+      "count": 1,
+      "reason": "verification + regression lane",
+      "reasoningEffort": "medium"
+    },
+    {
+      "role": "architect",
+      "count": 1,
+      "reason": "specialist support lane",
+      "reasoningEffort": "high"
+    },
+    {
+      "role": "test-engineer",
+      "count": 1,
+      "reason": "extra implementation capacity",
+      "reasoningEffort": "medium"
+    }
+  ],
+  "completed_at": "2026-03-19T13:43:12.098Z",
+  "last_turn_at": "2026-03-19T13:43:11.498Z"
+}

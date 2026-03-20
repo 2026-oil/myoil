@@ -1,0 +1,33 @@
+{
+  "active": false,
+  "current_phase": "completed",
+  "task_description": "Execute NeuralForecast seven external model families via team",
+  "team_name": "execute-prd-tmp-neuralforecast",
+  "tmux_target": "omx-neuralforecast-main-1773925193905-htowfk:0",
+  "workers": 4,
+  "workspace_mode": "worktree",
+  "artifact_tmpdir": "/tmp/neuralforecast-seven-team-20260319T132922Z",
+  "git_stash_message": "omx-team-launch-20260319T132922Z",
+  "current_step": "monitoring",
+  "iteration": 2,
+  "last_turn_at": "2026-03-19T13:43:11.498Z",
+  "tasks": {
+    "completed": 4,
+    "failed": 0
+  },
+  "completed_lanes": [
+    "worker-1 lane A",
+    "worker-2 lane B"
+  ],
+  "active_lanes": [
+    "worker-3 lane C",
+    "worker-4 lane D"
+  ],
+  "completed_at": "2026-03-19T13:43:30Z",
+  "shutdown": "complete",
+  "leader_merge_conflicts": [
+    "tests/test_models/test_deepedm.py",
+    "tests/test_models/test_nonstationary_transformer.py"
+  ],
+  "note": "Team orchestration finished and shutdown completed, but leader workspace still has unresolved merge conflicts from worker-4 shutdown merge."
+}
