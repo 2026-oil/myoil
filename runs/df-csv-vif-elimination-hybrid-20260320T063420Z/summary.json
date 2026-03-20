@@ -1,0 +1,639 @@
+{
+  "generated_at_utc": "2026-03-20T06:35:16.678243+00:00",
+  "threshold": 10.0,
+  "method": "hybrid iterative elimination: approximate VIF from correlation pseudo-inverse for fast selection, exact OLS-style VIF verification on final set",
+  "results": {
+    "Com_CrudeOil:raw": {
+      "n_obs": 584,
+      "initial_predictors": 89,
+      "removed_count": 58,
+      "final_predictors": 31,
+      "final_max_vif": 8.832229133408669,
+      "final_high_count_gt5": 15,
+      "final_severe_count_gt10": 0,
+      "first_10_removed": [
+        {
+          "iteration": 0,
+          "removed_variable": "BS_Core_Index_Integrated",
+          "selection_vif_approx": 80315131.29018763,
+          "removed_abs_target_corr": 0.17943500876069524,
+          "remaining_predictors_after_removal": 88
+        },
+        {
+          "iteration": 1,
+          "removed_variable": "BS_Core_Index_A",
+          "selection_vif_approx": 70005856.5098382,
+          "removed_abs_target_corr": 0.1812506084712448,
+          "remaining_predictors_after_removal": 87
+        },
+        {
+          "iteration": 2,
+          "removed_variable": "BS_Core_Index_B",
+          "selection_vif_approx": 63985817.037307,
+          "removed_abs_target_corr": 0.5521867355984692,
+          "remaining_predictors_after_removal": 86
+        },
+        {
+          "iteration": 3,
+          "removed_variable": "Idx_SnP500",
+          "selection_vif_approx": 7198.320772356872,
+          "removed_abs_target_corr": 0.537090522418116,
+          "remaining_predictors_after_removal": 85
+        },
+        {
+          "iteration": 4,
+          "removed_variable": "Com_LMEX",
+          "selection_vif_approx": 4851.484244757699,
+          "removed_abs_target_corr": 0.7398805081098754,
+          "remaining_predictors_after_removal": 84
+        },
+        {
+          "iteration": 5,
+          "removed_variable": "Bonds_US_1Y",
+          "selection_vif_approx": 4034.290924307865,
+          "removed_abs_target_corr": 0.5880081544697688,
+          "remaining_predictors_after_removal": 83
+        },
+        {
+          "iteration": 6,
+          "removed_variable": "Bonds_US_2Y",
+          "selection_vif_approx": 751.2212608509385,
+          "removed_abs_target_corr": 0.6237176909933271,
+          "remaining_predictors_after_removal": 82
+        },
+        {
+          "iteration": 7,
+          "removed_variable": "Bonds_AUS_10Y",
+          "selection_vif_approx": 696.4228360168767,
+          "removed_abs_target_corr": 0.5065201999677431,
+          "remaining_predictors_after_removal": 81
+        },
+        {
+          "iteration": 8,
+          "removed_variable": "Idx_CH50",
+          "selection_vif_approx": 651.6127896563193,
+          "removed_abs_target_corr": 0.2617143489322619,
+          "remaining_predictors_after_removal": 80
+        },
+        {
+          "iteration": 9,
+          "removed_variable": "Bonds_CHN_30Y",
+          "selection_vif_approx": 578.3854304302232,
+          "removed_abs_target_corr": 0.35459609220145827,
+          "remaining_predictors_after_removal": 79
+        }
+      ],
+      "last_10_removed": [
+        {
+          "iteration": 48,
+          "removed_variable": "Com_Wheat",
+          "selection_vif_approx": 18.1937990350553,
+          "removed_abs_target_corr": 0.7243604391002969,
+          "remaining_predictors_after_removal": 40
+        },
+        {
+          "iteration": 49,
+          "removed_variable": "Idx_HangSeng",
+          "selection_vif_approx": 17.3131074036141,
+          "removed_abs_target_corr": 0.3183852505638969,
+          "remaining_predictors_after_removal": 39
+        },
+        {
+          "iteration": 50,
+          "removed_variable": "Com_Coal",
+          "selection_vif_approx": 16.591306322958683,
+          "removed_abs_target_corr": 0.7705969114600648,
+          "remaining_predictors_after_removal": 38
+        },
+        {
+          "iteration": 51,
+          "removed_variable": "EX_USD_CNY",
+          "selection_vif_approx": 15.566345830771938,
+          "removed_abs_target_corr": 0.18711003477281646,
+          "remaining_predictors_after_removal": 37
+        },
+        {
+          "iteration": 52,
+          "removed_variable": "Bonds_KOR_10Y",
+          "selection_vif_approx": 13.796461516926406,
+          "removed_abs_target_corr": 0.736218487871644,
+          "remaining_predictors_after_removal": 36
+        },
+        {
+          "iteration": 53,
+          "removed_variable": "Com_Coffee",
+          "selection_vif_approx": 13.347464102609525,
+          "removed_abs_target_corr": 0.4149138761117267,
+          "remaining_predictors_after_removal": 35
+        },
+        {
+          "iteration": 54,
+          "removed_variable": "Com_OrangeJuice",
+          "selection_vif_approx": 12.144596858704894,
+          "removed_abs_target_corr": 0.43344827557698906,
+          "remaining_predictors_after_removal": 34
+        },
+        {
+          "iteration": 55,
+          "removed_variable": "Com_Cotton",
+          "selection_vif_approx": 11.612366797597796,
+          "removed_abs_target_corr": 0.7548271630839054,
+          "remaining_predictors_after_removal": 33
+        },
+        {
+          "iteration": 56,
+          "removed_variable": "Com_LME_Ni_Cash",
+          "selection_vif_approx": 10.911034385940107,
+          "removed_abs_target_corr": 0.7914483052029073,
+          "remaining_predictors_after_removal": 32
+        },
+        {
+          "iteration": 57,
+          "removed_variable": "Com_Barley",
+          "selection_vif_approx": 10.465706292609822,
+          "removed_abs_target_corr": 0.7351986780060489,
+          "remaining_predictors_after_removal": 31
+        }
+      ],
+      "first_10_kept": [
+        "Com_LME_Pb_Cash",
+        "Com_LME_Ni_Spread",
+        "Com_LME_Cu_Spread",
+        "Com_LME_Al_Spread",
+        "Com_LME_Pb_Spread",
+        "Com_LME_Sn_Spread",
+        "Com_LME_Zn_Spread",
+        "Com_LME_Cu_Inv",
+        "Com_LME_Pb_Inv",
+        "Com_LME_Sn_Inv"
+      ]
+    },
+    "Com_CrudeOil:diff1": {
+      "n_obs": 583,
+      "initial_predictors": 89,
+      "removed_count": 9,
+      "final_predictors": 80,
+      "final_max_vif": 7.159293181826744,
+      "final_high_count_gt5": 2,
+      "final_severe_count_gt10": 0,
+      "first_10_removed": [
+        {
+          "iteration": 0,
+          "removed_variable": "BS_Core_Index_Integrated",
+          "selection_vif_approx": 75089177.30027434,
+          "removed_abs_target_corr": 0.3237257027460248,
+          "remaining_predictors_after_removal": 88
+        },
+        {
+          "iteration": 1,
+          "removed_variable": "BS_Core_Index_A",
+          "selection_vif_approx": 64651142.19663667,
+          "removed_abs_target_corr": 0.33958506467070326,
+          "remaining_predictors_after_removal": 87
+        },
+        {
+          "iteration": 2,
+          "removed_variable": "BS_Core_Index_B",
+          "selection_vif_approx": 52209416.842963,
+          "removed_abs_target_corr": 0.13463888281609027,
+          "remaining_predictors_after_removal": 86
+        },
+        {
+          "iteration": 3,
+          "removed_variable": "Idx_SnPGlobal1200",
+          "selection_vif_approx": 42.80711131882817,
+          "removed_abs_target_corr": 0.24941777309040333,
+          "remaining_predictors_after_removal": 85
+        },
+        {
+          "iteration": 4,
+          "removed_variable": "Idx_CSI300",
+          "selection_vif_approx": 31.86212007534398,
+          "removed_abs_target_corr": 0.1637703408064367,
+          "remaining_predictors_after_removal": 84
+        },
+        {
+          "iteration": 5,
+          "removed_variable": "Com_LMEX",
+          "selection_vif_approx": 26.64096405741887,
+          "removed_abs_target_corr": 0.3367701865094888,
+          "remaining_predictors_after_removal": 83
+        },
+        {
+          "iteration": 6,
+          "removed_variable": "Idx_Shanghai50",
+          "selection_vif_approx": 21.42428637909778,
+          "removed_abs_target_corr": 0.16027658588524643,
+          "remaining_predictors_after_removal": 82
+        },
+        {
+          "iteration": 7,
+          "removed_variable": "Com_BloombergCommodity_BCOM",
+          "selection_vif_approx": 18.783360453507367,
+          "removed_abs_target_corr": 0.725119146153199,
+          "remaining_predictors_after_removal": 81
+        },
+        {
+          "iteration": 8,
+          "removed_variable": "Bonds_US_2Y",
+          "selection_vif_approx": 10.662070057506714,
+          "removed_abs_target_corr": 0.22780765665722444,
+          "remaining_predictors_after_removal": 80
+        }
+      ],
+      "last_10_removed": [
+        {
+          "iteration": 0,
+          "removed_variable": "BS_Core_Index_Integrated",
+          "selection_vif_approx": 75089177.30027434,
+          "removed_abs_target_corr": 0.3237257027460248,
+          "remaining_predictors_after_removal": 88
+        },
+        {
+          "iteration": 1,
+          "removed_variable": "BS_Core_Index_A",
+          "selection_vif_approx": 64651142.19663667,
+          "removed_abs_target_corr": 0.33958506467070326,
+          "remaining_predictors_after_removal": 87
+        },
+        {
+          "iteration": 2,
+          "removed_variable": "BS_Core_Index_B",
+          "selection_vif_approx": 52209416.842963,
+          "removed_abs_target_corr": 0.13463888281609027,
+          "remaining_predictors_after_removal": 86
+        },
+        {
+          "iteration": 3,
+          "removed_variable": "Idx_SnPGlobal1200",
+          "selection_vif_approx": 42.80711131882817,
+          "removed_abs_target_corr": 0.24941777309040333,
+          "remaining_predictors_after_removal": 85
+        },
+        {
+          "iteration": 4,
+          "removed_variable": "Idx_CSI300",
+          "selection_vif_approx": 31.86212007534398,
+          "removed_abs_target_corr": 0.1637703408064367,
+          "remaining_predictors_after_removal": 84
+        },
+        {
+          "iteration": 5,
+          "removed_variable": "Com_LMEX",
+          "selection_vif_approx": 26.64096405741887,
+          "removed_abs_target_corr": 0.3367701865094888,
+          "remaining_predictors_after_removal": 83
+        },
+        {
+          "iteration": 6,
+          "removed_variable": "Idx_Shanghai50",
+          "selection_vif_approx": 21.42428637909778,
+          "removed_abs_target_corr": 0.16027658588524643,
+          "remaining_predictors_after_removal": 82
+        },
+        {
+          "iteration": 7,
+          "removed_variable": "Com_BloombergCommodity_BCOM",
+          "selection_vif_approx": 18.783360453507367,
+          "removed_abs_target_corr": 0.725119146153199,
+          "remaining_predictors_after_removal": 81
+        },
+        {
+          "iteration": 8,
+          "removed_variable": "Bonds_US_2Y",
+          "selection_vif_approx": 10.662070057506714,
+          "removed_abs_target_corr": 0.22780765665722444,
+          "remaining_predictors_after_removal": 80
+        }
+      ],
+      "first_10_kept": [
+        "Com_LME_Ni_Cash",
+        "Com_LME_Cu_Cash",
+        "Com_LME_Al_Cash",
+        "Com_LME_Pb_Cash",
+        "Com_LME_Sn_Cash",
+        "Com_LME_Zn_Cash",
+        "Com_LME_Ni_Spread",
+        "Com_LME_Cu_Spread",
+        "Com_LME_Al_Spread",
+        "Com_LME_Pb_Spread"
+      ]
+    },
+    "Com_BrentCrudeOil:raw": {
+      "n_obs": 584,
+      "initial_predictors": 89,
+      "removed_count": 58,
+      "final_predictors": 31,
+      "final_max_vif": 8.832229133408669,
+      "final_high_count_gt5": 15,
+      "final_severe_count_gt10": 0,
+      "first_10_removed": [
+        {
+          "iteration": 0,
+          "removed_variable": "BS_Core_Index_Integrated",
+          "selection_vif_approx": 80315130.60186821,
+          "removed_abs_target_corr": 0.1646763653433928,
+          "remaining_predictors_after_removal": 88
+        },
+        {
+          "iteration": 1,
+          "removed_variable": "BS_Core_Index_A",
+          "selection_vif_approx": 70005856.25933033,
+          "removed_abs_target_corr": 0.19359972157181718,
+          "remaining_predictors_after_removal": 87
+        },
+        {
+          "iteration": 2,
+          "removed_variable": "BS_Core_Index_B",
+          "selection_vif_approx": 63985817.68593255,
+          "removed_abs_target_corr": 0.540344668968237,
+          "remaining_predictors_after_removal": 86
+        },
+        {
+          "iteration": 3,
+          "removed_variable": "Idx_SnP500",
+          "selection_vif_approx": 7198.32075881714,
+          "removed_abs_target_corr": 0.5122305052463864,
+          "remaining_predictors_after_removal": 85
+        },
+        {
+          "iteration": 4,
+          "removed_variable": "Com_LMEX",
+          "selection_vif_approx": 4851.484245091358,
+          "removed_abs_target_corr": 0.7191121107030622,
+          "remaining_predictors_after_removal": 84
+        },
+        {
+          "iteration": 5,
+          "removed_variable": "Bonds_US_1Y",
+          "selection_vif_approx": 4034.2909256858457,
+          "removed_abs_target_corr": 0.6036595408976656,
+          "remaining_predictors_after_removal": 83
+        },
+        {
+          "iteration": 6,
+          "removed_variable": "Bonds_US_2Y",
+          "selection_vif_approx": 751.2212612071504,
+          "removed_abs_target_corr": 0.6393025858830083,
+          "remaining_predictors_after_removal": 82
+        },
+        {
+          "iteration": 7,
+          "removed_variable": "Bonds_AUS_10Y",
+          "selection_vif_approx": 696.4228380241135,
+          "removed_abs_target_corr": 0.49470395301250664,
+          "remaining_predictors_after_removal": 81
+        },
+        {
+          "iteration": 8,
+          "removed_variable": "Idx_CH50",
+          "selection_vif_approx": 651.6127885004282,
+          "removed_abs_target_corr": 0.2523943430779695,
+          "remaining_predictors_after_removal": 80
+        },
+        {
+          "iteration": 9,
+          "removed_variable": "Bonds_CHN_30Y",
+          "selection_vif_approx": 578.385428862855,
+          "removed_abs_target_corr": 0.31549213687460026,
+          "remaining_predictors_after_removal": 79
+        }
+      ],
+      "last_10_removed": [
+        {
+          "iteration": 48,
+          "removed_variable": "Com_Wheat",
+          "selection_vif_approx": 18.1937990350553,
+          "removed_abs_target_corr": 0.7056793847298847,
+          "remaining_predictors_after_removal": 40
+        },
+        {
+          "iteration": 49,
+          "removed_variable": "Idx_HangSeng",
+          "selection_vif_approx": 17.3131074036141,
+          "removed_abs_target_corr": 0.27734230677116767,
+          "remaining_predictors_after_removal": 39
+        },
+        {
+          "iteration": 50,
+          "removed_variable": "Com_Coal",
+          "selection_vif_approx": 16.591306322958683,
+          "removed_abs_target_corr": 0.7643878884887794,
+          "remaining_predictors_after_removal": 38
+        },
+        {
+          "iteration": 51,
+          "removed_variable": "EX_USD_CNY",
+          "selection_vif_approx": 15.566345830771938,
+          "removed_abs_target_corr": 0.18748578580023653,
+          "remaining_predictors_after_removal": 37
+        },
+        {
+          "iteration": 52,
+          "removed_variable": "Bonds_KOR_10Y",
+          "selection_vif_approx": 13.796461516926406,
+          "removed_abs_target_corr": 0.7328843141738842,
+          "remaining_predictors_after_removal": 36
+        },
+        {
+          "iteration": 53,
+          "removed_variable": "Com_Coffee",
+          "selection_vif_approx": 13.347464102609525,
+          "removed_abs_target_corr": 0.37911851144404296,
+          "remaining_predictors_after_removal": 35
+        },
+        {
+          "iteration": 54,
+          "removed_variable": "Com_OrangeJuice",
+          "selection_vif_approx": 12.144596858704894,
+          "removed_abs_target_corr": 0.4078598631319712,
+          "remaining_predictors_after_removal": 34
+        },
+        {
+          "iteration": 55,
+          "removed_variable": "Com_Cotton",
+          "selection_vif_approx": 11.612366797597796,
+          "removed_abs_target_corr": 0.7381173752640662,
+          "remaining_predictors_after_removal": 33
+        },
+        {
+          "iteration": 56,
+          "removed_variable": "Com_LME_Ni_Cash",
+          "selection_vif_approx": 10.911034385940107,
+          "removed_abs_target_corr": 0.7811731540615984,
+          "remaining_predictors_after_removal": 32
+        },
+        {
+          "iteration": 57,
+          "removed_variable": "Com_Barley",
+          "selection_vif_approx": 10.465706292609822,
+          "removed_abs_target_corr": 0.7235712938677665,
+          "remaining_predictors_after_removal": 31
+        }
+      ],
+      "first_10_kept": [
+        "Com_LME_Pb_Cash",
+        "Com_LME_Ni_Spread",
+        "Com_LME_Cu_Spread",
+        "Com_LME_Al_Spread",
+        "Com_LME_Pb_Spread",
+        "Com_LME_Sn_Spread",
+        "Com_LME_Zn_Spread",
+        "Com_LME_Cu_Inv",
+        "Com_LME_Pb_Inv",
+        "Com_LME_Sn_Inv"
+      ]
+    },
+    "Com_BrentCrudeOil:diff1": {
+      "n_obs": 583,
+      "initial_predictors": 89,
+      "removed_count": 9,
+      "final_predictors": 80,
+      "final_max_vif": 7.159293181826744,
+      "final_high_count_gt5": 2,
+      "final_severe_count_gt10": 0,
+      "first_10_removed": [
+        {
+          "iteration": 0,
+          "removed_variable": "BS_Core_Index_Integrated",
+          "selection_vif_approx": 75089177.41822971,
+          "removed_abs_target_corr": 0.2631945850146386,
+          "remaining_predictors_after_removal": 88
+        },
+        {
+          "iteration": 1,
+          "removed_variable": "BS_Core_Index_A",
+          "selection_vif_approx": 64651143.341433845,
+          "removed_abs_target_corr": 0.27343999808915237,
+          "remaining_predictors_after_removal": 87
+        },
+        {
+          "iteration": 2,
+          "removed_variable": "BS_Core_Index_B",
+          "selection_vif_approx": 52209418.38238148,
+          "removed_abs_target_corr": 0.12204531369476711,
+          "remaining_predictors_after_removal": 86
+        },
+        {
+          "iteration": 3,
+          "removed_variable": "Idx_SnPGlobal1200",
+          "selection_vif_approx": 42.80711131232535,
+          "removed_abs_target_corr": 0.2639919947019545,
+          "remaining_predictors_after_removal": 85
+        },
+        {
+          "iteration": 4,
+          "removed_variable": "Idx_CSI300",
+          "selection_vif_approx": 31.86212007369863,
+          "removed_abs_target_corr": 0.1902440810470489,
+          "remaining_predictors_after_removal": 84
+        },
+        {
+          "iteration": 5,
+          "removed_variable": "Com_LMEX",
+          "selection_vif_approx": 26.64096405895305,
+          "removed_abs_target_corr": 0.3641434880720772,
+          "remaining_predictors_after_removal": 83
+        },
+        {
+          "iteration": 6,
+          "removed_variable": "Idx_Shanghai50",
+          "selection_vif_approx": 21.424286376403373,
+          "removed_abs_target_corr": 0.1881712480120802,
+          "remaining_predictors_after_removal": 82
+        },
+        {
+          "iteration": 7,
+          "removed_variable": "Com_BloombergCommodity_BCOM",
+          "selection_vif_approx": 18.783360343255275,
+          "removed_abs_target_corr": 0.7640938133242744,
+          "remaining_predictors_after_removal": 81
+        },
+        {
+          "iteration": 8,
+          "removed_variable": "Bonds_US_2Y",
+          "selection_vif_approx": 10.662070057479607,
+          "removed_abs_target_corr": 0.2602234155052219,
+          "remaining_predictors_after_removal": 80
+        }
+      ],
+      "last_10_removed": [
+        {
+          "iteration": 0,
+          "removed_variable": "BS_Core_Index_Integrated",
+          "selection_vif_approx": 75089177.41822971,
+          "removed_abs_target_corr": 0.2631945850146386,
+          "remaining_predictors_after_removal": 88
+        },
+        {
+          "iteration": 1,
+          "removed_variable": "BS_Core_Index_A",
+          "selection_vif_approx": 64651143.341433845,
+          "removed_abs_target_corr": 0.27343999808915237,
+          "remaining_predictors_after_removal": 87
+        },
+        {
+          "iteration": 2,
+          "removed_variable": "BS_Core_Index_B",
+          "selection_vif_approx": 52209418.38238148,
+          "removed_abs_target_corr": 0.12204531369476711,
+          "remaining_predictors_after_removal": 86
+        },
+        {
+          "iteration": 3,
+          "removed_variable": "Idx_SnPGlobal1200",
+          "selection_vif_approx": 42.80711131232535,
+          "removed_abs_target_corr": 0.2639919947019545,
+          "remaining_predictors_after_removal": 85
+        },
+        {
+          "iteration": 4,
+          "removed_variable": "Idx_CSI300",
+          "selection_vif_approx": 31.86212007369863,
+          "removed_abs_target_corr": 0.1902440810470489,
+          "remaining_predictors_after_removal": 84
+        },
+        {
+          "iteration": 5,
+          "removed_variable": "Com_LMEX",
+          "selection_vif_approx": 26.64096405895305,
+          "removed_abs_target_corr": 0.3641434880720772,
+          "remaining_predictors_after_removal": 83
+        },
+        {
+          "iteration": 6,
+          "removed_variable": "Idx_Shanghai50",
+          "selection_vif_approx": 21.424286376403373,
+          "removed_abs_target_corr": 0.1881712480120802,
+          "remaining_predictors_after_removal": 82
+        },
+        {
+          "iteration": 7,
+          "removed_variable": "Com_BloombergCommodity_BCOM",
+          "selection_vif_approx": 18.783360343255275,
+          "removed_abs_target_corr": 0.7640938133242744,
+          "remaining_predictors_after_removal": 81
+        },
+        {
+          "iteration": 8,
+          "removed_variable": "Bonds_US_2Y",
+          "selection_vif_approx": 10.662070057479607,
+          "removed_abs_target_corr": 0.2602234155052219,
+          "remaining_predictors_after_removal": 80
+        }
+      ],
+      "first_10_kept": [
+        "Com_LME_Ni_Cash",
+        "Com_LME_Cu_Cash",
+        "Com_LME_Al_Cash",
+        "Com_LME_Pb_Cash",
+        "Com_LME_Sn_Cash",
+        "Com_LME_Zn_Cash",
+        "Com_LME_Ni_Spread",
+        "Com_LME_Cu_Spread",
+        "Com_LME_Al_Spread",
+        "Com_LME_Pb_Spread"
+      ]
+    }
+  }
+}

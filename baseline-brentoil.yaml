@@ -1,0 +1,206 @@
+# Deferred model intent only; do not activate until runtime wiring exists:
+# - DLinear
+# - NLinear
+# - RNN
+# - GRU
+
+task:
+  name: baseline_brentoil
+dataset:
+  path: data/df.csv
+  target_col: Com_BrentCrudeOil
+  dt_col: dt
+  hist_exog_cols:
+  - Com_LME_Ni_Cash
+  - Com_LME_Cu_Cash
+  - Com_LME_Al_Cash
+  - Com_LME_Pb_Cash
+  - Com_LME_Sn_Cash
+  - Com_LME_Zn_Cash
+  - Com_LME_Ni_Spread
+  - Com_LME_Cu_Spread
+  - Com_LME_Al_Spread
+  - Com_LME_Pb_Spread
+  - Com_LME_Sn_Spread
+  - Com_LME_Zn_Spread
+  - Com_LME_Ni_Inv
+  - Com_LME_Cu_Inv
+  - Com_LME_Al_Inv
+  - Com_LME_Pb_Inv
+  - Com_LME_Sn_Inv
+  - Com_LME_Zn_Inv
+  - EX_USD_CNY
+  - EX_USD_KRW
+  - EX_USD_JPY
+  - EX_AUD_USD
+  - EX_USD_BRL
+  - EX_INR_USD
+  - Idx_DxyUSD
+  - Idx_SnP500
+  - Idx_SnPVIX
+  - Bonds_MOVE
+  - Idx_GVZ
+  - Idx_OVX
+  - Com_BloombergCommodity_BCOM
+  - Com_LMEX
+  - Idx_CH50
+  - Idx_CSI300
+  - Idx_Shanghai50
+  - Idx_Shanghai
+  - Idx_HangSeng
+  - Idx_SnPGlobal1200
+  - Bonds_CHN_30Y
+  - Bonds_CHN_20Y
+  - Bonds_CHN_10Y
+  - Bonds_CHN_5Y
+  - Bonds_CHN_2Y
+  - Bonds_CHN_1Y
+  - Bonds_US_10Y
+  - Bonds_US_2Y
+  - Bonds_US_1Y
+  - Bonds_US_3M
+  - Bonds_AUS_10Y
+  - Bonds_AUS_1Y
+  - Bonds_BRZ_10Y
+  - Bonds_BRZ_1Y
+  - Bonds_IND_10Y
+  - Bonds_IND_1Y
+  - Bonds_KOR_10Y
+  - Bonds_KOR_1Y
+  - Com_Gasoline
+  - Com_NaturalGas
+  - Com_Uranium
+  - Com_HRC_Steel
+  - Com_Iron_Ore
+  - Com_Coal
+  - Com_Steel
+  - Com_Gold
+  - Com_Silver
+  - Com_Soybeans
+  - Com_Wheat
+  - Com_Rice
+  - Com_Barley
+  - Com_Cheese
+  - Com_Corn
+  - Com_Oat
+  - Com_Sugar
+  - Com_Cocoa
+  - Com_Milk
+  - Com_OrangeJuice
+  - Com_Coffee
+  - Com_SunflowerOil
+  - Com_PalmOil
+  - Com_Canola
+  - Com_Cotton
+  - Com_Wool
+  - Com_Lumber
+  - BS_Core_Index_A
+  - BS_Core_Index_B
+  - BS_Core_Index_C
+  - BS_Core_Index_Integrated
+  - Com_Oil_Spread
+  futr_exog_cols: []
+  static_exog_cols: []
+runtime:
+  random_seed: 1
+training:
+  train_protocol: expanding_window_tscv
+  input_size: 64
+  season_length: 52
+  batch_size: 32
+  valid_batch_size: 32
+  windows_batch_size: 1024
+  inference_windows_batch_size: 1024
+  learning_rate: 0.001
+  max_steps: 1000
+  val_size: 12
+  val_check_steps: 100
+  early_stop_patience_steps: -1
+  loss: mse
+cv:
+  horizon: 8
+  step_size: 4
+  n_windows: 24
+  gap: 0
+  max_train_size: null
+  overlap_eval_policy: by_cutoff_mean
+scheduler:
+  gpu_ids:
+  - 0
+  - 1
+  max_concurrent_jobs: 2
+  worker_devices: 1
+residual:
+  enabled: false
+  model: xgboost
+  params: {}
+jobs:
+- model: TFT
+  params:
+    hidden_size: 128
+- model: VanillaTransformer
+  params:
+    hidden_size: 128
+    dropout: 0.05
+    scaler_type: identity
+- model: Informer
+  params:
+    hidden_size: 128
+    factor: 3
+    dropout: 0.05
+    scaler_type: identity
+- model: Autoformer
+  params:
+    hidden_size: 128
+    factor: 3
+    dropout: 0.05
+    scaler_type: identity
+- model: FEDformer
+  params:
+    hidden_size: 128
+    modes: 64
+    dropout: 0.05
+    scaler_type: identity
+- model: PatchTST
+  params:
+    hidden_size: 128
+    n_heads: 16
+    encoder_layers: 3
+    patch_len: 16
+    dropout: 0.2
+    scaler_type: identity
+- model: LSTM
+  params:
+    encoder_hidden_size: 128
+    decoder_hidden_size: 128
+- model: NHITS
+  params:
+    mlp_units:
+    - - 64
+      - 64
+    - - 64
+      - 64
+    - - 64
+      - 64
+    n_pool_kernel_size:
+    - 2
+    - 2
+    - 1
+    n_freq_downsample:
+    - 4
+    - 2
+    - 1
+    dropout_prob_theta: 0.0
+    activation: ReLU
+- model: iTransformer
+  params:
+    hidden_size: 128
+    n_heads: 8
+    e_layers: 2
+    d_ff: 256
+- model: Naive
+  params: {}
+- model: SeasonalNaive
+  params: {}
+- model: HistoricAverage
+  params: {}

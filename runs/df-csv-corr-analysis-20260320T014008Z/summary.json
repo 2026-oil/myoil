@@ -1,0 +1,326 @@
+{
+  "input_path": "data/df.csv",
+  "output_dir": "runs/df-csv-corr-analysis-20260320T014008Z",
+  "row_count": 584,
+  "numeric_column_count_excluding_dt": 89,
+  "other_variable_count": 87,
+  "targets": [
+    "Com_CrudeOil",
+    "Com_BrentCrudeOil"
+  ],
+  "raw_summary": {
+    "Com_CrudeOil": {
+      "top_positive": [
+        {
+          "variable": "Com_Gasoline",
+          "pearson_corr": 0.9596477763569006
+        },
+        {
+          "variable": "Com_BloombergCommodity_BCOM",
+          "pearson_corr": 0.82320071486374
+        },
+        {
+          "variable": "Com_LME_Ni_Cash",
+          "pearson_corr": 0.7914483052029073
+        },
+        {
+          "variable": "Com_Coal",
+          "pearson_corr": 0.7705969114600648
+        },
+        {
+          "variable": "Com_Canola",
+          "pearson_corr": 0.7593646880647547
+        },
+        {
+          "variable": "Com_Cotton",
+          "pearson_corr": 0.7548271630839054
+        },
+        {
+          "variable": "Com_LME_Al_Cash",
+          "pearson_corr": 0.7530524230146465
+        },
+        {
+          "variable": "Com_LMEX",
+          "pearson_corr": 0.7398805081098754
+        }
+      ],
+      "top_negative": [
+        {
+          "variable": "Com_LME_Ni_Inv",
+          "pearson_corr": -0.7043273885491448
+        },
+        {
+          "variable": "Com_LME_Al_Inv",
+          "pearson_corr": -0.5943371211268318
+        },
+        {
+          "variable": "Com_Wool",
+          "pearson_corr": -0.5033604315411498
+        },
+        {
+          "variable": "Com_LME_Zn_Inv",
+          "pearson_corr": -0.4417867828428455
+        },
+        {
+          "variable": "Com_LME_Cu_Inv",
+          "pearson_corr": -0.40357814061480585
+        },
+        {
+          "variable": "Bonds_CHN_30Y",
+          "pearson_corr": -0.35459609220145827
+        },
+        {
+          "variable": "Idx_HangSeng",
+          "pearson_corr": -0.3183852505638969
+        },
+        {
+          "variable": "Bonds_CHN_1Y",
+          "pearson_corr": -0.29362692122724576
+        }
+      ],
+      "bucket_counts": {
+        "ge_0_7": 16,
+        "ge_0_5": 42,
+        "ge_0_3": 56
+      }
+    },
+    "Com_BrentCrudeOil": {
+      "top_positive": [
+        {
+          "variable": "Com_Gasoline",
+          "pearson_corr": 0.9513152473892688
+        },
+        {
+          "variable": "Com_BloombergCommodity_BCOM",
+          "pearson_corr": 0.8049334068750233
+        },
+        {
+          "variable": "Com_LME_Ni_Cash",
+          "pearson_corr": 0.7811731540615984
+        },
+        {
+          "variable": "Com_Coal",
+          "pearson_corr": 0.7643878884887794
+        },
+        {
+          "variable": "Com_Cotton",
+          "pearson_corr": 0.7381173752640662
+        },
+        {
+          "variable": "Com_LME_Al_Cash",
+          "pearson_corr": 0.7339769202969253
+        },
+        {
+          "variable": "Bonds_KOR_10Y",
+          "pearson_corr": 0.7328843141738842
+        },
+        {
+          "variable": "Com_Barley",
+          "pearson_corr": 0.7235712938677665
+        }
+      ],
+      "top_negative": [
+        {
+          "variable": "Com_LME_Ni_Inv",
+          "pearson_corr": -0.7130061550603075
+        },
+        {
+          "variable": "Com_LME_Al_Inv",
+          "pearson_corr": -0.5991989136181461
+        },
+        {
+          "variable": "Com_LME_Zn_Inv",
+          "pearson_corr": -0.4730266959252074
+        },
+        {
+          "variable": "Com_Wool",
+          "pearson_corr": -0.4482881085452397
+        },
+        {
+          "variable": "Com_LME_Cu_Inv",
+          "pearson_corr": -0.39218093127197684
+        },
+        {
+          "variable": "Bonds_CHN_30Y",
+          "pearson_corr": -0.31549213687460026
+        },
+        {
+          "variable": "Com_LME_Pb_Inv",
+          "pearson_corr": -0.3024593165333303
+        },
+        {
+          "variable": "EX_AUD_USD",
+          "pearson_corr": -0.2849506752694997
+        }
+      ],
+      "bucket_counts": {
+        "ge_0_7": 13,
+        "ge_0_5": 37,
+        "ge_0_3": 55
+      }
+    }
+  },
+  "diff_summary": {
+    "Com_CrudeOil": {
+      "top_positive": [
+        {
+          "variable": "Com_Gasoline",
+          "pearson_corr": 0.7810868590362754
+        },
+        {
+          "variable": "Com_BloombergCommodity_BCOM",
+          "pearson_corr": 0.725119146153199
+        },
+        {
+          "variable": "Com_LME_Al_Cash",
+          "pearson_corr": 0.36592737976474066
+        },
+        {
+          "variable": "Com_PalmOil",
+          "pearson_corr": 0.3584396287586943
+        },
+        {
+          "variable": "Com_LMEX",
+          "pearson_corr": 0.3367701865094888
+        },
+        {
+          "variable": "Com_LME_Cu_Cash",
+          "pearson_corr": 0.2825156152952385
+        },
+        {
+          "variable": "EX_AUD_USD",
+          "pearson_corr": 0.2618416335053329
+        },
+        {
+          "variable": "Com_Soybeans",
+          "pearson_corr": 0.255492173459608
+        }
+      ],
+      "top_negative": [
+        {
+          "variable": "Idx_OVX",
+          "pearson_corr": -0.36931417549375634
+        },
+        {
+          "variable": "BS_Core_Index_A",
+          "pearson_corr": -0.33958506467070326
+        },
+        {
+          "variable": "BS_Core_Index_Integrated",
+          "pearson_corr": -0.3237257027460248
+        },
+        {
+          "variable": "Idx_SnPVIX",
+          "pearson_corr": -0.2681211550562903
+        },
+        {
+          "variable": "EX_USD_BRL",
+          "pearson_corr": -0.26433316810525176
+        },
+        {
+          "variable": "Bonds_MOVE",
+          "pearson_corr": -0.13526012549252966
+        },
+        {
+          "variable": "BS_Core_Index_B",
+          "pearson_corr": -0.13463888281609027
+        },
+        {
+          "variable": "Idx_GVZ",
+          "pearson_corr": -0.12686259251537846
+        }
+      ],
+      "bucket_counts": {
+        "ge_0_7": 2,
+        "ge_0_5": 2,
+        "ge_0_3": 8
+      }
+    },
+    "Com_BrentCrudeOil": {
+      "top_positive": [
+        {
+          "variable": "Com_Gasoline",
+          "pearson_corr": 0.8165817927673042
+        },
+        {
+          "variable": "Com_BloombergCommodity_BCOM",
+          "pearson_corr": 0.7640938133242744
+        },
+        {
+          "variable": "Com_LME_Al_Cash",
+          "pearson_corr": 0.36854405793215433
+        },
+        {
+          "variable": "Com_PalmOil",
+          "pearson_corr": 0.36654630837834845
+        },
+        {
+          "variable": "Com_LMEX",
+          "pearson_corr": 0.3641434880720772
+        },
+        {
+          "variable": "Com_LME_Cu_Cash",
+          "pearson_corr": 0.2999381610001751
+        },
+        {
+          "variable": "EX_AUD_USD",
+          "pearson_corr": 0.2653171570866811
+        },
+        {
+          "variable": "Idx_SnPGlobal1200",
+          "pearson_corr": 0.2639919947019545
+        }
+      ],
+      "top_negative": [
+        {
+          "variable": "Idx_SnPVIX",
+          "pearson_corr": -0.2797118984504444
+        },
+        {
+          "variable": "BS_Core_Index_A",
+          "pearson_corr": -0.27343999808915237
+        },
+        {
+          "variable": "BS_Core_Index_Integrated",
+          "pearson_corr": -0.2631945850146386
+        },
+        {
+          "variable": "EX_USD_BRL",
+          "pearson_corr": -0.2615539807416041
+        },
+        {
+          "variable": "Idx_OVX",
+          "pearson_corr": -0.2461897744787281
+        },
+        {
+          "variable": "Bonds_MOVE",
+          "pearson_corr": -0.13367858456255646
+        },
+        {
+          "variable": "BS_Core_Index_B",
+          "pearson_corr": -0.12204531369476711
+        },
+        {
+          "variable": "EX_USD_CNY",
+          "pearson_corr": -0.10188365576522167
+        }
+      ],
+      "bucket_counts": {
+        "ge_0_7": 2,
+        "ge_0_5": 2,
+        "ge_0_3": 5
+      }
+    }
+  },
+  "artifacts": {
+    "report": "runs/df-csv-corr-analysis-20260320T014008Z/report.md",
+    "raw_wti_csv": "runs/df-csv-corr-analysis-20260320T014008Z/raw_Com_CrudeOil_correlations.csv",
+    "raw_brent_csv": "runs/df-csv-corr-analysis-20260320T014008Z/raw_Com_BrentCrudeOil_correlations.csv",
+    "diff_wti_csv": "runs/df-csv-corr-analysis-20260320T014008Z/diff_Com_CrudeOil_correlations.csv",
+    "diff_brent_csv": "runs/df-csv-corr-analysis-20260320T014008Z/diff_Com_BrentCrudeOil_correlations.csv",
+    "raw_bar": "runs/df-csv-corr-analysis-20260320T014008Z/raw_target_vs_rest_bar.png",
+    "diff_bar": "runs/df-csv-corr-analysis-20260320T014008Z/diff_target_vs_rest_bar.png",
+    "raw_heatmap": "runs/df-csv-corr-analysis-20260320T014008Z/raw_target_vs_rest_heatmap.png",
+    "diff_heatmap": "runs/df-csv-corr-analysis-20260320T014008Z/diff_target_vs_rest_heatmap.png"
+  }
+}

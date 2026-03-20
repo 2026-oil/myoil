@@ -1,0 +1,42 @@
+[
+  {
+    "block_id": "329dd0b4-6a75-81c0-bace-ed6638d07f90",
+    "file_name": "full_raw_Com_CrudeOil_correlations_bar.png",
+    "upload_id": "329dd0b4-6a75-81bd-be58-00b23ddcfda4"
+  },
+  {
+    "block_id": "329dd0b4-6a75-8107-a746-dc5636b82b39",
+    "file_name": "full_raw_Com_BrentCrudeOil_correlations_bar.png",
+    "upload_id": "329dd0b4-6a75-81d2-8b38-00b256d5038d"
+  },
+  {
+    "block_id": "329dd0b4-6a75-816b-9387-d21fe1d1802f",
+    "file_name": "full_diff_Com_CrudeOil_correlations_bar.png",
+    "upload_id": "329dd0b4-6a75-8111-a7cf-00b2b2c09bd2"
+  },
+  {
+    "block_id": "329dd0b4-6a75-813e-bd43-dcd3875867e8",
+    "file_name": "full_diff_Com_BrentCrudeOil_correlations_bar.png",
+    "upload_id": "329dd0b4-6a75-8147-940e-00b2415bed2f"
+  },
+  {
+    "block_id": "329dd0b4-6a75-81a4-b497-fc15a95a6bc7",
+    "file_name": "full_top_vif_com_crudeoil_raw.png",
+    "upload_id": "329dd0b4-6a75-8179-ba98-00b2dc6f22f7"
+  },
+  {
+    "block_id": "329dd0b4-6a75-81a2-8157-f4fc39f2c61d",
+    "file_name": "flagged_corr_heatmap_com_crudeoil_raw.png",
+    "upload_id": "329dd0b4-6a75-81e3-928f-00b21c85cf19"
+  },
+  {
+    "block_id": "329dd0b4-6a75-8137-8a3c-cba3eedfdfcb",
+    "file_name": "full_top_vif_com_brentcrudeoil_raw.png",
+    "upload_id": "329dd0b4-6a75-814d-aa5b-00b2086d6485"
+  },
+  {
+    "block_id": "329dd0b4-6a75-81c6-8ce0-e840e55f46b8",
+    "file_name": "flagged_corr_heatmap_com_brentcrudeoil_raw.png",
+    "upload_id": "329dd0b4-6a75-819e-a5d5-00b2e2c4477e"
+  }
+]

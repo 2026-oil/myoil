@@ -1,0 +1,74 @@
+[
+  {
+    "id": "329dd0b4-6a75-81c0-bace-ed6638d07f90",
+    "caption": "Com_CrudeOil correlation bar chart"
+  },
+  {
+    "id": "329dd0b4-6a75-818a-97e5-d16e8d690ac2",
+    "caption": "Com_CrudeOil full correlation table image"
+  },
+  {
+    "id": "329dd0b4-6a75-8107-a746-dc5636b82b39",
+    "caption": "Com_BrentCrudeOil correlation bar chart"
+  },
+  {
+    "id": "329dd0b4-6a75-81e1-bb75-fe4848c92964",
+    "caption": "Com_BrentCrudeOil full correlation table image"
+  },
+  {
+    "id": "329dd0b4-6a75-816b-9387-d21fe1d1802f",
+    "caption": "diff(Com_CrudeOil) correlation bar chart"
+  },
+  {
+    "id": "329dd0b4-6a75-81fc-b318-f0a08107d8a7",
+    "caption": "diff(Com_CrudeOil) full correlation table image"
+  },
+  {
+    "id": "329dd0b4-6a75-813e-bd43-dcd3875867e8",
+    "caption": "diff(Com_BrentCrudeOil) correlation bar chart"
+  },
+  {
+    "id": "329dd0b4-6a75-8196-be8f-f9d850c73e60",
+    "caption": "diff(Com_BrentCrudeOil) full correlation table image"
+  },
+  {
+    "id": "329dd0b4-6a75-81a4-b497-fc15a95a6bc7",
+    "caption": "Com_CrudeOil top VIF figure (raw only)"
+  },
+  {
+    "id": "329dd0b4-6a75-81a2-8157-f4fc39f2c61d",
+    "caption": "Com_CrudeOil flagged correlation heatmap (raw only)"
+  },
+  {
+    "id": "329dd0b4-6a75-81de-a923-eef8a66cb2f4",
+    "caption": "vif com crudeoil raw"
+  },
+  {
+    "id": "329dd0b4-6a75-8196-9a33-cb46247a1606",
+    "caption": "flagged pairwise com crudeoil raw"
+  },
+  {
+    "id": "329dd0b4-6a75-811d-afc9-ceb362883aaf",
+    "caption": "group summary com crudeoil raw"
+  },
+  {
+    "id": "329dd0b4-6a75-8137-8a3c-cba3eedfdfcb",
+    "caption": "Com_BrentCrudeOil top VIF figure (raw only)"
+  },
+  {
+    "id": "329dd0b4-6a75-81c6-8ce0-e840e55f46b8",
+    "caption": "Com_BrentCrudeOil flagged correlation heatmap (raw only)"
+  },
+  {
+    "id": "329dd0b4-6a75-8185-8943-f0a385514858",
+    "caption": "vif com brentcrudeoil raw"
+  },
+  {
+    "id": "329dd0b4-6a75-8102-81fe-ca4aaaba2795",
+    "caption": "flagged pairwise com brentcrudeoil raw"
+  },
+  {
+    "id": "329dd0b4-6a75-8160-ad1d-d942f3ab31dc",
+    "caption": "group summary com brentcrudeoil raw"
+  }
+]

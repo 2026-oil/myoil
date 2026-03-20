@@ -1,0 +1,514 @@
+{
+  "generated_at_utc": "2026-03-20T02:21:08.436798+00:00",
+  "rule_set": {
+    "vif_high": 5.0,
+    "vif_severe": 10.0,
+    "pairwise_abs_corr_flag": 0.8,
+    "condition_warning": 30.0,
+    "eigenvalue_ratio_warning": 1e-06
+  },
+  "results": {
+    "Com_CrudeOil:raw": {
+      "n_obs": 584,
+      "n_predictors": 88,
+      "dropped_zero_variance": [],
+      "high_vif_count": 86,
+      "severe_vif_count": 82,
+      "condition_number": 2251814774404938.5,
+      "condition_warning": true,
+      "min_eigenvalue": 3.932804842920393e-27,
+      "max_eigenvalue": 19941.95466066658,
+      "eigenvalue_ratio": 1.9721260577717786e-31,
+      "near_singularity": true,
+      "top_vif_variables": [
+        {
+          "variable": "Bonds_MOVE",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_B",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_DxyUSD",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_OVX",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_C",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_A",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_Integrated",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_GVZ",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_SnPVIX",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_SnPGlobal1200",
+          "vif": 7040.1958414870005,
+          "severity": "severe"
+        }
+      ],
+      "group_count": 7
+    },
+    "Com_CrudeOil:diff1": {
+      "n_obs": 583,
+      "n_predictors": 88,
+      "dropped_zero_variance": [],
+      "high_vif_count": 23,
+      "severe_vif_count": 19,
+      "condition_number": 2787659043020064.0,
+      "condition_warning": true,
+      "min_eigenvalue": 8.330134969542119e-28,
+      "max_eigenvalue": 6473.383654540312,
+      "eigenvalue_ratio": 1.286828560469997e-31,
+      "near_singularity": true,
+      "top_vif_variables": [
+        {
+          "variable": "Idx_OVX",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_SnPVIX",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_GVZ",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_C",
+          "vif": 1501199875790165.2,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_Integrated",
+          "vif": 1125899906842624.0,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_DxyUSD",
+          "vif": 750599937895082.6,
+          "severity": "severe"
+        },
+        {
+          "variable": "Bonds_MOVE",
+          "vif": 562949953421312.0,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_B",
+          "vif": 140737488355328.0,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_A",
+          "vif": 102354536985693.1,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_SnPGlobal1200",
+          "vif": 42.81287960481157,
+          "severity": "severe"
+        }
+      ],
+      "group_count": 8
+    },
+    "Com_BrentCrudeOil:raw": {
+      "n_obs": 584,
+      "n_predictors": 88,
+      "dropped_zero_variance": [],
+      "high_vif_count": 86,
+      "severe_vif_count": 82,
+      "condition_number": 2251814785099849.0,
+      "condition_warning": true,
+      "min_eigenvalue": 3.937329998199083e-27,
+      "max_eigenvalue": 19964.90041842513,
+      "eigenvalue_ratio": 1.9721260390386994e-31,
+      "near_singularity": true,
+      "top_vif_variables": [
+        {
+          "variable": "Bonds_MOVE",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_B",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_DxyUSD",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_OVX",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_C",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_A",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_GVZ",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_Integrated",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_SnPVIX",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_SnPGlobal1200",
+          "vif": 6755.216301138122,
+          "severity": "severe"
+        }
+      ],
+      "group_count": 7
+    },
+    "Com_BrentCrudeOil:diff1": {
+      "n_obs": 583,
+      "n_predictors": 88,
+      "dropped_zero_variance": [],
+      "high_vif_count": 23,
+      "severe_vif_count": 19,
+      "condition_number": 2787756974950238.5,
+      "condition_warning": true,
+      "min_eigenvalue": 8.322210516923161e-28,
+      "max_eigenvalue": 6467.6799304409315,
+      "eigenvalue_ratio": 1.2867381513042496e-31,
+      "near_singularity": true,
+      "top_vif_variables": [
+        {
+          "variable": "Idx_SnPVIX",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_OVX",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_GVZ",
+          "vif": Infinity,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_A",
+          "vif": 4503599627370496.0,
+          "severity": "severe"
+        },
+        {
+          "variable": "Bonds_MOVE",
+          "vif": 3002399751580330.5,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_B",
+          "vif": 818836295885544.8,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_DxyUSD",
+          "vif": 818836295885544.8,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_C",
+          "vif": 562949953421312.0,
+          "severity": "severe"
+        },
+        {
+          "variable": "BS_Core_Index_Integrated",
+          "vif": 57007590219879.695,
+          "severity": "severe"
+        },
+        {
+          "variable": "Idx_SnPGlobal1200",
+          "vif": 42.638592092511644,
+          "severity": "severe"
+        }
+      ],
+      "group_count": 7
+    }
+  },
+  "comparisons": {
+    "Com_CrudeOil": {
+      "raw_high_count": 86,
+      "diff_high_count": 23,
+      "raw_severe_count": 82,
+      "diff_severe_count": 19,
+      "persisting_high": [
+        "BS_Core_Index_A",
+        "BS_Core_Index_B",
+        "BS_Core_Index_C",
+        "BS_Core_Index_Integrated",
+        "Bonds_AUS_10Y",
+        "Bonds_MOVE",
+        "Bonds_US_10Y",
+        "Bonds_US_1Y",
+        "Bonds_US_2Y",
+        "Com_BloombergCommodity_BCOM",
+        "Com_BrentCrudeOil",
+        "Com_LMEX",
+        "Com_LME_Cu_Cash",
+        "Idx_CH50",
+        "Idx_CSI300",
+        "Idx_DxyUSD",
+        "Idx_GVZ",
+        "Idx_OVX",
+        "Idx_Shanghai",
+        "Idx_Shanghai50",
+        "Idx_SnP500",
+        "Idx_SnPGlobal1200",
+        "Idx_SnPVIX"
+      ],
+      "raw_only_high": [
+        "Bonds_AUS_1Y",
+        "Bonds_BRZ_10Y",
+        "Bonds_BRZ_1Y",
+        "Bonds_CHN_10Y",
+        "Bonds_CHN_1Y",
+        "Bonds_CHN_20Y",
+        "Bonds_CHN_2Y",
+        "Bonds_CHN_30Y",
+        "Bonds_CHN_5Y",
+        "Bonds_IND_10Y",
+        "Bonds_IND_1Y",
+        "Bonds_KOR_10Y",
+        "Bonds_KOR_1Y",
+        "Bonds_US_3M",
+        "Com_Barley",
+        "Com_Canola",
+        "Com_Cheese",
+        "Com_Coal",
+        "Com_Cocoa",
+        "Com_Coffee",
+        "Com_Corn",
+        "Com_Cotton",
+        "Com_Gasoline",
+        "Com_Gold",
+        "Com_HRC_Steel",
+        "Com_Iron_Ore",
+        "Com_LME_Al_Cash",
+        "Com_LME_Al_Inv",
+        "Com_LME_Cu_Inv",
+        "Com_LME_Cu_Spread",
+        "Com_LME_Ni_Cash",
+        "Com_LME_Ni_Inv",
+        "Com_LME_Ni_Spread",
+        "Com_LME_Pb_Cash",
+        "Com_LME_Pb_Inv",
+        "Com_LME_Sn_Cash",
+        "Com_LME_Sn_Inv",
+        "Com_LME_Sn_Spread",
+        "Com_LME_Zn_Cash",
+        "Com_LME_Zn_Inv",
+        "Com_LME_Zn_Spread",
+        "Com_Lumber",
+        "Com_Milk",
+        "Com_NaturalGas",
+        "Com_Oat",
+        "Com_OrangeJuice",
+        "Com_PalmOil",
+        "Com_Rice",
+        "Com_Silver",
+        "Com_Soybeans",
+        "Com_Steel",
+        "Com_Sugar",
+        "Com_SunflowerOil",
+        "Com_Uranium",
+        "Com_Wheat",
+        "Com_Wool",
+        "EX_AUD_USD",
+        "EX_INR_USD",
+        "EX_USD_BRL",
+        "EX_USD_CNY",
+        "EX_USD_JPY",
+        "EX_USD_KRW",
+        "Idx_HangSeng"
+      ],
+      "diff_only_high": [],
+      "persisting_severe": [
+        "BS_Core_Index_A",
+        "BS_Core_Index_B",
+        "BS_Core_Index_C",
+        "BS_Core_Index_Integrated",
+        "Bonds_MOVE",
+        "Bonds_US_2Y",
+        "Com_BloombergCommodity_BCOM",
+        "Com_LMEX",
+        "Com_LME_Cu_Cash",
+        "Idx_CH50",
+        "Idx_CSI300",
+        "Idx_DxyUSD",
+        "Idx_GVZ",
+        "Idx_OVX",
+        "Idx_Shanghai",
+        "Idx_Shanghai50",
+        "Idx_SnP500",
+        "Idx_SnPGlobal1200",
+        "Idx_SnPVIX"
+      ]
+    },
+    "Com_BrentCrudeOil": {
+      "raw_high_count": 86,
+      "diff_high_count": 23,
+      "raw_severe_count": 82,
+      "diff_severe_count": 19,
+      "persisting_high": [
+        "BS_Core_Index_A",
+        "BS_Core_Index_B",
+        "BS_Core_Index_C",
+        "BS_Core_Index_Integrated",
+        "Bonds_AUS_10Y",
+        "Bonds_MOVE",
+        "Bonds_US_10Y",
+        "Bonds_US_1Y",
+        "Bonds_US_2Y",
+        "Com_BloombergCommodity_BCOM",
+        "Com_CrudeOil",
+        "Com_LMEX",
+        "Com_LME_Cu_Cash",
+        "Idx_CH50",
+        "Idx_CSI300",
+        "Idx_DxyUSD",
+        "Idx_GVZ",
+        "Idx_OVX",
+        "Idx_Shanghai",
+        "Idx_Shanghai50",
+        "Idx_SnP500",
+        "Idx_SnPGlobal1200",
+        "Idx_SnPVIX"
+      ],
+      "raw_only_high": [
+        "Bonds_AUS_1Y",
+        "Bonds_BRZ_10Y",
+        "Bonds_BRZ_1Y",
+        "Bonds_CHN_10Y",
+        "Bonds_CHN_1Y",
+        "Bonds_CHN_20Y",
+        "Bonds_CHN_2Y",
+        "Bonds_CHN_30Y",
+        "Bonds_CHN_5Y",
+        "Bonds_IND_10Y",
+        "Bonds_IND_1Y",
+        "Bonds_KOR_10Y",
+        "Bonds_KOR_1Y",
+        "Bonds_US_3M",
+        "Com_Barley",
+        "Com_Canola",
+        "Com_Cheese",
+        "Com_Coal",
+        "Com_Cocoa",
+        "Com_Coffee",
+        "Com_Corn",
+        "Com_Cotton",
+        "Com_Gasoline",
+        "Com_Gold",
+        "Com_HRC_Steel",
+        "Com_Iron_Ore",
+        "Com_LME_Al_Cash",
+        "Com_LME_Al_Inv",
+        "Com_LME_Cu_Inv",
+        "Com_LME_Cu_Spread",
+        "Com_LME_Ni_Cash",
+        "Com_LME_Ni_Inv",
+        "Com_LME_Ni_Spread",
+        "Com_LME_Pb_Cash",
+        "Com_LME_Pb_Inv",
+        "Com_LME_Sn_Cash",
+        "Com_LME_Sn_Inv",
+        "Com_LME_Sn_Spread",
+        "Com_LME_Zn_Cash",
+        "Com_LME_Zn_Inv",
+        "Com_LME_Zn_Spread",
+        "Com_Lumber",
+        "Com_Milk",
+        "Com_NaturalGas",
+        "Com_Oat",
+        "Com_OrangeJuice",
+        "Com_PalmOil",
+        "Com_Rice",
+        "Com_Silver",
+        "Com_Soybeans",
+        "Com_Steel",
+        "Com_Sugar",
+        "Com_SunflowerOil",
+        "Com_Uranium",
+        "Com_Wheat",
+        "Com_Wool",
+        "EX_AUD_USD",
+        "EX_INR_USD",
+        "EX_USD_BRL",
+        "EX_USD_CNY",
+        "EX_USD_JPY",
+        "EX_USD_KRW",
+        "Idx_HangSeng"
+      ],
+      "diff_only_high": [],
+      "persisting_severe": [
+        "BS_Core_Index_A",
+        "BS_Core_Index_B",
+        "BS_Core_Index_C",
+        "BS_Core_Index_Integrated",
+        "Bonds_MOVE",
+        "Bonds_US_2Y",
+        "Com_BloombergCommodity_BCOM",
+        "Com_LMEX",
+        "Com_LME_Cu_Cash",
+        "Idx_CH50",
+        "Idx_CSI300",
+        "Idx_DxyUSD",
+        "Idx_GVZ",
+        "Idx_OVX",
+        "Idx_Shanghai",
+        "Idx_Shanghai50",
+        "Idx_SnP500",
+        "Idx_SnPGlobal1200",
+        "Idx_SnPVIX"
+      ]
+    }
+  }
+}
