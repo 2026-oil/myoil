@@ -7,16 +7,17 @@ from typing import Any
 import pandas as pd
 from xgboost import Booster, DMatrix, train as xgb_train
 
+from residual.optuna_spaces import DEFAULT_RESIDUAL_PARAMS
 from residual.plugins_base import ResidualContext, ResidualPlugin
 
 
 @dataclass(frozen=True)
 class _XGBoostConfig:
-    n_estimators: int = 32
-    max_depth: int = 3
-    learning_rate: float = 0.1
-    subsample: float = 1.0
-    colsample_bytree: float = 1.0
+    n_estimators: int = DEFAULT_RESIDUAL_PARAMS["n_estimators"]
+    max_depth: int = DEFAULT_RESIDUAL_PARAMS["max_depth"]
+    learning_rate: float = DEFAULT_RESIDUAL_PARAMS["learning_rate"]
+    subsample: float = DEFAULT_RESIDUAL_PARAMS["subsample"]
+    colsample_bytree: float = DEFAULT_RESIDUAL_PARAMS["colsample_bytree"]
 
 
 class XGBoostResidualPlugin(ResidualPlugin):
@@ -25,11 +26,11 @@ class XGBoostResidualPlugin(ResidualPlugin):
     def __init__(
         self,
         *,
-        n_estimators: int = 32,
-        max_depth: int = 3,
-        learning_rate: float = 0.1,
-        subsample: float = 1.0,
-        colsample_bytree: float = 1.0,
+        n_estimators: int = DEFAULT_RESIDUAL_PARAMS["n_estimators"],
+        max_depth: int = DEFAULT_RESIDUAL_PARAMS["max_depth"],
+        learning_rate: float = DEFAULT_RESIDUAL_PARAMS["learning_rate"],
+        subsample: float = DEFAULT_RESIDUAL_PARAMS["subsample"],
+        colsample_bytree: float = DEFAULT_RESIDUAL_PARAMS["colsample_bytree"],
     ):
         self.config = _XGBoostConfig(
             n_estimators=n_estimators,

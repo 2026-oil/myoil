@@ -28,9 +28,27 @@ def build_manifest(
         'config_resolved_path': str(resolved_config_path),
         'config_input_sha256': loaded.input_hash,
         'config_resolved_sha256': loaded.resolved_hash,
+        'search_space_path': str(loaded.search_space_path)
+        if loaded.search_space_path
+        else None,
+        'search_space_sha256': loaded.search_space_hash,
         'entrypoint_version': entrypoint_version,
         'compat_mode': compat_mode,
-        'jobs': [job.model for job in loaded.config.jobs],
+        'jobs': [
+            {
+                'model': job.model,
+                'requested_mode': job.requested_mode,
+                'validated_mode': job.validated_mode,
+                'selected_search_params': list(job.selected_search_params),
+            }
+            for job in loaded.config.jobs
+        ],
+        'residual': {
+            'model': loaded.config.residual.model,
+            'requested_mode': loaded.config.residual.requested_mode,
+            'validated_mode': loaded.config.residual.validated_mode,
+            'selected_search_params': list(loaded.config.residual.selected_search_params),
+        },
         'training': {'loss': loaded.config.training.loss},
     }
 

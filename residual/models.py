@@ -14,6 +14,7 @@ except Exception:  # pragma: no cover
     DummyMultivariate = DummyUnivariate = None
 
 from .config import AppConfig, JobConfig
+from .optuna_spaces import BASELINE_MODEL_NAMES, FIRST_CUT_AUTO_MODEL_NAMES
 
 
 @dataclass(frozen=True)
@@ -43,9 +44,6 @@ if DummyUnivariate is not None:
 if DummyMultivariate is not None:
     MODEL_CLASSES['DummyMultivariate'] = DummyMultivariate
 
-BASELINE_MODEL_NAMES = {'Naive', 'SeasonalNaive', 'HistoricAverage'}
-
-
 def resolve_loss(name: str) -> Any:
     normalized = name.lower()
     if normalized != 'mse':
@@ -73,7 +71,13 @@ def validate_job(job: JobConfig) -> ModelCapabilities:
     return capabilities_for(job.model)
 
 
-def build_model(config: AppConfig, job: JobConfig, *, n_series: int | None = None) -> Any:
+def build_model(
+    config: AppConfig,
+    job: JobConfig,
+    *,
+    n_series: int | None = None,
+    params_override: dict[str, Any] | None = None,
+) -> Any:
     caps = validate_job(job)
     if job.model in BASELINE_MODEL_NAMES:
         raise ValueError(f'{job.model} is a baseline model and is not built via neuralforecast model constructors')
@@ -105,7 +109,11 @@ def build_model(config: AppConfig, job: JobConfig, *, n_series: int | None = Non
     signature = inspect.signature(model_cls.__init__)
     accepts_var_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in signature.parameters.values())
     accepted = {}
-    for key, value in {**shared_kwargs, **job.params}.items():
+    for key, value in {**shared_kwargs, **job.params, **(params_override or {})}.items():
         if key in signature.parameters or accepts_var_kwargs:
             accepted[key] = value
     return model_cls(**accepted)
+
+
+def supports_auto_mode(model_name: str) -> bool:
+    return model_name in FIRST_CUT_AUTO_MODEL_NAMES

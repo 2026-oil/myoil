@@ -9,6 +9,17 @@ import tomllib
 
 import yaml
 
+from .optuna_spaces import (
+    BASELINE_MODEL_NAMES,
+    FIRST_CUT_AUTO_MODEL_NAMES,
+    FIRST_CUT_RESIDUAL_MODELS,
+    MODEL_PARAM_REGISTRY,
+    RESIDUAL_PARAM_REGISTRY,
+    ResidualMode,
+    SearchSpaceContract,
+    load_search_space_contract,
+)
+
 CONFIG_FILENAMES = ("config.yaml", "config.yml", "config.toml")
 DEFAULT_MANIFEST_VERSION = "1"
 DEFAULT_ARTIFACT_SCHEMA_VERSION = "1"
@@ -92,12 +103,18 @@ class ResidualConfig:
     enabled: bool = True
     model: str = "xgboost"
     params: dict[str, Any] = field(default_factory=dict)
+    requested_mode: ResidualMode = "residual_fixed"
+    validated_mode: ResidualMode = "residual_fixed"
+    selected_search_params: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
 class JobConfig:
     model: str
     params: dict[str, Any] = field(default_factory=dict)
+    requested_mode: Literal["baseline_fixed", "learned_fixed", "learned_auto_requested"] = "learned_fixed"
+    validated_mode: Literal["baseline_fixed", "learned_fixed", "learned_auto"] = "learned_fixed"
+    selected_search_params: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -116,6 +133,12 @@ class AppConfig:
         if self.task.name is None:
             payload.pop("task", None)
         payload["dataset"]["path"] = str(self.dataset.path)
+        payload["jobs"] = list(payload["jobs"])
+        for job in payload["jobs"]:
+            job["selected_search_params"] = list(job["selected_search_params"])
+        payload["residual"]["selected_search_params"] = list(
+            payload["residual"]["selected_search_params"]
+        )
         return payload
 
 
@@ -127,6 +150,8 @@ class LoadedConfig:
     normalized_payload: dict[str, Any]
     input_hash: str
     resolved_hash: str
+    search_space_path: Path | None
+    search_space_hash: str | None
 
 
 def _hash_text(text: str) -> str:
@@ -179,14 +204,130 @@ def _load_document(path: Path, source_type: str) -> dict[str, Any]:
     return {} if payload is None else payload
 
 
-def _normalize_job(job: dict[str, Any]) -> JobConfig:
+def _coerce_param_name_list(value: Any, *, section: str, name: str) -> tuple[str, ...]:
+    if not isinstance(value, list) or not value:
+        raise ValueError(
+            f"search_space.{section}.{name} must be a non-empty list of canonical parameter names"
+        )
+    out = tuple(str(item) for item in value)
+    if any(not item.strip() for item in out):
+        raise ValueError(
+            f"search_space.{section}.{name} contains an empty parameter name"
+        )
+    return out
+
+
+def _validate_search_space_payload(payload: dict[str, Any]) -> dict[str, dict[str, tuple[str, ...]]]:
+    if not payload:
+        raise ValueError("search_space.yaml is empty")
+    required_sections = {"models", "residual"}
+    missing = required_sections.difference(payload)
+    if missing:
+        raise ValueError(
+            "search_space.yaml must contain top-level sections: models and residual"
+        )
+    normalized: dict[str, dict[str, tuple[str, ...]]] = {"models": {}, "residual": {}}
+    for section in ("models", "residual"):
+        section_payload = payload.get(section)
+        if not isinstance(section_payload, dict):
+            raise ValueError(f"search_space.{section} must be a mapping")
+        for name, value in section_payload.items():
+            normalized[section][str(name)] = _coerce_param_name_list(
+                value, section=section, name=str(name)
+            )
+    unknown_models = sorted(
+        set(normalized["models"]).difference(FIRST_CUT_AUTO_MODEL_NAMES)
+    )
+    if unknown_models:
+        raise ValueError(
+            "search_space.models contains unsupported first-cut model(s): "
+            + ", ".join(unknown_models)
+        )
+    unknown_residual = sorted(
+        set(normalized["residual"]).difference(FIRST_CUT_RESIDUAL_MODELS)
+    )
+    if unknown_residual:
+        raise ValueError(
+            "search_space.residual contains unsupported first-cut model(s): "
+            + ", ".join(unknown_residual)
+        )
+    for model_name, param_names in normalized["models"].items():
+        unknown = sorted(set(param_names).difference(MODEL_PARAM_REGISTRY[model_name]))
+        if unknown:
+            raise ValueError(
+                f"search_space.models.{model_name} contains unknown parameter(s): {', '.join(unknown)}"
+            )
+    for model_name, param_names in normalized["residual"].items():
+        unknown = sorted(
+            set(param_names).difference(RESIDUAL_PARAM_REGISTRY[model_name])
+        )
+        if unknown:
+            raise ValueError(
+                f"search_space.residual.{model_name} contains unknown parameter(s): {', '.join(unknown)}"
+            )
+    return normalized
+
+
+def _requested_job_mode(model_name: str, params: dict[str, Any]) -> str:
+    if model_name in BASELINE_MODEL_NAMES:
+        return "baseline_fixed"
+    if params:
+        return "learned_fixed"
+    return "learned_auto_requested"
+
+
+def _requested_residual_mode(enabled: bool, params: dict[str, Any]) -> ResidualMode:
+    if not enabled:
+        return "residual_disabled"
+    if params:
+        return "residual_fixed"
+    return "residual_auto_requested"
+
+
+def _normalize_job(
+    job: dict[str, Any],
+    *,
+    search_space: dict[str, dict[str, tuple[str, ...]]] | None,
+) -> JobConfig:
+    model_name = str(job["model"])
+    params = dict(job.get("params", {}))
+    requested_mode = _requested_job_mode(model_name, params)
+    selected: tuple[str, ...] = ()
+    if requested_mode == "baseline_fixed":
+        validated_mode = "baseline_fixed"
+    elif requested_mode == "learned_fixed":
+        validated_mode = "learned_fixed"
+    else:
+        if model_name not in FIRST_CUT_AUTO_MODEL_NAMES:
+            raise ValueError(
+                f"jobs[{model_name}] uses empty params but has no supported learned_auto Optuna mapping in the first cut"
+            )
+        if search_space is None or model_name not in search_space["models"]:
+            raise ValueError(
+                f"jobs[{model_name}] requires search_space.models.{model_name} for learned_auto execution"
+            )
+        selected = search_space["models"][model_name]
+        unknown = sorted(set(selected).difference(MODEL_PARAM_REGISTRY[model_name]))
+        if unknown:
+            raise ValueError(
+                f"search_space.models.{model_name} contains unknown parameter(s): {', '.join(unknown)}"
+            )
+        validated_mode = "learned_auto"
     return JobConfig(
-        model=str(job["model"]),
-        params=dict(job.get("params", {})),
+        model=model_name,
+        params=params,
+        requested_mode=requested_mode,
+        validated_mode=validated_mode,
+        selected_search_params=selected,
     )
 
 
-def _normalize_payload(payload: dict[str, Any], base_dir: Path) -> AppConfig:
+def _normalize_payload(
+    payload: dict[str, Any],
+    base_dir: Path,
+    *,
+    search_space: dict[str, dict[str, tuple[str, ...]]] | None,
+) -> AppConfig:
     task = dict(payload.get("task", {}))
     dataset = dict(payload.get("dataset", {}))
     runtime = dict(payload.get("runtime", {}))
@@ -232,8 +373,34 @@ def _normalize_payload(payload: dict[str, Any], base_dir: Path) -> AppConfig:
         raise ValueError(f"Unsupported residual model: {residual_model}")
     residual["model"] = residual_model
     residual["params"] = dict(residual.get("params", {}))
+    residual_requested_mode = _requested_residual_mode(
+        bool(residual["enabled"]), residual["params"]
+    )
+    residual_selected: tuple[str, ...] = ()
+    if residual_requested_mode == "residual_auto_requested":
+        if residual_model not in FIRST_CUT_RESIDUAL_MODELS:
+            raise ValueError(
+                f"residual[{residual_model}] has no supported auto-tuning mapping in the first cut"
+            )
+        if search_space is None or residual_model not in search_space["residual"]:
+            raise ValueError(
+                f"residual[{residual_model}] requires search_space.residual.{residual_model} for auto tuning"
+            )
+        residual_selected = search_space["residual"][residual_model]
+        unknown = sorted(
+            set(residual_selected).difference(RESIDUAL_PARAM_REGISTRY[residual_model])
+        )
+        if unknown:
+            raise ValueError(
+                f"search_space.residual.{residual_model} contains unknown parameter(s): {', '.join(unknown)}"
+            )
+        residual_validated_mode: ResidualMode = "residual_auto"
+    else:
+        residual_validated_mode = residual_requested_mode
 
-    jobs = tuple(_normalize_job(job) for job in payload.get("jobs", []))
+    jobs = tuple(
+        _normalize_job(job, search_space=search_space) for job in payload.get("jobs", [])
+    )
     if not jobs:
         raise ValueError("Config must define at least one job")
     models = [job.model for job in jobs]
@@ -265,7 +432,12 @@ def _normalize_payload(payload: dict[str, Any], base_dir: Path) -> AppConfig:
         training=TrainingConfig(**training),
         cv=CVConfig(**cv),
         scheduler=SchedulerConfig(**scheduler),
-        residual=ResidualConfig(**residual),
+        residual=ResidualConfig(
+            **residual,
+            requested_mode=residual_requested_mode,
+            validated_mode=residual_validated_mode,
+            selected_search_params=residual_selected,
+        ),
         jobs=jobs,
     )
 
@@ -283,8 +455,34 @@ def load_app_config(
     )
     raw_text = source_path.read_text(encoding="utf-8")
     payload = _load_document(source_path, source_type)
-    config = _normalize_payload(payload, source_path.parent)
+    search_space_contract: SearchSpaceContract | None = None
+    requested_search_space = False
+    jobs_payload = payload.get("jobs", [])
+    for job in jobs_payload:
+        if str(job.get("model")) not in BASELINE_MODEL_NAMES and not dict(job.get("params", {})):
+            requested_search_space = True
+            break
+    residual_payload = dict(payload.get("residual", {}))
+    if (
+        residual_payload.get("enabled", True)
+        and not dict(residual_payload.get("params", {}))
+    ):
+        requested_search_space = True
+    if requested_search_space:
+        search_space_contract = load_search_space_contract(repo_root)
+    search_space = (
+        _validate_search_space_payload(search_space_contract.payload)
+        if search_space_contract is not None
+        else None
+    )
+    config = _normalize_payload(payload, source_path.parent, search_space=search_space)
     normalized_payload = config.to_dict()
+    normalized_payload["search_space_path"] = (
+        str(search_space_contract.path) if search_space_contract else None
+    )
+    normalized_payload["search_space_sha256"] = (
+        search_space_contract.sha256 if search_space_contract else None
+    )
     resolved_text = json.dumps(normalized_payload, sort_keys=True, ensure_ascii=False)
     return LoadedConfig(
         config=config,
@@ -293,4 +491,6 @@ def load_app_config(
         normalized_payload=normalized_payload,
         input_hash=_hash_text(raw_text),
         resolved_hash=_hash_text(resolved_text),
+        search_space_path=search_space_contract.path if search_space_contract else None,
+        search_space_hash=search_space_contract.sha256 if search_space_contract else None,
     )

@@ -1,0 +1,46 @@
+models:
+  TFT:
+    - hidden_size
+    - dropout
+    - n_head
+  VanillaTransformer:
+    - hidden_size
+    - dropout
+    - encoder_layers
+  Informer:
+    - hidden_size
+    - dropout
+    - factor
+  Autoformer:
+    - hidden_size
+    - dropout
+    - factor
+  FEDformer:
+    - hidden_size
+    - modes
+    - dropout
+  PatchTST:
+    - hidden_size
+    - n_heads
+    - encoder_layers
+    - patch_len
+  LSTM:
+    - encoder_hidden_size
+    - decoder_hidden_size
+    - encoder_n_layers
+  NHITS:
+    - n_pool_kernel_size
+    - n_freq_downsample
+    - dropout_prob_theta
+  iTransformer:
+    - hidden_size
+    - n_heads
+    - e_layers
+    - d_ff
+residual:
+  xgboost:
+    - n_estimators
+    - max_depth
+    - learning_rate
+    - subsample
+    - colsample_bytree

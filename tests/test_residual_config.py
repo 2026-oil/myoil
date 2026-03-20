@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 from typing import Any, TypedDict, cast
 
 import pandas as pd
@@ -16,6 +17,27 @@ from residual.scheduler import build_launch_plan, worker_env
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _write_search_space(
+    root: Path,
+    payload: dict[str, Any] | None = None,
+    *,
+    name: str = "search_space.yaml",
+) -> Path:
+    if payload is None:
+        payload = {
+            "models": {
+                "TFT": ["hidden_size", "dropout", "n_head"],
+                "iTransformer": ["hidden_size", "n_heads", "e_layers", "d_ff"],
+            },
+            "residual": {
+                "xgboost": ["n_estimators", "max_depth", "learning_rate"]
+            },
+        }
+    path = root / name
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    return path
 
 
 def _write_config(tmp_path: Path, payload: dict, suffix: str) -> Path:
@@ -71,11 +93,11 @@ learning_rate = 0.2
 
 [[jobs]]
 model = 'TFT'
-params = {}
+params = { hidden_size = 32 }
 
 [[jobs]]
 model = 'iTransformer'
-params = {}
+params = { hidden_size = 32, n_heads = 4, e_layers = 2, d_ff = 64 }
 """
         text = f"{task_block}{text}"
         path.write_text(text, encoding="utf-8")
@@ -120,8 +142,11 @@ def _payload() -> dict:
             "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
         },
         "jobs": [
-            {"model": "TFT", "params": {}},
-            {"model": "iTransformer", "params": {}},
+            {"model": "TFT", "params": {"hidden_size": 32}},
+            {
+                "model": "iTransformer",
+                "params": {"hidden_size": 32, "n_heads": 4, "e_layers": 2, "d_ff": 64},
+            },
         ],
     }
 
@@ -274,6 +299,8 @@ def test_runtime_executes_single_job_with_dummy_model(tmp_path: Path):
     assert code == 0
     assert (output_root / "cv" / "DummyUnivariate_forecasts.csv").exists()
     assert not (output_root / "holdout").exists()
+    capability = json.loads((output_root / "config" / "capability_report.json").read_text())
+    assert capability["DummyUnivariate"]["supports_auto"] is False
 
 
 def test_runtime_uses_task_name_for_default_run_directory(tmp_path: Path):
@@ -706,3 +733,177 @@ def test_readme_documents_conservative_fairness_policy():
     )
     assert "PatchTST.n_heads" in readme
     assert "FEDformer.modes" in readme
+
+
+def test_load_app_config_marks_auto_requested_and_validated_modes(tmp_path: Path):
+    payload = _payload()
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": True, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(tmp_path)
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    job = loaded.config.jobs[0]
+    assert job.requested_mode == "learned_auto_requested"
+    assert job.validated_mode == "learned_auto"
+    assert list(job.selected_search_params) == ["hidden_size", "dropout", "n_head"]
+    assert loaded.config.residual.requested_mode == "residual_auto_requested"
+    assert loaded.config.residual.validated_mode == "residual_auto"
+    assert loaded.normalized_payload["search_space_path"] == str(
+        (tmp_path / "search_space.yaml").resolve()
+    )
+    assert loaded.normalized_payload["search_space_sha256"]
+
+
+def test_load_app_config_rejects_missing_model_search_space_entry(tmp_path: Path):
+    payload = _payload()
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {"models": {"iTransformer": ["hidden_size"]}, "residual": {"xgboost": ["n_estimators"]}},
+    )
+
+    with pytest.raises(ValueError, match="requires search_space.models.TFT"):
+        load_app_config(tmp_path, config_path=config_path)
+
+
+def test_load_app_config_rejects_unknown_search_space_param(tmp_path: Path):
+    payload = _payload()
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {"models": {"TFT": ["encoder_layers"]}, "residual": {"xgboost": ["n_estimators"]}},
+    )
+
+    with pytest.raises(ValueError, match="unknown parameter"):
+        load_app_config(tmp_path, config_path=config_path)
+
+
+def test_load_app_config_rejects_stale_unused_allowlisted_selector_entry(tmp_path: Path):
+    payload = _payload()
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"], "PatchTST": ["not_a_real_key"]},
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    with pytest.raises(ValueError, match="PatchTST contains unknown parameter"):
+        load_app_config(tmp_path, config_path=config_path)
+
+
+def test_load_app_config_uses_repo_root_search_space_not_config_parent(tmp_path: Path):
+    repo_root = tmp_path / "repo"
+    config_dir = tmp_path / "config_dir"
+    repo_root.mkdir()
+    config_dir.mkdir()
+    payload = _payload()
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (config_dir / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    payload["dataset"]["path"] = str((config_dir / "data.csv").resolve())
+    config_path = _write_config(config_dir, payload, ".yaml")
+    _write_search_space(repo_root)
+    _write_search_space(
+        config_dir,
+        {"models": {"TFT": ["hidden_size"]}, "residual": {"xgboost": ["max_depth"]}},
+    )
+
+    loaded = load_app_config(repo_root, config_path=config_path)
+
+    assert loaded.search_space_path == (repo_root / "search_space.yaml").resolve()
+    assert list(loaded.config.jobs[0].selected_search_params) == [
+        "hidden_size",
+        "dropout",
+        "n_head",
+    ]
+
+
+def test_runtime_auto_mode_records_selector_provenance_and_modes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    payload = _payload()
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    data = (
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n"
+        "2020-01-29,5\n2020-02-05,6\n2020-02-12,7\n2020-02-19,8\n"
+    )
+    (tmp_path / "data.csv").write_text(data, encoding="utf-8")
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(tmp_path)
+
+    from residual import runtime
+
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    monkeypatch.setenv("NEURALFORECAST_OPTUNA_NUM_TRIALS", "1")
+    monkeypatch.setenv("NEURALFORECAST_OPTUNA_SEED", "7")
+    monkeypatch.setattr(
+        runtime,
+        "load_app_config",
+        lambda _repo_root, **kwargs: load_app_config(tmp_path, **kwargs),
+    )
+
+    output_root = tmp_path / "run_auto"
+    code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "TFT",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+    assert code == 0
+    resolved = json.loads((output_root / "config" / "config.resolved.json").read_text())
+    capability = json.loads(
+        (output_root / "config" / "capability_report.json").read_text()
+    )
+    manifest = json.loads(
+        (output_root / "manifest" / "run_manifest.json").read_text()
+    )
+
+    assert resolved["search_space_path"] == str((tmp_path / "search_space.yaml").resolve())
+    assert resolved["jobs"][0]["requested_mode"] == "learned_auto_requested"
+    assert resolved["jobs"][0]["validated_mode"] == "learned_auto"
+    assert capability["TFT"]["requested_mode"] == "learned_auto_requested"
+    assert capability["TFT"]["validated_mode"] == "learned_auto"
+    assert manifest["search_space_path"] == str((tmp_path / "search_space.yaml").resolve())
+    assert manifest["jobs"][0]["requested_mode"] == "learned_auto_requested"
+    assert manifest["jobs"][0]["validated_mode"] == "learned_auto"
+    assert manifest["jobs"][0]["model_best_params_path"]
+    assert manifest["jobs"][0]["model_optuna_study_summary_path"]
+    assert (output_root / "models" / "TFT" / "best_params.json").exists()
+    assert (output_root / "models" / "TFT" / "optuna_study_summary.json").exists()

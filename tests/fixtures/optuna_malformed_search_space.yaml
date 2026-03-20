@@ -1,0 +1,7 @@
+models:
+  TFT:
+    hidden_size:
+      type: int
+residual:
+  xgboost:
+    - n_estimators
