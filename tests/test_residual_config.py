@@ -509,6 +509,70 @@ def test_runtime_logs_fold_errors_to_stdout(
     assert "synthetic failure" in captured.out
 
 
+def test_build_tscv_splits_uses_configured_step_size(tmp_path: Path):
+    payload = _payload()
+    payload["cv"].update({"horizon": 3, "step_size": 2, "n_windows": 3, "gap": 0})
+    payload["dataset"]["hist_exog_cols"] = []
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n"
+        "2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n"
+        "2020-01-29,5\n2020-02-05,6\n2020-02-12,7\n2020-02-19,8\n"
+        "2020-02-26,9\n2020-03-04,10\n2020-03-11,11\n2020-03-18,12\n",
+        encoding="utf-8",
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    from residual import runtime
+
+    splits = runtime._build_tscv_splits(12, loaded.config.cv)
+
+    assert [test_idx for _, test_idx in splits] == [
+        [5, 6, 7],
+        [7, 8, 9],
+        [9, 10, 11],
+    ]
+
+
+def test_runtime_outer_cv_cutoffs_follow_step_size(tmp_path: Path):
+    payload = _payload()
+    payload["cv"].update({"horizon": 1, "step_size": 2, "n_windows": 2, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    data = (
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n"
+        "2020-01-22,4\n2020-01-29,5\n2020-02-05,6\n"
+    )
+    (tmp_path / "data.csv").write_text(data, encoding="utf-8")
+    config_path = _write_config(tmp_path, payload, ".yaml")
+
+    from residual.runtime import main as runtime_main
+
+    output_root = tmp_path / "run_step_size_outer_cv"
+    code = runtime_main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "DummyUnivariate",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    forecasts = pd.read_csv(output_root / "cv" / "DummyUnivariate_forecasts.csv")
+
+    assert code == 0
+    assert forecasts["cutoff"].tolist() == [
+        "2020-01-15 00:00:00",
+        "2020-01-29 00:00:00",
+    ]
+
+
 def test_runtime_uses_task_name_for_default_run_directory(tmp_path: Path):
     payload = _payload()
     payload["task"] = {"name": "pytest_task_default_output"}

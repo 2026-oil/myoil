@@ -9,7 +9,6 @@ from typing import Any, Sequence
 import optuna
 import pandas as pd
 from neuralforecast import NeuralForecast
-from sklearn.model_selection import TimeSeriesSplit
 
 from .adapters import build_multivariate_inputs, build_univariate_inputs
 from .config import JobConfig, LoadedConfig, load_app_config
@@ -465,39 +464,47 @@ def _build_adapter_inputs(
 
 
 def _build_tscv_splits(total_rows: int, cv_config) -> list[tuple[list[int], list[int]]]:
-    if cv_config.n_windows == 1:
-        train_end = total_rows - cv_config.gap - cv_config.horizon
+    if cv_config.step_size < 1:
+        raise ValueError("cv.step_size must be at least 1")
+
+    required_rows = (
+        cv_config.gap
+        + cv_config.horizon
+        + cv_config.step_size * (cv_config.n_windows - 1)
+        + 1
+    )
+    if total_rows < required_rows:
+        raise ValueError(
+            "Dataset is too short for the configured TSCV policy "
+            f"(n_windows={cv_config.n_windows}, horizon={cv_config.horizon}, "
+            f"step_size={cv_config.step_size}, gap={cv_config.gap}, "
+            f"max_train_size={cv_config.max_train_size})"
+        )
+
+    splits: list[tuple[list[int], list[int]]] = []
+    for fold_idx in range(cv_config.n_windows):
+        train_end = (
+            total_rows
+            - cv_config.gap
+            - cv_config.horizon
+            - cv_config.step_size * (cv_config.n_windows - 1 - fold_idx)
+        )
         if train_end <= 0:
             raise ValueError(
-                "Dataset is too short for the configured single-split TSCV policy "
-                f"(horizon={cv_config.horizon}, gap={cv_config.gap})"
+                "Dataset is too short for the configured TSCV policy "
+                f"(n_windows={cv_config.n_windows}, horizon={cv_config.horizon}, "
+                f"step_size={cv_config.step_size}, gap={cv_config.gap}, "
+                f"max_train_size={cv_config.max_train_size})"
             )
         train_start = 0
         if cv_config.max_train_size is not None:
             train_start = max(0, train_end - cv_config.max_train_size)
         test_start = train_end + cv_config.gap
         test_end = test_start + cv_config.horizon
-        return [
+        splits.append(
             (list(range(train_start, train_end)), list(range(test_start, test_end)))
-        ]
-
-    splitter = TimeSeriesSplit(
-        n_splits=cv_config.n_windows,
-        test_size=cv_config.horizon,
-        gap=cv_config.gap,
-        max_train_size=cv_config.max_train_size,
-    )
-    try:
-        return [
-            (train_idx.tolist(), test_idx.tolist())
-            for train_idx, test_idx in splitter.split(range(total_rows))
-        ]
-    except ValueError as exc:
-        raise ValueError(
-            "Dataset is too short for the configured TSCV policy "
-            f"(n_windows={cv_config.n_windows}, horizon={cv_config.horizon}, "
-            f"gap={cv_config.gap}, max_train_size={cv_config.max_train_size})"
-        ) from exc
+        )
+    return splits
 
 
 def _iter_backcast_cutoff_indices(
