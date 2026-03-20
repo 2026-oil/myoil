@@ -177,6 +177,7 @@ def build_model(
         'accelerator': 'gpu' if os.environ.get('CUDA_VISIBLE_DEVICES') else 'cpu',
         'devices': 1,
         'enable_checkpointing': False,
+        'enable_progress_bar': False,
         'logger': False,
         'loss': resolve_loss(config.training.loss),
         'valid_loss': resolve_loss(config.training.loss),

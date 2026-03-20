@@ -1072,6 +1072,69 @@ def _plot_last_fold_overlay(
     plt.close(fig)
 
 
+def _learned_fold_artifact_dir(run_root: Path, model_name: str, fold_idx: int) -> Path:
+    return run_root / "models" / model_name / "folds" / f"fold_{fold_idx:03d}"
+
+
+def _trajectory_frame(nf: NeuralForecast) -> pd.DataFrame:
+    models = getattr(nf, "models", None)
+    if not models:
+        return pd.DataFrame()
+    model = models[0]
+    train_points = list(getattr(model, "train_trajectories", []))
+    val_points = list(getattr(model, "valid_trajectories", []))
+    if not train_points or not val_points:
+        return pd.DataFrame()
+
+    train_frame = pd.DataFrame(train_points, columns=["global_step", "train_loss"])
+    val_frame = pd.DataFrame(val_points, columns=["global_step", "val_loss"])
+    return train_frame.merge(val_frame, on="global_step", how="outer").sort_values(
+        "global_step", kind="stable"
+    )
+
+
+def _write_loss_curve_artifact(
+    run_root: Path,
+    model_name: str,
+    fold_idx: int,
+    *,
+    nf: NeuralForecast,
+) -> Path | None:
+    curve_frame = _trajectory_frame(nf)
+    if curve_frame.empty:
+        return None
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fold_root = _learned_fold_artifact_dir(run_root, model_name, fold_idx)
+    fold_root.mkdir(parents=True, exist_ok=True)
+    figure_path = fold_root / "loss_curve.png"
+    figure, axis = plt.subplots(figsize=(10, 5))
+    axis.plot(
+        curve_frame["global_step"],
+        curve_frame["train_loss"],
+        label="train_loss",
+        linewidth=1.8,
+    )
+    axis.plot(
+        curve_frame["global_step"],
+        curve_frame["val_loss"],
+        label="val_loss",
+        linewidth=1.8,
+    )
+    axis.set_title(f"{model_name} fold {fold_idx:03d} loss curve")
+    axis.set_xlabel("global_step")
+    axis.set_ylabel("loss")
+    axis.legend(loc="best")
+    figure.tight_layout()
+    figure.savefig(figure_path, dpi=150)
+    plt.close(figure)
+    return figure_path
+
+
 def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
     summary_dir = run_root / "summary"
     metrics = _load_metrics_for_summary(run_root)
@@ -1205,6 +1268,12 @@ def _run_single_job(
                     fold_idx, total_folds=len(splits), phase="replay", exc=exc
                 )
                 raise
+            loss_curve_path = _write_loss_curve_artifact(
+                run_root,
+                effective_job.model,
+                fold_idx,
+                nf=nf,
+            )
             future_df = source_df.iloc[test_idx].reset_index(drop=True)
             metrics = _compute_metrics(
                 target_actuals, target_predictions[effective_job.model]
@@ -1271,6 +1340,9 @@ def _run_single_job(
                             "eval_rows": int(len(future_df)),
                             "train_end_ds": str(train_end_ds),
                             "loss": loaded.config.training.loss,
+                            "loss_curve_path": (
+                                str(loss_curve_path) if loss_curve_path is not None else None
+                            ),
                         },
                     }
                 )

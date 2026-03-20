@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 from pathlib import Path
 import json
+from types import SimpleNamespace
 from typing import Any, TypedDict, cast
 
 import pandas as pd
@@ -297,6 +298,7 @@ def test_model_builder_disables_logger_and_keeps_timemixer_without_future_featur
     timemixer = build_model(loaded.config, loaded.config.jobs[0], n_series=1)
 
     assert timemixer.trainer_kwargs["logger"] is False
+    assert timemixer.trainer_kwargs["enable_progress_bar"] is False
     assert timemixer.use_future_temporal_feature == 0
 
 
@@ -313,6 +315,7 @@ def test_scheduler_plan_and_worker_env_use_single_device(tmp_path: Path):
     env = worker_env(1)
     assert env["CUDA_VISIBLE_DEVICES"] == "1"
     assert env["NEURALFORECAST_WORKER_DEVICES"] == "1"
+    assert env["NEURALFORECAST_PROGRESS_MODE"] == "structured"
 
 
 def test_scheduler_respects_max_concurrent_jobs(
@@ -648,6 +651,27 @@ def test_runtime_smoke_writes_summary_artifacts_for_dummy_model(tmp_path: Path):
     assert workbook["leaderboard"].auto_filter.ref
 
 
+def test_trajectory_frame_contains_train_and_val_series():
+    from residual import runtime
+
+    nf = SimpleNamespace(
+        models=[
+            SimpleNamespace(
+                train_trajectories=[(1, 0.9), (2, 0.7)],
+                valid_trajectories=[(1, 1.1), (2, 0.8)],
+            )
+        ]
+    )
+
+    frame = runtime._trajectory_frame(nf)
+
+    assert frame.columns.tolist() == ["global_step", "train_loss", "val_loss"]
+    assert frame.to_dict(orient="records") == [
+        {"global_step": 1, "train_loss": 0.9, "val_loss": 1.1},
+        {"global_step": 2, "train_loss": 0.7, "val_loss": 0.8},
+    ]
+
+
 def test_build_tscv_splits_uses_configured_step_size(tmp_path: Path):
     payload = _payload()
     payload["cv"].update({"horizon": 3, "step_size": 2, "n_windows": 3, "gap": 0})
@@ -866,6 +890,139 @@ def test_runtime_generates_per_fold_residual_artifacts_with_dummy_model(tmp_path
     assert diagnostics["corrected_eval_mode"] == "per_fold_backcast_runtime"
     assert diagnostics["fold_count"] == 4
     assert diagnostics["tscv_policy"]["gap"] == 0
+
+
+def test_runtime_writes_loss_curve_images_for_residual_disabled_learned_folds(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    data = (
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n"
+        "2020-01-22,4\n2020-01-29,5\n2020-02-05,6\n"
+    )
+    (tmp_path / "data.csv").write_text(data, encoding="utf-8")
+    config_path = _write_config(tmp_path, payload, ".yaml")
+
+    from residual.runtime import main as runtime_main
+
+    output_root = tmp_path / "run_loss_curves"
+    code = runtime_main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "DummyUnivariate",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    assert code == 0
+    for fold_idx in range(2):
+        assert (
+            output_root
+            / "models"
+            / "DummyUnivariate"
+            / "folds"
+            / f"fold_{fold_idx:03d}"
+            / "loss_curve.png"
+        ).exists()
+
+
+def test_runtime_writes_loss_curve_images_for_residual_enabled_learned_folds(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["residual"] = {
+        "enabled": True,
+        "model": "xgboost",
+        "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+    }
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    data = (
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n"
+        "2020-01-22,4\n2020-01-29,5\n2020-02-05,6\n"
+    )
+    (tmp_path / "data.csv").write_text(data, encoding="utf-8")
+    config_path = _write_config(tmp_path, payload, ".yaml")
+
+    from residual.runtime import main as runtime_main
+
+    output_root = tmp_path / "run_loss_curves_residual"
+    code = runtime_main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "DummyUnivariate",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    assert code == 0
+    for fold_idx in range(2):
+        assert (
+            output_root
+            / "models"
+            / "DummyUnivariate"
+            / "folds"
+            / f"fold_{fold_idx:03d}"
+            / "loss_curve.png"
+        ).exists()
+        assert (
+            output_root
+            / "residual"
+            / "DummyUnivariate"
+            / "folds"
+            / f"fold_{fold_idx:03d}"
+            / "base_checkpoint"
+            / "fit_summary.json"
+        ).exists()
+
+
+def test_baseline_models_do_not_write_loss_curve_images(tmp_path: Path):
+    payload = _payload()
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
+    payload["training"].update({"val_size": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    payload["jobs"] = [{"model": "Naive", "params": {}}]
+    data = (
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n"
+        "2020-01-22,4\n2020-01-29,5\n2020-02-05,6\n"
+    )
+    (tmp_path / "data.csv").write_text(data, encoding="utf-8")
+    config_path = _write_config(tmp_path, payload, ".yaml")
+
+    from residual.runtime import main as runtime_main
+
+    output_root = tmp_path / "run_baseline"
+    code = runtime_main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "Naive",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    assert code == 0
+    assert not (output_root / "models" / "Naive" / "folds").exists()
 
 
 class _RecordingResidualPlugin(ResidualPlugin):
