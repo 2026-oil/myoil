@@ -269,7 +269,11 @@ def _effective_config(
     loaded: LoadedConfig, training_override: dict[str, Any] | None = None
 ):
     if not training_override:
-        return loaded.config
+        if loaded.config.training_search.validated_mode != "training_auto":
+            return loaded.config
+        training_override = {}
+    if loaded.config.training_search.validated_mode == "training_auto":
+        training_override = {**training_override, "val_size": loaded.config.cv.horizon}
     return replace(
         loaded.config,
         training=replace(loaded.config.training, **training_override),

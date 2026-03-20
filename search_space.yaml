@@ -199,7 +199,6 @@ training:
   - inference_windows_batch_size
   - learning_rate
   - max_steps
-  - val_size
   - val_check_steps
 residual:
   xgboost:

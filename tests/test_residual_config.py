@@ -1061,7 +1061,7 @@ def test_load_app_config_accepts_training_search_space_section(tmp_path: Path):
         tmp_path,
         {
             "models": {"TFT": ["hidden_size", "dropout", "n_head"]},
-            "training": ["input_size", "max_steps", "val_size"],
+            "training": ["input_size", "max_steps"],
             "residual": {"xgboost": ["n_estimators"]},
         },
     )
@@ -1073,7 +1073,6 @@ def test_load_app_config_accepts_training_search_space_section(tmp_path: Path):
     assert list(loaded.config.training_search.selected_search_params) == [
         "input_size",
         "max_steps",
-        "val_size",
     ]
 
 
@@ -1314,7 +1313,7 @@ def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
         tmp_path,
         {
             "models": {"TFT": ["hidden_size"]},
-            "training": ["max_steps", "val_size"],
+            "training": ["max_steps"],
             "residual": {"xgboost": ["n_estimators"]},
         },
     )
@@ -1353,7 +1352,7 @@ def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
     monkeypatch.setattr(
         runtime,
         "suggest_training_params",
-        lambda *_args, **_kwargs: {"max_steps": 123, "val_size": 7},
+        lambda *_args, **_kwargs: {"max_steps": 123},
     )
     monkeypatch.setattr(
         runtime,
@@ -1389,12 +1388,38 @@ def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
     assert calls[-1]["max_steps"] == 123
     assert manifest["training_search"]["selected_search_params"] == [
         "max_steps",
-        "val_size",
     ]
     assert manifest["jobs"][0]["training_best_params_path"]
     assert manifest["jobs"][0]["training_optuna_study_summary_path"]
     assert capability["training_search"]["validated_mode"] == "training_auto"
-    assert training_best == {"max_steps": 123, "val_size": 7}
+    assert training_best == {"max_steps": 123}
+
+
+def test_effective_config_pins_val_size_to_horizon_for_training_auto(tmp_path: Path):
+    payload = _payload()
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"]},
+            "training": ["max_steps"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    from residual import runtime
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+    effective = runtime._effective_config(loaded, {"max_steps": 123})
+
+    assert effective.training.max_steps == 123
+    assert effective.training.val_size == loaded.config.cv.horizon
 
 
 def test_supported_auto_model_matrix_matches_registry_and_yaml():

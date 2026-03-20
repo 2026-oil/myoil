@@ -420,7 +420,6 @@ TRAINING_PARAM_REGISTRY = {
     "inference_windows_batch_size": _categorical([256, 512, 1024]),
     "learning_rate": _float(1e-4, 1e-1, log=True),
     "max_steps": _categorical([100, 300, 500, 1000]),
-    "val_size": _categorical([0, 6, 12, 24]),
     "val_check_steps": _categorical([25, 50, 100, 200]),
 }
 
