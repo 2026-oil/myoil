@@ -23,6 +23,7 @@ from residual.optuna_spaces import (
     TRAINING_PARAM_REGISTRY,
 )
 from residual.plugins_base import ResidualContext, ResidualPlugin
+from residual.progress import PROGRESS_EVENT_PREFIX
 from residual.registry import build_residual_plugin
 from residual.scheduler import build_launch_plan, run_parallel_jobs, worker_env
 
@@ -380,7 +381,25 @@ def test_scheduler_streams_worker_stdout_to_terminal(
         def __init__(self, *_args, **_kwargs):
             self._completed = False
             self.stdout = io.StringIO(
-                "[progress][TFT] model-start | [------------------] 0/1   0%\n"
+                f"{PROGRESS_EVENT_PREFIX}"
+                + json.dumps(
+                    {
+                        "job_name": "TFT",
+                        "model_index": 1,
+                        "total_models": 1,
+                        "total_steps": 2,
+                        "completed_steps": 1,
+                        "total_folds": 2,
+                        "current_fold": 0,
+                        "phase": "replay",
+                        "status": "running",
+                        "detail": "mse=1.0000",
+                        "event": "fold-done",
+                        "progress_pct": 50,
+                        "progress_text": "[#########---------] 1/2  50%",
+                    }
+                )
+                + "\nworker note\n"
             )
 
         def poll(self):
@@ -399,7 +418,11 @@ def test_scheduler_streams_worker_stdout_to_terminal(
     run_parallel_jobs(tmp_path, loaded, [launch], tmp_path / "scheduler")
 
     captured = capsys.readouterr()
-    assert "[worker:TFT] [progress][TFT] model-start" in captured.out
+    assert "[summary]" in captured.out
+    assert "[model:TFT]" in captured.out
+    assert "completed=1/1" in captured.out
+    assert "[worker:TFT] worker note" in captured.out
+    assert PROGRESS_EVENT_PREFIX not in captured.out
 
 
 def test_runtime_executes_single_job_with_dummy_model(tmp_path: Path):
@@ -467,9 +490,11 @@ def test_runtime_logs_model_and_fold_progress_to_stdout(
 
     captured = capsys.readouterr()
     assert code == 0
-    assert "[progress][DummyUnivariate] model-start" in captured.out
-    assert "[progress][DummyUnivariate] fold-start" in captured.out
-    assert "[progress][DummyUnivariate] fold-done" in captured.out
+    assert "[summary] completed=0/1" in captured.out
+    assert "[summary] completed=1/1" in captured.out
+    assert "[model:DummyUnivariate]" in captured.out
+    assert "phase=replay" in captured.out
+    assert "fold=2/2" in captured.out
     assert "100%" in captured.out
 
 
@@ -511,8 +536,116 @@ def test_runtime_logs_fold_errors_to_stdout(
         )
 
     captured = capsys.readouterr()
-    assert "[progress][DummyUnivariate] error" in captured.out
+    assert "[model:DummyUnivariate]" in captured.out
+    assert "status=failed" in captured.out
     assert "synthetic failure" in captured.out
+
+
+def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
+    from openpyxl import load_workbook
+    from residual import runtime
+
+    run_root = tmp_path / "summary_run"
+    cv_dir = run_root / "cv"
+    cv_dir.mkdir(parents=True)
+    pd.DataFrame(
+        [
+            {"fold_idx": 0, "cutoff": "2020-01-15", "MAE": 1.0, "MSE": 1.0, "RMSE": 1.0},
+            {"fold_idx": 1, "cutoff": "2020-01-22", "MAE": 0.5, "MSE": 0.25, "RMSE": 0.5},
+        ]
+    ).to_csv(cv_dir / "ModelA_metrics_by_cutoff.csv", index=False)
+    pd.DataFrame(
+        [
+            {"fold_idx": 0, "cutoff": "2020-01-15", "MAE": 2.0, "MSE": 4.0, "RMSE": 2.0},
+            {"fold_idx": 1, "cutoff": "2020-01-22", "MAE": 1.5, "MSE": 2.25, "RMSE": 1.5},
+        ]
+    ).to_csv(cv_dir / "ModelB_metrics_by_cutoff.csv", index=False)
+    for model_name, values in {
+        "ModelA": [10.0, 11.0],
+        "ModelB": [9.5, 10.5],
+    }.items():
+        pd.DataFrame(
+            [
+                {
+                    "model": model_name,
+                    "fold_idx": 1,
+                    "cutoff": "2020-01-22",
+                    "train_end_ds": "2020-01-22",
+                    "unique_id": "target",
+                    "ds": "2020-01-29",
+                    "horizon_step": 1,
+                    "y": 10.0,
+                    "y_hat": values[0],
+                },
+                {
+                    "model": model_name,
+                    "fold_idx": 1,
+                    "cutoff": "2020-01-22",
+                    "train_end_ds": "2020-01-22",
+                    "unique_id": "target",
+                    "ds": "2020-02-05",
+                    "horizon_step": 2,
+                    "y": 11.0,
+                    "y_hat": values[1],
+                },
+            ]
+        ).to_csv(cv_dir / f"{model_name}_forecasts.csv", index=False)
+
+    artifacts = runtime._build_summary_artifacts(run_root)
+
+    workbook_path = run_root / "summary" / "leaderboard.xlsx"
+    assert artifacts["leaderboard"] == str(workbook_path)
+    assert workbook_path.exists()
+    workbook = load_workbook(workbook_path)
+    sheet = workbook["leaderboard"]
+    assert sheet.auto_filter.ref == sheet.dimensions
+    assert sheet["A2"].value == 1
+    assert sheet["B2"].value == "ModelA"
+    assert sheet.column_dimensions["A"].width is not None
+    assert sheet.column_dimensions["A"].width >= 10
+    assert (run_root / "summary" / "last_fold_all_models.png").exists()
+    assert (run_root / "summary" / "last_fold_top3.png").exists()
+    assert (run_root / "summary" / "last_fold_top5.png").exists()
+
+
+def test_runtime_smoke_writes_summary_artifacts_for_dummy_model(tmp_path: Path):
+    from openpyxl import load_workbook
+    from residual.runtime import main as runtime_main
+
+    payload = _payload()
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 0})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    data = (
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n"
+        "2020-01-22,4\n2020-01-29,5\n"
+    )
+    (tmp_path / "data.csv").write_text(data, encoding="utf-8")
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    output_root = tmp_path / "run_summary"
+
+    code = runtime_main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "DummyUnivariate",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    leaderboard_path = output_root / "summary" / "leaderboard.xlsx"
+    assert code == 0
+    assert leaderboard_path.exists()
+    assert (output_root / "summary" / "last_fold_all_models.png").exists()
+    assert (output_root / "summary" / "last_fold_top3.png").exists()
+    assert (output_root / "summary" / "last_fold_top5.png").exists()
+    workbook = load_workbook(leaderboard_path)
+    assert workbook["leaderboard"].auto_filter.ref
 
 
 def test_build_tscv_splits_uses_configured_step_size(tmp_path: Path):

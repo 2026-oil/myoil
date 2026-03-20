@@ -12,6 +12,7 @@ import threading
 import time
 
 from .config import AppConfig, JobConfig, LoadedConfig
+from .progress import ConsoleProgressRenderer, ModelProgressState, parse_progress_event
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,7 @@ def worker_env(gpu_id: int) -> dict[str, str]:
     env = os.environ.copy()
     env['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
     env['NEURALFORECAST_WORKER_DEVICES'] = '1'
+    env['NEURALFORECAST_PROGRESS_MODE'] = 'structured'
     return env
 
 
@@ -74,6 +76,21 @@ def run_parallel_jobs(
     entrypoint = repo_root / 'main.py'
     events_path = scheduler_root / 'events.jsonl'
     results: list[dict[str, object]] = []
+    progress_states = {
+        launch.job_name: ModelProgressState(
+            job_name=launch.job_name,
+            model_index=index + 1,
+            total_models=len(launches),
+            total_steps=1,
+        )
+        for index, launch in enumerate(launches)
+    }
+    progress_renderer = ConsoleProgressRenderer()
+    render_lock = threading.Lock()
+
+    def _render_progress() -> None:
+        with render_lock:
+            progress_renderer.render(list(progress_states.values()))
     active: list[
         tuple[
             WorkerLaunch,
@@ -115,6 +132,10 @@ def run_parallel_jobs(
         (worker_root / 'summary.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
         with events_path.open('a', encoding='utf-8') as handle:
             handle.write(json.dumps({'event': 'worker_completed', **summary}) + '\n')
+        state = progress_states[launch.job_name]
+        state.status = 'completed' if returncode == 0 else 'failed'
+        state.detail = f"returncode={returncode}"
+        _render_progress()
         results.append(summary)
         return summary
 
@@ -142,6 +163,9 @@ def run_parallel_jobs(
                     )
                     + '\n'
                 )
+            progress_states[launch.job_name].status = 'running'
+            progress_states[launch.job_name].detail = f"gpu={launch.gpu_id}"
+            _render_progress()
             stdout_handle = stdout_path.open('w', encoding='utf-8')
             stderr_handle = stderr_path.open('w', encoding='utf-8')
             process = subprocess.Popen(
@@ -164,6 +188,19 @@ def run_parallel_jobs(
                     for line in stream:
                         file_handle.write(line)
                         file_handle.flush()
+                        payload = parse_progress_event(line)
+                        if payload is not None:
+                            state = progress_states[job_name]
+                            state.total_steps = max(int(payload["total_steps"]), 1)
+                            state.completed_steps = int(payload["completed_steps"])
+                            state.total_folds = payload.get("total_folds")
+                            state.current_fold = payload.get("current_fold")
+                            state.phase = payload.get("phase")
+                            state.status = payload.get("status", state.status)
+                            state.detail = payload.get("detail")
+                            state.event = payload.get("event", state.event)
+                            _render_progress()
+                            continue
                         print(f"[worker:{job_name}] {line}", end='', flush=True)
                     stream.close()
 
@@ -195,4 +232,6 @@ def run_parallel_jobs(
             continue
         if active:
             time.sleep(1)
+    with render_lock:
+        progress_renderer.close()
     return results

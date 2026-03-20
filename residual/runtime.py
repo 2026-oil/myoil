@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import replace
 import json
+import os
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -27,28 +28,38 @@ from .optuna_spaces import (
     suggest_training_params,
 )
 from .plugins_base import ResidualContext
+from .progress import (
+    ConsoleProgressRenderer,
+    ModelProgressState,
+    emit_progress_event,
+)
 from .registry import build_residual_plugin
 from .scheduler import build_launch_plan, run_parallel_jobs
 
 ENTRYPOINT_VERSION = "neuralforecast-residual-v1"
 
 
-def _progress_bar(completed: int, total: int, *, width: int = 18) -> str:
-    if total <= 0:
-        total = 1
-    ratio = min(max(completed / total, 0.0), 1.0)
-    filled = int(round(width * ratio))
-    pct = int(round(ratio * 100))
-    return f"[{'#' * filled}{'-' * (width - filled)}] {completed}/{total} {pct:3d}%"
-
-
 class _ProgressLogger:
-    def __init__(self, job_name: str, total_steps: int) -> None:
-        self.job_name = job_name
-        self.total_steps = max(total_steps, 1)
-        self.completed_steps = 0
+    def __init__(
+        self,
+        job_name: str,
+        total_steps: int,
+        *,
+        model_index: int = 1,
+        total_models: int = 1,
+    ) -> None:
+        self.state = ModelProgressState(
+            job_name=job_name,
+            model_index=model_index,
+            total_models=total_models,
+            total_steps=max(total_steps, 1),
+        )
+        self._structured_mode = (
+            os.environ.get("NEURALFORECAST_PROGRESS_MODE") == "structured"
+        )
+        self._renderer = None if self._structured_mode else ConsoleProgressRenderer()
 
-    def _emit(
+    def _publish(
         self,
         event: str,
         *,
@@ -56,31 +67,45 @@ class _ProgressLogger:
         total_folds: int | None = None,
         phase: str | None = None,
         detail: str | None = None,
+        status: str | None = None,
+        step_increment: int = 0,
     ) -> None:
-        parts = [f"[progress][{self.job_name}] {event}"]
-        if phase:
-            parts.append(f"phase={phase}")
-        if fold_idx is not None:
-            fold_text = f"fold={fold_idx + 1}"
-            if total_folds is not None:
-                fold_text += f"/{total_folds}"
-            parts.append(fold_text)
-        parts.append(_progress_bar(self.completed_steps, self.total_steps))
-        if detail:
-            parts.append(detail)
-        print(" | ".join(parts), flush=True)
+        self.state.event = event
+        self.state.completed_steps = min(
+            self.state.total_steps,
+            max(0, self.state.completed_steps + step_increment),
+        )
+        self.state.current_fold = fold_idx
+        if total_folds is not None:
+            self.state.total_folds = total_folds
+        if phase is not None:
+            self.state.phase = phase
+        self.state.detail = detail
+        if status is not None:
+            self.state.status = status
+        if self._structured_mode:
+            emit_progress_event(self.state)
+            return
+        assert self._renderer is not None
+        self._renderer.render([self.state])
 
     def model_started(self, *, total_folds: int, detail: str | None = None) -> None:
-        self._emit("model-start", total_folds=total_folds, detail=detail)
+        self._publish(
+            "model-start",
+            total_folds=total_folds,
+            detail=detail,
+            status="running",
+        )
 
     def fold_started(
         self, fold_idx: int, *, total_folds: int, phase: str | None = None
     ) -> None:
-        self._emit(
+        self._publish(
             "fold-start",
             fold_idx=fold_idx,
             total_folds=total_folds,
             phase=phase,
+            status="running",
         )
 
     def fold_completed(
@@ -91,13 +116,14 @@ class _ProgressLogger:
         phase: str | None = None,
         detail: str | None = None,
     ) -> None:
-        self.completed_steps += 1
-        self._emit(
+        self._publish(
             "fold-done",
             fold_idx=fold_idx,
             total_folds=total_folds,
             phase=phase,
             detail=detail,
+            status="running",
+            step_increment=1,
         )
 
     def error(
@@ -108,13 +134,26 @@ class _ProgressLogger:
         phase: str | None = None,
         exc: BaseException,
     ) -> None:
-        self._emit(
+        self._publish(
             "error",
             fold_idx=fold_idx,
             total_folds=total_folds,
             phase=phase,
             detail=f"{type(exc).__name__}: {exc}",
+            status="failed",
         )
+        if self._renderer is not None:
+            self._renderer.close()
+
+    def model_finished(self, *, detail: str | None = None) -> None:
+        self._publish(
+            "model-done",
+            phase=self.state.phase,
+            detail=detail,
+            status="completed",
+        )
+        if self._renderer is not None:
+            self._renderer.close()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -901,6 +940,170 @@ def _baseline_cross_validation(
     return metrics_rows, forecast_rows
 
 
+def _artifact_model_name(path: Path, suffix: str) -> str:
+    return path.name.removesuffix(suffix)
+
+
+def _summary_job_roots(run_root: Path) -> list[Path]:
+    roots: list[Path] = []
+    if (run_root / "cv").exists():
+        roots.append(run_root)
+    workers_root = run_root / "scheduler" / "workers"
+    if workers_root.exists():
+        roots.extend(
+            path for path in sorted(workers_root.iterdir()) if (path / "cv").exists()
+        )
+    return roots
+
+
+def _load_metrics_for_summary(run_root: Path) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+    for root in _summary_job_roots(run_root):
+        for path in sorted((root / "cv").glob("*_metrics_by_cutoff.csv")):
+            frame = pd.read_csv(path)
+            if frame.empty:
+                continue
+            model_name = _artifact_model_name(path, "_metrics_by_cutoff.csv")
+            if "model" not in frame.columns:
+                frame["model"] = model_name
+            rows.extend(frame.to_dict(orient="records"))
+    return pd.DataFrame(rows)
+
+
+def _build_leaderboard(metrics_frame: pd.DataFrame) -> pd.DataFrame:
+    leaderboard = (
+        metrics_frame.groupby("model", as_index=False)
+        .agg(
+            mean_fold_mae=("MAE", "mean"),
+            mean_fold_mse=("MSE", "mean"),
+            mean_fold_rmse=("RMSE", "mean"),
+            fold_count=("fold_idx", "nunique"),
+        )
+        .sort_values(
+            by=["mean_fold_mse", "mean_fold_mae", "model"],
+            ascending=[True, True, True],
+            kind="stable",
+        )
+        .reset_index(drop=True)
+    )
+    leaderboard.insert(0, "rank", leaderboard.index + 1)
+    return leaderboard
+
+
+def _write_leaderboard_workbook(leaderboard: pd.DataFrame, workbook_path: Path) -> None:
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "leaderboard"
+    rows = [leaderboard.columns.tolist(), *leaderboard.values.tolist()]
+    for row in rows:
+        sheet.append(list(row))
+    sheet.auto_filter.ref = sheet.dimensions
+    for column_cells in sheet.columns:
+        values = ["" if cell.value is None else str(cell.value) for cell in column_cells]
+        width = min(max(len(value) for value in values) + 2, 48)
+        sheet.column_dimensions[column_cells[0].column_letter].width = max(width, 10)
+    workbook_path.parent.mkdir(parents=True, exist_ok=True)
+    workbook.save(workbook_path)
+
+
+def _load_last_fold_forecasts(run_root: Path) -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
+    for root in _summary_job_roots(run_root):
+        for path in sorted((root / "cv").glob("*_forecasts.csv")):
+            frame = pd.read_csv(path)
+            if frame.empty:
+                continue
+            model_name = _artifact_model_name(path, "_forecasts.csv")
+            if "model" not in frame.columns:
+                frame["model"] = model_name
+            frame["fold_idx"] = pd.to_numeric(frame["fold_idx"], errors="coerce")
+            frames.append(frame)
+    if not frames:
+        return pd.DataFrame()
+    forecasts = pd.concat(frames, ignore_index=True)
+    forecasts = forecasts.dropna(subset=["fold_idx"]).copy()
+    forecasts["fold_idx"] = forecasts["fold_idx"].astype(int)
+    return forecasts
+
+
+def _plot_last_fold_overlay(
+    forecasts: pd.DataFrame,
+    selected_models: list[str],
+    plot_path: Path,
+    *,
+    title: str,
+) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    plot_path.parent.mkdir(parents=True, exist_ok=True)
+    selected = forecasts[forecasts["model"].isin(selected_models)].copy()
+    if selected.empty:
+        return
+    selected["ds"] = pd.to_datetime(selected["ds"])
+    actual = (
+        selected[["ds", "y"]]
+        .drop_duplicates(subset=["ds"])
+        .sort_values("ds")
+        .reset_index(drop=True)
+    )
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.plot(actual["ds"], actual["y"], label="actual", linewidth=2.5, color="black")
+    for model_name in selected_models:
+        model_frame = (
+            selected[selected["model"] == model_name]
+            .sort_values("ds")
+            .reset_index(drop=True)
+        )
+        if model_frame.empty:
+            continue
+        ax.plot(model_frame["ds"], model_frame["y_hat"], label=model_name, linewidth=1.8)
+    ax.set_title(title)
+    ax.set_xlabel("ds")
+    ax.set_ylabel("y")
+    ax.legend(loc="best")
+    fig.autofmt_xdate()
+    fig.tight_layout()
+    fig.savefig(plot_path, dpi=150)
+    plt.close(fig)
+
+
+def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
+    summary_dir = run_root / "summary"
+    metrics = _load_metrics_for_summary(run_root)
+    if metrics.empty:
+        return {}
+    leaderboard = _build_leaderboard(metrics)
+    workbook_path = summary_dir / "leaderboard.xlsx"
+    _write_leaderboard_workbook(leaderboard, workbook_path)
+
+    forecasts = _load_last_fold_forecasts(run_root)
+    plot_paths: dict[str, str] = {"leaderboard": str(workbook_path)}
+    if forecasts.empty:
+        return plot_paths
+    last_fold = int(forecasts["fold_idx"].max())
+    last_fold_forecasts = forecasts[forecasts["fold_idx"] == last_fold].copy()
+    ordered_models = [
+        model for model in leaderboard["model"].tolist() if model in set(last_fold_forecasts["model"])
+    ]
+    plot_specs = [
+        ("all_models", ordered_models, "Last fold predictions (all models)"),
+        ("top3", ordered_models[:3], "Last fold predictions (top 3)"),
+        ("top5", ordered_models[:5], "Last fold predictions (top 5)"),
+    ]
+    for slug, models, title in plot_specs:
+        if not models:
+            continue
+        plot_path = summary_dir / f"last_fold_{slug}.png"
+        _plot_last_fold_overlay(last_fold_forecasts, models, plot_path, title=title)
+        plot_paths[slug] = str(plot_path)
+    return plot_paths
+
+
 def _run_single_job(
     loaded: LoadedConfig, job: JobConfig, run_root: Path, *, manifest_path: Path
 ) -> None:
@@ -1108,6 +1311,7 @@ def _run_single_job(
             fold_payloads,
             manifest_path=manifest_path,
         )
+    progress.model_finished(detail="run-complete")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1135,7 +1339,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             paths["run_root"],
             manifest_path=paths["manifest_path"],
         )
-        print(json.dumps({"ok": True, "executed_jobs": [selected_jobs[0].model]}))
+        summary_artifacts = _build_summary_artifacts(paths["run_root"])
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "executed_jobs": [selected_jobs[0].model],
+                    "summary_artifacts": summary_artifacts,
+                }
+            )
+        )
         return 0
     launches = build_launch_plan(loaded.config, selected_jobs)
     scheduler_dir = paths["run_root"] / "scheduler"
@@ -1144,14 +1357,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         json.dumps([launch.__dict__ for launch in launches], indent=2), encoding="utf-8"
     )
     results = run_parallel_jobs(repo_root, loaded, launches, scheduler_dir)
+    summary_artifacts = _build_summary_artifacts(paths["run_root"])
     if any(int(result["returncode"]) != 0 for result in results):
-        raise SystemExit(json.dumps({"ok": False, "worker_results": results}))
+        raise SystemExit(
+            json.dumps(
+                {
+                    "ok": False,
+                    "worker_results": results,
+                    "summary_artifacts": summary_artifacts,
+                }
+            )
+        )
     print(
         json.dumps(
             {
                 "ok": True,
                 "scheduled_jobs": [launch.__dict__ for launch in launches],
                 "worker_results": results,
+                "summary_artifacts": summary_artifacts,
             }
         )
     )
