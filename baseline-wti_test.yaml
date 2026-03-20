@@ -99,16 +99,6 @@ runtime:
   random_seed: 1
 training:
   train_protocol: expanding_window_tscv
-  input_size: 64
-  season_length: 52
-  batch_size: 32
-  valid_batch_size: 32
-  windows_batch_size: 1024
-  inference_windows_batch_size: 1024
-  learning_rate: 0.001
-  max_steps: 3
-  val_size: 12
-  val_check_steps: 100
   early_stop_patience_steps: -1
   loss: mse
 cv:

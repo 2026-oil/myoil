@@ -24,6 +24,7 @@ from .optuna_spaces import (
     optuna_seed,
     suggest_model_params,
     suggest_residual_params,
+    suggest_training_params,
 )
 from .plugins_base import ResidualContext
 from .registry import build_residual_plugin
@@ -198,6 +199,19 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
         "unknown_search_params": [],
         "validation_error": None,
     }
+    payload["training_search"] = {
+        "requested_mode": loaded.config.training_search.requested_mode,
+        "validated_mode": loaded.config.training_search.validated_mode,
+        "supports_auto": bool(loaded.config.training_search.selected_search_params),
+        "search_space_entry_found": bool(
+            loaded.config.training_search.selected_search_params
+        ),
+        "selected_search_params": list(
+            loaded.config.training_search.selected_search_params
+        ),
+        "unknown_search_params": [],
+        "validation_error": None,
+    }
     capability_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
@@ -207,6 +221,8 @@ def _update_manifest_artifacts(
     job_name: str,
     model_best_params_path: Path | None = None,
     model_study_summary_path: Path | None = None,
+    training_best_params_path: Path | None = None,
+    training_study_summary_path: Path | None = None,
     residual_best_params_path: Path | None = None,
     residual_study_summary_path: Path | None = None,
 ) -> None:
@@ -217,6 +233,12 @@ def _update_manifest_artifacts(
                 job["model_best_params_path"] = str(model_best_params_path)
             if model_study_summary_path is not None:
                 job["model_optuna_study_summary_path"] = str(model_study_summary_path)
+            if training_best_params_path is not None:
+                job["training_best_params_path"] = str(training_best_params_path)
+            if training_study_summary_path is not None:
+                job["training_optuna_study_summary_path"] = str(
+                    training_study_summary_path
+                )
             if residual_best_params_path is not None:
                 job["residual_best_params_path"] = str(residual_best_params_path)
             if residual_study_summary_path is not None:
@@ -228,11 +250,30 @@ def _update_manifest_artifacts(
         manifest.setdefault("residual", {})["best_params_path"] = str(
             residual_best_params_path
         )
+    if training_best_params_path is not None:
+        manifest.setdefault("training_search", {})["best_params_path"] = str(
+            training_best_params_path
+        )
+    if training_study_summary_path is not None:
+        manifest.setdefault("training_search", {})["optuna_study_summary_path"] = str(
+            training_study_summary_path
+        )
     if residual_study_summary_path is not None:
         manifest.setdefault("residual", {})["optuna_study_summary_path"] = str(
             residual_study_summary_path
         )
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+
+def _effective_config(
+    loaded: LoadedConfig, training_override: dict[str, Any] | None = None
+):
+    if not training_override:
+        return loaded.config
+    return replace(
+        loaded.config,
+        training=replace(loaded.config.training, **training_override),
+    )
 
 
 def _should_use_multivariate(loaded: LoadedConfig, job: JobConfig) -> bool:
@@ -294,14 +335,16 @@ def _fit_and_predict_fold(
     train_idx: list[int],
     test_idx: list[int],
     params_override: dict[str, Any] | None = None,
+    training_override: dict[str, Any] | None = None,
 ) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, NeuralForecast]:
+    effective_config = _effective_config(loaded, training_override)
     dt_col = loaded.config.dataset.dt_col
     target_col = loaded.config.dataset.target_col
     train_df = source_df.iloc[train_idx].reset_index(drop=True)
     future_df = source_df.iloc[test_idx].reset_index(drop=True)
     adapter_inputs = _build_adapter_inputs(loaded, train_df, future_df, job, dt_col)
     model = build_model(
-        loaded.config,
+        effective_config,
         job,
         n_series=adapter_inputs.metadata.get("n_series"),
         params_override=params_override,
@@ -310,7 +353,7 @@ def _fit_and_predict_fold(
     nf.fit(
         adapter_inputs.fit_df,
         static_df=adapter_inputs.static_df,
-        val_size=loaded.config.training.val_size,
+        val_size=effective_config.training.val_size,
     )
     predictions = _predict_with_fitted_model(nf, adapter_inputs)
     _prediction_column(predictions, job.model)
@@ -340,13 +383,16 @@ def _tune_main_job(
     freq: str,
     splits: list[tuple[list[int], list[int]]],
     progress: _ProgressLogger | None = None,
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     sampler = build_optuna_sampler(optuna_seed(loaded.config.runtime.random_seed))
     trial_count = optuna_num_trials()
 
     def objective(trial: optuna.Trial) -> float:
         candidate_params = suggest_model_params(
             job.model, job.selected_search_params, trial
+        )
+        candidate_training_params = suggest_training_params(
+            loaded.config.training_search.selected_search_params, trial
         )
         fold_mse: list[float] = []
         for fold_idx, (train_idx, test_idx) in enumerate(splits):
@@ -364,6 +410,7 @@ def _tune_main_job(
                     train_idx=train_idx,
                     test_idx=test_idx,
                     params_override=candidate_params,
+                    training_override=candidate_training_params,
                 )
                 mse = _compute_metrics(
                     target_actuals, target_predictions[job.model]
@@ -387,6 +434,7 @@ def _tune_main_job(
                 raise
         metric = float(sum(fold_mse) / len(fold_mse))
         trial.set_user_attr("best_params", candidate_params)
+        trial.set_user_attr("best_training_params", candidate_training_params)
         trial.set_user_attr("fold_mse", fold_mse)
         return metric
 
@@ -395,16 +443,21 @@ def _tune_main_job(
     )
     study.optimize(objective, n_trials=trial_count, show_progress_bar=False)
     best_params = dict(study.best_trial.user_attrs["best_params"])
+    best_training_params = dict(study.best_trial.user_attrs["best_training_params"])
     summary = {
         **_trial_metrics_summary(study),
         "requested_mode": job.requested_mode,
         "validated_mode": job.validated_mode,
         "selected_search_params": list(job.selected_search_params),
+        "selected_training_search_params": list(
+            loaded.config.training_search.selected_search_params
+        ),
         "best_params": best_params,
+        "best_training_params": best_training_params,
         "fold_mse": study.best_trial.user_attrs["fold_mse"],
         "objective_stage": "tuning_pre_replay_direct_predictions",
     }
-    return best_params, summary
+    return best_params, best_training_params, summary
 
 
 def _score_residual_params(
@@ -860,6 +913,7 @@ def _run_single_job(
     metrics_rows: list[dict[str, object]] = []
     fold_payloads: list[dict[str, Any]] = []
     effective_job = job
+    effective_training_params: dict[str, Any] = {}
     models_dir = run_root / "models" / job.model
     models_dir.mkdir(parents=True, exist_ok=True)
     total_steps = len(splits)
@@ -872,7 +926,7 @@ def _run_single_job(
     )
 
     if job.validated_mode == "learned_auto":
-        best_params, study_summary = _tune_main_job(
+        best_params, best_training_params, study_summary = _tune_main_job(
             loaded,
             job,
             source_df=source_df,
@@ -883,7 +937,13 @@ def _run_single_job(
         (models_dir / "best_params.json").write_text(
             json.dumps(best_params, indent=2), encoding="utf-8"
         )
+        (models_dir / "training_best_params.json").write_text(
+            json.dumps(best_training_params, indent=2), encoding="utf-8"
+        )
         (models_dir / "optuna_study_summary.json").write_text(
+            json.dumps(study_summary, indent=2), encoding="utf-8"
+        )
+        (models_dir / "training_optuna_study_summary.json").write_text(
             json.dumps(study_summary, indent=2), encoding="utf-8"
         )
         _update_manifest_artifacts(
@@ -891,8 +951,12 @@ def _run_single_job(
             job_name=job.model,
             model_best_params_path=models_dir / "best_params.json",
             model_study_summary_path=models_dir / "optuna_study_summary.json",
+            training_best_params_path=models_dir / "training_best_params.json",
+            training_study_summary_path=models_dir
+            / "training_optuna_study_summary.json",
         )
         effective_job = replace(job, params=best_params)
+        effective_training_params = best_training_params
 
     if effective_job.model in BASELINE_MODEL_NAMES:
         train_series = source_df[[dt_col, target_col]].copy()
@@ -926,6 +990,7 @@ def _run_single_job(
                         freq=freq,
                         train_idx=train_idx,
                         test_idx=test_idx,
+                        training_override=effective_training_params,
                     )
                 )
             except Exception as exc:
@@ -1016,6 +1081,9 @@ def _run_single_job(
                 "requested_mode": job.requested_mode,
                 "validated_mode": job.validated_mode,
                 "selected_search_params": list(job.selected_search_params),
+                "selected_training_search_params": list(
+                    loaded.config.training_search.selected_search_params
+                ),
                 "devices": 1,
                 "loss": loaded.config.training.loss,
                 "evaluation_policy": "tscv_only",

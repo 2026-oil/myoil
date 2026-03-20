@@ -43,6 +43,13 @@ def build_manifest(
             }
             for job in loaded.config.jobs
         ],
+        'training_search': {
+            'requested_mode': loaded.config.training_search.requested_mode,
+            'validated_mode': loaded.config.training_search.validated_mode,
+            'selected_search_params': list(
+                loaded.config.training_search.selected_search_params
+            ),
+        },
         'residual': {
             'model': loaded.config.residual.model,
             'requested_mode': loaded.config.residual.requested_mode,

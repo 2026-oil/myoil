@@ -11,10 +11,12 @@ import yaml
 
 from .optuna_spaces import (
     BASELINE_MODEL_NAMES,
+    DEFAULT_TRAINING_PARAMS,
     SUPPORTED_AUTO_MODEL_NAMES,
     SUPPORTED_RESIDUAL_MODELS,
     MODEL_PARAM_REGISTRY,
     RESIDUAL_PARAM_REGISTRY,
+    TRAINING_PARAM_REGISTRY,
     ResidualMode,
     SearchSpaceContract,
     load_search_space_contract,
@@ -25,7 +27,6 @@ DEFAULT_MANIFEST_VERSION = "1"
 DEFAULT_ARTIFACT_SCHEMA_VERSION = "1"
 DEFAULT_EVALUATION_PROTOCOL_VERSION = "2"
 SUPPORTED_LOSSES = {"mse"}
-SUPPORTED_RESIDUAL_MODELS = {"xgboost"}
 CENTRALIZED_TRAINING_KEYS = {
     "train_protocol",
     "input_size",
@@ -67,18 +68,29 @@ class TaskConfig:
 @dataclass(frozen=True)
 class TrainingConfig:
     train_protocol: str = "expanding_window_tscv"
-    input_size: int = 64
-    season_length: int = 52
-    batch_size: int = 32
-    valid_batch_size: int = 32
-    windows_batch_size: int = 1024
-    inference_windows_batch_size: int = 1024
-    learning_rate: float = 0.001
-    max_steps: int = 100
-    val_size: int = 0
-    val_check_steps: int = 100
+    input_size: int = DEFAULT_TRAINING_PARAMS["input_size"]
+    season_length: int = DEFAULT_TRAINING_PARAMS["season_length"]
+    batch_size: int = DEFAULT_TRAINING_PARAMS["batch_size"]
+    valid_batch_size: int = DEFAULT_TRAINING_PARAMS["valid_batch_size"]
+    windows_batch_size: int = DEFAULT_TRAINING_PARAMS["windows_batch_size"]
+    inference_windows_batch_size: int = DEFAULT_TRAINING_PARAMS[
+        "inference_windows_batch_size"
+    ]
+    learning_rate: float = DEFAULT_TRAINING_PARAMS["learning_rate"]
+    max_steps: int = DEFAULT_TRAINING_PARAMS["max_steps"]
+    val_size: int = DEFAULT_TRAINING_PARAMS["val_size"]
+    val_check_steps: int = DEFAULT_TRAINING_PARAMS["val_check_steps"]
     early_stop_patience_steps: int = -1
     loss: str = "mse"
+
+
+@dataclass(frozen=True)
+class TrainingSearchConfig:
+    requested_mode: Literal["training_fixed", "training_auto_requested"] = (
+        "training_fixed"
+    )
+    validated_mode: Literal["training_fixed", "training_auto"] = "training_fixed"
+    selected_search_params: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -123,6 +135,7 @@ class AppConfig:
     dataset: DatasetConfig
     runtime: RuntimeConfig
     training: TrainingConfig
+    training_search: TrainingSearchConfig
     cv: CVConfig
     scheduler: SchedulerConfig
     residual: ResidualConfig
@@ -133,6 +146,9 @@ class AppConfig:
         if self.task.name is None:
             payload.pop("task", None)
         payload["dataset"]["path"] = str(self.dataset.path)
+        payload["training_search"]["selected_search_params"] = list(
+            payload["training_search"]["selected_search_params"]
+        )
         payload["jobs"] = list(payload["jobs"])
         for job in payload["jobs"]:
             job["selected_search_params"] = list(job["selected_search_params"])
@@ -205,9 +221,9 @@ def _load_document(path: Path, source_type: str) -> dict[str, Any]:
 
 
 def _coerce_param_name_list(value: Any, *, section: str, name: str) -> tuple[str, ...]:
-    if not isinstance(value, list) or not value:
+    if not isinstance(value, list):
         raise ValueError(
-            f"search_space.{section}.{name} must be a non-empty list of canonical parameter names"
+            f"search_space.{section}.{name} must be a list of canonical parameter names"
         )
     out = tuple(str(item) for item in value)
     if any(not item.strip() for item in out):
@@ -217,7 +233,9 @@ def _coerce_param_name_list(value: Any, *, section: str, name: str) -> tuple[str
     return out
 
 
-def _validate_search_space_payload(payload: dict[str, Any]) -> dict[str, dict[str, tuple[str, ...]]]:
+def _validate_search_space_payload(
+    payload: dict[str, Any],
+) -> dict[str, Any]:
     if not payload:
         raise ValueError("search_space.yaml is empty")
     required_sections = {"models", "residual"}
@@ -226,15 +244,26 @@ def _validate_search_space_payload(payload: dict[str, Any]) -> dict[str, dict[st
         raise ValueError(
             "search_space.yaml must contain top-level sections: models and residual"
         )
-    normalized: dict[str, dict[str, tuple[str, ...]]] = {"models": {}, "residual": {}}
+    normalized: dict[str, Any] = {
+        "models": {},
+        "training": (),
+        "residual": {},
+    }
     for section in ("models", "residual"):
         section_payload = payload.get(section)
+        if section_payload is None:
+            continue
         if not isinstance(section_payload, dict):
             raise ValueError(f"search_space.{section} must be a mapping")
         for name, value in section_payload.items():
             normalized[section][str(name)] = _coerce_param_name_list(
                 value, section=section, name=str(name)
             )
+    training_payload = payload.get("training")
+    if training_payload is not None:
+        normalized["training"] = _coerce_param_name_list(
+            training_payload, section="training", name="selectors"
+        )
     unknown_models = sorted(
         set(normalized["models"]).difference(SUPPORTED_AUTO_MODEL_NAMES)
     )
@@ -257,6 +286,12 @@ def _validate_search_space_payload(payload: dict[str, Any]) -> dict[str, dict[st
             raise ValueError(
                 f"search_space.models.{model_name} contains unknown parameter(s): {', '.join(unknown)}"
             )
+    unknown_training = sorted(set(normalized["training"]).difference(TRAINING_PARAM_REGISTRY))
+    if unknown_training:
+        raise ValueError(
+            "search_space.training contains unknown parameter(s): "
+            + ", ".join(unknown_training)
+        )
     for model_name, param_names in normalized["residual"].items():
         unknown = sorted(
             set(param_names).difference(RESIDUAL_PARAM_REGISTRY[model_name])
@@ -264,6 +299,18 @@ def _validate_search_space_payload(payload: dict[str, Any]) -> dict[str, dict[st
         if unknown:
             raise ValueError(
                 f"search_space.residual.{model_name} contains unknown parameter(s): {', '.join(unknown)}"
+            )
+    if "learning_rate" in normalized["training"]:
+        overlaps = sorted(
+            model_name
+            for model_name, param_names in normalized["models"].items()
+            if "learning_rate" in param_names
+        )
+        if overlaps:
+            raise ValueError(
+                "search_space.training.learning_rate overlaps with model-level "
+                "learning_rate selector(s): "
+                + ", ".join(overlaps)
             )
     return normalized
 
@@ -414,6 +461,17 @@ def _normalize_payload(
                 f"jobs[{job.model}] repeats centralized training key(s): {duplicated_keys}. "
                 "Move these settings under training."
             )
+    training_selected = ()
+    if any(job.validated_mode == "learned_auto" for job in jobs):
+        training_selected = (
+            search_space["training"] if search_space is not None else ()
+        )
+    training_requested_mode = (
+        "training_auto_requested" if training_selected else "training_fixed"
+    )
+    training_validated_mode = (
+        "training_auto" if training_selected else "training_fixed"
+    )
 
     return AppConfig(
         task=TaskConfig(name=str(task["name"]).strip() or None)
@@ -430,6 +488,11 @@ def _normalize_payload(
         ),
         runtime=RuntimeConfig(**runtime),
         training=TrainingConfig(**training),
+        training_search=TrainingSearchConfig(
+            requested_mode=training_requested_mode,
+            validated_mode=training_validated_mode,
+            selected_search_params=training_selected,
+        ),
         cv=CVConfig(**cv),
         scheduler=SchedulerConfig(**scheduler),
         residual=ResidualConfig(

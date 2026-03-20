@@ -54,8 +54,7 @@ models:
     - dropout_prob_theta
   DLinear:
     - moving_avg_window
-  NLinear:
-    - learning_rate
+  NLinear: []
   TiDE:
     - hidden_size
     - decoder_output_dim
@@ -191,6 +190,17 @@ models:
     - temporal_ff
     - channel_ff
     - temporal_dropout
+training:
+  - input_size
+  - season_length
+  - batch_size
+  - valid_batch_size
+  - windows_batch_size
+  - inference_windows_batch_size
+  - learning_rate
+  - max_steps
+  - val_size
+  - val_check_steps
 residual:
   xgboost:
     - n_estimators

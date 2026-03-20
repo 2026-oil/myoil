@@ -66,6 +66,19 @@ DEFAULT_RESIDUAL_PARAMS = {
     "colsample_bytree": 1.0,
 }
 
+DEFAULT_TRAINING_PARAMS = {
+    "input_size": 64,
+    "season_length": 52,
+    "batch_size": 32,
+    "valid_batch_size": 32,
+    "windows_batch_size": 1024,
+    "inference_windows_batch_size": 1024,
+    "learning_rate": 0.001,
+    "max_steps": 1000,
+    "val_size": 12,
+    "val_check_steps": 100,
+}
+
 ExecutionMode = Literal[
     "baseline_fixed",
     "learned_fixed",
@@ -398,6 +411,19 @@ RESIDUAL_PARAM_REGISTRY = {
     }
 }
 
+TRAINING_PARAM_REGISTRY = {
+    "input_size": _categorical([16, 32, 64, 128]),
+    "season_length": _categorical([12, 24, 52]),
+    "batch_size": _categorical([16, 32, 64]),
+    "valid_batch_size": _categorical([16, 32, 64]),
+    "windows_batch_size": _categorical([256, 512, 1024]),
+    "inference_windows_batch_size": _categorical([256, 512, 1024]),
+    "learning_rate": _float(1e-4, 1e-1, log=True),
+    "max_steps": _categorical([100, 300, 500, 1000]),
+    "val_size": _categorical([0, 6, 12, 24]),
+    "val_check_steps": _categorical([25, 50, 100, 200]),
+}
+
 
 def suggest_model_params(
     model_name: str, selected_names: tuple[str, ...], trial: optuna.Trial
@@ -413,4 +439,13 @@ def suggest_residual_params(
     suggested = DEFAULT_RESIDUAL_PARAMS.copy()
     for name in selected_names:
         suggested[name] = registry[name](trial, name)
+    return suggested
+
+
+def suggest_training_params(
+    selected_names: tuple[str, ...], trial: optuna.Trial
+) -> dict[str, Any]:
+    suggested = {}
+    for name in selected_names:
+        suggested[name] = TRAINING_PARAM_REGISTRY[name](trial, name)
     return suggested

@@ -16,6 +16,7 @@ from residual.optuna_spaces import (
     EXCLUDED_AUTO_MODEL_NAMES,
     MODEL_PARAM_REGISTRY,
     SUPPORTED_AUTO_MODEL_NAMES,
+    TRAINING_PARAM_REGISTRY,
 )
 from residual.plugins_base import ResidualContext, ResidualPlugin
 from residual.registry import build_residual_plugin
@@ -37,6 +38,7 @@ def _write_search_space(
                 "TFT": ["hidden_size", "dropout", "n_head"],
                 "iTransformer": ["hidden_size", "n_heads", "e_layers", "d_ff"],
             },
+            "training": [],
             "residual": {
                 "xgboost": ["n_estimators", "max_depth", "learning_rate"]
             },
@@ -399,7 +401,7 @@ def test_scheduler_streams_worker_stdout_to_terminal(
 def test_runtime_executes_single_job_with_dummy_model(tmp_path: Path):
     payload = _payload()
     payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
-    payload["training"].update({"input_size": 1, "max_steps": 1})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 0})
     payload["dataset"]["hist_exog_cols"] = []
     payload["jobs"] = [
         {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
@@ -433,7 +435,7 @@ def test_runtime_logs_model_and_fold_progress_to_stdout(
 ):
     payload = _payload()
     payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
-    payload["training"].update({"input_size": 1, "max_steps": 1})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 0})
     payload["dataset"]["hist_exog_cols"] = []
     payload["jobs"] = [
         {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
@@ -474,7 +476,7 @@ def test_runtime_logs_fold_errors_to_stdout(
 ):
     payload = _payload()
     payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
-    payload["training"].update({"input_size": 1, "max_steps": 1})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 0})
     payload["dataset"]["hist_exog_cols"] = []
     payload["jobs"] = [
         {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
@@ -538,7 +540,7 @@ def test_build_tscv_splits_uses_configured_step_size(tmp_path: Path):
 def test_runtime_outer_cv_cutoffs_follow_step_size(tmp_path: Path):
     payload = _payload()
     payload["cv"].update({"horizon": 1, "step_size": 2, "n_windows": 2, "gap": 0})
-    payload["training"].update({"input_size": 1, "max_steps": 1})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 0})
     payload["dataset"]["hist_exog_cols"] = []
     payload["jobs"] = [
         {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
@@ -577,7 +579,7 @@ def test_runtime_uses_task_name_for_default_run_directory(tmp_path: Path):
     payload = _payload()
     payload["task"] = {"name": "pytest_task_default_output"}
     payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
-    payload["training"].update({"input_size": 1, "max_steps": 1})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 0})
     payload["dataset"]["hist_exog_cols"] = []
     payload["jobs"] = [
         {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
@@ -680,7 +682,7 @@ def test_residual_registry_builds_xgboost_plugin():
 def test_runtime_generates_per_fold_residual_artifacts_with_dummy_model(tmp_path: Path):
     payload = _payload()
     payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 4, "gap": 0})
-    payload["training"].update({"input_size": 1, "max_steps": 1})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 0})
     payload["dataset"]["hist_exog_cols"] = []
     payload["residual"] = {
         "enabled": True,
@@ -1033,10 +1035,109 @@ def test_load_app_config_marks_auto_requested_and_validated_modes(tmp_path: Path
     assert list(job.selected_search_params) == ["hidden_size", "dropout", "n_head"]
     assert loaded.config.residual.requested_mode == "residual_auto_requested"
     assert loaded.config.residual.validated_mode == "residual_auto"
+    assert loaded.config.training_search.requested_mode == "training_fixed"
+    assert loaded.config.training_search.validated_mode == "training_fixed"
+    assert list(loaded.config.training_search.selected_search_params) == []
     assert loaded.normalized_payload["search_space_path"] == str(
         (tmp_path / "search_space.yaml").resolve()
     )
     assert loaded.normalized_payload["search_space_sha256"]
+
+
+def test_load_app_config_accepts_training_search_space_section(tmp_path: Path):
+    payload = _payload()
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size", "dropout", "n_head"]},
+            "training": ["input_size", "max_steps", "val_size"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    assert loaded.config.training_search.requested_mode == "training_auto_requested"
+    assert loaded.config.training_search.validated_mode == "training_auto"
+    assert list(loaded.config.training_search.selected_search_params) == [
+        "input_size",
+        "max_steps",
+        "val_size",
+    ]
+
+
+def test_load_app_config_accepts_training_search_space_max_steps(tmp_path: Path):
+    payload = _payload()
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"]},
+            "training": ["max_steps"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    assert list(loaded.config.training_search.selected_search_params) == ["max_steps"]
+
+
+def test_load_app_config_rejects_unknown_training_search_space_param(tmp_path: Path):
+    payload = _payload()
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"]},
+            "training": ["not_a_real_training_key"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    with pytest.raises(ValueError, match="search_space.training contains unknown"):
+        load_app_config(tmp_path, config_path=config_path)
+
+
+def test_load_app_config_rejects_training_model_learning_rate_overlap(tmp_path: Path):
+    payload = _payload()
+    payload["jobs"] = [{"model": "NLinear", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"NLinear": ["learning_rate"]},
+            "training": ["learning_rate"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    with pytest.raises(ValueError, match="training.learning_rate overlaps"):
+        load_app_config(tmp_path, config_path=config_path)
 
 
 def test_load_app_config_rejects_missing_model_search_space_entry(tmp_path: Path):
@@ -1177,15 +1278,119 @@ def test_runtime_auto_mode_records_selector_provenance_and_modes(
     assert resolved["search_space_path"] == str((tmp_path / "search_space.yaml").resolve())
     assert resolved["jobs"][0]["requested_mode"] == "learned_auto_requested"
     assert resolved["jobs"][0]["validated_mode"] == "learned_auto"
+    assert resolved["training_search"]["requested_mode"] == "training_fixed"
+    assert resolved["training_search"]["validated_mode"] == "training_fixed"
     assert capability["TFT"]["requested_mode"] == "learned_auto_requested"
     assert capability["TFT"]["validated_mode"] == "learned_auto"
+    assert capability["training_search"]["validated_mode"] == "training_fixed"
     assert manifest["search_space_path"] == str((tmp_path / "search_space.yaml").resolve())
     assert manifest["jobs"][0]["requested_mode"] == "learned_auto_requested"
     assert manifest["jobs"][0]["validated_mode"] == "learned_auto"
+    assert manifest["training_search"]["validated_mode"] == "training_fixed"
     assert manifest["jobs"][0]["model_best_params_path"]
     assert manifest["jobs"][0]["model_optuna_study_summary_path"]
     assert (output_root / "models" / "TFT" / "best_params.json").exists()
     assert (output_root / "models" / "TFT" / "optuna_study_summary.json").exists()
+
+
+def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    payload = _payload()
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"]},
+            "training": ["max_steps", "val_size"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    from residual import runtime
+
+    calls: list[dict[str, Any]] = []
+
+    def _fake_fit_and_predict_fold(
+        loaded,
+        job,
+        *,
+        source_df,
+        freq,
+        train_idx,
+        test_idx,
+        params_override=None,
+        training_override=None,
+    ):
+        calls.append(training_override or {})
+        ds = pd.Series(["2020-01-22"])
+        predictions = pd.DataFrame(
+            {"unique_id": [loaded.config.dataset.target_col], "ds": ds, job.model: [1.0]}
+        )
+        actuals = pd.Series([1.0])
+        return predictions, actuals, pd.Timestamp("2020-01-15"), source_df.iloc[train_idx], object()
+
+    monkeypatch.setenv("NEURALFORECAST_OPTUNA_NUM_TRIALS", "1")
+    monkeypatch.setenv("NEURALFORECAST_OPTUNA_SEED", "7")
+    monkeypatch.setattr(runtime, "_fit_and_predict_fold", _fake_fit_and_predict_fold)
+    monkeypatch.setattr(
+        runtime,
+        "suggest_model_params",
+        lambda *_args, **_kwargs: {"hidden_size": 32},
+    )
+    monkeypatch.setattr(
+        runtime,
+        "suggest_training_params",
+        lambda *_args, **_kwargs: {"max_steps": 123, "val_size": 7},
+    )
+    monkeypatch.setattr(
+        runtime,
+        "load_app_config",
+        lambda _repo_root, **kwargs: load_app_config(tmp_path, **kwargs),
+    )
+
+    output_root = tmp_path / "run_auto_training"
+    code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "TFT",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    manifest = json.loads(
+        (output_root / "manifest" / "run_manifest.json").read_text(encoding="utf-8")
+    )
+    capability = json.loads(
+        (output_root / "config" / "capability_report.json").read_text(encoding="utf-8")
+    )
+    training_best = json.loads(
+        (output_root / "models" / "TFT" / "training_best_params.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert code == 0
+    assert calls[-1]["max_steps"] == 123
+    assert manifest["training_search"]["selected_search_params"] == [
+        "max_steps",
+        "val_size",
+    ]
+    assert manifest["jobs"][0]["training_best_params_path"]
+    assert manifest["jobs"][0]["training_optuna_study_summary_path"]
+    assert capability["training_search"]["validated_mode"] == "training_auto"
+    assert training_best == {"max_steps": 123, "val_size": 7}
 
 
 def test_supported_auto_model_matrix_matches_registry_and_yaml():
@@ -1200,8 +1405,13 @@ def test_supported_auto_model_matrix_matches_registry_and_yaml():
     assert SUPPORTED_AUTO_MODEL_NAMES == learned_model_classes
     assert SUPPORTED_AUTO_MODEL_NAMES == learned_registry_models
     assert SUPPORTED_AUTO_MODEL_NAMES == set(search_space["models"])
+    assert tuple(search_space["training"]) == tuple(TRAINING_PARAM_REGISTRY)
     assert set(search_space["residual"]) == {"xgboost"}
-    assert all(search_space["models"][model] for model in search_space["models"])
+    assert all(
+        isinstance(search_space["models"][model], list)
+        for model in search_space["models"]
+    )
+    assert "learning_rate" not in search_space["models"]["NLinear"]
 
 
 def test_supported_auto_model_matrix_includes_v3_expansion():
