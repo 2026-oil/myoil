@@ -1,4 +1,74 @@
 models:
+  RNN:
+    - encoder_hidden_size
+    - encoder_n_layers
+    - context_size
+    - decoder_hidden_size
+  GRU:
+    - encoder_hidden_size
+    - encoder_n_layers
+    - context_size
+    - decoder_hidden_size
+  LSTM:
+    - encoder_hidden_size
+    - decoder_hidden_size
+    - encoder_n_layers
+    - context_size
+  TCN:
+    - encoder_hidden_size
+    - kernel_size
+    - context_size
+    - decoder_hidden_size
+  DeepAR:
+    - lstm_hidden_size
+    - lstm_n_layers
+    - lstm_dropout
+    - decoder_hidden_size
+  DilatedRNN:
+    - cell_type
+    - encoder_hidden_size
+    - context_size
+    - decoder_hidden_size
+  BiTCN:
+    - hidden_size
+    - dropout
+  xLSTM:
+    - encoder_hidden_size
+    - encoder_n_blocks
+    - decoder_hidden_size
+    - encoder_dropout
+  MLP:
+    - hidden_size
+    - num_layers
+  NBEATS:
+    - n_blocks
+    - mlp_units
+    - dropout_prob_theta
+  NBEATSx:
+    - n_blocks
+    - mlp_units
+    - dropout_prob_theta
+  NHITS:
+    - n_pool_kernel_size
+    - n_freq_downsample
+    - dropout_prob_theta
+  DLinear:
+    - moving_avg_window
+  NLinear:
+    - learning_rate
+  TiDE:
+    - hidden_size
+    - decoder_output_dim
+    - temporal_decoder_dim
+    - num_encoder_layers
+  DeepNPTS:
+    - hidden_size
+    - dropout
+    - n_layers
+  KAN:
+    - grid_size
+    - spline_order
+    - hidden_size
   TFT:
     - hidden_size
     - dropout
@@ -7,14 +77,17 @@ models:
     - hidden_size
     - dropout
     - encoder_layers
+    - n_head
   Informer:
     - hidden_size
     - dropout
     - factor
+    - n_head
   Autoformer:
     - hidden_size
     - dropout
     - factor
+    - n_head
   FEDformer:
     - hidden_size
     - modes
@@ -24,19 +97,56 @@ models:
     - n_heads
     - encoder_layers
     - patch_len
-  LSTM:
-    - encoder_hidden_size
-    - decoder_hidden_size
-    - encoder_n_layers
-  NHITS:
-    - n_pool_kernel_size
-    - n_freq_downsample
-    - dropout_prob_theta
   iTransformer:
     - hidden_size
     - n_heads
     - e_layers
     - d_ff
+  TimeXer:
+    - patch_len
+    - hidden_size
+    - n_heads
+    - e_layers
+  TimesNet:
+    - hidden_size
+    - conv_hidden_size
+    - top_k
+    - encoder_layers
+  StemGNN:
+    - n_stacks
+    - multi_layer
+    - dropout_rate
+  TSMixer:
+    - n_block
+    - ff_dim
+    - dropout
+  TSMixerx:
+    - n_block
+    - ff_dim
+    - dropout
+  MLPMultivariate:
+    - hidden_size
+    - num_layers
+  SOFTS:
+    - hidden_size
+    - d_core
+    - e_layers
+    - d_ff
+  TimeMixer:
+    - d_model
+    - d_ff
+    - down_sampling_layers
+    - top_k
+  RMoK:
+    - taylor_order
+    - jacobi_degree
+    - wavelet_function
+    - dropout
+  XLinear:
+    - hidden_size
+    - temporal_ff
+    - channel_ff
+    - temporal_dropout
 residual:
   xgboost:
     - n_estimators

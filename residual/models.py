@@ -6,7 +6,42 @@ from dataclasses import dataclass
 from typing import Any
 
 from neuralforecast.losses.pytorch import MSE
-from neuralforecast.models import Autoformer, FEDformer, Informer, LSTM, NHITS, PatchTST, TFT, VanillaTransformer, iTransformer
+from neuralforecast.models import (
+    Autoformer,
+    BiTCN,
+    DLinear,
+    DeepAR,
+    DeepNPTS,
+    DilatedRNN,
+    FEDformer,
+    GRU,
+    Informer,
+    KAN,
+    LSTM,
+    MLP,
+    MLPMultivariate,
+    NBEATS,
+    NBEATSx,
+    NHITS,
+    NLinear,
+    PatchTST,
+    RMoK,
+    RNN,
+    SOFTS,
+    StemGNN,
+    TCN,
+    TFT,
+    TSMixer,
+    TSMixerx,
+    TiDE,
+    TimeMixer,
+    TimeXer,
+    TimesNet,
+    VanillaTransformer,
+    XLinear,
+    iTransformer,
+    xLSTM,
+)
 
 try:
     from tests.dummy.dummy_models import DummyMultivariate, DummyUnivariate
@@ -14,7 +49,7 @@ except Exception:  # pragma: no cover
     DummyMultivariate = DummyUnivariate = None
 
 from .config import AppConfig, JobConfig
-from .optuna_spaces import BASELINE_MODEL_NAMES, FIRST_CUT_AUTO_MODEL_NAMES
+from .optuna_spaces import BASELINE_MODEL_NAMES, SUPPORTED_AUTO_MODEL_NAMES
 
 
 @dataclass(frozen=True)
@@ -29,6 +64,21 @@ class ModelCapabilities:
 
 
 MODEL_CLASSES = {
+    'RNN': RNN,
+    'GRU': GRU,
+    'TCN': TCN,
+    'DeepAR': DeepAR,
+    'DilatedRNN': DilatedRNN,
+    'BiTCN': BiTCN,
+    'xLSTM': xLSTM,
+    'MLP': MLP,
+    'NBEATS': NBEATS,
+    'NBEATSx': NBEATSx,
+    'DLinear': DLinear,
+    'NLinear': NLinear,
+    'TiDE': TiDE,
+    'DeepNPTS': DeepNPTS,
+    'KAN': KAN,
     'TFT': TFT,
     'VanillaTransformer': VanillaTransformer,
     'Informer': Informer,
@@ -38,6 +88,16 @@ MODEL_CLASSES = {
     'LSTM': LSTM,
     'NHITS': NHITS,
     'iTransformer': iTransformer,
+    'TimeXer': TimeXer,
+    'TimesNet': TimesNet,
+    'StemGNN': StemGNN,
+    'TSMixer': TSMixer,
+    'TSMixerx': TSMixerx,
+    'MLPMultivariate': MLPMultivariate,
+    'SOFTS': SOFTS,
+    'TimeMixer': TimeMixer,
+    'RMoK': RMoK,
+    'XLinear': XLinear,
 }
 if DummyUnivariate is not None:
     MODEL_CLASSES['DummyUnivariate'] = DummyUnivariate
@@ -116,4 +176,4 @@ def build_model(
 
 
 def supports_auto_mode(model_name: str) -> bool:
-    return model_name in FIRST_CUT_AUTO_MODEL_NAMES
+    return model_name in SUPPORTED_AUTO_MODEL_NAMES

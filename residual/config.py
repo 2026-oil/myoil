@@ -11,8 +11,8 @@ import yaml
 
 from .optuna_spaces import (
     BASELINE_MODEL_NAMES,
-    FIRST_CUT_AUTO_MODEL_NAMES,
-    FIRST_CUT_RESIDUAL_MODELS,
+    SUPPORTED_AUTO_MODEL_NAMES,
+    SUPPORTED_RESIDUAL_MODELS,
     MODEL_PARAM_REGISTRY,
     RESIDUAL_PARAM_REGISTRY,
     ResidualMode,
@@ -236,19 +236,19 @@ def _validate_search_space_payload(payload: dict[str, Any]) -> dict[str, dict[st
                 value, section=section, name=str(name)
             )
     unknown_models = sorted(
-        set(normalized["models"]).difference(FIRST_CUT_AUTO_MODEL_NAMES)
+        set(normalized["models"]).difference(SUPPORTED_AUTO_MODEL_NAMES)
     )
     if unknown_models:
         raise ValueError(
-            "search_space.models contains unsupported first-cut model(s): "
+            "search_space.models contains unsupported learned model(s): "
             + ", ".join(unknown_models)
         )
     unknown_residual = sorted(
-        set(normalized["residual"]).difference(FIRST_CUT_RESIDUAL_MODELS)
+        set(normalized["residual"]).difference(SUPPORTED_RESIDUAL_MODELS)
     )
     if unknown_residual:
         raise ValueError(
-            "search_space.residual contains unsupported first-cut model(s): "
+            "search_space.residual contains unsupported residual model(s): "
             + ", ".join(unknown_residual)
         )
     for model_name, param_names in normalized["models"].items():
@@ -298,9 +298,9 @@ def _normalize_job(
     elif requested_mode == "learned_fixed":
         validated_mode = "learned_fixed"
     else:
-        if model_name not in FIRST_CUT_AUTO_MODEL_NAMES:
+        if model_name not in SUPPORTED_AUTO_MODEL_NAMES:
             raise ValueError(
-                f"jobs[{model_name}] uses empty params but has no supported learned_auto Optuna mapping in the first cut"
+                f"jobs[{model_name}] uses empty params but has no supported learned_auto Optuna mapping"
             )
         if search_space is None or model_name not in search_space["models"]:
             raise ValueError(
@@ -378,9 +378,9 @@ def _normalize_payload(
     )
     residual_selected: tuple[str, ...] = ()
     if residual_requested_mode == "residual_auto_requested":
-        if residual_model not in FIRST_CUT_RESIDUAL_MODELS:
+        if residual_model not in SUPPORTED_RESIDUAL_MODELS:
             raise ValueError(
-                f"residual[{residual_model}] has no supported auto-tuning mapping in the first cut"
+                f"residual[{residual_model}] has no supported auto-tuning mapping"
             )
         if search_space is None or residual_model not in search_space["residual"]:
             raise ValueError(

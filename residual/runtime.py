@@ -18,8 +18,8 @@ from .models import BASELINE_MODEL_NAMES, build_model, validate_job
 from .optuna_spaces import (
     DEFAULT_OPTUNA_STUDY_DIRECTION,
     DEFAULT_RESIDUAL_PARAMS,
-    FIRST_CUT_AUTO_MODEL_NAMES,
-    FIRST_CUT_RESIDUAL_MODELS,
+    SUPPORTED_AUTO_MODEL_NAMES,
+    SUPPORTED_RESIDUAL_MODELS,
     build_optuna_sampler,
     optuna_num_trials,
     optuna_seed,
@@ -99,7 +99,7 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
             **caps.__dict__,
             "requested_mode": job.requested_mode,
             "validated_mode": job.validated_mode,
-            "supports_auto": job.model in FIRST_CUT_AUTO_MODEL_NAMES,
+            "supports_auto": job.model in SUPPORTED_AUTO_MODEL_NAMES,
             "search_space_entry_found": bool(job.selected_search_params),
             "selected_search_params": list(job.selected_search_params),
             "unknown_search_params": [],
@@ -109,7 +109,7 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
         "model": loaded.config.residual.model,
         "requested_mode": loaded.config.residual.requested_mode,
         "validated_mode": loaded.config.residual.validated_mode,
-        "supports_auto": loaded.config.residual.model in FIRST_CUT_RESIDUAL_MODELS,
+        "supports_auto": loaded.config.residual.model in SUPPORTED_RESIDUAL_MODELS,
         "search_space_entry_found": bool(loaded.config.residual.selected_search_params),
         "selected_search_params": list(loaded.config.residual.selected_search_params),
         "unknown_search_params": [],
@@ -154,12 +154,7 @@ def _update_manifest_artifacts(
 
 def _should_use_multivariate(loaded: LoadedConfig, job: JobConfig) -> bool:
     caps = validate_job(job)
-    has_dataset_exog = bool(
-        loaded.config.dataset.hist_exog_cols
-        or loaded.config.dataset.futr_exog_cols
-        or loaded.config.dataset.static_exog_cols
-    )
-    return bool(caps.multivariate and has_dataset_exog)
+    return bool(caps.multivariate)
 
 
 def _validate_adapters(loaded: LoadedConfig, selected_jobs) -> None:

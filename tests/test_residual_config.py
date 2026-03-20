@@ -10,7 +10,12 @@ import yaml
 
 from residual.adapters import build_multivariate_inputs, build_univariate_inputs
 from residual.config import load_app_config
-from residual.models import build_model
+from residual.models import MODEL_CLASSES, build_model, supports_auto_mode
+from residual.optuna_spaces import (
+    EXCLUDED_AUTO_MODEL_NAMES,
+    MODEL_PARAM_REGISTRY,
+    SUPPORTED_AUTO_MODEL_NAMES,
+)
 from residual.plugins_base import ResidualContext, ResidualPlugin
 from residual.registry import build_residual_plugin
 from residual.scheduler import build_launch_plan, worker_env
@@ -907,3 +912,170 @@ def test_runtime_auto_mode_records_selector_provenance_and_modes(
     assert manifest["jobs"][0]["model_optuna_study_summary_path"]
     assert (output_root / "models" / "TFT" / "best_params.json").exists()
     assert (output_root / "models" / "TFT" / "optuna_study_summary.json").exists()
+
+
+def test_supported_auto_model_matrix_matches_registry_and_yaml():
+    search_space = yaml.safe_load((REPO_ROOT / "search_space.yaml").read_text())
+    learned_model_classes = {
+        model_name
+        for model_name in MODEL_CLASSES
+        if not model_name.startswith("Dummy")
+    }
+    learned_registry_models = set(MODEL_PARAM_REGISTRY)
+    assert "HINT" not in SUPPORTED_AUTO_MODEL_NAMES
+    assert SUPPORTED_AUTO_MODEL_NAMES == learned_model_classes
+    assert SUPPORTED_AUTO_MODEL_NAMES == learned_registry_models
+    assert SUPPORTED_AUTO_MODEL_NAMES == set(search_space["models"])
+    assert set(search_space["residual"]) == {"xgboost"}
+    assert all(search_space["models"][model] for model in search_space["models"])
+
+
+def test_supported_auto_model_matrix_includes_v3_expansion():
+    for model_name in (
+        "RNN",
+        "GRU",
+        "TCN",
+        "DeepAR",
+        "DilatedRNN",
+        "BiTCN",
+        "xLSTM",
+        "MLP",
+        "NBEATS",
+        "NBEATSx",
+        "DLinear",
+        "NLinear",
+        "TiDE",
+        "DeepNPTS",
+        "KAN",
+        "TimeXer",
+        "TimesNet",
+        "StemGNN",
+        "TSMixer",
+        "TSMixerx",
+        "MLPMultivariate",
+        "SOFTS",
+        "TimeMixer",
+        "RMoK",
+        "XLinear",
+    ):
+        assert model_name in SUPPORTED_AUTO_MODEL_NAMES
+    assert EXCLUDED_AUTO_MODEL_NAMES == {"HINT"}
+
+
+def test_supports_auto_mode_expands_to_newly_added_models():
+    for model_name in ("RNN", "DeepAR", "TimeMixer", "XLinear", "StemGNN"):
+        assert supports_auto_mode(model_name) is True
+    assert supports_auto_mode("Naive") is False
+
+
+def test_should_use_multivariate_for_no_exog_multivariate_model(tmp_path: Path):
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [
+        {"model": "DummyMultivariate", "params": {"start_padding_enabled": True}}
+    ]
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n",
+        encoding="utf-8",
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    import residual.runtime as runtime
+
+    assert runtime._should_use_multivariate(loaded, loaded.config.jobs[0]) is True
+
+
+def test_build_model_supports_representative_expanded_models(tmp_path: Path):
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [
+        {
+            "model": "RNN",
+            "params": {
+                "encoder_hidden_size": 16,
+                "encoder_n_layers": 1,
+                "context_size": 5,
+                "decoder_hidden_size": 16,
+            },
+        },
+        {
+            "model": "MLP",
+            "params": {"hidden_size": 32, "num_layers": 2},
+        },
+        {
+            "model": "TimeMixer",
+            "params": {
+                "d_model": 16,
+                "d_ff": 32,
+                "down_sampling_layers": 1,
+                "top_k": 3,
+            },
+        },
+        {
+            "model": "MLPMultivariate",
+            "params": {"hidden_size": 32, "num_layers": 2},
+        },
+    ]
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n",
+        encoding="utf-8",
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    rnn = build_model(loaded.config, loaded.config.jobs[0])
+    mlp = build_model(loaded.config, loaded.config.jobs[1])
+    timemixer = build_model(loaded.config, loaded.config.jobs[2], n_series=1)
+    mlpmulti = build_model(loaded.config, loaded.config.jobs[3], n_series=1)
+
+    assert rnn.hparams.encoder_hidden_size == 16
+    assert mlp.hparams.hidden_size == 32
+    assert timemixer.hparams.d_model == 16
+    assert getattr(mlpmulti.hparams, "n_series", 1) == 1
+
+
+def test_runtime_executes_multivariate_model_without_hist_exog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    payload = _payload()
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["dataset"]["futr_exog_cols"] = []
+    payload["jobs"] = [{"model": "iTransformer", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    _write_search_space(tmp_path)
+    data = (
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n"
+        "2020-01-29,5\n2020-02-05,6\n2020-02-12,7\n2020-02-19,8\n"
+    )
+    (tmp_path / "data.csv").write_text(data, encoding="utf-8")
+    config_path = _write_config(tmp_path, payload, ".yaml")
+
+    from residual import runtime
+
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    monkeypatch.setenv("NEURALFORECAST_OPTUNA_NUM_TRIALS", "1")
+    monkeypatch.setenv("NEURALFORECAST_OPTUNA_SEED", "7")
+    monkeypatch.setattr(
+        runtime,
+        "load_app_config",
+        lambda _repo_root, **kwargs: load_app_config(tmp_path, **kwargs),
+    )
+
+    output_root = tmp_path / "run_multivariate"
+    code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "iTransformer",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+    assert code == 0
+    assert (output_root / "cv" / "iTransformer_forecasts.csv").exists()

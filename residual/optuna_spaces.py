@@ -11,18 +11,44 @@ import yaml
 
 SEARCH_SPACE_FILENAME = "search_space.yaml"
 BASELINE_MODEL_NAMES = {"Naive", "SeasonalNaive", "HistoricAverage"}
-FIRST_CUT_AUTO_MODEL_NAMES = {
+EXCLUDED_AUTO_MODEL_NAMES = {"HINT"}
+SUPPORTED_AUTO_MODEL_NAMES = {
+    "RNN",
+    "GRU",
+    "LSTM",
+    "TCN",
+    "DeepAR",
+    "DilatedRNN",
+    "BiTCN",
+    "xLSTM",
+    "MLP",
+    "NBEATS",
+    "NBEATSx",
+    "NHITS",
+    "DLinear",
+    "NLinear",
+    "TiDE",
+    "DeepNPTS",
+    "KAN",
     "TFT",
     "VanillaTransformer",
     "Informer",
     "Autoformer",
     "FEDformer",
     "PatchTST",
-    "LSTM",
-    "NHITS",
     "iTransformer",
+    "TimeXer",
+    "TimesNet",
+    "StemGNN",
+    "TSMixer",
+    "TSMixerx",
+    "MLPMultivariate",
+    "SOFTS",
+    "TimeMixer",
+    "RMoK",
+    "XLinear",
 }
-FIRST_CUT_RESIDUAL_MODELS = {"xgboost"}
+SUPPORTED_RESIDUAL_MODELS = {"xgboost"}
 DEFAULT_OPTUNA_NUM_TRIALS = 5
 DEFAULT_OPTUNA_STUDY_DIRECTION = "minimize"
 
@@ -105,6 +131,18 @@ def _float(low: float, high: float, *, log: bool = False):
 
 
 MODEL_PARAM_REGISTRY = {
+    "RNN": {
+        "encoder_hidden_size": _categorical([16, 32, 64, 128]),
+        "encoder_n_layers": _int(1, 3),
+        "context_size": _categorical([5, 10, 50]),
+        "decoder_hidden_size": _categorical([16, 32, 64, 128]),
+    },
+    "GRU": {
+        "encoder_hidden_size": _categorical([16, 32, 64, 128]),
+        "encoder_n_layers": _int(1, 3),
+        "context_size": _categorical([5, 10, 50]),
+        "decoder_hidden_size": _categorical([16, 32, 64, 128]),
+    },
     "TFT": {
         "hidden_size": _categorical([32, 64, 128, 256]),
         "dropout": _float(0.0, 0.3),
@@ -147,6 +185,58 @@ MODEL_PARAM_REGISTRY = {
         "encoder_n_layers": _int(1, 3),
         "context_size": _categorical([5, 10, 50]),
     },
+    "TCN": {
+        "encoder_hidden_size": _categorical([16, 32, 64, 128]),
+        "context_size": _categorical([5, 10, 50]),
+        "decoder_hidden_size": _categorical([16, 32, 64, 128]),
+        "kernel_size": _categorical([2, 3, 5]),
+    },
+    "DeepAR": {
+        "lstm_hidden_size": _categorical([16, 32, 64, 128]),
+        "lstm_n_layers": _int(1, 3),
+        "lstm_dropout": _float(0.0, 0.3),
+        "decoder_hidden_size": _categorical([16, 32, 64]),
+    },
+    "DilatedRNN": {
+        "cell_type": _categorical(["GRU", "LSTM"]),
+        "encoder_hidden_size": _categorical([16, 32, 64, 128]),
+        "context_size": _categorical([5, 10, 50]),
+        "decoder_hidden_size": _categorical([16, 32, 64, 128]),
+    },
+    "BiTCN": {
+        "hidden_size": _categorical([16, 32, 64, 128]),
+        "dropout": _float(0.0, 0.3),
+    },
+    "xLSTM": {
+        "encoder_hidden_size": _categorical([16, 32, 64, 128]),
+        "encoder_n_blocks": _int(1, 3),
+        "decoder_hidden_size": _categorical([16, 32, 64, 128]),
+        "encoder_dropout": _float(0.0, 0.3),
+    },
+    "MLP": {
+        "hidden_size": _categorical([32, 64, 128, 256]),
+        "num_layers": _int(1, 4),
+    },
+    "NBEATS": {
+        "n_blocks": _categorical([[1, 1, 1], [2, 2, 2], [3, 3, 3]]),
+        "mlp_units": _categorical(
+            [
+                [[64, 64], [64, 64], [64, 64]],
+                [[128, 128], [128, 128], [128, 128]],
+            ]
+        ),
+        "dropout_prob_theta": _float(0.0, 0.3),
+    },
+    "NBEATSx": {
+        "n_blocks": _categorical([[1, 1, 1], [2, 2, 2], [3, 3, 3]]),
+        "mlp_units": _categorical(
+            [
+                [[64, 64], [64, 64], [64, 64]],
+                [[128, 128], [128, 128], [128, 128]],
+            ]
+        ),
+        "dropout_prob_theta": _float(0.0, 0.3),
+    },
     "NHITS": {
         "n_pool_kernel_size": _categorical(
             [[2, 2, 1], [1, 1, 1], [2, 2, 2], [4, 2, 1]]
@@ -156,12 +246,89 @@ MODEL_PARAM_REGISTRY = {
         ),
         "dropout_prob_theta": _float(0.0, 0.3),
     },
+    "DLinear": {
+        "moving_avg_window": _categorical([3, 5, 7, 25]),
+    },
+    "NLinear": {
+        "learning_rate": _float(1e-4, 1e-1, log=True),
+    },
+    "TiDE": {
+        "hidden_size": _categorical([32, 64, 128, 256]),
+        "decoder_output_dim": _categorical([8, 16, 32]),
+        "temporal_decoder_dim": _categorical([8, 16, 32]),
+        "num_encoder_layers": _int(1, 3),
+    },
+    "DeepNPTS": {
+        "hidden_size": _categorical([16, 32, 64, 128]),
+        "dropout": _float(0.0, 0.3),
+        "n_layers": _int(1, 4),
+    },
+    "KAN": {
+        "grid_size": _categorical([3, 5, 8]),
+        "spline_order": _categorical([2, 3, 4]),
+        "hidden_size": _categorical([16, 32, 64, 128]),
+    },
     "iTransformer": {
         "hidden_size": _categorical([32, 64, 128, 256]),
         "n_heads": _categorical([4, 8]),
         "e_layers": _int(1, 4),
         "d_ff": _categorical([128, 256, 512]),
         "dropout": _float(0.0, 0.3),
+    },
+    "TimeXer": {
+        "patch_len": _categorical([8, 16, 24]),
+        "hidden_size": _categorical([32, 64, 128, 256]),
+        "n_heads": _categorical([4, 8]),
+        "e_layers": _int(1, 4),
+    },
+    "TimesNet": {
+        "hidden_size": _categorical([32, 64, 128, 256]),
+        "conv_hidden_size": _categorical([32, 64, 128]),
+        "top_k": _categorical([3, 5, 7]),
+        "encoder_layers": _int(1, 4),
+    },
+    "StemGNN": {
+        "n_stacks": _categorical([1, 2, 3]),
+        "multi_layer": _categorical([3, 5, 7]),
+        "dropout_rate": _float(0.0, 0.3),
+    },
+    "TSMixer": {
+        "n_block": _categorical([1, 2, 3]),
+        "ff_dim": _categorical([16, 32, 64, 128]),
+        "dropout": _float(0.0, 0.3),
+    },
+    "TSMixerx": {
+        "n_block": _categorical([1, 2, 3]),
+        "ff_dim": _categorical([16, 32, 64, 128]),
+        "dropout": _float(0.0, 0.3),
+    },
+    "MLPMultivariate": {
+        "hidden_size": _categorical([32, 64, 128, 256]),
+        "num_layers": _int(1, 4),
+    },
+    "SOFTS": {
+        "hidden_size": _categorical([32, 64, 128, 256]),
+        "d_core": _categorical([16, 32, 64]),
+        "e_layers": _int(1, 4),
+        "d_ff": _categorical([64, 128, 256]),
+    },
+    "TimeMixer": {
+        "d_model": _categorical([16, 32, 64, 128]),
+        "d_ff": _categorical([32, 64, 128, 256]),
+        "down_sampling_layers": _categorical([1, 2, 3]),
+        "top_k": _categorical([3, 5, 7]),
+    },
+    "RMoK": {
+        "taylor_order": _categorical([2, 3, 4]),
+        "jacobi_degree": _categorical([2, 3, 4]),
+        "wavelet_function": _categorical(["haar", "db2"]),
+        "dropout": _float(0.0, 0.3),
+    },
+    "XLinear": {
+        "hidden_size": _categorical([32, 64, 128, 256]),
+        "temporal_ff": _categorical([64, 128, 256]),
+        "channel_ff": _categorical([64, 128, 256]),
+        "temporal_dropout": _float(0.0, 0.3),
     },
 }
 
