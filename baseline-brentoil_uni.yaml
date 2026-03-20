@@ -1,0 +1,47 @@
+task:
+  name: baseline_brentoil
+dataset:
+  path: data/df.csv
+  target_col: Com_BrentCrudeOil
+  dt_col: dt
+  hist_exog_cols: []
+  futr_exog_cols: []
+  static_exog_cols: []
+runtime:
+  random_seed: 1
+training:
+  train_protocol: expanding_window_tscv
+  early_stop_patience_steps: -1
+  loss: mse
+cv:
+  horizon: 8
+  step_size: 4
+  n_windows: 24
+  gap: 0
+  max_train_size: null
+  overlap_eval_policy: by_cutoff_mean
+scheduler:
+  gpu_ids:
+  - 0
+  - 1
+  max_concurrent_jobs: 2
+  worker_devices: 1
+residual:
+  enabled: false
+  model: xgboost
+  params: {}
+jobs:
+- model: DLinear
+  params: {}
+- model: PatchTST
+  params: {}
+- model: iTransformer
+  params: {}
+- model: TimeMixer
+  params: {}
+- model: NonstationaryTransformer
+  params: {}
+- model: SMamba
+  params: {}
+- model: Naive
+  params: {}

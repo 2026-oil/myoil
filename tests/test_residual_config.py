@@ -11,7 +11,11 @@ import yaml
 
 from residual.adapters import build_multivariate_inputs, build_univariate_inputs
 from residual.config import load_app_config
-from residual.models import MODEL_CLASSES, build_model, supports_auto_mode
+from residual.models import (
+    MODEL_CLASSES,
+    build_model,
+    supports_auto_mode,
+)
 from residual.optuna_spaces import (
     EXCLUDED_AUTO_MODEL_NAMES,
     MODEL_PARAM_REGISTRY,
@@ -1610,3 +1614,113 @@ def test_runtime_executes_multivariate_model_without_hist_exog(
     )
     assert code == 0
     assert (output_root / "cv" / "iTransformer_forecasts.csv").exists()
+
+
+@pytest.mark.parametrize(
+    ("source_name", "derived_name"),
+    [
+        ("baseline-wti.yaml", "baseline-wti_uni.yaml"),
+        ("baseline-brentoil.yaml", "baseline-brentoil_uni.yaml"),
+    ],
+)
+def test_generate_baseline_uni_yaml_files_exist_and_parse(
+    source_name: str, derived_name: str
+):
+    source = yaml.safe_load((REPO_ROOT / source_name).read_text(encoding="utf-8"))
+    derived_path = REPO_ROOT / derived_name
+    derived = yaml.safe_load(derived_path.read_text(encoding="utf-8"))
+
+    assert derived_path.exists()
+    assert isinstance(derived, dict)
+    assert derived["task"] == source["task"]
+    assert derived["dataset"]["target_col"] == source["dataset"]["target_col"]
+
+
+@pytest.mark.parametrize(
+    "derived_name",
+    ["baseline-wti_uni.yaml", "baseline-brentoil_uni.yaml"],
+)
+def test_uni_yaml_exogenous_lists_are_empty(derived_name: str):
+    derived = yaml.safe_load((REPO_ROOT / derived_name).read_text(encoding="utf-8"))
+
+    assert derived["dataset"]["hist_exog_cols"] == []
+    assert derived["dataset"]["futr_exog_cols"] == []
+    assert derived["dataset"]["static_exog_cols"] == []
+
+
+@pytest.mark.parametrize(
+    ("source_name", "derived_name"),
+    [
+        ("baseline-wti.yaml", "baseline-wti_uni.yaml"),
+        ("baseline-brentoil.yaml", "baseline-brentoil_uni.yaml"),
+    ],
+)
+def test_uni_yaml_jobs_follow_capability_rule(
+    source_name: str, derived_name: str
+):
+    from residual.models import capabilities_for as resolve_capabilities
+
+    source = yaml.safe_load((REPO_ROOT / source_name).read_text(encoding="utf-8"))
+    derived = yaml.safe_load((REPO_ROOT / derived_name).read_text(encoding="utf-8"))
+
+    source_jobs = [job["model"] for job in source["jobs"]]
+    derived_jobs = [job["model"] for job in derived["jobs"]]
+
+    expected_jobs = []
+    dropped_jobs = []
+    for model_name in source_jobs:
+        caps = resolve_capabilities(model_name)
+        needs_exog = (
+            caps.supports_hist_exog
+            or caps.supports_futr_exog
+            or caps.supports_stat_exog
+        )
+        if needs_exog:
+            dropped_jobs.append(model_name)
+        else:
+            expected_jobs.append(model_name)
+
+    assert derived_jobs == expected_jobs
+    assert set(derived_jobs).issubset(source_jobs)
+    assert set(derived_jobs).isdisjoint(dropped_jobs)
+
+
+@pytest.mark.parametrize(
+    ("source_name", "derived_name"),
+    [
+        ("baseline-wti.yaml", "baseline-wti_uni.yaml"),
+        ("baseline-brentoil.yaml", "baseline-brentoil_uni.yaml"),
+    ],
+)
+def test_uni_yaml_preserves_non_exog_fields(
+    source_name: str, derived_name: str
+):
+    source = yaml.safe_load((REPO_ROOT / source_name).read_text(encoding="utf-8"))
+    derived = yaml.safe_load((REPO_ROOT / derived_name).read_text(encoding="utf-8"))
+
+    source_dataset = dict(source["dataset"])
+    derived_dataset = dict(derived["dataset"])
+    for key in ("hist_exog_cols", "futr_exog_cols", "static_exog_cols"):
+        source_dataset.pop(key, None)
+        derived_dataset.pop(key, None)
+
+    source_without_jobs = dict(source)
+    derived_without_jobs = dict(derived)
+    source_without_jobs["dataset"] = source_dataset
+    derived_without_jobs["dataset"] = derived_dataset
+    source_without_jobs.pop("jobs", None)
+    derived_without_jobs.pop("jobs", None)
+
+    assert derived_without_jobs == source_without_jobs
+
+
+def test_source_baseline_yaml_files_unchanged():
+    wti = yaml.safe_load((REPO_ROOT / "baseline-wti.yaml").read_text(encoding="utf-8"))
+    brent = yaml.safe_load(
+        (REPO_ROOT / "baseline-brentoil.yaml").read_text(encoding="utf-8")
+    )
+
+    assert len(wti["dataset"]["hist_exog_cols"]) > 0
+    assert len(brent["dataset"]["hist_exog_cols"]) > 0
+    assert any(job["model"] == "LSTM" for job in wti["jobs"])
+    assert any(job["model"] == "LSTM" for job in brent["jobs"])
