@@ -40,7 +40,7 @@ training:
   max_steps: 1000
   val_size: 8
   val_check_steps: 100
-  early_stop_patience_steps: -1
+  early_stop_patience_steps: 5
   loss: mse
 cv:
   horizon: 8

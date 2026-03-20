@@ -23,7 +23,7 @@ runtime:
 training:
   # Learned models are trained separately for each expanding-window TS-CV fold.
   train_protocol: expanding_window_tscv
-  early_stop_patience_steps: -1
+  early_stop_patience_steps: 5
   loss: mse
 cv:
   # Time-series cross-validation uses expanding windows:

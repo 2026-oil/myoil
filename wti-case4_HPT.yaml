@@ -30,7 +30,7 @@ runtime:
   random_seed: 1
 training:
   train_protocol: expanding_window_tscv
-  early_stop_patience_steps: -1
+  early_stop_patience_steps: 5
   loss: mse
 cv:
   horizon: 8
