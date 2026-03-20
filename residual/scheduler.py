@@ -72,9 +72,50 @@ def run_parallel_jobs(
     entrypoint = repo_root / 'main.py'
     events_path = scheduler_root / 'events.jsonl'
     results: list[dict[str, object]] = []
-    active: list[tuple[WorkerLaunch, subprocess.Popen[str], Path, Path]] = []
+    active: list[
+        tuple[
+            WorkerLaunch,
+            subprocess.Popen[str],
+            Path,
+            Path,
+            object,
+            object,
+        ]
+    ] = []
+    max_concurrent = max(1, loaded.config.scheduler.max_concurrent_jobs)
+
+    def _finalize_worker(
+        launch: WorkerLaunch,
+        process: subprocess.Popen[str],
+        stdout_path: Path,
+        stderr_path: Path,
+        stdout_handle,
+        stderr_handle,
+    ) -> dict[str, object]:
+        returncode = process.wait()
+        stdout_handle.close()
+        stderr_handle.close()
+        summary = {
+            'job_name': launch.job_name,
+            'gpu_id': launch.gpu_id,
+            'devices': launch.devices,
+            'cuda_visible_devices': str(launch.gpu_id),
+            'returncode': returncode,
+            'stdout_path': str(stdout_path),
+            'stderr_path': str(stderr_path),
+            'completed_at': _now_iso(),
+        }
+        worker_root = workers_root / launch.job_name
+        (worker_root / 'summary.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
+        with events_path.open('a', encoding='utf-8') as handle:
+            handle.write(json.dumps({'event': 'worker_completed', **summary}) + '\n')
+        results.append(summary)
+        return summary
 
     for launch in launches:
+        while len(active) >= max_concurrent:
+            _finalize_worker(*active.pop(0))
+
         worker_root = workers_root / launch.job_name
         worker_root.mkdir(parents=True, exist_ok=True)
         stdout_path = worker_root / 'stdout.log'
@@ -105,23 +146,8 @@ def run_parallel_jobs(
             stdout=stdout_handle,
             stderr=stderr_handle,
         )
-        active.append((launch, process, stdout_path, stderr_path))
+        active.append((launch, process, stdout_path, stderr_path, stdout_handle, stderr_handle))
 
-    for launch, process, stdout_path, stderr_path in active:
-        returncode = process.wait()
-        summary = {
-            'job_name': launch.job_name,
-            'gpu_id': launch.gpu_id,
-            'devices': launch.devices,
-            'cuda_visible_devices': str(launch.gpu_id),
-            'returncode': returncode,
-            'stdout_path': str(stdout_path),
-            'stderr_path': str(stderr_path),
-            'completed_at': _now_iso(),
-        }
-        worker_root = workers_root / launch.job_name
-        (worker_root / 'summary.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
-        with events_path.open('a', encoding='utf-8') as handle:
-            handle.write(json.dumps({'event': 'worker_completed', **summary}) + '\n')
-        results.append(summary)
+    while active:
+        _finalize_worker(*active.pop(0))
     return results

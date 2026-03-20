@@ -613,7 +613,7 @@ class TriangularCausalMask:
         return self._mask
 
 
-class FullAttention(nn.Module):  
+class FullAttention(nn.Module):
     """Full attention mechanism with scaled dot-product attention.  
 
     Implements standard multi-head attention using scaled dot-product attention.  
@@ -661,6 +661,19 @@ class FullAttention(nn.Module):
         self.output_attention = output_attention
         self.dropout = nn.Dropout(attention_dropout)
 
+    def _explicit_attention(self, queries, keys, values, attn_mask, scale):
+        scores = torch.einsum("blhe,bshe->bhls", queries, keys)
+
+        if self.mask_flag:
+            if attn_mask is None:
+                B, L, _, _ = queries.shape
+                attn_mask = TriangularCausalMask(B, L, device=queries.device)
+            scores.masked_fill_(attn_mask.mask, -np.inf)
+
+        A = self.dropout(torch.softmax(scale * scores, dim=-1))
+        V = torch.einsum("bhls,bshd->blhd", A, values)
+        return V.contiguous(), (A if self.output_attention else None)
+
     def forward(self, queries, keys, values, attn_mask, tau=None, delta=None):
         B, L, H, E = queries.shape
         _, S, _, D = values.shape
@@ -671,33 +684,28 @@ class FullAttention(nn.Module):
             v = values.permute(0, 2, 1, 3)
 
             scale = self.scale or 1.0 / math.sqrt(E)
-            attn_output = F.scaled_dot_product_attention(
-                q,
-                k,
-                v,
-                attn_mask=(
-                    attn_mask.mask[:, 0] if (self.mask_flag and attn_mask) else None
-                ),
-                dropout_p=self.dropout.p if self.training else 0.0,
-                scale=scale,
-            )
+            try:
+                attn_output = F.scaled_dot_product_attention(
+                    q,
+                    k,
+                    v,
+                    attn_mask=(
+                        attn_mask.mask[:, 0] if (self.mask_flag and attn_mask) else None
+                    ),
+                    dropout_p=self.dropout.p if self.training else 0.0,
+                    scale=scale,
+                )
+            except RuntimeError as exc:
+                if "Efficient attention cannot produce valid seed and offset outputs" not in str(
+                    exc
+                ):
+                    raise
+                return self._explicit_attention(queries, keys, values, attn_mask, scale)
             V = attn_output.permute(0, 2, 1, 3).contiguous()
             return (V, None) if self.output_attention else (V, None)
         else:
             scale = self.scale or 1.0 / math.sqrt(E)
-            scores = torch.einsum("blhe,bshe->bhls", queries, keys)
-
-            if self.mask_flag:
-                if attn_mask is None:
-                    attn_mask = TriangularCausalMask(B, L, device=queries.device)
-                scores.masked_fill_(attn_mask.mask, -np.inf)
-
-            A = self.dropout(torch.softmax(scale * scores, dim=-1))
-            V = torch.einsum("bhls,bshd->blhd", A, values)
-
-            return (
-                (V.contiguous(), A) if self.output_attention else (V.contiguous(), None)
-            )
+            return self._explicit_attention(queries, keys, values, attn_mask, scale)
 
 
 class PositionalEmbedding(nn.Module):  

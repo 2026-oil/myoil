@@ -1,9 +1,3 @@
-# Deferred model intent only; do not activate until runtime wiring exists:
-# - DLinear
-# - NLinear
-# - RNN
-# - GRU
-
 task:
   name: baseline_brentoil
 dataset:
@@ -135,72 +129,49 @@ residual:
   model: xgboost
   params: {}
 jobs:
-- model: TFT
-  params:
-    hidden_size: 128
-- model: VanillaTransformer
-  params:
-    hidden_size: 128
-    dropout: 0.05
-    scaler_type: identity
-- model: Informer
-  params:
-    hidden_size: 128
-    factor: 3
-    dropout: 0.05
-    scaler_type: identity
-- model: Autoformer
-  params:
-    hidden_size: 128
-    factor: 3
-    dropout: 0.05
-    scaler_type: identity
-- model: FEDformer
-  params:
-    hidden_size: 128
-    modes: 64
-    dropout: 0.05
-    scaler_type: identity
-- model: PatchTST
-  params:
-    hidden_size: 128
-    n_heads: 16
-    encoder_layers: 3
-    patch_len: 16
-    dropout: 0.2
-    scaler_type: identity
+- model: RNN
+  params: {}
+- model: GRU
+  params: {}
 - model: LSTM
-  params:
-    encoder_hidden_size: 128
-    decoder_hidden_size: 128
+  params: {}
 - model: NHITS
-  params:
-    mlp_units:
-    - - 64
-      - 64
-    - - 64
-      - 64
-    - - 64
-      - 64
-    n_pool_kernel_size:
-    - 2
-    - 2
-    - 1
-    n_freq_downsample:
-    - 4
-    - 2
-    - 1
-    dropout_prob_theta: 0.0
-    activation: ReLU
+  params: {}
+- model: DLinear
+  params: {}
+- model: NLinear
+  params: {}
+- model: TFT
+  params: {}
+- model: VanillaTransformer
+  params: {}
+- model: Informer
+  params: {}
+- model: Autoformer
+  params: {}
+- model: FEDformer
+  params: {}
+- model: PatchTST
+  params: {}
 - model: iTransformer
-  params:
-    hidden_size: 128
-    n_heads: 8
-    e_layers: 2
-    d_ff: 256
+  params: {}
+- model: TimeLLM
+  params: {}
+- model: TimeMixer
+  params: {}
+- model: TimesNet
+  params: {}
+- model: TimeXer
+  params: {}
+- model: NonstationaryTransformer
+  params: {}
+- model: xLSTMMixer
+  params: {}
+- model: Mamba
+  params: {}
+- model: SMamba
+  params: {}
+- model: CMamba
+  params: {}
 - model: Naive
-  params: {}
-- model: SeasonalNaive
-  params: {}
-- model: HistoricAverage
   params: {}

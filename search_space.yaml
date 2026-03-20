@@ -102,6 +102,14 @@ models:
     - n_heads
     - e_layers
     - d_ff
+  TimeLLM:
+    - patch_len
+    - stride
+    - d_ff
+    - top_k
+    - d_model
+    - n_heads
+    - dropout
   TimeXer:
     - patch_len
     - hidden_size
@@ -112,6 +120,13 @@ models:
     - conv_hidden_size
     - top_k
     - encoder_layers
+  NonstationaryTransformer:
+    - hidden_size
+    - dropout
+    - n_head
+    - conv_hidden_size
+    - encoder_layers
+    - decoder_layers
   StemGNN:
     - n_stacks
     - multi_layer
@@ -137,6 +152,35 @@ models:
     - d_ff
     - down_sampling_layers
     - top_k
+  Mamba:
+    - hidden_size
+    - n_block
+    - expand_ratio
+    - kernel_size
+    - dropout
+  SMamba:
+    - hidden_size
+    - n_block
+    - expand_ratio
+    - kernel_size
+    - dropout
+    - revin
+  CMamba:
+    - hidden_size
+    - ff_dim
+    - n_block
+    - expand_ratio
+    - kernel_size
+    - dropout
+    - revin
+  xLSTMMixer:
+    - hidden_size
+    - n_block
+    - ff_dim
+    - dropout
+    - encoder_n_blocks
+    - encoder_dropout
+    - revin
   RMoK:
     - taylor_order
     - jacobi_degree

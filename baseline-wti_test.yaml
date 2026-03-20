@@ -1,5 +1,5 @@
 task:
-  name: baseline_wti
+  name: baseline_wti_test
 dataset:
   path: data/df.csv
   target_col: Com_CrudeOil
@@ -106,7 +106,7 @@ training:
   windows_batch_size: 1024
   inference_windows_batch_size: 1024
   learning_rate: 0.001
-  max_steps: 1000
+  max_steps: 3
   val_size: 12
   val_check_steps: 100
   early_stop_patience_steps: -1

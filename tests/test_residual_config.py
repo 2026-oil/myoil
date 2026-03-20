@@ -18,7 +18,7 @@ from residual.optuna_spaces import (
 )
 from residual.plugins_base import ResidualContext, ResidualPlugin
 from residual.registry import build_residual_plugin
-from residual.scheduler import build_launch_plan, worker_env
+from residual.scheduler import build_launch_plan, run_parallel_jobs, worker_env
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -261,6 +261,37 @@ def test_model_builder_propagates_centralized_training_controls(tmp_path: Path):
         assert model.hparams.early_stop_patience_steps == 11
 
 
+def test_model_builder_disables_logger_and_keeps_timemixer_without_future_features(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["dataset"]["futr_exog_cols"] = []
+    payload["jobs"] = [
+        {
+            "model": "TimeMixer",
+            "params": {
+                "d_model": 16,
+                "d_ff": 32,
+                "down_sampling_layers": 1,
+                "top_k": 3,
+            },
+        }
+    ]
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n",
+        encoding="utf-8",
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    timemixer = build_model(loaded.config, loaded.config.jobs[0], n_series=1)
+
+    assert timemixer.trainer_kwargs["logger"] is False
+    assert timemixer.use_future_temporal_feature == 0
+
+
 def test_scheduler_plan_and_worker_env_use_single_device(tmp_path: Path):
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n", encoding="utf-8"
@@ -274,6 +305,49 @@ def test_scheduler_plan_and_worker_env_use_single_device(tmp_path: Path):
     env = worker_env(1)
     assert env["CUDA_VISIBLE_DEVICES"] == "1"
     assert env["NEURALFORECAST_WORKER_DEVICES"] == "1"
+
+
+def test_scheduler_respects_max_concurrent_jobs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n", encoding="utf-8"
+    )
+    payload = _payload()
+    payload["jobs"] = [
+        {"model": "TFT", "params": {"hidden_size": 32}},
+        {
+            "model": "LSTM",
+            "params": {"encoder_hidden_size": 16, "decoder_hidden_size": 16},
+        },
+        {"model": "NHITS", "params": {"mlp_units": [[8, 8], [8, 8], [8, 8]]}},
+    ]
+    payload["scheduler"]["max_concurrent_jobs"] = 2
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+    launches = build_launch_plan(loaded.config, loaded.config.jobs)
+    state = {"active": 0, "max_active": 0}
+
+    class FakePopen:
+        def __init__(self, *_args, **_kwargs):
+            state["active"] += 1
+            state["max_active"] = max(state["max_active"], state["active"])
+
+        def wait(self):
+            state["active"] -= 1
+            return 0
+
+    monkeypatch.setattr("residual.scheduler.subprocess.Popen", FakePopen)
+    monkeypatch.setattr(
+        "residual.scheduler._worker_command",
+        lambda *_args, **_kwargs: ["python", "fake_worker.py"],
+    )
+
+    results = run_parallel_jobs(tmp_path, loaded, launches, tmp_path / "scheduler")
+
+    assert len(results) == 3
+    assert state["max_active"] == 2
 
 
 def test_runtime_executes_single_job_with_dummy_model(tmp_path: Path):
@@ -548,7 +622,16 @@ def test_apply_residual_plugin_uses_fold_local_backcasts_only(
             }
         )
 
-    runtime._apply_residual_plugin(loaded, job, run_root, fold_payloads)
+    manifest_path = run_root / "manifest" / "run_manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps({"jobs": [{"model": job.model}], "residual": {}}, indent=2),
+        encoding="utf-8",
+    )
+
+    runtime._apply_residual_plugin(
+        loaded, job, run_root, fold_payloads, manifest_path=manifest_path
+    )
 
     assert [record["fit_lengths"][0] for record in plugin_log] == [1, 2, 3]
     assert all(
@@ -947,14 +1030,20 @@ def test_supported_auto_model_matrix_includes_v3_expansion():
         "TiDE",
         "DeepNPTS",
         "KAN",
+        "TimeLLM",
         "TimeXer",
         "TimesNet",
+        "NonstationaryTransformer",
         "StemGNN",
         "TSMixer",
         "TSMixerx",
         "MLPMultivariate",
         "SOFTS",
         "TimeMixer",
+        "Mamba",
+        "SMamba",
+        "CMamba",
+        "xLSTMMixer",
         "RMoK",
         "XLinear",
     ):
@@ -963,7 +1052,19 @@ def test_supported_auto_model_matrix_includes_v3_expansion():
 
 
 def test_supports_auto_mode_expands_to_newly_added_models():
-    for model_name in ("RNN", "DeepAR", "TimeMixer", "XLinear", "StemGNN"):
+    for model_name in (
+        "RNN",
+        "DeepAR",
+        "TimeMixer",
+        "XLinear",
+        "StemGNN",
+        "TimeLLM",
+        "NonstationaryTransformer",
+        "Mamba",
+        "SMamba",
+        "CMamba",
+        "xLSTMMixer",
+    ):
         assert supports_auto_mode(model_name) is True
     assert supports_auto_mode("Naive") is False
 
@@ -985,6 +1086,35 @@ def test_should_use_multivariate_for_no_exog_multivariate_model(tmp_path: Path):
     import residual.runtime as runtime
 
     assert runtime._should_use_multivariate(loaded, loaded.config.jobs[0]) is True
+
+
+def test_should_use_univariate_adapter_for_multivariate_model_with_native_exog(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["jobs"] = [
+        {
+            "model": "TimeXer",
+            "params": {
+                "patch_len": 1,
+                "hidden_size": 8,
+                "n_heads": 1,
+                "e_layers": 1,
+                "d_ff": 16,
+            },
+        }
+    ]
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,10\n2020-01-08,2,11\n2020-01-15,3,12\n",
+        encoding="utf-8",
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    import residual.runtime as runtime
+
+    assert runtime._should_use_multivariate(loaded, loaded.config.jobs[0]) is False
 
 
 def test_build_model_supports_representative_expanded_models(tmp_path: Path):

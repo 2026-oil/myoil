@@ -31,6 +31,7 @@ from neuralforecast.models import (
     StemGNN,
     TCN,
     TFT,
+    TimeLLM,
     TSMixer,
     TSMixerx,
     TiDE,
@@ -42,6 +43,11 @@ from neuralforecast.models import (
     iTransformer,
     xLSTM,
 )
+from neuralforecast.models.cmamba import CMamba
+from neuralforecast.models.mamba import Mamba
+from neuralforecast.models.nonstationary_transformer import NonstationaryTransformer
+from neuralforecast.models.smamba import SMamba
+from neuralforecast.models.xlstm_mixer import xLSTMMixer
 
 try:
     from tests.dummy.dummy_models import DummyMultivariate, DummyUnivariate
@@ -88,14 +94,20 @@ MODEL_CLASSES = {
     'LSTM': LSTM,
     'NHITS': NHITS,
     'iTransformer': iTransformer,
+    'TimeLLM': TimeLLM,
     'TimeXer': TimeXer,
     'TimesNet': TimesNet,
+    'NonstationaryTransformer': NonstationaryTransformer,
     'StemGNN': StemGNN,
     'TSMixer': TSMixer,
     'TSMixerx': TSMixerx,
     'MLPMultivariate': MLPMultivariate,
     'SOFTS': SOFTS,
     'TimeMixer': TimeMixer,
+    'Mamba': Mamba,
+    'SMamba': SMamba,
+    'CMamba': CMamba,
+    'xLSTMMixer': xLSTMMixer,
     'RMoK': RMoK,
     'XLinear': XLinear,
 }
@@ -142,6 +154,13 @@ def build_model(
     if job.model in BASELINE_MODEL_NAMES:
         raise ValueError(f'{job.model} is a baseline model and is not built via neuralforecast model constructors')
     model_cls = MODEL_CLASSES[job.model]
+    def _configured_exog_list(
+        supported: bool, values: tuple[str, ...]
+    ) -> list[str] | None:
+        if not supported or not values:
+            return None
+        return list(values)
+
     shared_kwargs: dict[str, Any] = {
         'h': config.cv.horizon,
         'input_size': config.training.input_size,
@@ -158,11 +177,18 @@ def build_model(
         'accelerator': 'gpu' if os.environ.get('CUDA_VISIBLE_DEVICES') else 'cpu',
         'devices': 1,
         'enable_checkpointing': False,
+        'logger': False,
         'loss': resolve_loss(config.training.loss),
         'valid_loss': resolve_loss(config.training.loss),
-        'hist_exog_list': list(config.dataset.hist_exog_cols) if caps.supports_hist_exog and not caps.multivariate else [],
-        'futr_exog_list': list(config.dataset.futr_exog_cols) if caps.supports_futr_exog and not caps.multivariate else [],
-        'stat_exog_list': list(config.dataset.static_exog_cols) if caps.supports_stat_exog else [],
+        'hist_exog_list': _configured_exog_list(
+            caps.supports_hist_exog, config.dataset.hist_exog_cols
+        ),
+        'futr_exog_list': _configured_exog_list(
+            caps.supports_futr_exog, config.dataset.futr_exog_cols
+        ),
+        'stat_exog_list': _configured_exog_list(
+            caps.supports_stat_exog, config.dataset.static_exog_cols
+        ),
     }
     if caps.requires_n_series:
         shared_kwargs['n_series'] = 1 if n_series is None else n_series

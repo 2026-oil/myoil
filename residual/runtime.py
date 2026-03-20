@@ -154,7 +154,12 @@ def _update_manifest_artifacts(
 
 def _should_use_multivariate(loaded: LoadedConfig, job: JobConfig) -> bool:
     caps = validate_job(job)
-    return bool(caps.multivariate)
+    configured_native_exog = (
+        (bool(loaded.config.dataset.hist_exog_cols) and caps.supports_hist_exog)
+        or (bool(loaded.config.dataset.futr_exog_cols) and caps.supports_futr_exog)
+        or (bool(loaded.config.dataset.static_exog_cols) and caps.supports_stat_exog)
+    )
+    return bool(caps.multivariate and not configured_native_exog)
 
 
 def _validate_adapters(loaded: LoadedConfig, selected_jobs) -> None:
@@ -225,7 +230,7 @@ def _fit_and_predict_fold(
         val_size=loaded.config.training.val_size,
     )
     predictions = _predict_with_fitted_model(nf, adapter_inputs)
-    pred_col = _prediction_column(predictions, job.model)
+    _prediction_column(predictions, job.model)
     target_predictions = predictions[
         predictions["unique_id"] == target_col
     ].reset_index(drop=True)

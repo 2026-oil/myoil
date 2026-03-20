@@ -47,3 +47,6 @@ nbs/_extensions
 .venv/
 
 CLAUDE.md
+
+# local run artifacts
+/runs/
