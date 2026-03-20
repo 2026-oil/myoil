@@ -1135,6 +1135,10 @@ def _write_loss_curve_artifact(
     return figure_path
 
 
+def _should_build_summary_artifacts() -> bool:
+    return os.environ.get("NEURALFORECAST_SKIP_SUMMARY_ARTIFACTS") != "1"
+
+
 def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
     summary_dir = run_root / "summary"
     metrics = _load_metrics_for_summary(run_root)
@@ -1411,7 +1415,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             paths["run_root"],
             manifest_path=paths["manifest_path"],
         )
-        summary_artifacts = _build_summary_artifacts(paths["run_root"])
+        summary_artifacts = (
+            _build_summary_artifacts(paths["run_root"])
+            if _should_build_summary_artifacts()
+            else {}
+        )
         print(
             json.dumps(
                 {

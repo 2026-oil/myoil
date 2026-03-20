@@ -1,5 +1,5 @@
 task:
-  name: baseline_brentoil
+  name: brentoil_case1
 dataset:
   path: data/df.csv
   target_col: Com_BrentCrudeOil
@@ -32,7 +32,7 @@ training:
 cv:
   horizon: 8
   step_size: 4
-  n_windows: 24
+  n_windows: 12
   gap: 0
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean

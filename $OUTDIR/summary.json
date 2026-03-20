@@ -1,0 +1,14 @@
+{
+  "source_csv": "data/df.csv",
+  "output_png": "$OUTDIR/bs_wti_last_5_months.png",
+  "window_start": "2025-10-13",
+  "window_end": "2026-03-09",
+  "row_count": 22,
+  "series": [
+    "Com_CrudeOil",
+    "BS_Core_Index_A",
+    "BS_Core_Index_B",
+    "BS_Core_Index_C",
+    "BS_Core_Index_Integrated"
+  ]
+}

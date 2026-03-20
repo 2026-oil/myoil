@@ -1,26 +1,23 @@
 task:
-  name: baseline_brentoil
+  name: brentoil_case2
 dataset:
   path: data/df.csv
   target_col: Com_BrentCrudeOil
   dt_col: dt
   hist_exog_cols:
   - Com_Gasoline
-  - Com_Steel
-  - Bonds_US_Spread_10Y_1Y
-  - Bonds_CHN_Spread_30Y_5Y
-  - EX_USD_BRL
-  - Com_Cheese
-  - Bonds_BRZ_Spread_10Y_1Y
-  - Com_Cu_Gold_Ratio
-  - Idx_OVX
-  - Com_Oil_Spread
-  - Com_LME_Zn_Spread
-  - Idx_CSI300
-  - Bonds_CHN_Spread_5Y_1Y
-  - Com_LME_Cu_Spread
-  - Com_LME_Pb_Spread
-  - Com_LME_Al_Spread
+  - Com_BloombergCommodity_BCOM
+  - Com_LME_Ni_Cash
+  - Com_Coal
+  - Com_Cotton
+  - Com_LME_Al_Cash
+  - Bonds_KOR_10Y
+  - Com_Barley
+  - Com_Canola
+  - Com_LMEX
+  - Com_LME_Ni_Inv
+  - Com_Corn
+  - Com_Wheat
   futr_exog_cols: []
   static_exog_cols: []
 runtime:
@@ -32,7 +29,7 @@ training:
 cv:
   horizon: 8
   step_size: 4
-  n_windows: 24
+  n_windows: 12
   gap: 0
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean

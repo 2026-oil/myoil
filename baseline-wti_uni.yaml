@@ -35,8 +35,6 @@ jobs:
   params: {}
 - model: PatchTST
   params: {}
-- model: iTransformer
-  params: {}
 - model: TimeMixer
   params: {}
 - model: NonstationaryTransformer

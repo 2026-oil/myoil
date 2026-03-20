@@ -316,6 +316,7 @@ def test_scheduler_plan_and_worker_env_use_single_device(tmp_path: Path):
     assert env["CUDA_VISIBLE_DEVICES"] == "1"
     assert env["NEURALFORECAST_WORKER_DEVICES"] == "1"
     assert env["NEURALFORECAST_PROGRESS_MODE"] == "structured"
+    assert env["NEURALFORECAST_SKIP_SUMMARY_ARTIFACTS"] == "1"
 
 
 def test_scheduler_respects_max_concurrent_jobs(
@@ -609,6 +610,44 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
     assert (run_root / "summary" / "last_fold_all_models.png").exists()
     assert (run_root / "summary" / "last_fold_top3.png").exists()
     assert (run_root / "summary" / "last_fold_top5.png").exists()
+
+
+def test_runtime_skip_summary_env_suppresses_summary_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from residual.runtime import main as runtime_main
+
+    payload = _payload()
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 0})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n"
+        "2020-01-22,4\n2020-01-29,5\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    output_root = tmp_path / "worker_like_run"
+
+    monkeypatch.setenv("NEURALFORECAST_SKIP_SUMMARY_ARTIFACTS", "1")
+
+    code = runtime_main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "DummyUnivariate",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    assert code == 0
+    assert (output_root / "cv" / "DummyUnivariate_forecasts.csv").exists()
+    assert not (output_root / "summary").exists()
 
 
 def test_runtime_smoke_writes_summary_artifacts_for_dummy_model(tmp_path: Path):

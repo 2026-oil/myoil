@@ -52,8 +52,6 @@ jobs:
   params: {}
 - model: DLinear
   params: {}
-- model: TFT
-  params: {}
 - model: Autoformer
   params: {}
 - model: FEDformer
@@ -62,13 +60,7 @@ jobs:
   params: {}
 - model: iTransformer
   params: {}
-- model: TimeMixer
-  params: {}
 - model: TimesNet
-  params: {}
-- model: NonstationaryTransformer
-  params: {}
-- model: SMamba
   params: {}
 - model: Naive
   params: {}

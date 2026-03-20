@@ -36,6 +36,7 @@ def worker_env(gpu_id: int) -> dict[str, str]:
     env['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
     env['NEURALFORECAST_WORKER_DEVICES'] = '1'
     env['NEURALFORECAST_PROGRESS_MODE'] = 'structured'
+    env['NEURALFORECAST_SKIP_SUMMARY_ARTIFACTS'] = '1'
     return env
 
 
