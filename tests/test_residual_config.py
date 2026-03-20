@@ -2078,3 +2078,243 @@ def test_source_baseline_yaml_files_unchanged():
     assert len(brent["dataset"]["hist_exog_cols"]) > 0
     assert any(job["model"] == "LSTM" for job in wti["jobs"])
     assert any(job["model"] == "LSTM" for job in brent["jobs"])
+
+
+CASE_YAML_FILES = [
+    REPO_ROOT / 'brentoil-case1.yaml',
+    REPO_ROOT / 'brentoil-case2.yaml',
+    REPO_ROOT / 'brentoil-case3.yaml',
+    REPO_ROOT / 'brentoil-case4.yaml',
+    REPO_ROOT / 'wti-case1.yaml',
+    REPO_ROOT / 'wti-case2.yaml',
+    REPO_ROOT / 'wti-case3.yaml',
+    REPO_ROOT / 'wti-case4.yaml',
+]
+
+EXPECTED_CASE_TRAINING = {
+    'input_size': 64,
+    'season_length': 52,
+    'batch_size': 32,
+    'valid_batch_size': 32,
+    'windows_batch_size': 1024,
+    'inference_windows_batch_size': 1024,
+    'learning_rate': 0.001,
+    'max_steps': 1000,
+    'val_size': 8,
+    'val_check_steps': 100,
+    'train_protocol': 'expanding_window_tscv',
+    'early_stop_patience_steps': -1,
+    'loss': 'mse',
+}
+
+EXPECTED_CASE_MODEL_PARAMS = {
+    'LSTM': {
+        'encoder_hidden_size': 64,
+        'decoder_hidden_size': 64,
+        'encoder_n_layers': 2,
+        'context_size': 10,
+    },
+    'NHITS': {
+        'n_pool_kernel_size': [2, 2, 1],
+        'n_freq_downsample': [24, 12, 1],
+        'dropout_prob_theta': 0.0,
+    },
+    'DLinear': {'moving_avg_window': 7},
+    'Autoformer': {
+        'hidden_size': 64,
+        'dropout': 0.1,
+        'factor': 3,
+        'n_head': 4,
+    },
+    'FEDformer': {
+        'hidden_size': 64,
+        'modes': 32,
+        'dropout': 0.1,
+        'n_head': 8,
+    },
+    'PatchTST': {
+        'hidden_size': 64,
+        'n_heads': 4,
+        'encoder_layers': 2,
+        'patch_len': 16,
+        'dropout': 0.1,
+    },
+    'iTransformer': {
+        'hidden_size': 64,
+        'n_heads': 4,
+        'e_layers': 2,
+        'd_ff': 256,
+        'dropout': 0.1,
+    },
+    'TimesNet': {
+        'hidden_size': 64,
+        'conv_hidden_size': 64,
+        'top_k': 5,
+        'encoder_layers': 2,
+    },
+    'Naive': {},
+}
+
+EXPECTED_CASE_METADATA = {
+    'brentoil-case1.yaml': {
+        'task_name': 'brentoil_case1',
+        'target_col': 'Com_BrentCrudeOil',
+        'hist_exog_cols': [
+            'Com_Gasoline', 'Com_Steel', 'Bonds_US_Spread_10Y_1Y',
+            'Bonds_CHN_Spread_30Y_5Y', 'EX_USD_BRL', 'Com_Cheese',
+            'Bonds_BRZ_Spread_10Y_1Y', 'Com_Cu_Gold_Ratio', 'Idx_OVX',
+            'Com_Oil_Spread', 'Com_LME_Zn_Spread', 'Idx_CSI300',
+            'Bonds_CHN_Spread_5Y_1Y', 'Com_LME_Cu_Spread',
+            'Com_LME_Pb_Spread', 'Com_LME_Al_Spread',
+        ],
+    },
+    'brentoil-case2.yaml': {
+        'task_name': 'brentoil_case2',
+        'target_col': 'Com_BrentCrudeOil',
+        'hist_exog_cols': [
+            'Com_Gasoline', 'Com_BloombergCommodity_BCOM', 'Com_LME_Ni_Cash',
+            'Com_Coal', 'Com_Cotton', 'Com_LME_Al_Cash', 'Bonds_KOR_10Y',
+            'Com_Barley', 'Com_Canola', 'Com_LMEX', 'Com_LME_Ni_Inv',
+            'Com_Corn', 'Com_Wheat',
+        ],
+    },
+    'brentoil-case3.yaml': {
+        'task_name': 'brentoil_case3',
+        'target_col': 'Com_BrentCrudeOil',
+        'hist_exog_cols': [
+            'Com_Gasoline', 'Com_BloombergCommodity_BCOM', 'Com_LME_Ni_Cash',
+            'Com_Coal', 'Com_LME_Al_Cash', 'Bonds_KOR_10Y', 'Com_LMEX',
+            'Com_LME_Ni_Inv',
+        ],
+    },
+    'brentoil-case4.yaml': {
+        'task_name': 'brentoil_case4',
+        'target_col': 'Com_BrentCrudeOil',
+        'hist_exog_cols': [
+            'Com_Gasoline', 'Com_BloombergCommodity_BCOM', 'Com_LME_Ni_Cash',
+            'Com_Coal', 'Com_Cotton', 'Com_LME_Al_Cash', 'Bonds_KOR_10Y',
+            'Com_Barley', 'Com_Canola', 'Com_LMEX', 'Com_LME_Ni_Inv',
+            'Com_Corn', 'Com_Wheat', 'Com_NaturalGas', 'Idx_OVX', 'Com_Gold',
+        ],
+    },
+    'wti-case1.yaml': {
+        'task_name': 'wti_case1',
+        'target_col': 'Com_CrudeOil',
+        'hist_exog_cols': [
+            'Com_Gasoline', 'Com_LME_Zn_Inv', 'Com_OrangeJuice', 'Com_Cheese',
+            'Bonds_BRZ_1Y', 'Idx_OVX', 'Com_Cu_Gold_Ratio', 'Com_LME_Sn_Inv',
+            'Idx_CSI300', 'Com_LME_Zn_Spread', 'Bonds_CHN_Spread_5Y_2Y',
+            'Com_LME_Al_Spread', 'Bonds_CHN_Spread_2Y_1Y', 'Com_Oil_Spread',
+            'Bonds_CHN_Spread_10Y_5Y',
+        ],
+    },
+    'wti-case2.yaml': {
+        'task_name': 'wti_case2',
+        'target_col': 'Com_CrudeOil',
+        'hist_exog_cols': [
+            'Com_Gasoline', 'Com_BloombergCommodity_BCOM', 'Com_LME_Ni_Cash',
+            'Com_Coal', 'Com_Canola', 'Com_Cotton', 'Com_LME_Al_Cash',
+            'Com_LMEX', 'Bonds_KOR_10Y', 'Com_PalmOil', 'Com_Barley',
+            'Com_Corn', 'Com_Oat', 'Com_Wheat', 'Com_Soybeans',
+            'Com_LME_Ni_Inv',
+        ],
+    },
+    'wti-case3.yaml': {
+        'task_name': 'wti_case3',
+        'target_col': 'Com_CrudeOil',
+        'hist_exog_cols': [
+            'Com_Gasoline', 'Com_BloombergCommodity_BCOM', 'Com_LME_Ni_Cash',
+            'Com_Coal', 'Com_LME_Al_Cash', 'Com_LMEX', 'Bonds_KOR_10Y',
+            'Com_LME_Ni_Inv',
+        ],
+    },
+    'wti-case4.yaml': {
+        'task_name': 'wti_case4',
+        'target_col': 'Com_CrudeOil',
+        'hist_exog_cols': [
+            'Com_Gasoline', 'Com_BloombergCommodity_BCOM', 'Com_LME_Ni_Cash',
+            'Com_Coal', 'Com_Canola', 'Com_Cotton', 'Com_LME_Al_Cash',
+            'Com_LMEX', 'Bonds_KOR_10Y', 'Com_PalmOil', 'Com_Barley',
+            'Com_Corn', 'Com_Oat', 'Com_Wheat', 'Com_Soybeans',
+            'Com_LME_Ni_Inv', 'Com_NaturalGas', 'Idx_OVX', 'Com_Gold',
+        ],
+    },
+}
+
+
+def _load_case_yaml(path: Path) -> dict[str, Any]:
+    return cast(dict[str, Any], yaml.safe_load(path.read_text(encoding='utf-8')))
+
+
+def _case_jobs_by_model(path: Path) -> dict[str, dict[str, Any]]:
+    return {
+        job['model']: job['params']
+        for job in _load_case_yaml(path)['jobs']
+    }
+
+
+def test_case_yaml_training_mapping_matches_expected_across_all_files():
+    for path in CASE_YAML_FILES:
+        payload = _load_case_yaml(path)
+        assert payload['training'] == EXPECTED_CASE_TRAINING
+
+
+@pytest.mark.parametrize('path', CASE_YAML_FILES, ids=lambda p: p.name)
+def test_case_yaml_learned_model_params_match_expected(path: Path):
+    jobs = _case_jobs_by_model(path)
+
+    for model_name, expected_params in EXPECTED_CASE_MODEL_PARAMS.items():
+        if model_name == 'Naive':
+            continue
+        assert jobs[model_name] == expected_params
+        assert jobs[model_name]
+
+
+@pytest.mark.parametrize('path', CASE_YAML_FILES, ids=lambda p: p.name)
+def test_case_yaml_naive_params_remain_empty(path: Path):
+    jobs = _case_jobs_by_model(path)
+    assert jobs['Naive'] == {}
+
+
+@pytest.mark.parametrize('path', CASE_YAML_FILES, ids=lambda p: p.name)
+def test_case_yaml_feature_lists_and_targets_do_not_drift(path: Path):
+    payload = _load_case_yaml(path)
+    expected = EXPECTED_CASE_METADATA[path.name]
+
+    assert payload['task']['name'] == expected['task_name']
+    assert payload['dataset']['target_col'] == expected['target_col']
+    assert payload['dataset']['hist_exog_cols'] == expected['hist_exog_cols']
+
+
+@pytest.mark.parametrize('path', CASE_YAML_FILES, ids=lambda p: p.name)
+def test_case_yaml_normalizes_to_fixed_modes_without_auto(path: Path):
+    loaded = load_app_config(REPO_ROOT, config_path=path)
+
+    for job in loaded.config.jobs:
+        if job.model == 'Naive':
+            assert job.requested_mode == 'baseline_fixed'
+            assert job.validated_mode == 'baseline_fixed'
+        else:
+            assert job.params == EXPECTED_CASE_MODEL_PARAMS[job.model]
+            assert job.requested_mode == 'learned_fixed'
+            assert job.validated_mode == 'learned_fixed'
+
+    assert all(job.validated_mode != 'learned_auto' for job in loaded.config.jobs)
+
+
+def test_case_yaml_build_model_preserves_expected_fixed_params():
+    loaded = load_app_config(REPO_ROOT, config_path=REPO_ROOT / 'brentoil-case1.yaml')
+
+    for job in loaded.config.jobs:
+        if job.model == 'Naive':
+            continue
+        model = build_model(
+            loaded.config,
+            job,
+            n_series=1 if job.model == 'iTransformer' else None,
+        )
+        for key, expected_value in EXPECTED_CASE_MODEL_PARAMS[job.model].items():
+            actual_value = getattr(model, key, None)
+            if actual_value is None and hasattr(model, 'hparams'):
+                actual_value = getattr(model.hparams, key, None)
+            assert actual_value == expected_value

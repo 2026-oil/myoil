@@ -31,8 +31,8 @@
 | residual backcast panel이 outer-fold test를 학습에 섞는가 | N/A | No | PASS | code + targeted pytest + probe artifacts |
 | residual eval panel이 outer-fold train 안쪽을 평가에 섞는가 | N/A | No | PASS | code + probe artifacts |
 | residual XGBoost feature frame에 fold id / corrected target 같은 누수 컬럼이 들어가는가 | N/A | No | PASS | plugin code + targeted pytest |
-| Optuna main tuning이 fold별 test 바깥을 미리 학습/평가에 쓰는가 | inspection only | inspection only | INSPECTION ONLY | `_tune_main_job` |
-| Optuna residual tuning이 fold-local backcast/eval 밖의 데이터를 쓰는가 | inspection only | inspection only | INSPECTION ONLY | `_score_residual_params` |
+| Optuna main tuning이 fold별 test 바깥을 미리 학습/평가에 쓰는가 | targeted tests + inspection | targeted tests + inspection | PASS (targeted) | `_tune_main_job` + auto-mode tests |
+| Optuna residual tuning이 fold-local backcast/eval 밖의 데이터를 쓰는가 | config-mode test + inspection | config-mode test + inspection | PARTIAL (no end-to-end runtime) | `_score_residual_params` + mode-selection test |
 | 평가 metric이 날짜 중복 없이 완전 disjoint하게 집계되는가 | No | probe에서는 1-step overlap 존재 가능 | CAUTION | `step_size < horizon`, config field unused |
 | 원본 `baseline-brentoil.yaml`이 변경되지 않았는가 | Yes | Yes | PASS | SHA256 before/after identical |
 
@@ -217,20 +217,39 @@ Residual plugin feature는 다음 4개입니다.
   - `residual/plugins/xgboost.py:47-115`
   - targeted pytest: `test_xgboost_plugin_predicts_panel_and_writes_checkpoint`
 
-### 9) Optuna tuning 경로도 코드상 fold-local 평가 구조
+### 9) Optuna tuning 경로도 fold-local 평가 구조
 #### Main model auto tuning
 `_tune_main_job` 는 trial마다 각 fold에 대해 `_fit_and_predict_fold(...)` 를 다시 호출하고, fold MSE 평균을 objective로 사용합니다. 즉 tuning objective도 fold test 기준입니다.
 
+여기에 대해 추가로 최소 단위 targeted test를 다시 돌렸습니다. 통과한 테스트는 다음을 보장합니다.
+
+- `test_runtime_auto_mode_records_selector_provenance_and_modes`
+  - learned-auto 실행 시 `requested_mode=learned_auto_requested`, `validated_mode=learned_auto`
+  - `best_params.json`, `optuna_study_summary.json` artifact 생성
+- `test_runtime_auto_mode_records_training_selector_provenance_and_artifacts`
+  - training-auto 경로에서 `training_override` 가 실제 fold 실행에 전달됨
+  - `training_best_params.json` 과 training study artifact 생성
+- `test_effective_config_pins_val_size_to_horizon_for_training_auto`
+  - training-auto일 때 `val_size` 가 `cv.horizon` 으로 고정되어 fold 경계를 유지
+
+- Fresh verification:
+  - `UV_CACHE_DIR=/tmp/uv-cache CUDA_VISIBLE_DEVICES='' uv run pytest --no-cov tests/test_residual_config.py -k 'test_load_app_config_marks_auto_requested_and_validated_modes or test_runtime_auto_mode_records_selector_provenance_and_modes or test_runtime_auto_mode_records_training_selector_provenance_and_artifacts or test_effective_config_pins_val_size_to_horizon_for_training_auto' -q`
+  - result: `4 passed`
+
 - Evidence:
   - `residual/runtime.py:421-503`
+  - `tests/test_residual_config.py:1562-1625`
+  - `tests/test_residual_config.py:1628-1724`
+  - `tests/test_residual_config.py:1727-1751`
 
 #### Residual auto tuning
-`_score_residual_params` 는 이미 만들어진 `fold_payloads` 안의 `backcast_panel` / `eval_panel` 만 사용합니다.
+`_score_residual_params` 는 이미 만들어진 `fold_payloads` 안의 `backcast_panel` / `eval_panel` 만 사용합니다. 또한 config normalization 테스트에서 residual auto 모드가 `requested_mode=residual_auto_requested`, `validated_mode=residual_auto` 로 정상 표기되는 것을 확인했습니다.
+
+다만 residual auto에 대해서는 **end-to-end tiny runtime Optuna 재생산까지는 하지 않았습니다.** 그래서 결론은 **code+config evidence상 leak path not found** 이지만, **runtime-proven verdict는 partial** 로 남깁니다.
 
 - Evidence:
   - `residual/runtime.py:506-533`
-
-**단, 이 부분은 사용자 제약 때문에 full auto-tune run으로 exact baseline job mix 전체를 재생산하지는 않았습니다.** 따라서 결론은 **코드 inspection상 no leak path found** 이지만, **runtime-proven verdict는 아닙니다.**
+  - `tests/test_residual_config.py:1352-1373`
 
 ### 10) 진짜 조심할 점: evaluation overlap은 있음
 현재 baseline config는
@@ -328,6 +347,10 @@ UV_CACHE_DIR=/tmp/uv-cache CUDA_VISIBLE_DEVICES='' \
 UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_residual_main.py -q
 
 UV_CACHE_DIR=/tmp/uv-cache CUDA_VISIBLE_DEVICES='' \
+  uv run pytest --no-cov tests/test_residual_config.py \
+  -k 'test_load_app_config_marks_auto_requested_and_validated_modes or test_runtime_auto_mode_records_selector_provenance_and_modes or test_runtime_auto_mode_records_training_selector_provenance_and_artifacts or test_effective_config_pins_val_size_to_horizon_for_training_auto' -q
+
+UV_CACHE_DIR=/tmp/uv-cache CUDA_VISIBLE_DEVICES='' \
   uv run pytest --no-cov tests/test_residual_main.py tests/test_residual_config.py \
   -k 'build_tscv_splits_uses_configured_step_size or runtime_outer_cv_cutoffs_follow_step_size or apply_residual_plugin_uses_fold_local_backcasts_only or xgboost_plugin_predicts_panel_and_writes_checkpoint' -q
 ```
@@ -350,11 +373,12 @@ UV_CACHE_DIR=/tmp/uv-cache CUDA_VISIBLE_DEVICES='' \
 - `/tmp/neuralforecast-leak-audit-20260320/itransformer_multivariate_adapter_summary.json`
 - `/tmp/neuralforecast-leak-audit-20260320/residual_probe_itransformer_boundary_summary.json`
 - `/tmp/neuralforecast-leak-audit-20260320/residual-probe-itransformer-run/residual/iTransformer/diagnostics.json`
+- `/tmp/neuralforecast-leak-audit-20260320/test_residual_config_auto_refs.txt`
 
 ## Bottom line
 현재 코드 기준으로는:
 
 - **baseline path:** 미래 test row가 학습으로 직접 섞이는 leakage 증거 없음
 - **residual path:** backcast는 outer train 내부, eval은 outer test만 사용 → leakage 증거 없음
-- **Optuna path:** 코드상 fold-local 구조, leakage 증거 없음 (단, inspection verdict)
+- **Optuna path:** main learned-auto/training-auto는 targeted test + code 기준 문제 없음, residual-auto는 code+config 기준 문제 없음(단, end-to-end runtime은 partial)
 - **주의점:** overlapping evaluation windows는 존재하므로, 이건 leakage가 아니라 **metric interpretation caveat** 로 봐야 함

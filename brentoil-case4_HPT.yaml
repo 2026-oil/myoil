@@ -1,10 +1,26 @@
 task:
-  name: baseline_wti
+  name: brentoil_case4_HPT
 dataset:
   path: data/df.csv
-  target_col: Com_CrudeOil
+  target_col: Com_BrentCrudeOil
   dt_col: dt
-  hist_exog_cols: []
+  hist_exog_cols:
+  - Com_Gasoline
+  - Com_BloombergCommodity_BCOM
+  - Com_LME_Ni_Cash
+  - Com_Coal
+  - Com_Cotton
+  - Com_LME_Al_Cash
+  - Bonds_KOR_10Y
+  - Com_Barley
+  - Com_Canola
+  - Com_LMEX
+  - Com_LME_Ni_Inv
+  - Com_Corn
+  - Com_Wheat
+  - Com_NaturalGas
+  - Idx_OVX
+  - Com_Gold
   futr_exog_cols: []
   static_exog_cols: []
 runtime:
@@ -16,7 +32,7 @@ training:
 cv:
   horizon: 8
   step_size: 4
-  n_windows: 24
+  n_windows: 12
   gap: 0
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean
@@ -31,15 +47,21 @@ residual:
   model: xgboost
   params: {}
 jobs:
+- model: LSTM
+  params: {}
+- model: NHITS
+  params: {}
 - model: DLinear
+  params: {}
+- model: Autoformer
+  params: {}
+- model: FEDformer
   params: {}
 - model: PatchTST
   params: {}
-- model: TimeMixer
+- model: iTransformer
   params: {}
-- model: NonstationaryTransformer
-  params: {}
-- model: SMamba
+- model: TimesNet
   params: {}
 - model: Naive
   params: {}

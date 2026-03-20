@@ -1,5 +1,5 @@
 task:
-  name: wti_case4
+  name: wti_case4_HPT
 dataset:
   path: data/df.csv
   target_col: Com_CrudeOil
@@ -30,16 +30,6 @@ runtime:
   random_seed: 1
 training:
   train_protocol: expanding_window_tscv
-  input_size: 64
-  season_length: 52
-  batch_size: 32
-  valid_batch_size: 32
-  windows_batch_size: 1024
-  inference_windows_batch_size: 1024
-  learning_rate: 0.001
-  max_steps: 1000
-  val_size: 8
-  val_check_steps: 100
   early_stop_patience_steps: -1
   loss: mse
 cv:
@@ -61,56 +51,20 @@ residual:
   params: {}
 jobs:
 - model: LSTM
-  params:
-    encoder_hidden_size: 64
-    decoder_hidden_size: 64
-    encoder_n_layers: 2
-    context_size: 10
+  params: {}
 - model: NHITS
-  params:
-    n_pool_kernel_size:
-    - 2
-    - 2
-    - 1
-    n_freq_downsample:
-    - 24
-    - 12
-    - 1
-    dropout_prob_theta: 0.0
+  params: {}
 - model: DLinear
-  params:
-    moving_avg_window: 7
+  params: {}
 - model: Autoformer
-  params:
-    hidden_size: 64
-    dropout: 0.1
-    factor: 3
-    n_head: 4
+  params: {}
 - model: FEDformer
-  params:
-    hidden_size: 64
-    modes: 32
-    dropout: 0.1
-    n_head: 8
+  params: {}
 - model: PatchTST
-  params:
-    hidden_size: 64
-    n_heads: 4
-    encoder_layers: 2
-    patch_len: 16
-    dropout: 0.1
+  params: {}
 - model: iTransformer
-  params:
-    hidden_size: 64
-    n_heads: 4
-    e_layers: 2
-    d_ff: 256
-    dropout: 0.1
+  params: {}
 - model: TimesNet
-  params:
-    hidden_size: 64
-    conv_hidden_size: 64
-    top_k: 5
-    encoder_layers: 2
+  params: {}
 - model: Naive
   params: {}
