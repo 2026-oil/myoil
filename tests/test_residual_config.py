@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 from pathlib import Path
 import json
 from typing import Any, TypedDict, cast
@@ -333,8 +334,14 @@ def test_scheduler_respects_max_concurrent_jobs(
         def __init__(self, *_args, **_kwargs):
             state["active"] += 1
             state["max_active"] = max(state["max_active"], state["active"])
+            self._completed = False
+            self.stdout = io.StringIO("")
+
+        def poll(self):
+            return 0 if not self._completed else 0
 
         def wait(self):
+            self._completed = True
             state["active"] -= 1
             return 0
 
@@ -348,6 +355,45 @@ def test_scheduler_respects_max_concurrent_jobs(
 
     assert len(results) == 3
     assert state["max_active"] == 2
+
+
+def test_scheduler_streams_worker_stdout_to_terminal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n", encoding="utf-8"
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, _payload(), ".yaml")
+    )
+    launch = build_launch_plan(loaded.config, loaded.config.jobs[:1])[0]
+
+    class FakePopen:
+        def __init__(self, *_args, **_kwargs):
+            self._completed = False
+            self.stdout = io.StringIO(
+                "[progress][TFT] model-start | [------------------] 0/1   0%\n"
+            )
+
+        def poll(self):
+            return 0
+
+        def wait(self):
+            self._completed = True
+            return 0
+
+    monkeypatch.setattr("residual.scheduler.subprocess.Popen", FakePopen)
+    monkeypatch.setattr(
+        "residual.scheduler._worker_command",
+        lambda *_args, **_kwargs: ["python", "fake_worker.py"],
+    )
+
+    run_parallel_jobs(tmp_path, loaded, [launch], tmp_path / "scheduler")
+
+    captured = capsys.readouterr()
+    assert "[worker:TFT] [progress][TFT] model-start" in captured.out
 
 
 def test_runtime_executes_single_job_with_dummy_model(tmp_path: Path):
@@ -380,6 +426,87 @@ def test_runtime_executes_single_job_with_dummy_model(tmp_path: Path):
     assert not (output_root / "holdout").exists()
     capability = json.loads((output_root / "config" / "capability_report.json").read_text())
     assert capability["DummyUnivariate"]["supports_auto"] is False
+
+
+def test_runtime_logs_model_and_fold_progress_to_stdout(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    payload = _payload()
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    data = (
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n"
+        "2020-01-22,4\n2020-01-29,5\n"
+    )
+    (tmp_path / "data.csv").write_text(data, encoding="utf-8")
+    config_path = _write_config(tmp_path, payload, ".yaml")
+
+    from residual.runtime import main as runtime_main
+
+    output_root = tmp_path / "run_progress"
+    code = runtime_main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "DummyUnivariate",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "[progress][DummyUnivariate] model-start" in captured.out
+    assert "[progress][DummyUnivariate] fold-start" in captured.out
+    assert "[progress][DummyUnivariate] fold-done" in captured.out
+    assert "100%" in captured.out
+
+
+def test_runtime_logs_fold_errors_to_stdout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    payload = _payload()
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    data = (
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n"
+    )
+    (tmp_path / "data.csv").write_text(data, encoding="utf-8")
+    config_path = _write_config(tmp_path, payload, ".yaml")
+
+    from residual import runtime
+
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError("synthetic failure")
+
+    monkeypatch.setattr(runtime, "_fit_and_predict_fold", _boom)
+
+    with pytest.raises(RuntimeError, match="synthetic failure"):
+        runtime.main(
+            [
+                "--config",
+                str(config_path),
+                "--jobs",
+                "DummyUnivariate",
+                "--output-root",
+                str(tmp_path / "run_error"),
+            ]
+        )
+
+    captured = capsys.readouterr()
+    assert "[progress][DummyUnivariate] error" in captured.out
+    assert "synthetic failure" in captured.out
 
 
 def test_runtime_uses_task_name_for_default_run_directory(tmp_path: Path):

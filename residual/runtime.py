@@ -33,6 +33,90 @@ from .scheduler import build_launch_plan, run_parallel_jobs
 ENTRYPOINT_VERSION = "neuralforecast-residual-v1"
 
 
+def _progress_bar(completed: int, total: int, *, width: int = 18) -> str:
+    if total <= 0:
+        total = 1
+    ratio = min(max(completed / total, 0.0), 1.0)
+    filled = int(round(width * ratio))
+    pct = int(round(ratio * 100))
+    return f"[{'#' * filled}{'-' * (width - filled)}] {completed}/{total} {pct:3d}%"
+
+
+class _ProgressLogger:
+    def __init__(self, job_name: str, total_steps: int) -> None:
+        self.job_name = job_name
+        self.total_steps = max(total_steps, 1)
+        self.completed_steps = 0
+
+    def _emit(
+        self,
+        event: str,
+        *,
+        fold_idx: int | None = None,
+        total_folds: int | None = None,
+        phase: str | None = None,
+        detail: str | None = None,
+    ) -> None:
+        parts = [f"[progress][{self.job_name}] {event}"]
+        if phase:
+            parts.append(f"phase={phase}")
+        if fold_idx is not None:
+            fold_text = f"fold={fold_idx + 1}"
+            if total_folds is not None:
+                fold_text += f"/{total_folds}"
+            parts.append(fold_text)
+        parts.append(_progress_bar(self.completed_steps, self.total_steps))
+        if detail:
+            parts.append(detail)
+        print(" | ".join(parts), flush=True)
+
+    def model_started(self, *, total_folds: int, detail: str | None = None) -> None:
+        self._emit("model-start", total_folds=total_folds, detail=detail)
+
+    def fold_started(
+        self, fold_idx: int, *, total_folds: int, phase: str | None = None
+    ) -> None:
+        self._emit(
+            "fold-start",
+            fold_idx=fold_idx,
+            total_folds=total_folds,
+            phase=phase,
+        )
+
+    def fold_completed(
+        self,
+        fold_idx: int,
+        *,
+        total_folds: int,
+        phase: str | None = None,
+        detail: str | None = None,
+    ) -> None:
+        self.completed_steps += 1
+        self._emit(
+            "fold-done",
+            fold_idx=fold_idx,
+            total_folds=total_folds,
+            phase=phase,
+            detail=detail,
+        )
+
+    def error(
+        self,
+        fold_idx: int | None,
+        *,
+        total_folds: int | None = None,
+        phase: str | None = None,
+        exc: BaseException,
+    ) -> None:
+        self._emit(
+            "error",
+            fold_idx=fold_idx,
+            total_folds=total_folds,
+            phase=phase,
+            detail=f"{type(exc).__name__}: {exc}",
+        )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Residual wrapper runtime for neuralforecast."
@@ -256,27 +340,52 @@ def _tune_main_job(
     source_df: pd.DataFrame,
     freq: str,
     splits: list[tuple[list[int], list[int]]],
+    progress: _ProgressLogger | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     sampler = build_optuna_sampler(optuna_seed(loaded.config.runtime.random_seed))
+    trial_count = optuna_num_trials()
 
     def objective(trial: optuna.Trial) -> float:
         candidate_params = suggest_model_params(
             job.model, job.selected_search_params, trial
         )
         fold_mse: list[float] = []
-        for train_idx, test_idx in splits:
-            target_predictions, target_actuals, _, _, _ = _fit_and_predict_fold(
-                loaded,
-                job,
-                source_df=source_df,
-                freq=freq,
-                train_idx=train_idx,
-                test_idx=test_idx,
-                params_override=candidate_params,
-            )
-            fold_mse.append(
-                _compute_metrics(target_actuals, target_predictions[job.model])["MSE"]
-            )
+        for fold_idx, (train_idx, test_idx) in enumerate(splits):
+            phase = f"tune-trial-{trial.number + 1}/{trial_count}"
+            if progress is not None:
+                progress.fold_started(
+                    fold_idx, total_folds=len(splits), phase=phase
+                )
+            try:
+                target_predictions, target_actuals, _, _, _ = _fit_and_predict_fold(
+                    loaded,
+                    job,
+                    source_df=source_df,
+                    freq=freq,
+                    train_idx=train_idx,
+                    test_idx=test_idx,
+                    params_override=candidate_params,
+                )
+                mse = _compute_metrics(
+                    target_actuals, target_predictions[job.model]
+                )["MSE"]
+                fold_mse.append(mse)
+                if progress is not None:
+                    progress.fold_completed(
+                        fold_idx,
+                        total_folds=len(splits),
+                        phase=phase,
+                        detail=f"mse={mse:.4f}",
+                    )
+            except Exception as exc:
+                if progress is not None:
+                    progress.error(
+                        fold_idx,
+                        total_folds=len(splits),
+                        phase=phase,
+                        exc=exc,
+                    )
+                raise
         metric = float(sum(fold_mse) / len(fold_mse))
         trial.set_user_attr("best_params", candidate_params)
         trial.set_user_attr("fold_mse", fold_mse)
@@ -285,7 +394,7 @@ def _tune_main_job(
     study = optuna.create_study(
         sampler=sampler, direction=DEFAULT_OPTUNA_STUDY_DIRECTION
     )
-    study.optimize(objective, n_trials=optuna_num_trials(), show_progress_bar=False)
+    study.optimize(objective, n_trials=trial_count, show_progress_bar=False)
     best_params = dict(study.best_trial.user_attrs["best_params"])
     summary = {
         **_trial_metrics_summary(study),
@@ -746,10 +855,23 @@ def _run_single_job(
     effective_job = job
     models_dir = run_root / "models" / job.model
     models_dir.mkdir(parents=True, exist_ok=True)
+    total_steps = len(splits)
+    if job.validated_mode == "learned_auto":
+        total_steps *= optuna_num_trials() + 1
+    progress = _ProgressLogger(job.model, total_steps)
+    progress.model_started(
+        total_folds=len(splits),
+        detail=f"mode={job.validated_mode} output_root={run_root}",
+    )
 
     if job.validated_mode == "learned_auto":
         best_params, study_summary = _tune_main_job(
-            loaded, job, source_df=source_df, freq=freq, splits=splits
+            loaded,
+            job,
+            source_df=source_df,
+            freq=freq,
+            splits=splits,
+            progress=progress,
         )
         (models_dir / "best_params.json").write_text(
             json.dumps(best_params, indent=2), encoding="utf-8"
@@ -775,22 +897,45 @@ def _run_single_job(
             splits,
             effective_job.model,
         )
+        for fold_idx, baseline_metric in enumerate(baseline_metrics):
+            progress.fold_started(fold_idx, total_folds=len(splits), phase="baseline")
+            progress.fold_completed(
+                fold_idx,
+                total_folds=len(splits),
+                phase="baseline",
+                detail=f"mse={baseline_metric['MSE']:.4f}",
+            )
         metrics_rows.extend(baseline_metrics)
         cv_rows.extend(baseline_forecasts)
     else:
         for fold_idx, (train_idx, test_idx) in enumerate(splits):
-            target_predictions, target_actuals, train_end_ds, train_df, nf = (
-                _fit_and_predict_fold(
-                    loaded,
-                    effective_job,
-                    source_df=source_df,
-                    freq=freq,
-                    train_idx=train_idx,
-                    test_idx=test_idx,
+            progress.fold_started(fold_idx, total_folds=len(splits), phase="replay")
+            try:
+                target_predictions, target_actuals, train_end_ds, train_df, nf = (
+                    _fit_and_predict_fold(
+                        loaded,
+                        effective_job,
+                        source_df=source_df,
+                        freq=freq,
+                        train_idx=train_idx,
+                        test_idx=test_idx,
+                    )
                 )
-            )
+            except Exception as exc:
+                progress.error(
+                    fold_idx, total_folds=len(splits), phase="replay", exc=exc
+                )
+                raise
             future_df = source_df.iloc[test_idx].reset_index(drop=True)
-            metrics = _compute_metrics(target_actuals, target_predictions[effective_job.model])
+            metrics = _compute_metrics(
+                target_actuals, target_predictions[effective_job.model]
+            )
+            progress.fold_completed(
+                fold_idx,
+                total_folds=len(splits),
+                phase="replay",
+                detail=f"mse={metrics['MSE']:.4f}",
+            )
             metrics_rows.append(
                 {
                     "model": effective_job.model,

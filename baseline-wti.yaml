@@ -129,23 +129,13 @@ residual:
   model: xgboost
   params: {}
 jobs:
-- model: RNN
-  params: {}
-- model: GRU
-  params: {}
 - model: LSTM
   params: {}
 - model: NHITS
   params: {}
 - model: DLinear
   params: {}
-- model: NLinear
-  params: {}
 - model: TFT
-  params: {}
-- model: VanillaTransformer
-  params: {}
-- model: Informer
   params: {}
 - model: Autoformer
   params: {}
@@ -155,23 +145,13 @@ jobs:
   params: {}
 - model: iTransformer
   params: {}
-- model: TimeLLM
-  params: {}
 - model: TimeMixer
   params: {}
 - model: TimesNet
   params: {}
-- model: TimeXer
-  params: {}
 - model: NonstationaryTransformer
   params: {}
-- model: xLSTMMixer
-  params: {}
-- model: Mamba
-  params: {}
 - model: SMamba
-  params: {}
-- model: CMamba
   params: {}
 - model: Naive
   params: {}
