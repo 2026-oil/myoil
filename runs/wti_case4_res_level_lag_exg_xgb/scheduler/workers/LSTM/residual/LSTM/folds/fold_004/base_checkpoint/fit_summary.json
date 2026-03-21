@@ -1,0 +1,9 @@
+{
+  "model": "LSTM",
+  "fold_idx": 4,
+  "train_rows": 520,
+  "eval_rows": 8,
+  "train_end_ds": "2024-12-16 00:00:00",
+  "loss": "mse",
+  "loss_curve_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_res_level_lag_exg_xgb/scheduler/workers/LSTM/models/LSTM/folds/fold_004/loss_curve.png"
+}
