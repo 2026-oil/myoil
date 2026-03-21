@@ -2676,18 +2676,18 @@ def test_runtime_auto_mode_prefers_yaml_opt_n_trial_over_env(
     assert study_summary["trial_count"] == 2
 
 
-def test_runtime_auto_mode_prunes_trials_only_after_fold_three(
+def test_runtime_auto_mode_prunes_trials_only_after_fold_ten(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     payload = _payload()
     payload["runtime"]["opt_n_trial"] = 2
-    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 4, "gap": 0})
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 11, "gap": 0})
     payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
     payload["dataset"]["hist_exog_cols"] = []
     payload["jobs"] = [{"model": "TFT", "params": {}}]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     (tmp_path / "data.csv").write_text(
-        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n2020-01-29,5\n2020-02-05,6\n2020-02-12,7\n2020-02-19,8\n",
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n2020-01-29,5\n2020-02-05,6\n2020-02-12,7\n2020-02-19,8\n2020-02-26,9\n2020-03-04,10\n2020-03-11,11\n2020-03-18,12\n",
         encoding="utf-8",
     )
     config_path = _write_config(tmp_path, payload, ".yaml")
@@ -2785,10 +2785,10 @@ def test_runtime_auto_mode_prunes_trials_only_after_fold_three(
     assert summary["state_counts"]["complete"] == 1
     assert summary["state_counts"]["pruned"] == 1
     assert len(should_prune_steps) == 2
-    assert all(step == 4 for step in should_prune_steps)
+    assert all(step == 11 for step in should_prune_steps)
 
 
-def test_residual_auto_mode_prunes_trials_only_after_fold_three(
+def test_residual_auto_mode_prunes_trials_only_after_fold_ten(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     from residual import runtime
@@ -2840,7 +2840,7 @@ def test_residual_auto_mode_prunes_trials_only_after_fold_three(
     )
 
     fold_payloads = []
-    for fold_idx in range(4):
+    for fold_idx in range(11):
         panel = pd.DataFrame(
             {
                 "y": [1.0],
@@ -2872,8 +2872,8 @@ def test_residual_auto_mode_prunes_trials_only_after_fold_three(
             trial=trial,
         )
 
-    assert trial.reported_steps == [0, 1, 2, 3]
-    assert trial.prune_checks == [4]
+    assert trial.reported_steps == list(range(11))
+    assert trial.prune_checks == [11]
 
 
 def test_runtime_auto_mode_catches_recoverable_trial_failures(

@@ -61,7 +61,7 @@ DEFAULT_SAMPLE_STRUCTURE = {
     "results_intro": "- 각 run의 leaderboard.csv 기준 결과를 아래에 정리했다.",
     "section_model_tables": "### 각 모형별 Table",
 }
-MIN_PRUNE_FOLD_IDX = 3
+MIN_PRUNE_FOLD_IDX = 10
 
 
 class _OptunaTrialFailure(RuntimeError):
