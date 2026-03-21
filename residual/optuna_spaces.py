@@ -98,16 +98,20 @@ def default_residual_params(model_name: str) -> dict[str, Any]:
 
 DEFAULT_TRAINING_PARAMS = {
     "input_size": 64,
-    "season_length": 52,
     "batch_size": 32,
     "valid_batch_size": 32,
     "windows_batch_size": 1024,
     "inference_windows_batch_size": 1024,
     "learning_rate": 0.001,
+    "scaler_type": None,
+    "model_step_size": 1,
     "max_steps": 1000,
     "val_size": 12,
     "val_check_steps": 100,
+    "early_stop_patience_steps": -1,
+    "num_lr_decays": -1,
 }
+TRAINING_SELECTOR_TO_CONFIG_FIELD = {"step_size": "model_step_size"}
 
 ExecutionMode = Literal[
     "baseline_fixed",
@@ -220,6 +224,7 @@ MODEL_PARAM_REGISTRY = {
         "decoder_layers": _int(1, 2),
         "factor": _categorical([1, 3, 5]),
         "MovingAvg_window": _categorical([5, 13, 25]),
+        "conv_hidden_size": _categorical([32, 64, 128]),
         "dropout": _categorical([0.0, 0.1, 0.2, 0.3]),
     },
     "FEDformer": {
@@ -243,10 +248,10 @@ MODEL_PARAM_REGISTRY = {
     "LSTM": {
         "encoder_hidden_size": _categorical([32, 64, 128, 256]),
         "encoder_n_layers": _int(1, 3),
+        "inference_input_size": _categorical([-1, 24, 48, 96]),
         "encoder_dropout": _categorical([0.0, 0.1, 0.2, 0.3]),
         "decoder_hidden_size": _categorical([32, 64, 128, 256]),
         "decoder_layers": _int(1, 3),
-        "context_size": _categorical([5, 10, 50]),
     },
     "TCN": {
         "encoder_hidden_size": _categorical([16, 32, 64, 128]),
@@ -316,6 +321,9 @@ MODEL_PARAM_REGISTRY = {
             ]
         ),
         "dropout_prob_theta": _categorical([0.0, 0.1, 0.2]),
+        "activation": _categorical(
+            ["ReLU", "Softplus", "Tanh", "SELU", "LeakyReLU", "PReLU", "Sigmoid"]
+        ),
     },
     "DLinear": {
         "moving_avg_window": _categorical([5, 9, 13, 25, 51]),
@@ -502,14 +510,17 @@ RESIDUAL_PARAM_REGISTRY = {
 
 TRAINING_PARAM_REGISTRY = {
     "input_size": _categorical([24, 36, 48, 64, 72, 96]),
-    "season_length": _categorical([26, 52]),
     "batch_size": _categorical([16, 32, 64]),
     "valid_batch_size": _categorical([16, 32, 64]),
     "windows_batch_size": _categorical([128, 256, 512, 1024]),
     "inference_windows_batch_size": _categorical([256, 512, 1024]),
     "learning_rate": _float(3e-4, 1e-2, log=True),
+    "scaler_type": _categorical([None, "robust", "standard", "identity"]),
+    "step_size": _categorical([1, 4, 8, 12]),
     "max_steps": _categorical([300, 500, 800, 1200]),
     "val_check_steps": _categorical([50, 100, 200]),
+    "early_stop_patience_steps": _categorical([-1, 5, 10, 20]),
+    "num_lr_decays": _categorical([-1, 1, 2, 3]),
 }
 
 

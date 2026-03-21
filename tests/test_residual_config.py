@@ -406,7 +406,10 @@ def test_model_builder_propagates_centralized_training_controls(tmp_path: Path):
         {
             "max_steps": 17,
             "learning_rate": 0.123,
+            "scaler_type": "standard",
+            "step_size": 3,
             "val_check_steps": 7,
+            "num_lr_decays": 2,
             "early_stop_patience_steps": 11,
         }
     )
@@ -437,8 +440,50 @@ def test_model_builder_propagates_centralized_training_controls(tmp_path: Path):
     for model in (tft, lstm, nhits, itransformer):
         assert model.hparams.max_steps == 17
         assert model.hparams.learning_rate == pytest.approx(0.123)
+        assert model.hparams.scaler_type == "standard"
+        assert model.hparams.step_size == 3
         assert model.hparams.val_check_steps == 7
+        assert model.hparams.num_lr_decays == 2
         assert model.hparams.early_stop_patience_steps == 11
+
+
+def test_load_app_config_ignores_legacy_training_season_length_and_maps_step_size(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["training"].update({"season_length": 52, "step_size": 6})
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n", encoding="utf-8"
+    )
+
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    assert loaded.config.training.model_step_size == 6
+    assert "season_length" not in loaded.normalized_payload["training"]
+    assert loaded.normalized_payload["training"]["model_step_size"] == 6
+
+
+def test_load_app_config_migrates_legacy_shared_job_scaler_type_to_training(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["jobs"] = [
+        {"model": "VanillaTransformer", "params": {"hidden_size": 32, "scaler_type": "identity"}},
+        {"model": "Informer", "params": {"hidden_size": 32, "factor": 3, "scaler_type": "identity"}},
+    ]
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n", encoding="utf-8"
+    )
+
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    assert loaded.config.training.scaler_type == "identity"
+    assert loaded.config.jobs[0].params == {"hidden_size": 32}
+    assert loaded.config.jobs[1].params == {"hidden_size": 32, "factor": 3}
 
 
 def test_model_builder_disables_logger_and_keeps_timemixer_without_future_features(
@@ -2720,6 +2765,38 @@ def test_effective_config_pins_val_size_to_horizon_for_training_auto(tmp_path: P
     assert effective.training.val_size == loaded.config.cv.horizon
 
 
+def test_effective_config_maps_training_step_size_override_for_training_auto(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"]},
+            "training": ["step_size", "num_lr_decays"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    from residual import runtime
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+    effective = runtime._effective_config(
+        loaded, {"step_size": 5, "num_lr_decays": 2}
+    )
+
+    assert effective.training.model_step_size == 5
+    assert effective.training.num_lr_decays == 2
+    assert effective.training.val_size == loaded.config.cv.horizon
+
+
 def test_supported_auto_model_matrix_matches_registry_and_yaml():
     search_space = _load_search_space_strict()
     learned_model_classes = {
@@ -3268,6 +3345,9 @@ EXPECTED_HPT_CASE12_MODELS = [
 SEARCH_SPACE_MODELS = yaml.safe_load(
     (REPO_ROOT / "search_space.yaml").read_text(encoding="utf-8")
 )["models"]
+SEARCH_SPACE_TRAINING = yaml.safe_load(
+    (REPO_ROOT / "search_space.yaml").read_text(encoding="utf-8")
+)["training"]
 SEARCH_SPACE_RESIDUAL = yaml.safe_load(
     (REPO_ROOT / "search_space.yaml").read_text(encoding="utf-8")
 )["residual"]
@@ -3276,6 +3356,7 @@ EXPECTED_REPO_AUTO_SELECTORS = {
     "LSTM": [
         "encoder_hidden_size",
         "encoder_n_layers",
+        "inference_input_size",
         "encoder_dropout",
         "decoder_hidden_size",
         "decoder_layers",
@@ -3286,6 +3367,7 @@ EXPECTED_REPO_AUTO_SELECTORS = {
         "n_blocks",
         "mlp_units",
         "dropout_prob_theta",
+        "activation",
     ],
     "DLinear": ["moving_avg_window"],
     "Autoformer": [
@@ -3295,6 +3377,7 @@ EXPECTED_REPO_AUTO_SELECTORS = {
         "decoder_layers",
         "factor",
         "MovingAvg_window",
+        "conv_hidden_size",
         "dropout",
     ],
     "PatchTST": [
@@ -3320,6 +3403,20 @@ EXPECTED_REPO_AUTO_SELECTORS = {
         "use_norm",
     ],
 }
+EXPECTED_REPO_TRAINING_SELECTORS = [
+    "input_size",
+    "batch_size",
+    "valid_batch_size",
+    "windows_batch_size",
+    "inference_windows_batch_size",
+    "learning_rate",
+    "scaler_type",
+    "step_size",
+    "max_steps",
+    "val_check_steps",
+    "early_stop_patience_steps",
+    "num_lr_decays",
+]
 
 EXPECTED_CASE_METADATA = {
     "brentoil-case1.yaml": {
@@ -3651,6 +3748,9 @@ def test_repo_search_space_updates_requested_auto_selectors_only():
     for model_name, expected in EXPECTED_REPO_AUTO_SELECTORS.items():
         assert SEARCH_SPACE_MODELS[model_name] == expected
 
+    assert SEARCH_SPACE_TRAINING == EXPECTED_REPO_TRAINING_SELECTORS
+    assert "season_length" not in SEARCH_SPACE_TRAINING
+    assert "context_size" not in SEARCH_SPACE_MODELS["LSTM"]
     assert SEARCH_SPACE_MODELS["GRU"] == [
         "encoder_hidden_size",
         "encoder_n_layers",

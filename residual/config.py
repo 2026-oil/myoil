@@ -17,6 +17,7 @@ from .optuna_spaces import (
     MODEL_PARAM_REGISTRY,
     RESIDUAL_PARAM_REGISTRY,
     TRAINING_PARAM_REGISTRY,
+    TRAINING_SELECTOR_TO_CONFIG_FIELD,
     ResidualMode,
     SearchSpaceContract,
     load_search_space_contract,
@@ -30,17 +31,25 @@ SUPPORTED_LOSSES = {"mse"}
 CENTRALIZED_TRAINING_KEYS = {
     "train_protocol",
     "input_size",
-    "season_length",
     "batch_size",
     "valid_batch_size",
     "windows_batch_size",
     "inference_windows_batch_size",
     "learning_rate",
+    "scaler_type",
+    "step_size",
     "max_steps",
     "val_size",
     "val_check_steps",
     "early_stop_patience_steps",
+    "num_lr_decays",
     "loss",
+}
+LEGACY_SHARED_JOB_TRAINING_KEYS = {
+    "scaler_type",
+    "step_size",
+    "early_stop_patience_steps",
+    "num_lr_decays",
 }
 ResidualTargetMode = Literal["level", "delta"]
 
@@ -71,7 +80,6 @@ class TaskConfig:
 class TrainingConfig:
     train_protocol: str = "expanding_window_tscv"
     input_size: int = DEFAULT_TRAINING_PARAMS["input_size"]
-    season_length: int = DEFAULT_TRAINING_PARAMS["season_length"]
     batch_size: int = DEFAULT_TRAINING_PARAMS["batch_size"]
     valid_batch_size: int = DEFAULT_TRAINING_PARAMS["valid_batch_size"]
     windows_batch_size: int = DEFAULT_TRAINING_PARAMS["windows_batch_size"]
@@ -79,10 +87,15 @@ class TrainingConfig:
         "inference_windows_batch_size"
     ]
     learning_rate: float = DEFAULT_TRAINING_PARAMS["learning_rate"]
+    scaler_type: str | None = DEFAULT_TRAINING_PARAMS["scaler_type"]
+    model_step_size: int = DEFAULT_TRAINING_PARAMS["model_step_size"]
     max_steps: int = DEFAULT_TRAINING_PARAMS["max_steps"]
     val_size: int = DEFAULT_TRAINING_PARAMS["val_size"]
     val_check_steps: int = DEFAULT_TRAINING_PARAMS["val_check_steps"]
-    early_stop_patience_steps: int = -1
+    early_stop_patience_steps: int = DEFAULT_TRAINING_PARAMS[
+        "early_stop_patience_steps"
+    ]
+    num_lr_decays: int = DEFAULT_TRAINING_PARAMS["num_lr_decays"]
     loss: str = "mse"
 
 
@@ -393,6 +406,14 @@ def _normalize_payload(
     dataset = dict(payload.get("dataset", {}))
     runtime = dict(payload.get("runtime", {}))
     training = dict(payload.get("training", {}))
+    training.pop("season_length", None)
+    for selector, field_name in TRAINING_SELECTOR_TO_CONFIG_FIELD.items():
+        if selector in training:
+            if field_name in training:
+                raise ValueError(
+                    f"training.{selector} and training.{field_name} cannot both be set"
+                )
+            training[field_name] = training.pop(selector)
     cv = dict(payload.get("cv", {}))
     if "final_holdout" in cv:
         raise ValueError(
@@ -476,13 +497,43 @@ def _normalize_payload(
     else:
         residual_validated_mode = residual_requested_mode
 
+    jobs_payload = []
+    for raw_job in payload.get("jobs", []):
+        normalized_job = dict(raw_job)
+        normalized_job["params"] = dict(raw_job.get("params", {}))
+        jobs_payload.append(normalized_job)
+
+    for selector in LEGACY_SHARED_JOB_TRAINING_KEYS:
+        field_name = TRAINING_SELECTOR_TO_CONFIG_FIELD.get(selector, selector)
+        legacy_values = [
+            job["params"][selector]
+            for job in jobs_payload
+            if selector in job["params"]
+        ]
+        if not legacy_values:
+            continue
+        canonical_value = legacy_values[0]
+        if any(value != canonical_value for value in legacy_values[1:]):
+            raise ValueError(
+                f"jobs use conflicting legacy centralized training key values for {selector}; "
+                "move one shared value under training."
+            )
+        if field_name in training and training[field_name] != canonical_value:
+            raise ValueError(
+                f"training.{field_name} conflicts with legacy jobs[*].params.{selector}; "
+                "keep the shared value under training only."
+            )
+        training.setdefault(field_name, canonical_value)
+        for job in jobs_payload:
+            job["params"].pop(selector, None)
+
     jobs = tuple(
         _normalize_job(
             job,
             search_space=search_space,
             allow_missing_search_space=allow_missing_search_space,
         )
-        for job in payload.get("jobs", [])
+        for job in jobs_payload
     )
     if not jobs:
         raise ValueError("Config must define at least one job")

@@ -12,6 +12,7 @@ models:
   LSTM:
     - encoder_hidden_size
     - encoder_n_layers
+    - inference_input_size
     - encoder_dropout
     - decoder_hidden_size
     - decoder_layers
@@ -55,6 +56,7 @@ models:
     - n_blocks
     - mlp_units
     - dropout_prob_theta
+    - activation
   DLinear:
     - moving_avg_window
   NLinear: []
@@ -103,6 +105,7 @@ models:
     - decoder_layers
     - factor
     - MovingAvg_window
+    - conv_hidden_size
     - dropout
   FEDformer:
     - hidden_size
@@ -225,14 +228,17 @@ models:
     - temporal_dropout
 training:
   - input_size
-  - season_length
   - batch_size
   - valid_batch_size
   - windows_batch_size
   - inference_windows_batch_size
   - learning_rate
+  - scaler_type
+  - step_size
   - max_steps
   - val_check_steps
+  - early_stop_patience_steps
+  - num_lr_decays
 residual:
   xgboost:
     - n_estimators

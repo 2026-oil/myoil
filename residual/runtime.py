@@ -23,6 +23,7 @@ from .optuna_spaces import (
     RESIDUAL_DEFAULTS,
     SUPPORTED_AUTO_MODEL_NAMES,
     SUPPORTED_RESIDUAL_MODELS,
+    TRAINING_SELECTOR_TO_CONFIG_FIELD,
     build_optuna_sampler,
     optuna_num_trials,
     optuna_seed,
@@ -335,9 +336,13 @@ def _effective_config(
         training_override = {}
     if loaded.config.training_search.validated_mode == "training_auto":
         training_override = {**training_override, "val_size": loaded.config.cv.horizon}
+    normalized_override = {
+        TRAINING_SELECTOR_TO_CONFIG_FIELD.get(key, key): value
+        for key, value in training_override.items()
+    }
     return replace(
         loaded.config,
-        training=replace(loaded.config.training, **training_override),
+        training=replace(loaded.config.training, **normalized_override),
     )
 
 
