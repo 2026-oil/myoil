@@ -32,8 +32,8 @@ scheduler:
   max_concurrent_jobs: 1
   worker_devices: 1
 residual:
-  enabled: false
-  model: xgboost
+  enabled: true
+  model: lightgbm
   params: {}
 jobs:
   - model: TFT

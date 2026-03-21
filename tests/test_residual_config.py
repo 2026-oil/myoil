@@ -25,17 +25,42 @@ from residual.optuna_spaces import (
     DEFAULT_OPTUNA_NUM_TRIALS,
     EXCLUDED_AUTO_MODEL_NAMES,
     MODEL_PARAM_REGISTRY,
+    RESIDUAL_PARAM_REGISTRY,
     SUPPORTED_AUTO_MODEL_NAMES,
+    SUPPORTED_RESIDUAL_MODELS,
     TRAINING_PARAM_REGISTRY,
     optuna_num_trials,
 )
 from residual.plugins_base import ResidualContext, ResidualPlugin
 from residual.progress import PROGRESS_EVENT_PREFIX
-from residual.registry import build_residual_plugin
 from residual.scheduler import build_launch_plan, run_parallel_jobs, worker_env
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+EXPECTED_SUPPORTED_RESIDUAL_MODELS = ("xgboost", "randomforest", "lightgbm")
+XGBOOST_RESIDUAL_PARAM_KEYS = (
+    "n_estimators",
+    "max_depth",
+    "learning_rate",
+    "subsample",
+    "colsample_bytree",
+)
+RESIDUAL_AUTO_FIXTURE_FILES = [
+    REPO_ROOT / "tests" / "fixtures" / "optuna_learned_auto_with_residual.yaml",
+    REPO_ROOT
+    / "tests"
+    / "fixtures"
+    / "optuna_learned_auto_with_residual_randomforest.yaml",
+    REPO_ROOT
+    / "tests"
+    / "fixtures"
+    / "optuna_learned_auto_with_residual_lightgbm.yaml",
+]
+RESIDUAL_RUNTIME_SMOKE_FIXTURE_FILES = [
+    REPO_ROOT / "tests" / "fixtures" / "residual_runtime_smoke_xgboost.yaml",
+    REPO_ROOT / "tests" / "fixtures" / "residual_runtime_smoke_randomforest.yaml",
+    REPO_ROOT / "tests" / "fixtures" / "residual_runtime_smoke_lightgbm.yaml",
+]
 NEWLY_SUPPORTED_MODEL_ALIASES = {
     "Mamba": ("mamba", "automamba"),
     "SMamba": ("smamba", "autosmamba"),
@@ -62,7 +87,21 @@ def _write_search_space(
             },
             "training": [],
             "residual": {
-                "xgboost": ["n_estimators", "max_depth", "learning_rate"]
+                "xgboost": ["n_estimators", "max_depth", "learning_rate"],
+                "randomforest": [
+                    "n_estimators",
+                    "max_depth",
+                    "min_samples_leaf",
+                    "max_features",
+                ],
+                "lightgbm": [
+                    "n_estimators",
+                    "max_depth",
+                    "learning_rate",
+                    "num_leaves",
+                    "min_child_samples",
+                    "feature_fraction",
+                ],
             },
         }
     path = root / name
@@ -183,6 +222,63 @@ def _payload() -> dict:
     }
 
 
+def _residual_defaults_map() -> dict[str, dict[str, Any]]:
+    from residual import optuna_spaces as residual_spaces
+
+    for attr_name in (
+        "DEFAULT_RESIDUAL_PARAMS_BY_MODEL",
+        "RESIDUAL_DEFAULTS_MAP",
+        "RESIDUAL_DEFAULTS_BY_MODEL",
+        "RESIDUAL_DEFAULTS",
+    ):
+        value = getattr(residual_spaces, attr_name, None)
+        if value is not None:
+            return cast(dict[str, dict[str, Any]], value)
+    pytest.fail("residual.optuna_spaces must expose a per-model defaults map")
+
+
+def _import_build_residual_plugin():
+    try:
+        from residual.registry import build_residual_plugin as builder
+    except ModuleNotFoundError as exc:
+        if exc.name in {"lightgbm", "xgboost", "sklearn"}:
+            pytest.skip(f"optional dependency missing: {exc.name}")
+        raise
+    return builder
+
+
+def _skip_missing_residual_backend(model_name: str) -> None:
+    if model_name == "xgboost":
+        pytest.importorskip("xgboost")
+    elif model_name == "randomforest":
+        pytest.importorskip("sklearn")
+    elif model_name == "lightgbm":
+        pytest.importorskip("lightgbm")
+
+
+def _load_search_space_strict() -> dict[str, Any]:
+    class UniqueKeySafeLoader(yaml.SafeLoader):
+        pass
+
+    def construct_mapping(loader: yaml.SafeLoader, node: yaml.nodes.MappingNode, deep: bool = False) -> Any:
+        mapping: dict[Any, Any] = {}
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node, deep=deep)
+            if key in mapping:
+                raise ValueError(f"Duplicate YAML key: {key}")
+            mapping[key] = loader.construct_object(value_node, deep=deep)
+        return mapping
+
+    UniqueKeySafeLoader.add_constructor(
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+        construct_mapping,
+    )
+    return cast(
+        dict[str, Any],
+        yaml.load((REPO_ROOT / "search_space.yaml").read_text(), Loader=UniqueKeySafeLoader),
+    )
+
+
 def test_load_app_config_preserves_runtime_opt_n_trial(tmp_path: Path):
     payload = _payload()
     payload["runtime"]["opt_n_trial"] = 9
@@ -217,10 +313,10 @@ def test_load_app_config_rejects_non_positive_runtime_opt_n_trial(tmp_path: Path
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="runtime.opt_n_trial must be a positive integer"):
-        load_app_config(
-            tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
-        )
+    with pytest.raises(
+        ValueError, match="runtime.opt_n_trial must be a positive integer"
+    ):
+        load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
 
 
 def test_toml_and_yaml_normalize_to_same_typed_model(tmp_path: Path):
@@ -561,7 +657,9 @@ def test_runtime_executes_single_job_with_dummy_model(tmp_path: Path):
     assert code == 0
     assert (output_root / "cv" / "DummyUnivariate_forecasts.csv").exists()
     assert not (output_root / "holdout").exists()
-    capability = json.loads((output_root / "config" / "capability_report.json").read_text())
+    capability = json.loads(
+        (output_root / "config" / "capability_report.json").read_text()
+    )
     assert capability["DummyUnivariate"]["supports_auto"] is False
 
 
@@ -618,9 +716,7 @@ def test_runtime_logs_fold_errors_to_stdout(
     payload["jobs"] = [
         {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
     ]
-    data = (
-        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n"
-    )
+    data = "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n"
     (tmp_path / "data.csv").write_text(data, encoding="utf-8")
     config_path = _write_config(tmp_path, payload, ".yaml")
 
@@ -917,8 +1013,9 @@ def test_runtime_smoke_writes_summary_artifacts_for_dummy_model(tmp_path: Path):
     assert (output_root / "summary" / "last_fold_top5.png").exists()
     leaderboard = pd.read_csv(leaderboard_path)
     assert "rank" in leaderboard.columns
-    assert "| Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |" in markdown_path.read_text(
-        encoding="utf-8"
+    assert (
+        "| Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |"
+        in markdown_path.read_text(encoding="utf-8")
     )
 
 
@@ -1117,12 +1214,14 @@ def test_load_app_config_rejects_invalid_residual_target_values(
     )
     path = _write_config(tmp_path, payload, ".yaml")
 
-    with pytest.raises(ValueError, match="residual.target must be one of: level, delta"):
+    with pytest.raises(
+        ValueError, match="residual.target must be one of: level, delta"
+    ):
         load_app_config(tmp_path, config_path=path)
 
 
-def test_residual_registry_builds_xgboost_plugin():
-    plugin = build_residual_plugin(
+def test_residual_registry_builds_xgboost_plugin_with_custom_params():
+    plugin = _import_build_residual_plugin()(
         {
             "model": "xgboost",
             "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
@@ -1130,6 +1229,19 @@ def test_residual_registry_builds_xgboost_plugin():
     )
     assert plugin.metadata()["plugin"] == "xgboost"
     assert plugin.metadata()["n_estimators"] == 8
+
+
+@pytest.mark.parametrize(
+    "model_name",
+    EXPECTED_SUPPORTED_RESIDUAL_MODELS,
+    ids=EXPECTED_SUPPORTED_RESIDUAL_MODELS,
+)
+def test_residual_registry_builds_all_supported_plugins(model_name: str):
+    _skip_missing_residual_backend(model_name)
+
+    plugin = _import_build_residual_plugin()({"model": model_name, "params": {}})
+
+    assert plugin.metadata()["plugin"] == model_name
 
 
 def test_runtime_generates_per_fold_residual_artifacts_with_dummy_model(tmp_path: Path):
@@ -1347,6 +1459,21 @@ class _RecordingLog(TypedDict):
     predict_panel_splits: list[list[str]]
 
 
+class _CheckpointResidualPlugin(ResidualPlugin):
+    def __init__(self, name: str):
+        self.name = name
+
+    def fit(self, panel_df: pd.DataFrame, context: ResidualContext) -> None:
+        context.output_dir.mkdir(parents=True, exist_ok=True)
+        (context.output_dir / "model.ubj").write_text(self.name, encoding="utf-8")
+
+    def predict(self, panel_df: pd.DataFrame) -> pd.DataFrame:
+        return panel_df.copy().assign(residual_hat=0.0)
+
+    def metadata(self) -> dict[str, object]:
+        return {"plugin": self.name}
+
+
 def test_apply_residual_plugin_uses_fold_local_backcasts_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -1422,6 +1549,89 @@ def test_apply_residual_plugin_uses_fold_local_backcasts_only(
     residual_root = run_root / "residual" / job.model
     assert (residual_root / "corrected_folds.csv").exists()
     assert not (residual_root / "corrected_holdout.csv").exists()
+
+
+@pytest.mark.parametrize(
+    "path", RESIDUAL_RUNTIME_SMOKE_FIXTURE_FILES, ids=lambda p: p.stem
+)
+def test_runtime_residual_checkpoint_contract_extends_to_all_supported_models(
+    path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from residual import runtime
+
+    payload = _load_case_yaml(path)
+    loaded = load_app_config(REPO_ROOT, config_path=path)
+    job = loaded.config.jobs[0]
+    run_root = tmp_path / path.stem
+    manifest_path = run_root / "manifest" / "run_manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps({"jobs": [{"model": job.model}], "residual": {}}, indent=2),
+        encoding="utf-8",
+    )
+    fold_payloads = [
+        {
+            "fold_idx": 0,
+            "backcast_panel": _residual_target_panel(
+                [
+                    {
+                        "model_name": job.model,
+                        "fold_idx": 0,
+                        "panel_split": "backcast_train",
+                        "unique_id": "target",
+                        "cutoff": "2020-01-08",
+                        "train_end_ds": "2020-01-08",
+                        "ds": "2020-01-15",
+                        "horizon_step": 1,
+                        "y_hat_base": 10.0,
+                        "y": 11.0,
+                        "residual_target": 1.0,
+                    }
+                ]
+            ),
+            "eval_panel": _residual_target_panel(
+                [
+                    {
+                        "model_name": job.model,
+                        "fold_idx": 0,
+                        "panel_split": "fold_eval",
+                        "unique_id": "target",
+                        "cutoff": "2020-01-15",
+                        "train_end_ds": "2020-01-15",
+                        "ds": "2020-01-22",
+                        "horizon_step": 1,
+                        "y_hat_base": 12.0,
+                        "y": 13.0,
+                        "residual_target": 1.0,
+                    }
+                ]
+            ),
+            "base_summary": {"fold_idx": 0},
+        }
+    ]
+
+    monkeypatch.setattr(
+        runtime,
+        "build_residual_plugin",
+        lambda config: _CheckpointResidualPlugin(config["model"]),
+    )
+
+    runtime._apply_residual_plugin(
+        loaded,
+        job,
+        run_root,
+        fold_payloads,
+        manifest_path=manifest_path,
+    )
+
+    residual_root = run_root / "residual" / job.model
+    assert (residual_root / "corrected_folds.csv").exists()
+    assert (
+        residual_root / "folds" / "fold_000" / "residual_checkpoint" / "model.ubj"
+    ).exists()
+    assert payload["residual"]["model"] in (
+        residual_root / "plugin_metadata.json"
+    ).read_text(encoding="utf-8")
 
 
 def test_build_residual_target_preserves_level_mode_parity():
@@ -1501,13 +1711,42 @@ def test_reconstruct_corrected_forecast_level_mode_parity():
     assert corrected.tolist() == [12.5, 10.5]
 
 
-def test_xgboost_plugin_predicts_panel_and_writes_checkpoint(tmp_path: Path):
+@pytest.mark.parametrize(
+    ("model_name", "params"),
+    [
+        ("xgboost", {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2}),
+        (
+            "randomforest",
+            {
+                "n_estimators": 8,
+                "max_depth": 2,
+                "min_samples_leaf": 1,
+                "max_features": "sqrt",
+            },
+        ),
+        (
+            "lightgbm",
+            {
+                "n_estimators": 8,
+                "max_depth": 2,
+                "learning_rate": 0.1,
+                "num_leaves": 7,
+                "min_child_samples": 5,
+                "feature_fraction": 1.0,
+            },
+        ),
+    ],
+)
+def test_residual_plugins_predict_panel_and_write_checkpoint(
+    tmp_path: Path, model_name: str, params: dict[str, Any]
+):
+    _skip_missing_residual_backend(model_name)
     plugin = cast(
         Any,
-        build_residual_plugin(
+        _import_build_residual_plugin()(
             {
-                "model": "xgboost",
-                "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+                "model": model_name,
+                "params": params,
             }
         ),
     )
@@ -1546,6 +1785,7 @@ def test_xgboost_plugin_predicts_panel_and_writes_checkpoint(tmp_path: Path):
     predicted = plugin.predict(train_df.drop(columns=["residual_target"]))
     assert "residual_hat" in predicted.columns
     assert len(predicted) == 3
+    assert plugin.metadata()["plugin"] == model_name
     assert (tmp_path / "checkpoint" / "model.ubj").exists()
 
 
@@ -1812,7 +2052,10 @@ def test_load_app_config_rejects_missing_model_search_space_entry(tmp_path: Path
     config_path = _write_config(tmp_path, payload, ".yaml")
     _write_search_space(
         tmp_path,
-        {"models": {"iTransformer": ["hidden_size"]}, "residual": {"xgboost": ["n_estimators"]}},
+        {
+            "models": {"iTransformer": ["hidden_size"]},
+            "residual": {"xgboost": ["n_estimators"]},
+        },
     )
 
     with pytest.raises(ValueError, match="requires search_space.models.TFT"):
@@ -1830,14 +2073,19 @@ def test_load_app_config_rejects_unknown_search_space_param(tmp_path: Path):
     config_path = _write_config(tmp_path, payload, ".yaml")
     _write_search_space(
         tmp_path,
-        {"models": {"TFT": ["encoder_layers"]}, "residual": {"xgboost": ["n_estimators"]}},
+        {
+            "models": {"TFT": ["encoder_layers"]},
+            "residual": {"xgboost": ["n_estimators"]},
+        },
     )
 
     with pytest.raises(ValueError, match="unknown parameter"):
         load_app_config(tmp_path, config_path=config_path)
 
 
-def test_load_app_config_rejects_stale_unused_allowlisted_selector_entry(tmp_path: Path):
+def test_load_app_config_rejects_stale_unused_allowlisted_selector_entry(
+    tmp_path: Path,
+):
     payload = _payload()
     payload["jobs"] = [{"model": "TFT", "params": {}}]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
@@ -1951,11 +2199,11 @@ def test_runtime_auto_mode_records_selector_provenance_and_modes(
     capability = json.loads(
         (output_root / "config" / "capability_report.json").read_text()
     )
-    manifest = json.loads(
-        (output_root / "manifest" / "run_manifest.json").read_text()
-    )
+    manifest = json.loads((output_root / "manifest" / "run_manifest.json").read_text())
 
-    assert resolved["search_space_path"] == str((tmp_path / "search_space.yaml").resolve())
+    assert resolved["search_space_path"] == str(
+        (tmp_path / "search_space.yaml").resolve()
+    )
     assert resolved["jobs"][0]["requested_mode"] == "learned_auto_requested"
     assert resolved["jobs"][0]["validated_mode"] == "learned_auto"
     assert resolved["training_search"]["requested_mode"] == "training_fixed"
@@ -1963,7 +2211,9 @@ def test_runtime_auto_mode_records_selector_provenance_and_modes(
     assert capability["TFT"]["requested_mode"] == "learned_auto_requested"
     assert capability["TFT"]["validated_mode"] == "learned_auto"
     assert capability["training_search"]["validated_mode"] == "training_fixed"
-    assert manifest["search_space_path"] == str((tmp_path / "search_space.yaml").resolve())
+    assert manifest["search_space_path"] == str(
+        (tmp_path / "search_space.yaml").resolve()
+    )
     assert manifest["jobs"][0]["requested_mode"] == "learned_auto_requested"
     assert manifest["jobs"][0]["validated_mode"] == "learned_auto"
     assert manifest["training_search"]["validated_mode"] == "training_fixed"
@@ -2374,10 +2624,20 @@ def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
         calls.append(training_override or {})
         ds = pd.Series(["2020-01-22"])
         predictions = pd.DataFrame(
-            {"unique_id": [loaded.config.dataset.target_col], "ds": ds, job.model: [1.0]}
+            {
+                "unique_id": [loaded.config.dataset.target_col],
+                "ds": ds,
+                job.model: [1.0],
+            }
         )
         actuals = pd.Series([1.0])
-        return predictions, actuals, pd.Timestamp("2020-01-15"), source_df.iloc[train_idx], object()
+        return (
+            predictions,
+            actuals,
+            pd.Timestamp("2020-01-15"),
+            source_df.iloc[train_idx],
+            object(),
+        )
 
     monkeypatch.setenv("NEURALFORECAST_OPTUNA_NUM_TRIALS", "1")
     monkeypatch.setenv("NEURALFORECAST_OPTUNA_SEED", "7")
@@ -2461,11 +2721,9 @@ def test_effective_config_pins_val_size_to_horizon_for_training_auto(tmp_path: P
 
 
 def test_supported_auto_model_matrix_matches_registry_and_yaml():
-    search_space = yaml.safe_load((REPO_ROOT / "search_space.yaml").read_text())
+    search_space = _load_search_space_strict()
     learned_model_classes = {
-        model_name
-        for model_name in MODEL_CLASSES
-        if not model_name.startswith("Dummy")
+        model_name for model_name in MODEL_CLASSES if not model_name.startswith("Dummy")
     }
     learned_registry_models = set(MODEL_PARAM_REGISTRY)
     assert "HINT" not in SUPPORTED_AUTO_MODEL_NAMES
@@ -2473,12 +2731,33 @@ def test_supported_auto_model_matrix_matches_registry_and_yaml():
     assert SUPPORTED_AUTO_MODEL_NAMES == learned_registry_models
     assert SUPPORTED_AUTO_MODEL_NAMES == set(search_space["models"])
     assert tuple(search_space["training"]) == tuple(TRAINING_PARAM_REGISTRY)
-    assert set(search_space["residual"]) == {"xgboost"}
+    assert set(search_space["residual"]) == {"xgboost", "randomforest", "lightgbm"}
     assert all(
         isinstance(search_space["models"][model], list)
         for model in search_space["models"]
     )
     assert "learning_rate" not in search_space["models"]["NLinear"]
+
+
+def test_supported_residual_model_matrix_matches_defaults_registry_and_yaml():
+    search_space = _load_search_space_strict()
+    residual_defaults_map = _residual_defaults_map()
+
+    assert set(SUPPORTED_RESIDUAL_MODELS) == set(EXPECTED_SUPPORTED_RESIDUAL_MODELS)
+    assert set(residual_defaults_map) == set(EXPECTED_SUPPORTED_RESIDUAL_MODELS)
+    assert set(RESIDUAL_PARAM_REGISTRY) == set(EXPECTED_SUPPORTED_RESIDUAL_MODELS)
+    assert set(search_space["residual"]) == set(EXPECTED_SUPPORTED_RESIDUAL_MODELS)
+
+    for model_name in EXPECTED_SUPPORTED_RESIDUAL_MODELS:
+        assert set(residual_defaults_map[model_name]) == set(
+            RESIDUAL_PARAM_REGISTRY[model_name]
+        )
+        assert set(residual_defaults_map[model_name]) == set(
+            search_space["residual"][model_name]
+        )
+        assert residual_defaults_map[model_name]
+
+    assert tuple(search_space["residual"]["xgboost"]) == XGBOOST_RESIDUAL_PARAM_KEYS
 
 
 def test_supported_auto_model_matrix_includes_v3_expansion():
@@ -2626,7 +2905,9 @@ def test_build_model_supports_new_official_model_ports(tmp_path: Path):
             },
         },
     ]
-    loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
 
     deform = build_model(loaded.config, loaded.config.jobs[0], n_series=1)
     deformabletst = build_model(loaded.config, loaded.config.jobs[1], n_series=1)
@@ -2818,9 +3099,7 @@ def test_uni_yaml_exogenous_lists_are_empty(derived_name: str):
         ("baseline-brentoil.yaml", "baseline-brentoil_uni.yaml"),
     ],
 )
-def test_uni_yaml_jobs_follow_capability_rule(
-    source_name: str, derived_name: str
-):
+def test_uni_yaml_jobs_follow_capability_rule(source_name: str, derived_name: str):
     from residual.models import capabilities_for as resolve_capabilities
 
     source = yaml.safe_load((REPO_ROOT / source_name).read_text(encoding="utf-8"))
@@ -2855,9 +3134,7 @@ def test_uni_yaml_jobs_follow_capability_rule(
         ("baseline-brentoil.yaml", "baseline-brentoil_uni.yaml"),
     ],
 )
-def test_uni_yaml_preserves_non_exog_fields(
-    source_name: str, derived_name: str
-):
+def test_uni_yaml_preserves_non_exog_fields(source_name: str, derived_name: str):
     source = yaml.safe_load((REPO_ROOT / source_name).read_text(encoding="utf-8"))
     derived = yaml.safe_load((REPO_ROOT / derived_name).read_text(encoding="utf-8"))
 
@@ -2890,391 +3167,484 @@ def test_source_baseline_yaml_files_unchanged():
 
 
 CASE_YAML_FILES = [
-    REPO_ROOT / 'yaml' / 'feature_set' / 'brentoil-case1.yaml',
-    REPO_ROOT / 'yaml' / 'feature_set' / 'brentoil-case2.yaml',
-    REPO_ROOT / 'yaml' / 'feature_set' / 'brentoil-case3.yaml',
-    REPO_ROOT / 'yaml' / 'feature_set' / 'brentoil-case4.yaml',
-    REPO_ROOT / 'yaml' / 'feature_set' / 'wti-case1.yaml',
-    REPO_ROOT / 'yaml' / 'feature_set' / 'wti-case2.yaml',
-    REPO_ROOT / 'yaml' / 'feature_set' / 'wti-case3.yaml',
-    REPO_ROOT / 'yaml' / 'feature_set' / 'wti-case4.yaml',
+    REPO_ROOT / "yaml" / "feature_set" / "brentoil-case1.yaml",
+    REPO_ROOT / "yaml" / "feature_set" / "brentoil-case2.yaml",
+    REPO_ROOT / "yaml" / "feature_set" / "brentoil-case3.yaml",
+    REPO_ROOT / "yaml" / "feature_set" / "brentoil-case4.yaml",
+    REPO_ROOT / "yaml" / "feature_set" / "wti-case1.yaml",
+    REPO_ROOT / "yaml" / "feature_set" / "wti-case2.yaml",
+    REPO_ROOT / "yaml" / "feature_set" / "wti-case3.yaml",
+    REPO_ROOT / "yaml" / "feature_set" / "wti-case4.yaml",
 ]
 
 HPT_CASE12_YAML_FILES = [
-    REPO_ROOT / 'yaml' / 'feature_set_HPT' / 'brentoil-case1.yaml',
-    REPO_ROOT / 'yaml' / 'feature_set_HPT' / 'brentoil-case2.yaml',
-    REPO_ROOT / 'yaml' / 'feature_set_HPT' / 'wti-case1.yaml',
-    REPO_ROOT / 'yaml' / 'feature_set_HPT' / 'wti-case2.yaml',
+    REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case1.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case2.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case1.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case2.yaml",
 ]
 
 OPTUNA_CONFIG_YAML_FILES = [
-    REPO_ROOT / 'baseline-brentoil.yaml',
-    REPO_ROOT / 'baseline-brentoil_uni.yaml',
-    REPO_ROOT / 'baseline-wti.yaml',
-    REPO_ROOT / 'baseline-wti_uni.yaml',
-    REPO_ROOT / 'yaml' / 'blackswan' / 'swan_test.yaml',
+    REPO_ROOT / "baseline-brentoil.yaml",
+    REPO_ROOT / "baseline-brentoil_uni.yaml",
+    REPO_ROOT / "baseline-wti.yaml",
+    REPO_ROOT / "baseline-wti_uni.yaml",
+    REPO_ROOT / "yaml" / "blackswan" / "swan_test.yaml",
     *HPT_CASE12_YAML_FILES,
-    REPO_ROOT / 'tests' / 'fixtures' / 'optuna_learned_auto.yaml',
-    REPO_ROOT / 'tests' / 'fixtures' / 'optuna_learned_auto_with_residual.yaml',
-    REPO_ROOT / 'tests' / 'fixtures' / 'optuna_relocated_config.yaml',
-    REPO_ROOT / 'tests' / 'fixtures' / 'optuna_unsupported_learned_empty_params.yaml',
+    REPO_ROOT / "tests" / "fixtures" / "optuna_learned_auto.yaml",
+    *RESIDUAL_AUTO_FIXTURE_FILES,
+    REPO_ROOT / "tests" / "fixtures" / "optuna_relocated_config.yaml",
+    REPO_ROOT / "tests" / "fixtures" / "optuna_unsupported_learned_empty_params.yaml",
 ]
 
 EXPECTED_CASE_TRAINING = {
-    'input_size': 64,
-    'season_length': 52,
-    'batch_size': 32,
-    'valid_batch_size': 32,
-    'windows_batch_size': 1024,
-    'inference_windows_batch_size': 1024,
-    'learning_rate': 0.001,
-    'max_steps': 1000,
-    'val_size': 8,
-    'val_check_steps': 100,
-    'train_protocol': 'expanding_window_tscv',
-    'early_stop_patience_steps': 5,
-    'loss': 'mse',
+    "input_size": 64,
+    "season_length": 52,
+    "batch_size": 32,
+    "valid_batch_size": 32,
+    "windows_batch_size": 1024,
+    "inference_windows_batch_size": 1024,
+    "learning_rate": 0.001,
+    "max_steps": 1000,
+    "val_size": 8,
+    "val_check_steps": 100,
+    "train_protocol": "expanding_window_tscv",
+    "early_stop_patience_steps": 5,
+    "loss": "mse",
 }
 
 EXPECTED_CASE_MODEL_PARAMS = {
-    'LSTM': {
-        'encoder_hidden_size': 64,
-        'decoder_hidden_size': 64,
-        'encoder_n_layers': 2,
-        'context_size': 10,
+    "LSTM": {
+        "encoder_hidden_size": 64,
+        "decoder_hidden_size": 64,
+        "encoder_n_layers": 2,
+        "context_size": 10,
     },
-    'NHITS': {
-        'n_pool_kernel_size': [2, 2, 1],
-        'n_freq_downsample': [24, 12, 1],
-        'dropout_prob_theta': 0.0,
+    "NHITS": {
+        "n_pool_kernel_size": [2, 2, 1],
+        "n_freq_downsample": [24, 12, 1],
+        "dropout_prob_theta": 0.0,
     },
-    'DLinear': {'moving_avg_window': 7},
-    'Autoformer': {
-        'hidden_size': 64,
-        'dropout': 0.1,
-        'factor': 3,
-        'n_head': 4,
+    "DLinear": {"moving_avg_window": 7},
+    "Autoformer": {
+        "hidden_size": 64,
+        "dropout": 0.1,
+        "factor": 3,
+        "n_head": 4,
     },
-    'PatchTST': {
-        'hidden_size': 64,
-        'n_heads': 4,
-        'encoder_layers': 2,
-        'patch_len': 16,
-        'dropout': 0.1,
+    "PatchTST": {
+        "hidden_size": 64,
+        "n_heads": 4,
+        "encoder_layers": 2,
+        "patch_len": 16,
+        "dropout": 0.1,
     },
-    'iTransformer': {
-        'hidden_size': 64,
-        'n_heads': 4,
-        'e_layers': 2,
-        'd_ff': 256,
-        'dropout': 0.1,
+    "iTransformer": {
+        "hidden_size": 64,
+        "n_heads": 4,
+        "e_layers": 2,
+        "d_ff": 256,
+        "dropout": 0.1,
     },
-    'Naive': {},
+    "Naive": {},
 }
 
 EXPECTED_HPT_CASE12_TRAINING = {
-    'train_protocol': 'expanding_window_tscv',
-    'val_size': 8,
-    'early_stop_patience_steps': 5,
-    'loss': 'mse',
+    "train_protocol": "expanding_window_tscv",
+    "val_size": 8,
+    "early_stop_patience_steps": 5,
+    "loss": "mse",
 }
 
 EXPECTED_HPT_CASE12_MODELS = [
-    'PatchTST',
-    'DLinear',
-    'Naive',
-    'iTransformer',
-    'LSTM',
-    'NHITS',
+    "PatchTST",
+    "DLinear",
+    "Naive",
+    "iTransformer",
+    "LSTM",
+    "NHITS",
 ]
 
 SEARCH_SPACE_MODELS = yaml.safe_load(
-    (REPO_ROOT / 'search_space.yaml').read_text(encoding='utf-8')
-)['models']
+    (REPO_ROOT / "search_space.yaml").read_text(encoding="utf-8")
+)["models"]
 SEARCH_SPACE_RESIDUAL = yaml.safe_load(
-    (REPO_ROOT / 'search_space.yaml').read_text(encoding='utf-8')
-)['residual']
+    (REPO_ROOT / "search_space.yaml").read_text(encoding="utf-8")
+)["residual"]
 
 EXPECTED_REPO_AUTO_SELECTORS = {
-    'LSTM': [
-        'encoder_hidden_size',
-        'encoder_n_layers',
-        'encoder_dropout',
-        'decoder_hidden_size',
-        'decoder_layers',
+    "LSTM": [
+        "encoder_hidden_size",
+        "encoder_n_layers",
+        "encoder_dropout",
+        "decoder_hidden_size",
+        "decoder_layers",
     ],
-    'NHITS': [
-        'n_pool_kernel_size',
-        'n_freq_downsample',
-        'n_blocks',
-        'mlp_units',
-        'dropout_prob_theta',
+    "NHITS": [
+        "n_pool_kernel_size",
+        "n_freq_downsample",
+        "n_blocks",
+        "mlp_units",
+        "dropout_prob_theta",
     ],
-    'DLinear': ['moving_avg_window'],
-    'Autoformer': [
-        'hidden_size',
-        'n_head',
-        'encoder_layers',
-        'decoder_layers',
-        'factor',
-        'MovingAvg_window',
-        'dropout',
+    "DLinear": ["moving_avg_window"],
+    "Autoformer": [
+        "hidden_size",
+        "n_head",
+        "encoder_layers",
+        "decoder_layers",
+        "factor",
+        "MovingAvg_window",
+        "dropout",
     ],
-    'PatchTST': [
-        'hidden_size',
-        'n_heads',
-        'encoder_layers',
-        'linear_hidden_size',
-        'patch_len',
-        'stride',
-        'dropout',
-        'fc_dropout',
-        'attn_dropout',
-        'revin',
+    "PatchTST": [
+        "hidden_size",
+        "n_heads",
+        "encoder_layers",
+        "linear_hidden_size",
+        "patch_len",
+        "stride",
+        "dropout",
+        "fc_dropout",
+        "attn_dropout",
+        "revin",
     ],
-    'iTransformer': [
-        'hidden_size',
-        'n_heads',
-        'e_layers',
-        'd_ff',
-        'd_layers',
-        'factor',
-        'dropout',
-        'use_norm',
+    "iTransformer": [
+        "hidden_size",
+        "n_heads",
+        "e_layers",
+        "d_ff",
+        "d_layers",
+        "factor",
+        "dropout",
+        "use_norm",
     ],
 }
 
 EXPECTED_CASE_METADATA = {
-    'brentoil-case1.yaml': {
-        'task_name': 'brentoil_case1_re',
-        'target_col': 'Com_BrentCrudeOil',
-        'hist_exog_cols': [
-            'Com_Gasoline', 'Com_Steel', 'Bonds_US_Spread_10Y_1Y',
-            'Bonds_CHN_Spread_30Y_5Y', 'EX_USD_BRL', 'Com_Cheese',
-            'Bonds_BRZ_Spread_10Y_1Y', 'Com_Cu_Gold_Ratio', 'Idx_OVX',
-            'Com_Oil_Spread', 'Com_LME_Zn_Spread', 'Idx_CSI300',
-            'Bonds_CHN_Spread_5Y_1Y', 'Com_LME_Cu_Spread',
-            'Com_LME_Pb_Spread', 'Com_LME_Al_Spread',
+    "brentoil-case1.yaml": {
+        "task_name": "brentoil_case1_re",
+        "target_col": "Com_BrentCrudeOil",
+        "hist_exog_cols": [
+            "Com_Gasoline",
+            "Com_Steel",
+            "Bonds_US_Spread_10Y_1Y",
+            "Bonds_CHN_Spread_30Y_5Y",
+            "EX_USD_BRL",
+            "Com_Cheese",
+            "Bonds_BRZ_Spread_10Y_1Y",
+            "Com_Cu_Gold_Ratio",
+            "Idx_OVX",
+            "Com_Oil_Spread",
+            "Com_LME_Zn_Spread",
+            "Idx_CSI300",
+            "Bonds_CHN_Spread_5Y_1Y",
+            "Com_LME_Cu_Spread",
+            "Com_LME_Pb_Spread",
+            "Com_LME_Al_Spread",
         ],
     },
-    'brentoil-case2.yaml': {
-        'task_name': 'brentoil_case2',
-        'target_col': 'Com_BrentCrudeOil',
-        'hist_exog_cols': [
-            'Com_Gasoline', 'Com_BloombergCommodity_BCOM', 'Com_LME_Ni_Cash',
-            'Com_Coal', 'Com_Cotton', 'Com_LME_Al_Cash', 'Bonds_KOR_10Y',
-            'Com_Barley', 'Com_Canola', 'Com_LMEX', 'Com_LME_Ni_Inv',
-            'Com_Corn', 'Com_Wheat',
+    "brentoil-case2.yaml": {
+        "task_name": "brentoil_case2",
+        "target_col": "Com_BrentCrudeOil",
+        "hist_exog_cols": [
+            "Com_Gasoline",
+            "Com_BloombergCommodity_BCOM",
+            "Com_LME_Ni_Cash",
+            "Com_Coal",
+            "Com_Cotton",
+            "Com_LME_Al_Cash",
+            "Bonds_KOR_10Y",
+            "Com_Barley",
+            "Com_Canola",
+            "Com_LMEX",
+            "Com_LME_Ni_Inv",
+            "Com_Corn",
+            "Com_Wheat",
         ],
     },
-    'brentoil-case3.yaml': {
-        'task_name': 'brentoil_case3',
-        'target_col': 'Com_BrentCrudeOil',
-        'hist_exog_cols': [
-            'Com_Gasoline', 'Com_BloombergCommodity_BCOM', 'Com_LME_Ni_Cash',
-            'Com_Coal', 'Com_LME_Al_Cash', 'Bonds_KOR_10Y', 'Com_LMEX',
-            'Com_LME_Ni_Inv',
+    "brentoil-case3.yaml": {
+        "task_name": "brentoil_case3",
+        "target_col": "Com_BrentCrudeOil",
+        "hist_exog_cols": [
+            "Com_Gasoline",
+            "Com_BloombergCommodity_BCOM",
+            "Com_LME_Ni_Cash",
+            "Com_Coal",
+            "Com_LME_Al_Cash",
+            "Bonds_KOR_10Y",
+            "Com_LMEX",
+            "Com_LME_Ni_Inv",
         ],
     },
-    'brentoil-case4.yaml': {
-        'task_name': 'brentoil_case4',
-        'target_col': 'Com_BrentCrudeOil',
-        'hist_exog_cols': [
-            'Com_Gasoline', 'Com_BloombergCommodity_BCOM', 'Com_LME_Ni_Cash',
-            'Com_Coal', 'Com_Cotton', 'Com_LME_Al_Cash', 'Bonds_KOR_10Y',
-            'Com_Barley', 'Com_Canola', 'Com_LMEX', 'Com_LME_Ni_Inv',
-            'Com_Corn', 'Com_Wheat', 'Com_NaturalGas', 'Idx_OVX', 'Com_Gold',
+    "brentoil-case4.yaml": {
+        "task_name": "brentoil_case4",
+        "target_col": "Com_BrentCrudeOil",
+        "hist_exog_cols": [
+            "Com_Gasoline",
+            "Com_BloombergCommodity_BCOM",
+            "Com_LME_Ni_Cash",
+            "Com_Coal",
+            "Com_Cotton",
+            "Com_LME_Al_Cash",
+            "Bonds_KOR_10Y",
+            "Com_Barley",
+            "Com_Canola",
+            "Com_LMEX",
+            "Com_LME_Ni_Inv",
+            "Com_Corn",
+            "Com_Wheat",
+            "Com_NaturalGas",
+            "Idx_OVX",
+            "Com_Gold",
         ],
     },
-    'wti-case1.yaml': {
-        'task_name': 'wti_case1',
-        'target_col': 'Com_CrudeOil',
-        'hist_exog_cols': [
-            'Com_Gasoline', 'Com_LME_Zn_Inv', 'Com_OrangeJuice', 'Com_Cheese',
-            'Bonds_BRZ_1Y', 'Idx_OVX', 'Com_Cu_Gold_Ratio', 'Com_LME_Sn_Inv',
-            'Idx_CSI300', 'Com_LME_Zn_Spread', 'Bonds_CHN_Spread_5Y_2Y',
-            'Com_LME_Al_Spread', 'Bonds_CHN_Spread_2Y_1Y', 'Com_Oil_Spread',
-            'Bonds_CHN_Spread_10Y_5Y',
+    "wti-case1.yaml": {
+        "task_name": "wti_case1",
+        "target_col": "Com_CrudeOil",
+        "hist_exog_cols": [
+            "Com_Gasoline",
+            "Com_LME_Zn_Inv",
+            "Com_OrangeJuice",
+            "Com_Cheese",
+            "Bonds_BRZ_1Y",
+            "Idx_OVX",
+            "Com_Cu_Gold_Ratio",
+            "Com_LME_Sn_Inv",
+            "Idx_CSI300",
+            "Com_LME_Zn_Spread",
+            "Bonds_CHN_Spread_5Y_2Y",
+            "Com_LME_Al_Spread",
+            "Bonds_CHN_Spread_2Y_1Y",
+            "Com_Oil_Spread",
+            "Bonds_CHN_Spread_10Y_5Y",
         ],
     },
-    'wti-case2.yaml': {
-        'task_name': 'wti_case2',
-        'target_col': 'Com_CrudeOil',
-        'hist_exog_cols': [
-            'Com_Gasoline', 'Com_BloombergCommodity_BCOM', 'Com_LME_Ni_Cash',
-            'Com_Coal', 'Com_Canola', 'Com_Cotton', 'Com_LME_Al_Cash',
-            'Com_LMEX', 'Bonds_KOR_10Y', 'Com_PalmOil', 'Com_Barley',
-            'Com_Corn', 'Com_Oat', 'Com_Wheat', 'Com_Soybeans',
-            'Com_LME_Ni_Inv',
+    "wti-case2.yaml": {
+        "task_name": "wti_case2",
+        "target_col": "Com_CrudeOil",
+        "hist_exog_cols": [
+            "Com_Gasoline",
+            "Com_BloombergCommodity_BCOM",
+            "Com_LME_Ni_Cash",
+            "Com_Coal",
+            "Com_Canola",
+            "Com_Cotton",
+            "Com_LME_Al_Cash",
+            "Com_LMEX",
+            "Bonds_KOR_10Y",
+            "Com_PalmOil",
+            "Com_Barley",
+            "Com_Corn",
+            "Com_Oat",
+            "Com_Wheat",
+            "Com_Soybeans",
+            "Com_LME_Ni_Inv",
         ],
     },
-    'wti-case3.yaml': {
-        'task_name': 'wti_case3',
-        'target_col': 'Com_CrudeOil',
-        'hist_exog_cols': [
-            'Com_Gasoline', 'Com_BloombergCommodity_BCOM', 'Com_LME_Ni_Cash',
-            'Com_Coal', 'Com_LME_Al_Cash', 'Com_LMEX', 'Bonds_KOR_10Y',
-            'Com_LME_Ni_Inv',
+    "wti-case3.yaml": {
+        "task_name": "wti_case3",
+        "target_col": "Com_CrudeOil",
+        "hist_exog_cols": [
+            "Com_Gasoline",
+            "Com_BloombergCommodity_BCOM",
+            "Com_LME_Ni_Cash",
+            "Com_Coal",
+            "Com_LME_Al_Cash",
+            "Com_LMEX",
+            "Bonds_KOR_10Y",
+            "Com_LME_Ni_Inv",
         ],
     },
-    'wti-case4.yaml': {
-        'task_name': 'wti_case4',
-        'target_col': 'Com_CrudeOil',
-        'hist_exog_cols': [
-            'Com_Gasoline', 'Com_BloombergCommodity_BCOM', 'Com_LME_Ni_Cash',
-            'Com_Coal', 'Com_Canola', 'Com_Cotton', 'Com_LME_Al_Cash',
-            'Com_LMEX', 'Bonds_KOR_10Y', 'Com_PalmOil', 'Com_Barley',
-            'Com_Corn', 'Com_Oat', 'Com_Wheat', 'Com_Soybeans',
-            'Com_LME_Ni_Inv', 'Com_NaturalGas', 'Idx_OVX', 'Com_Gold',
+    "wti-case4.yaml": {
+        "task_name": "wti_case4",
+        "target_col": "Com_CrudeOil",
+        "hist_exog_cols": [
+            "Com_Gasoline",
+            "Com_BloombergCommodity_BCOM",
+            "Com_LME_Ni_Cash",
+            "Com_Coal",
+            "Com_Canola",
+            "Com_Cotton",
+            "Com_LME_Al_Cash",
+            "Com_LMEX",
+            "Bonds_KOR_10Y",
+            "Com_PalmOil",
+            "Com_Barley",
+            "Com_Corn",
+            "Com_Oat",
+            "Com_Wheat",
+            "Com_Soybeans",
+            "Com_LME_Ni_Inv",
+            "Com_NaturalGas",
+            "Idx_OVX",
+            "Com_Gold",
         ],
     },
 }
 
 
 def _load_case_yaml(path: Path) -> dict[str, Any]:
-    return cast(dict[str, Any], yaml.safe_load(path.read_text(encoding='utf-8')))
+    return cast(dict[str, Any], yaml.safe_load(path.read_text(encoding="utf-8")))
 
 
 def _case_jobs_by_model(path: Path) -> dict[str, dict[str, Any]]:
-    return {
-        job['model']: job['params']
-        for job in _load_case_yaml(path)['jobs']
-    }
+    return {job["model"]: job["params"] for job in _load_case_yaml(path)["jobs"]}
 
 
 def test_case_yaml_training_mapping_matches_expected_across_all_files():
     for path in CASE_YAML_FILES:
         payload = _load_case_yaml(path)
-        assert payload['training'] == EXPECTED_CASE_TRAINING
+        assert payload["training"] == EXPECTED_CASE_TRAINING
 
 
-@pytest.mark.parametrize('path', CASE_YAML_FILES, ids=lambda p: p.name)
+@pytest.mark.parametrize("path", CASE_YAML_FILES, ids=lambda p: p.name)
 def test_case_yaml_learned_model_params_match_expected(path: Path):
     jobs = _case_jobs_by_model(path)
 
     for model_name, expected_params in EXPECTED_CASE_MODEL_PARAMS.items():
-        if model_name == 'Naive':
+        if model_name == "Naive":
             continue
         assert jobs[model_name] == expected_params
         assert jobs[model_name]
 
 
-@pytest.mark.parametrize('path', CASE_YAML_FILES, ids=lambda p: p.name)
+@pytest.mark.parametrize("path", CASE_YAML_FILES, ids=lambda p: p.name)
 def test_case_yaml_naive_params_remain_empty(path: Path):
     jobs = _case_jobs_by_model(path)
-    assert jobs['Naive'] == {}
+    assert jobs["Naive"] == {}
 
 
-@pytest.mark.parametrize('path', CASE_YAML_FILES, ids=lambda p: p.name)
+@pytest.mark.parametrize("path", CASE_YAML_FILES, ids=lambda p: p.name)
 def test_case_yaml_feature_lists_and_targets_do_not_drift(path: Path):
     payload = _load_case_yaml(path)
     expected = EXPECTED_CASE_METADATA[path.name]
 
-    assert payload['task']['name'] == expected['task_name']
-    assert payload['dataset']['target_col'] == expected['target_col']
-    assert payload['dataset']['hist_exog_cols'] == expected['hist_exog_cols']
+    assert payload["task"]["name"] == expected["task_name"]
+    assert payload["dataset"]["target_col"] == expected["target_col"]
+    assert payload["dataset"]["hist_exog_cols"] == expected["hist_exog_cols"]
 
 
-@pytest.mark.parametrize('path', CASE_YAML_FILES, ids=lambda p: p.name)
+@pytest.mark.parametrize("path", CASE_YAML_FILES, ids=lambda p: p.name)
 def test_case_yaml_normalizes_to_fixed_modes_without_auto(path: Path):
     loaded = load_app_config(REPO_ROOT, config_path=path)
 
     for job in loaded.config.jobs:
-        if job.model == 'Naive':
-            assert job.requested_mode == 'baseline_fixed'
-            assert job.validated_mode == 'baseline_fixed'
+        if job.model == "Naive":
+            assert job.requested_mode == "baseline_fixed"
+            assert job.validated_mode == "baseline_fixed"
         else:
             assert job.params == EXPECTED_CASE_MODEL_PARAMS[job.model]
-            assert job.requested_mode == 'learned_fixed'
-            assert job.validated_mode == 'learned_fixed'
+            assert job.requested_mode == "learned_fixed"
+            assert job.validated_mode == "learned_fixed"
 
-    assert all(job.validated_mode != 'learned_auto' for job in loaded.config.jobs)
+    assert all(job.validated_mode != "learned_auto" for job in loaded.config.jobs)
 
 
 def test_case_yaml_build_model_preserves_expected_fixed_params():
     loaded = load_app_config(
         REPO_ROOT,
-        config_path=REPO_ROOT / 'yaml' / 'feature_set' / 'brentoil-case1.yaml',
+        config_path=REPO_ROOT / "yaml" / "feature_set" / "brentoil-case1.yaml",
     )
 
     for job in loaded.config.jobs:
-        if job.model == 'Naive':
+        if job.model == "Naive":
             continue
         model = build_model(
             loaded.config,
             job,
-            n_series=1 if job.model == 'iTransformer' else None,
+            n_series=1 if job.model == "iTransformer" else None,
         )
         for key, expected_value in EXPECTED_CASE_MODEL_PARAMS[job.model].items():
             actual_value = getattr(model, key, None)
-            if actual_value is None and hasattr(model, 'hparams'):
+            if actual_value is None and hasattr(model, "hparams"):
                 actual_value = getattr(model.hparams, key, None)
             assert actual_value == expected_value
 
 
-@pytest.mark.parametrize('path', HPT_CASE12_YAML_FILES, ids=lambda p: p.name)
+@pytest.mark.parametrize("path", HPT_CASE12_YAML_FILES, ids=lambda p: p.name)
 def test_feature_set_hpt_case12_training_keeps_only_fixed_controls(path: Path):
     payload = _load_case_yaml(path)
-    assert payload['training'] == EXPECTED_HPT_CASE12_TRAINING
+    assert payload["training"] == EXPECTED_HPT_CASE12_TRAINING
 
 
 def test_feature_set_hpt_directory_only_contains_case12_files():
-    actual = sorted(path.name for path in (REPO_ROOT / 'yaml' / 'feature_set_HPT').glob('*.yaml'))
+    actual = sorted(
+        path.name for path in (REPO_ROOT / "yaml" / "feature_set_HPT").glob("*.yaml")
+    )
     assert actual == sorted(path.name for path in HPT_CASE12_YAML_FILES)
 
 
-@pytest.mark.parametrize('path', OPTUNA_CONFIG_YAML_FILES, ids=lambda p: p.name)
+@pytest.mark.parametrize("path", OPTUNA_CONFIG_YAML_FILES, ids=lambda p: p.name)
 def test_optuna_config_yamls_pin_runtime_opt_n_trial(path: Path):
     payload = _load_case_yaml(path)
     assert payload["runtime"]["opt_n_trial"] == 20
 
 
-@pytest.mark.parametrize('path', HPT_CASE12_YAML_FILES, ids=lambda p: p.name)
+@pytest.mark.parametrize("path", HPT_CASE12_YAML_FILES, ids=lambda p: p.name)
 def test_feature_set_hpt_case12_cv_and_jobs_follow_optuna_scope(path: Path):
     payload = _load_case_yaml(path)
 
-    assert payload['cv']['n_windows'] == 5
-    assert [job['model'] for job in payload['jobs']] == EXPECTED_HPT_CASE12_MODELS
-    assert all(job['params'] == {} for job in payload['jobs'])
+    assert payload["cv"]["n_windows"] == 5
+    assert [job["model"] for job in payload["jobs"]] == EXPECTED_HPT_CASE12_MODELS
+    assert all(job["params"] == {} for job in payload["jobs"])
 
 
-@pytest.mark.parametrize('path', HPT_CASE12_YAML_FILES, ids=lambda p: p.name)
+@pytest.mark.parametrize("path", HPT_CASE12_YAML_FILES, ids=lambda p: p.name)
 def test_feature_set_hpt_case12_preserves_metadata(path: Path):
     payload = _load_case_yaml(path)
     expected = EXPECTED_CASE_METADATA[path.name]
+    expected_task_name = path.stem.replace("-", "_") + "_HPT"
 
-    assert payload['task']['name'] == expected['task_name']
-    assert payload['dataset']['target_col'] == expected['target_col']
-    assert payload['dataset']['hist_exog_cols'] == expected['hist_exog_cols']
+    assert payload["task"]["name"] == expected_task_name
+    assert payload["dataset"]["target_col"] == expected["target_col"]
+    assert payload["dataset"]["hist_exog_cols"] == expected["hist_exog_cols"]
 
 
-@pytest.mark.parametrize('path', HPT_CASE12_YAML_FILES, ids=lambda p: p.name)
-def test_feature_set_hpt_case12_normalizes_to_auto_training_and_learned_jobs(path: Path):
+@pytest.mark.parametrize("path", RESIDUAL_AUTO_FIXTURE_FILES, ids=lambda p: p.name)
+def test_optuna_residual_auto_fixtures_cover_all_supported_models(path: Path):
+    payload = _load_case_yaml(path)
+    loaded = load_app_config(REPO_ROOT, config_path=path)
+    model_name = payload["residual"]["model"]
+
+    assert model_name in EXPECTED_SUPPORTED_RESIDUAL_MODELS
+    assert loaded.config.residual.model == model_name
+    assert loaded.config.residual.requested_mode == "residual_auto_requested"
+    assert loaded.config.residual.validated_mode == "residual_auto"
+    assert list(loaded.config.residual.selected_search_params) == list(
+        SEARCH_SPACE_RESIDUAL[model_name]
+    )
+
+
+@pytest.mark.parametrize("path", HPT_CASE12_YAML_FILES, ids=lambda p: p.name)
+def test_feature_set_hpt_case12_normalizes_to_auto_training_and_learned_jobs(
+    path: Path,
+):
     loaded = load_app_config(REPO_ROOT, config_path=path)
 
-    assert loaded.config.training_search.requested_mode == 'training_auto_requested'
-    assert loaded.config.training_search.validated_mode == 'training_auto'
-    assert (
-        list(loaded.config.training_search.selected_search_params)
-        == list(TRAINING_PARAM_REGISTRY)
+    assert loaded.config.training_search.requested_mode == "training_auto_requested"
+    assert loaded.config.training_search.validated_mode == "training_auto"
+    assert list(loaded.config.training_search.selected_search_params) == list(
+        TRAINING_PARAM_REGISTRY
     )
-    assert loaded.config.residual.requested_mode == 'residual_auto_requested'
-    assert loaded.config.residual.validated_mode == 'residual_auto'
-    assert (
-        list(loaded.config.residual.selected_search_params)
-        == list(SEARCH_SPACE_RESIDUAL['xgboost'])
+    assert loaded.config.residual.requested_mode == "residual_auto_requested"
+    assert loaded.config.residual.validated_mode == "residual_auto"
+    assert list(loaded.config.residual.selected_search_params) == list(
+        SEARCH_SPACE_RESIDUAL["xgboost"]
     )
 
     for job in loaded.config.jobs:
-        if job.model == 'Naive':
-            assert job.requested_mode == 'baseline_fixed'
-            assert job.validated_mode == 'baseline_fixed'
+        if job.model == "Naive":
+            assert job.requested_mode == "baseline_fixed"
+            assert job.validated_mode == "baseline_fixed"
             assert job.selected_search_params == ()
         else:
             assert job.params == {}
-            assert job.requested_mode == 'learned_auto_requested'
-            assert job.validated_mode == 'learned_auto'
-            assert list(job.selected_search_params) == list(SEARCH_SPACE_MODELS[job.model])
+            assert job.requested_mode == "learned_auto_requested"
+            assert job.validated_mode == "learned_auto"
+            assert list(job.selected_search_params) == list(
+                SEARCH_SPACE_MODELS[job.model]
+            )
 
 
 def test_repo_search_space_updates_requested_auto_selectors_only():
@@ -3603,12 +3973,7 @@ def test_apply_residual_plugin_prefers_yaml_opt_n_trial_over_env(
     )
 
     first_summary = json.loads(
-        (
-            run_root
-            / "residual"
-            / job.model
-            / "optuna_study_summary.json"
-        ).read_text()
+        (run_root / "residual" / job.model / "optuna_study_summary.json").read_text()
     )
     runtime._apply_residual_plugin(
         loaded,
@@ -3619,12 +3984,7 @@ def test_apply_residual_plugin_prefers_yaml_opt_n_trial_over_env(
     )
 
     summary = json.loads(
-        (
-            run_root
-            / "residual"
-            / job.model
-            / "optuna_study_summary.json"
-        ).read_text()
+        (run_root / "residual" / job.model / "optuna_study_summary.json").read_text()
     )
     assert first_summary["trial_count"] == 2
     assert first_summary["remaining_trial_count"] == 2

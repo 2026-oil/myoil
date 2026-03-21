@@ -3,43 +3,34 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+import pickle
 
 import pandas as pd
-from xgboost import Booster, DMatrix, train as xgb_train
+from sklearn.ensemble import RandomForestRegressor
 
 from residual.optuna_spaces import RESIDUAL_DEFAULTS
 from residual.plugins_base import ResidualContext, ResidualPlugin
 
 
 @dataclass(frozen=True)
-class _XGBoostConfig:
-    n_estimators: int = RESIDUAL_DEFAULTS["xgboost"]["n_estimators"]
-    max_depth: int = RESIDUAL_DEFAULTS["xgboost"]["max_depth"]
-    learning_rate: float = RESIDUAL_DEFAULTS["xgboost"]["learning_rate"]
-    subsample: float = RESIDUAL_DEFAULTS["xgboost"]["subsample"]
-    colsample_bytree: float = RESIDUAL_DEFAULTS["xgboost"]["colsample_bytree"]
+class _RandomForestConfig:
+    n_estimators: int = int(RESIDUAL_DEFAULTS["randomforest"]["n_estimators"])
+    max_depth: int = int(RESIDUAL_DEFAULTS["randomforest"]["max_depth"])
+    min_samples_leaf: int = int(RESIDUAL_DEFAULTS["randomforest"]["min_samples_leaf"])
+    max_features: str = str(RESIDUAL_DEFAULTS["randomforest"]["max_features"])
 
 
-class XGBoostResidualPlugin(ResidualPlugin):
-    name = "xgboost"
+class RandomForestResidualPlugin(ResidualPlugin):
+    name = "randomforest"
 
-    def __init__(
-        self,
-        *,
-        n_estimators: int = RESIDUAL_DEFAULTS["xgboost"]["n_estimators"],
-        max_depth: int = RESIDUAL_DEFAULTS["xgboost"]["max_depth"],
-        learning_rate: float = RESIDUAL_DEFAULTS["xgboost"]["learning_rate"],
-        subsample: float = RESIDUAL_DEFAULTS["xgboost"]["subsample"],
-        colsample_bytree: float = RESIDUAL_DEFAULTS["xgboost"]["colsample_bytree"],
-    ):
-        self.config = _XGBoostConfig(
+    def __init__(self, *, n_estimators: int = 200, max_depth: int = 6, min_samples_leaf: int = 2, max_features: str = "sqrt"):
+        self.config = _RandomForestConfig(
             n_estimators=n_estimators,
             max_depth=max_depth,
-            learning_rate=learning_rate,
-            subsample=subsample,
-            colsample_bytree=colsample_bytree,
+            min_samples_leaf=min_samples_leaf,
+            max_features=max_features,
         )
-        self.model: Booster | None = None
+        self.model: RandomForestRegressor | None = None
         self._trained = False
         self._fallback_value = 0.0
         self._checkpoint_path: Path | None = None
@@ -58,14 +49,7 @@ class XGBoostResidualPlugin(ResidualPlugin):
     @classmethod
     def _feature_frame(cls, panel_df: pd.DataFrame) -> pd.DataFrame:
         prepared = cls._prepare_panel(panel_df)
-        return prepared[
-            [
-                "horizon_step",
-                "y_hat_base",
-                "cutoff_day",
-                "ds_day",
-            ]
-        ].astype(float)
+        return prepared[["horizon_step", "y_hat_base", "cutoff_day", "ds_day"]].astype(float)
 
     def fit(self, panel_df: pd.DataFrame, context: ResidualContext) -> None:
         self._checkpoint_path = context.output_dir / "model.ubj"
@@ -82,22 +66,17 @@ class XGBoostResidualPlugin(ResidualPlugin):
         target = train_panel["residual_target"].astype(float)
         self._fallback_value = float(target.mean())
         features = self._feature_frame(train_panel)
-        dtrain = DMatrix(features, label=target)
-        self.model = xgb_train(
-            params={
-                "objective": "reg:squarederror",
-                "max_depth": self.config.max_depth,
-                "eta": self.config.learning_rate,
-                "subsample": self.config.subsample,
-                "colsample_bytree": self.config.colsample_bytree,
-                "verbosity": 0,
-                "nthread": 1,
-                "seed": 0,
-            },
-            dtrain=dtrain,
-            num_boost_round=self.config.n_estimators,
+        self.model = RandomForestRegressor(
+            n_estimators=self.config.n_estimators,
+            max_depth=self.config.max_depth,
+            min_samples_leaf=self.config.min_samples_leaf,
+            max_features=self.config.max_features,
+            random_state=0,
+            n_jobs=1,
         )
-        self.model.save_model(self._checkpoint_path)
+        self.model.fit(features, target)
+        with self._checkpoint_path.open("wb") as handle:
+            pickle.dump(self.model, handle)
         self._trained = True
 
     def predict(self, panel_df: pd.DataFrame) -> pd.DataFrame:
@@ -107,9 +86,7 @@ class XGBoostResidualPlugin(ResidualPlugin):
             return ordered
         if self._trained and self.model is not None:
             features = self._feature_frame(ordered)
-            ordered["residual_hat"] = self.model.predict(DMatrix(features)).astype(
-                float
-            )
+            ordered["residual_hat"] = self.model.predict(features).astype(float)
         else:
             ordered["residual_hat"] = float(self._fallback_value)
         return ordered
@@ -119,10 +96,7 @@ class XGBoostResidualPlugin(ResidualPlugin):
             "plugin": self.name,
             "n_estimators": self.config.n_estimators,
             "max_depth": self.config.max_depth,
-            "learning_rate": self.config.learning_rate,
-            "subsample": self.config.subsample,
-            "colsample_bytree": self.config.colsample_bytree,
-            "checkpoint_path": str(self._checkpoint_path)
-            if self._checkpoint_path
-            else None,
+            "min_samples_leaf": self.config.min_samples_leaf,
+            "max_features": self.config.max_features,
+            "checkpoint_path": str(self._checkpoint_path) if self._checkpoint_path else None,
         }

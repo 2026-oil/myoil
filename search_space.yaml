@@ -240,3 +240,15 @@ residual:
     - learning_rate
     - subsample
     - colsample_bytree
+  randomforest:
+    - n_estimators
+    - max_depth
+    - min_samples_leaf
+    - max_features
+  lightgbm:
+    - n_estimators
+    - max_depth
+    - learning_rate
+    - num_leaves
+    - min_child_samples
+    - feature_fraction

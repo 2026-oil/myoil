@@ -57,17 +57,44 @@ SUPPORTED_AUTO_MODEL_NAMES = {
     "RMoK",
     "XLinear",
 }
-SUPPORTED_RESIDUAL_MODELS = {"xgboost"}
+SUPPORTED_RESIDUAL_MODELS = {"xgboost", "randomforest", "lightgbm"}
 DEFAULT_OPTUNA_NUM_TRIALS = 20
 DEFAULT_OPTUNA_STUDY_DIRECTION = "minimize"
 
-DEFAULT_RESIDUAL_PARAMS = {
-    "n_estimators": 32,
-    "max_depth": 3,
-    "learning_rate": 0.1,
-    "subsample": 1.0,
-    "colsample_bytree": 1.0,
+DEFAULT_RESIDUAL_PARAMS_BY_MODEL = {
+    "xgboost": {
+        "n_estimators": 32,
+        "max_depth": 3,
+        "learning_rate": 0.1,
+        "subsample": 1.0,
+        "colsample_bytree": 1.0,
+    },
+    "randomforest": {
+        "n_estimators": 200,
+        "max_depth": 6,
+        "min_samples_leaf": 2,
+        "max_features": "sqrt",
+    },
+    "lightgbm": {
+        "n_estimators": 64,
+        "max_depth": 6,
+        "learning_rate": 0.05,
+        "num_leaves": 31,
+        "min_child_samples": 20,
+        "feature_fraction": 1.0,
+    },
 }
+DEFAULT_RESIDUAL_PARAMS = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["xgboost"].copy()
+RESIDUAL_DEFAULTS = {
+    name: params.copy() for name, params in DEFAULT_RESIDUAL_PARAMS_BY_MODEL.items()
+}
+
+
+def default_residual_params(model_name: str) -> dict[str, Any]:
+    normalized = str(model_name).lower()
+    if normalized not in RESIDUAL_DEFAULTS:
+        raise KeyError(f"Unsupported residual model defaults: {normalized}")
+    return RESIDUAL_DEFAULTS[normalized].copy()
 
 DEFAULT_TRAINING_PARAMS = {
     "input_size": 64,
@@ -456,7 +483,21 @@ RESIDUAL_PARAM_REGISTRY = {
         "learning_rate": _float(1e-3, 0.3, log=True),
         "subsample": _float(0.5, 1.0),
         "colsample_bytree": _float(0.5, 1.0),
-    }
+    },
+    "randomforest": {
+        "n_estimators": _categorical([64, 128, 200, 300]),
+        "max_depth": _categorical([4, 6, 8, 12, None]),
+        "min_samples_leaf": _categorical([1, 2, 4, 8]),
+        "max_features": _categorical(["sqrt", "log2", 1.0]),
+    },
+    "lightgbm": {
+        "n_estimators": _categorical([32, 64, 96, 128]),
+        "max_depth": _categorical([4, 6, 8, -1]),
+        "learning_rate": _float(1e-3, 0.1, log=True),
+        "num_leaves": _categorical([15, 31, 63]),
+        "min_child_samples": _categorical([10, 20, 40]),
+        "feature_fraction": _float(0.6, 1.0),
+    },
 }
 
 TRAINING_PARAM_REGISTRY = {
@@ -483,7 +524,7 @@ def suggest_residual_params(
     model_name: str, selected_names: tuple[str, ...], trial: optuna.Trial
 ) -> dict[str, Any]:
     registry = RESIDUAL_PARAM_REGISTRY[model_name]
-    suggested = DEFAULT_RESIDUAL_PARAMS.copy()
+    suggested = DEFAULT_RESIDUAL_PARAMS_BY_MODEL[model_name].copy()
     for name in selected_names:
         suggested[name] = registry[name](trial, name)
     return suggested

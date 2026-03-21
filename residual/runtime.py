@@ -20,7 +20,7 @@ from .manifest import build_manifest, write_manifest
 from .models import BASELINE_MODEL_NAMES, build_model, validate_job
 from .optuna_spaces import (
     DEFAULT_OPTUNA_STUDY_DIRECTION,
-    DEFAULT_RESIDUAL_PARAMS,
+    RESIDUAL_DEFAULTS,
     SUPPORTED_AUTO_MODEL_NAMES,
     SUPPORTED_RESIDUAL_MODELS,
     build_optuna_sampler,
@@ -1038,7 +1038,7 @@ def _apply_residual_plugin(
     corrected_groups: list[pd.DataFrame] = []
     checkpoint_metadata: dict[str, dict[str, object]] = {}
     total_backcast_rows = 0
-    residual_params = {**DEFAULT_RESIDUAL_PARAMS, **loaded.config.residual.params}
+    residual_params = {**RESIDUAL_DEFAULTS[loaded.config.residual.model], **loaded.config.residual.params}
     if loaded.config.residual.validated_mode == "residual_auto":
         sampler = build_optuna_sampler(optuna_seed(loaded.config.runtime.random_seed))
         residual_trial_count = optuna_num_trials(loaded.config.runtime.opt_n_trial)
@@ -1077,7 +1077,7 @@ def _apply_residual_plugin(
             study, label=f"{job.model} residual Optuna study"
         )
         residual_params = {
-            **DEFAULT_RESIDUAL_PARAMS,
+            **RESIDUAL_DEFAULTS[loaded.config.residual.model],
             **best_trial.user_attrs["best_params"],
         }
         (residual_root / "best_params.json").write_text(

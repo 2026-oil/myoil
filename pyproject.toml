@@ -36,6 +36,7 @@ dependencies = [
     "ray[train,tune]>=2.2.0",
     "optuna",
     "utilsforecast>=0.2.3",
+    "lightgbm",
     "xgboost",
 ]
 [project.optional-dependencies]

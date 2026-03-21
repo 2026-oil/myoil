@@ -1,5 +1,5 @@
 dataset:
-  path: optuna_smoke_data.csv
+  path: tests/fixtures/optuna_smoke_data.csv
   target_col: target
   dt_col: dt
   hist_exog_cols: []
