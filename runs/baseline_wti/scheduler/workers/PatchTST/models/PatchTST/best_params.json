@@ -1,6 +1,0 @@
-{
-  "hidden_size": 64,
-  "n_heads": 4,
-  "encoder_layers": 4,
-  "patch_len": 8
-}

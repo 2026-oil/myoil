@@ -50,14 +50,6 @@ if [[ -n "${NF_CASE_CONFIGS:-}" ]]; then
   done
 else
   configs=(
-    "yaml/feature_set/brentoil-case1.yaml"
-    "yaml/feature_set/brentoil-case2.yaml"
-    "yaml/feature_set/brentoil-case3.yaml"
-    "yaml/feature_set/brentoil-case4.yaml"
-    "yaml/feature_set/wti-case1.yaml"
-    "yaml/feature_set/wti-case2.yaml"
-    "yaml/feature_set/wti-case3.yaml"
-    "yaml/feature_set/wti-case4.yaml"
     "yaml/feature_set_HPT/brentoil-case1.yaml"
     "yaml/feature_set_HPT/brentoil-case2.yaml"
     "yaml/feature_set_HPT/wti-case1.yaml"

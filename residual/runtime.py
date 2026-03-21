@@ -11,6 +11,7 @@ import numpy as np
 import optuna
 import pandas as pd
 from neuralforecast import NeuralForecast
+from optuna.trial import TrialState
 
 from .adapters import build_multivariate_inputs, build_univariate_inputs
 from .config import JobConfig, LoadedConfig, load_app_config
@@ -38,6 +39,10 @@ from .registry import build_residual_plugin
 from .scheduler import build_launch_plan, run_parallel_jobs
 
 ENTRYPOINT_VERSION = "neuralforecast-residual-v1"
+
+
+class _OptunaTrialFailure(RuntimeError):
+    """Recoverable per-trial failure that should not abort the whole study."""
 
 
 class _ProgressLogger:
@@ -415,18 +420,117 @@ def _fit_and_predict_fold(
 
 
 def _trial_metrics_summary(study: optuna.Study) -> dict[str, Any]:
+    state_counts: dict[str, int] = {}
+    finished_trial_count = 0
+    for trial in study.trials:
+        state = trial.state.name.lower()
+        state_counts[state] = state_counts.get(state, 0) + 1
+        if trial.state.is_finished():
+            finished_trial_count += 1
+    best_value: float | None = None
+    best_trial_number: int | None = None
+    if any(trial.state == TrialState.COMPLETE for trial in study.trials):
+        best_value = float(study.best_value)
+        best_trial_number = int(study.best_trial.number)
     return {
         "direction": study.direction.name.lower(),
         "trial_count": len(study.trials),
-        "best_value": float(study.best_value),
-        "best_trial_number": int(study.best_trial.number),
+        "finished_trial_count": finished_trial_count,
+        "state_counts": state_counts,
+        "best_value": best_value,
+        "best_trial_number": best_trial_number,
         "objective_metric": "mean_fold_mse",
     }
+
+
+def _build_study_name(
+    loaded: LoadedConfig, *, stage: str, job_name: str, suffix: str = ""
+) -> str:
+    task_name = loaded.config.task.name or loaded.source_path.stem or "run"
+    parts = [
+        "neuralforecast",
+        task_name,
+        job_name,
+        stage,
+        loaded.input_hash[:12],
+    ]
+    if suffix:
+        parts.append(suffix)
+    return "::".join(parts)
+
+
+def _open_persistent_study(
+    study_root: Path,
+    *,
+    loaded: LoadedConfig,
+    stage: str,
+    job_name: str,
+    sampler: optuna.samplers.BaseSampler,
+) -> tuple[optuna.Study, dict[str, Any]]:
+    storage_dir = study_root / ".optuna"
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    storage_path = storage_dir / f"{stage}.journal"
+    storage = optuna.storages.JournalStorage(
+        optuna.storages.journal.JournalFileBackend(str(storage_path))
+    )
+    study_name = _build_study_name(loaded, stage=stage, job_name=job_name)
+    study = optuna.create_study(
+        storage=storage,
+        study_name=study_name,
+        load_if_exists=True,
+        sampler=sampler,
+        direction=DEFAULT_OPTUNA_STUDY_DIRECTION,
+    )
+    metadata = {
+        "study_name": study_name,
+        "storage_backend": "journal",
+        "storage_path": str(storage_path.resolve()),
+    }
+    return study, metadata
+
+
+def _finished_trial_count(study: optuna.Study) -> int:
+    return sum(1 for trial in study.trials if trial.state.is_finished())
+
+
+def _optimize_study_with_resume(
+    study: optuna.Study,
+    *,
+    objective,
+    target_trial_count: int,
+) -> dict[str, int]:
+    existing_trial_count = len(study.trials)
+    existing_finished_trial_count = _finished_trial_count(study)
+    remaining_trial_count = max(target_trial_count - existing_finished_trial_count, 0)
+    if remaining_trial_count > 0:
+        study.optimize(
+            objective,
+            n_trials=remaining_trial_count,
+            show_progress_bar=False,
+            catch=(_OptunaTrialFailure,),
+        )
+    return {
+        "requested_trial_count": target_trial_count,
+        "existing_trial_count_before_optimize": existing_trial_count,
+        "existing_finished_trial_count_before_optimize": (
+            existing_finished_trial_count
+        ),
+        "remaining_trial_count": remaining_trial_count,
+    }
+
+
+def _require_complete_best_trial(study: optuna.Study, *, label: str) -> optuna.FrozenTrial:
+    if not any(trial.state == TrialState.COMPLETE for trial in study.trials):
+        raise RuntimeError(
+            f"{label} finished without a successful Optuna trial; inspect study summary for failed/pruned states"
+        )
+    return study.best_trial
 
 
 def _tune_main_job(
     loaded: LoadedConfig,
     job: JobConfig,
+    models_dir: Path,
     *,
     source_df: pd.DataFrame,
     freq: str,
@@ -443,6 +547,8 @@ def _tune_main_job(
         candidate_training_params = suggest_training_params(
             loaded.config.training_search.selected_search_params, trial
         )
+        trial.set_user_attr("best_params", candidate_params)
+        trial.set_user_attr("best_training_params", candidate_training_params)
         fold_mse: list[float] = []
         for fold_idx, (train_idx, test_idx) in enumerate(splits):
             phase = f"tune-trial-{trial.number + 1}/{trial_count}"
@@ -465,6 +571,21 @@ def _tune_main_job(
                     target_actuals, target_predictions[job.model]
                 )["MSE"]
                 fold_mse.append(mse)
+                interim_metric = float(sum(fold_mse) / len(fold_mse))
+                trial.set_user_attr("fold_mse", fold_mse.copy())
+                trial.report(interim_metric, step=fold_idx)
+                if trial.should_prune():
+                    trial.set_user_attr("pruned_after_fold", fold_idx)
+                    if progress is not None:
+                        progress.fold_completed(
+                            fold_idx,
+                            total_folds=len(splits),
+                            phase=phase,
+                            detail=f"pruned mean_mse={interim_metric:.4f}",
+                        )
+                    raise optuna.TrialPruned(
+                        f"Pruned after fold {fold_idx} with mean_mse={interim_metric:.4f}"
+                    )
                 if progress is not None:
                     progress.fold_completed(
                         fold_idx,
@@ -472,6 +593,8 @@ def _tune_main_job(
                         phase=phase,
                         detail=f"mse={mse:.4f}",
                     )
+            except optuna.TrialPruned:
+                raise
             except Exception as exc:
                 if progress is not None:
                     progress.error(
@@ -480,21 +603,38 @@ def _tune_main_job(
                         phase=phase,
                         exc=exc,
                     )
-                raise
+                trial.set_user_attr(
+                    "failure_reason",
+                    f"fold={fold_idx} {type(exc).__name__}: {exc}",
+                )
+                raise _OptunaTrialFailure(
+                    f"{job.model} tuning failed on fold {fold_idx}: {type(exc).__name__}: {exc}"
+                ) from exc
         metric = float(sum(fold_mse) / len(fold_mse))
-        trial.set_user_attr("best_params", candidate_params)
-        trial.set_user_attr("best_training_params", candidate_training_params)
         trial.set_user_attr("fold_mse", fold_mse)
         return metric
 
-    study = optuna.create_study(
-        sampler=sampler, direction=DEFAULT_OPTUNA_STUDY_DIRECTION
+    study, study_metadata = _open_persistent_study(
+        models_dir,
+        loaded=loaded,
+        stage="main-search",
+        job_name=job.model,
+        sampler=sampler,
     )
-    study.optimize(objective, n_trials=trial_count, show_progress_bar=False)
-    best_params = dict(study.best_trial.user_attrs["best_params"])
-    best_training_params = dict(study.best_trial.user_attrs["best_training_params"])
+    optimize_metadata = _optimize_study_with_resume(
+        study,
+        objective=objective,
+        target_trial_count=trial_count,
+    )
+    best_trial = _require_complete_best_trial(
+        study, label=f"{job.model} main Optuna study"
+    )
+    best_params = dict(best_trial.user_attrs["best_params"])
+    best_training_params = dict(best_trial.user_attrs["best_training_params"])
     summary = {
         **_trial_metrics_summary(study),
+        **study_metadata,
+        **optimize_metadata,
         "requested_mode": job.requested_mode,
         "validated_mode": job.validated_mode,
         "selected_search_params": list(job.selected_search_params),
@@ -503,7 +643,7 @@ def _tune_main_job(
         ),
         "best_params": best_params,
         "best_training_params": best_training_params,
-        "fold_mse": study.best_trial.user_attrs["fold_mse"],
+        "fold_mse": best_trial.user_attrs["fold_mse"],
         "objective_stage": "tuning_pre_replay_direct_predictions",
     }
     return best_params, best_training_params, summary
@@ -514,29 +654,53 @@ def _score_residual_params(
     job: JobConfig,
     params: dict[str, Any],
     fold_payloads: list[dict[str, Any]],
+    *,
+    trial: optuna.Trial,
 ) -> float:
     mse_scores: list[float] = []
-    for payload in fold_payloads:
-        plugin = build_residual_plugin({"model": loaded.config.residual.model, "params": params})
-        plugin.fit(
-            payload["backcast_panel"],
-            _build_residual_context(
-                loaded,
-                job,
-                payload["trial_dir"],
-                model_name=job.model,
-            ),
-        )
-        predicted = plugin.predict(payload["eval_panel"].copy())
-        corrected = payload["eval_panel"].reset_index(drop=True).copy()
-        corrected["residual_hat"] = predicted["residual_hat"].astype(float).values
-        corrected["y_hat_corrected"] = reconstruct_corrected_forecast(
-            corrected,
-            loaded.config.residual.target,
-        )
-        mse_scores.append(
-            _compute_metrics(corrected["y"], corrected["y_hat_corrected"])["MSE"]
-        )
+    for step_idx, payload in enumerate(fold_payloads):
+        fold_idx = int(payload["fold_idx"])
+        try:
+            plugin = build_residual_plugin(
+                {"model": loaded.config.residual.model, "params": params}
+            )
+            plugin.fit(
+                payload["backcast_panel"],
+                _build_residual_context(
+                    loaded,
+                    job,
+                    payload["trial_dir"],
+                    model_name=job.model,
+                ),
+            )
+            predicted = plugin.predict(payload["eval_panel"].copy())
+            corrected = payload["eval_panel"].reset_index(drop=True).copy()
+            corrected["residual_hat"] = predicted["residual_hat"].astype(float).values
+            corrected["y_hat_corrected"] = reconstruct_corrected_forecast(
+                corrected,
+                loaded.config.residual.target,
+            )
+            mse_scores.append(
+                _compute_metrics(corrected["y"], corrected["y_hat_corrected"])["MSE"]
+            )
+            interim_metric = float(sum(mse_scores) / len(mse_scores))
+            trial.set_user_attr("fold_mse", mse_scores.copy())
+            trial.report(interim_metric, step=step_idx)
+            if trial.should_prune():
+                trial.set_user_attr("pruned_after_fold", fold_idx)
+                raise optuna.TrialPruned(
+                    f"Pruned residual trial after fold {fold_idx} with mean_mse={interim_metric:.4f}"
+                )
+        except optuna.TrialPruned:
+            raise
+        except Exception as exc:
+            trial.set_user_attr(
+                "failure_reason",
+                f"fold={fold_idx} {type(exc).__name__}: {exc}",
+            )
+            raise _OptunaTrialFailure(
+                f"{job.model} residual tuning failed on fold {fold_idx}: {type(exc).__name__}: {exc}"
+            ) from exc
     return float(sum(mse_scores) / len(mse_scores))
 
 
@@ -848,6 +1012,7 @@ def _apply_residual_plugin(
     residual_params = {**DEFAULT_RESIDUAL_PARAMS, **loaded.config.residual.params}
     if loaded.config.residual.validated_mode == "residual_auto":
         sampler = build_optuna_sampler(optuna_seed(loaded.config.runtime.random_seed))
+        residual_trial_count = optuna_num_trials(loaded.config.runtime.opt_n_trial)
 
         def objective(trial: optuna.Trial) -> float:
             candidate_params = suggest_residual_params(
@@ -855,21 +1020,37 @@ def _apply_residual_plugin(
                 loaded.config.residual.selected_search_params,
                 trial,
             )
+            trial.set_user_attr("best_params", candidate_params)
             for payload in fold_payloads:
                 payload["trial_dir"].mkdir(parents=True, exist_ok=True)
-            score = _score_residual_params(loaded, job, candidate_params, fold_payloads)
-            trial.set_user_attr("best_params", candidate_params)
+            score = _score_residual_params(
+                loaded,
+                job,
+                candidate_params,
+                fold_payloads,
+                trial=trial,
+            )
             return score
 
-        study = optuna.create_study(
-            sampler=sampler, direction=DEFAULT_OPTUNA_STUDY_DIRECTION
+        study, study_metadata = _open_persistent_study(
+            residual_root,
+            loaded=loaded,
+            stage="residual-search",
+            job_name=job.model,
+            sampler=sampler,
         )
-        study.optimize(
-            objective,
-            n_trials=optuna_num_trials(loaded.config.runtime.opt_n_trial),
-            show_progress_bar=False,
+        optimize_metadata = _optimize_study_with_resume(
+            study,
+            objective=objective,
+            target_trial_count=residual_trial_count,
         )
-        residual_params = {**DEFAULT_RESIDUAL_PARAMS, **study.best_trial.user_attrs["best_params"]}
+        best_trial = _require_complete_best_trial(
+            study, label=f"{job.model} residual Optuna study"
+        )
+        residual_params = {
+            **DEFAULT_RESIDUAL_PARAMS,
+            **best_trial.user_attrs["best_params"],
+        }
         (residual_root / "best_params.json").write_text(
             json.dumps(residual_params, indent=2), encoding="utf-8"
         )
@@ -877,6 +1058,8 @@ def _apply_residual_plugin(
             json.dumps(
                 {
                     **_trial_metrics_summary(study),
+                    **study_metadata,
+                    **optimize_metadata,
                     "requested_mode": loaded.config.residual.requested_mode,
                     "validated_mode": loaded.config.residual.validated_mode,
                     "selected_search_params": list(
@@ -1284,6 +1467,7 @@ def _run_single_job(
         best_params, best_training_params, study_summary = _tune_main_job(
             loaded,
             job,
+            models_dir,
             source_df=source_df,
             freq=freq,
             splits=splits,

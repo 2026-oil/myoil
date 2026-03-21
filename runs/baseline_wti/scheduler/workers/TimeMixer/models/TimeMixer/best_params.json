@@ -1,6 +1,0 @@
-{
-  "d_model": 32,
-  "d_ff": 256,
-  "down_sampling_layers": 2,
-  "top_k": 7
-}
