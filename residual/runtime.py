@@ -29,7 +29,7 @@ from .optuna_spaces import (
     RESIDUAL_DEFAULTS,
     SUPPORTED_AUTO_MODEL_NAMES,
     SUPPORTED_RESIDUAL_MODELS,
-    TRAINING_SELECTOR_TO_CONFIG_FIELD,
+    LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD,
     build_optuna_sampler,
     optuna_num_trials,
     optuna_seed,
@@ -362,7 +362,7 @@ def _effective_config(
     if loaded.config.training_search.validated_mode == "training_auto":
         training_override = {**training_override, "val_size": loaded.config.cv.horizon}
     normalized_override = {
-        TRAINING_SELECTOR_TO_CONFIG_FIELD.get(key, key): value
+        LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD.get(key, key): value
         for key, value in training_override.items()
     }
     return replace(
@@ -502,6 +502,12 @@ def _trial_metrics_summary(study: optuna.Study) -> dict[str, Any]:
     }
 
 
+def _mean_fold_metric(values: Sequence[float]) -> float:
+    if not values:
+        raise ValueError("fold metric values must be non-empty")
+    return float(sum(values) / len(values))
+
+
 def _build_study_name(
     loaded: LoadedConfig, *, stage: str, job_name: str, suffix: str = ""
 ) -> str:
@@ -630,7 +636,7 @@ def _tune_main_job(
                     target_actuals, target_predictions[job.model]
                 )["MSE"]
                 fold_mse.append(mse)
-                interim_metric = float(sum(fold_mse) / len(fold_mse))
+                interim_metric = _mean_fold_metric(fold_mse)
                 trial.set_user_attr("fold_mse", fold_mse.copy())
                 trial.report(interim_metric, step=fold_idx)
                 if _can_prune_at_fold(fold_idx) and trial.should_prune():
@@ -669,7 +675,7 @@ def _tune_main_job(
                 raise _OptunaTrialFailure(
                     f"{job.model} tuning failed on fold {fold_idx}: {type(exc).__name__}: {exc}"
                 ) from exc
-        metric = float(sum(fold_mse) / len(fold_mse))
+        metric = _mean_fold_metric(fold_mse)
         trial.set_user_attr("fold_mse", fold_mse)
         return metric
 
@@ -742,7 +748,7 @@ def _score_residual_params(
             mse_scores.append(
                 _compute_metrics(corrected["y"], corrected["y_hat_corrected"])["MSE"]
             )
-            interim_metric = float(sum(mse_scores) / len(mse_scores))
+            interim_metric = _mean_fold_metric(mse_scores)
             trial.set_user_attr("fold_mse", mse_scores.copy())
             trial.report(interim_metric, step=step_idx)
             if _can_prune_at_fold(fold_idx) and trial.should_prune():
@@ -760,7 +766,7 @@ def _score_residual_params(
             raise _OptunaTrialFailure(
                 f"{job.model} residual tuning failed on fold {fold_idx}: {type(exc).__name__}: {exc}"
             ) from exc
-    return float(sum(mse_scores) / len(mse_scores))
+    return _mean_fold_metric(mse_scores)
 
 
 def _residual_trajectory_group_keys() -> list[str]:

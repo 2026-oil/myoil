@@ -230,8 +230,7 @@ training:
   - input_size
   - learning_rate
   - scaler_type
-  - step_size
-  - early_stop_patience_steps
+  - model_step_size
 residual:
   xgboost:
     - n_estimators

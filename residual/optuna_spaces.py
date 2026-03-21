@@ -112,7 +112,7 @@ DEFAULT_TRAINING_PARAMS = {
     "early_stop_patience_steps": -1,
     "num_lr_decays": -1,
 }
-TRAINING_SELECTOR_TO_CONFIG_FIELD = {"step_size": "model_step_size"}
+LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD = {"step_size": "model_step_size"}
 FIXED_TRAINING_VALUES = {
     "season_length": 52,
     "batch_size": 32,
@@ -524,8 +524,7 @@ TRAINING_PARAM_REGISTRY = {
     "input_size": _categorical([24, 36, 48, 64, 72, 96]),
     "learning_rate": _float(3e-4, 1e-2, log=True),
     "scaler_type": _categorical([None, "robust", "standard", "identity"]),
-    "step_size": _categorical([1, 4, 8, 12]),
-    "early_stop_patience_steps": _categorical([-1, 5, 10, 20]),
+    "model_step_size": _categorical([1, 4, 8, 12]),
 }
 
 

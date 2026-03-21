@@ -634,7 +634,7 @@ def test_model_builder_propagates_centralized_training_controls(tmp_path: Path):
             "max_steps": 17,
             "learning_rate": 0.123,
             "scaler_type": "standard",
-            "step_size": 3,
+            "model_step_size": 3,
             "val_check_steps": 7,
             "num_lr_decays": 2,
             "early_stop_patience_steps": 11,
@@ -674,11 +674,11 @@ def test_model_builder_propagates_centralized_training_controls(tmp_path: Path):
         assert model.hparams.early_stop_patience_steps == 11
 
 
-def test_load_app_config_preserves_training_season_length_and_maps_step_size(
+def test_load_app_config_preserves_training_season_length_and_maps_model_step_size(
     tmp_path: Path,
 ):
     payload = _payload()
-    payload["training"].update({"season_length": 52, "step_size": 6})
+    payload["training"].update({"season_length": 52, "model_step_size": 6})
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a\n2020-01-01,1,2\n", encoding="utf-8"
     )
@@ -690,8 +690,8 @@ def test_load_app_config_preserves_training_season_length_and_maps_step_size(
     assert loaded.config.training.season_length == 52
     assert loaded.config.training.model_step_size == 6
     assert loaded.normalized_payload["training"]["season_length"] == 52
-    assert loaded.normalized_payload["training"]["step_size"] == 6
-    assert "model_step_size" not in loaded.normalized_payload["training"]
+    assert loaded.normalized_payload["training"]["model_step_size"] == 6
+    assert "step_size" not in loaded.normalized_payload["training"]
 
 
 def test_load_app_config_migrates_legacy_shared_job_scaler_type_to_training(
@@ -2333,7 +2333,7 @@ def test_load_app_config_accepts_training_search_space_section(tmp_path: Path):
         tmp_path,
         {
             "models": {"TFT": ["hidden_size", "dropout", "n_head"]},
-            "training": ["input_size", "step_size"],
+            "training": ["input_size", "model_step_size"],
             "residual": {"xgboost": ["n_estimators"]},
         },
     )
@@ -2344,7 +2344,7 @@ def test_load_app_config_accepts_training_search_space_section(tmp_path: Path):
     assert loaded.config.training_search.validated_mode == "training_auto"
     assert list(loaded.config.training_search.selected_search_params) == [
         "input_size",
-        "step_size",
+        "model_step_size",
     ]
 
 
@@ -2387,6 +2387,52 @@ def test_load_app_config_rejects_unknown_training_search_space_param(tmp_path: P
         {
             "models": {"TFT": ["hidden_size"]},
             "training": ["not_a_real_training_key"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    with pytest.raises(ValueError, match="search_space.training contains unknown"):
+        load_app_config(tmp_path, config_path=config_path)
+
+
+def test_load_app_config_rejects_legacy_step_size_search_space_param(tmp_path: Path):
+    payload = _payload()
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"]},
+            "training": ["step_size"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    with pytest.raises(ValueError, match="search_space.training contains unknown"):
+        load_app_config(tmp_path, config_path=config_path)
+
+
+def test_load_app_config_rejects_removed_early_stop_search_space_param(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"]},
+            "training": ["early_stop_patience_steps"],
             "residual": {"xgboost": ["n_estimators"]},
         },
     )
@@ -3223,7 +3269,7 @@ def test_effective_config_pins_val_size_to_horizon_for_training_auto(tmp_path: P
     assert effective.training.val_size == loaded.config.cv.horizon
 
 
-def test_effective_config_maps_training_step_size_override_for_training_auto(
+def test_effective_config_maps_training_model_step_size_override_for_training_auto(
     tmp_path: Path,
 ):
     payload = _payload()
@@ -3238,7 +3284,7 @@ def test_effective_config_maps_training_step_size_override_for_training_auto(
         tmp_path,
         {
             "models": {"TFT": ["hidden_size"]},
-            "training": ["step_size", "num_lr_decays"],
+            "training": ["model_step_size"],
             "residual": {"xgboost": ["n_estimators"]},
         },
     )
@@ -3247,7 +3293,7 @@ def test_effective_config_maps_training_step_size_override_for_training_auto(
 
     loaded = load_app_config(tmp_path, config_path=config_path)
     effective = runtime._effective_config(
-        loaded, {"step_size": 5, "num_lr_decays": 2}
+        loaded, {"model_step_size": 5, "num_lr_decays": 2}
     )
 
     assert effective.training.model_step_size == 5
@@ -3890,8 +3936,7 @@ EXPECTED_REPO_TRAINING_SELECTORS = [
     "input_size",
     "learning_rate",
     "scaler_type",
-    "step_size",
-    "early_stop_patience_steps",
+    "model_step_size",
 ]
 
 EXPECTED_FIXED_TRAINING_VALUES = {
@@ -4238,6 +4283,8 @@ def test_repo_search_space_updates_requested_auto_selectors_only():
 
     assert SEARCH_SPACE_TRAINING == EXPECTED_REPO_TRAINING_SELECTORS
     assert set(FIXED_TRAINING_KEYS).isdisjoint(SEARCH_SPACE_TRAINING)
+    assert "step_size" not in SEARCH_SPACE_TRAINING
+    assert "early_stop_patience_steps" not in SEARCH_SPACE_TRAINING
     assert "context_size" not in SEARCH_SPACE_MODELS["LSTM"]
     assert SEARCH_SPACE_MODELS["GRU"] == [
         "encoder_hidden_size",

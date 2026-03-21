@@ -18,7 +18,7 @@ from .optuna_spaces import (
     MODEL_PARAM_REGISTRY,
     RESIDUAL_PARAM_REGISTRY,
     TRAINING_PARAM_REGISTRY,
-    TRAINING_SELECTOR_TO_CONFIG_FIELD,
+    LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD,
     ResidualMode,
     SearchSpaceContract,
     load_search_space_contract,
@@ -38,7 +38,7 @@ CENTRALIZED_TRAINING_KEYS = {
     "inference_windows_batch_size",
     "learning_rate",
     "scaler_type",
-    "step_size",
+    "model_step_size",
     "max_steps",
     "val_size",
     "val_check_steps",
@@ -209,10 +209,6 @@ class AppConfig:
         if self.task.name is None:
             payload.pop("task", None)
         payload["dataset"]["path"] = str(self.dataset.path)
-        if "model_step_size" in payload["training"]:
-            payload["training"]["step_size"] = payload["training"].pop(
-                "model_step_size"
-            )
         payload["training_search"]["selected_search_params"] = list(
             payload["training_search"]["selected_search_params"]
         )
@@ -677,7 +673,7 @@ def _normalize_payload(
     dataset = dict(payload.get("dataset", {}))
     runtime = dict(payload.get("runtime", {}))
     training = dict(payload.get("training", {}))
-    for selector, field_name in TRAINING_SELECTOR_TO_CONFIG_FIELD.items():
+    for selector, field_name in LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD.items():
         if selector in training:
             if field_name in training:
                 raise ValueError(
@@ -783,7 +779,7 @@ def _normalize_payload(
         jobs_payload.append(normalized_job)
 
     for selector in LEGACY_SHARED_JOB_TRAINING_KEYS:
-        field_name = TRAINING_SELECTOR_TO_CONFIG_FIELD.get(selector, selector)
+        field_name = LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD.get(selector, selector)
         legacy_values = [
             job["params"][selector]
             for job in jobs_payload
