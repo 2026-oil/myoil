@@ -1,0 +1,10 @@
+{
+  "hidden_size": 128,
+  "n_heads": 4,
+  "e_layers": 1,
+  "d_ff": 512,
+  "d_layers": 1,
+  "factor": 3,
+  "dropout": 0.3,
+  "use_norm": false
+}
