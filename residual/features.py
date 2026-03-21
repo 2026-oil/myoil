@@ -107,10 +107,16 @@ def _extract_feature_payload(source: Any) -> dict[str, Any]:
 
 def resolve_residual_feature_config(source: Any = None) -> ResidualFeatureConfig:
     payload = _extract_feature_payload(source)
-    lag_payload = _coerce_mapping(payload.get("lag"))
+    lag_payload = _coerce_mapping(payload.get("lag_features"))
+    if not lag_payload:
+        lag_payload = _coerce_mapping(payload.get("lag"))
+
+    exog_payload = _coerce_mapping(payload.get("exog_sources"))
+    if not exog_payload:
+        exog_payload = _coerce_mapping(payload.get("exog"))
+
     lag_sources = payload.get("lag_sources", lag_payload.get("sources"))
     lag_steps = payload.get("lag_steps", lag_payload.get("steps"))
-    exog_payload = _coerce_mapping(payload.get("exog"))
     hist = payload.get("hist", exog_payload.get("hist"))
     futr = payload.get("futr", exog_payload.get("futr"))
     static = payload.get("static", exog_payload.get("static"))
