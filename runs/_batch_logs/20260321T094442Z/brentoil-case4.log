@@ -274,4 +274,124 @@
 [2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
 [2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
 [2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=4/5 [#-----------------] 3/105   3%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-4/20 fold=3/5 [###---------------] 18/105  17% mse=9.3389
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=4/5 [#-----------------] 3/105   3%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-4/20 fold=4/5 [###---------------] 18/105  17%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=4/5 [#-----------------] 3/105   3%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-4/20 fold=4/5 [###---------------] 19/105  18% mse=7.1305
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=4/5 [#-----------------] 3/105   3%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-4/20 fold=5/5 [###---------------] 19/105  18%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=4/5 [#-----------------] 3/105   3%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-4/20 fold=5/5 [###---------------] 20/105  19% mse=325.5295
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=4/5 [#-----------------] 3/105   3%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-5/20 fold=1/5 [###---------------] 20/105  19%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=4/5 [#-----------------] 3/105   3%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-5/20 fold=1/5 [####--------------] 21/105  20% mse=94.8856
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=4/5 [#-----------------] 3/105   3%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-5/20 fold=2/5 [####--------------] 21/105  20%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=4/5 [#-----------------] 3/105   3%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-5/20 fold=2/5 [####--------------] 22/105  21% mse=80.7710
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=4/5 [#-----------------] 3/105   3%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-5/20 fold=3/5 [####--------------] 22/105  21%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=4/5 [#-----------------] 3/105   3%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-5/20 fold=3/5 [####--------------] 23/105  22% mse=112.1776
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=4/5 [#-----------------] 3/105   3%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-5/20 fold=4/5 [####--------------] 23/105  22%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=4/5 [#-----------------] 3/105   3%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-5/20 fold=4/5 [####--------------] 24/105  23% mse=69.8362
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=4/5 [#-----------------] 3/105   3%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-5/20 fold=5/5 [####--------------] 24/105  23%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=4/5 [#-----------------] 4/105   4% mse=3.5138
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-5/20 fold=5/5 [####--------------] 24/105  23%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=5/5 [#-----------------] 4/105   4%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-5/20 fold=5/5 [####--------------] 24/105  23%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=5/5 [#-----------------] 4/105   4%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-5/20 fold=5/5 [####--------------] 25/105  24% mse=145.0652
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=5/5 [#-----------------] 4/105   4%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-6/20 fold=1/5 [####--------------] 25/105  24%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=5/5 [#-----------------] 4/105   4%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-6/20 fold=1/5 [####--------------] 26/105  25% mse=26.6984
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-1/20 fold=5/5 [#-----------------] 4/105   4%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-6/20 fold=2/5 [####--------------] 26/105  25%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
 [2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%
