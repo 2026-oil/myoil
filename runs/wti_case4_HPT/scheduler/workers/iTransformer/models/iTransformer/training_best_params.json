@@ -1,0 +1,14 @@
+{
+  "input_size": 64,
+  "batch_size": 32,
+  "valid_batch_size": 16,
+  "windows_batch_size": 128,
+  "inference_windows_batch_size": 256,
+  "learning_rate": 0.0004944921505666912,
+  "scaler_type": "identity",
+  "step_size": 1,
+  "max_steps": 300,
+  "val_check_steps": 200,
+  "early_stop_patience_steps": 20,
+  "num_lr_decays": 2
+}

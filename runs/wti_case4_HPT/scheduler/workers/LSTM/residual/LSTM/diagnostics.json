@@ -1,0 +1,39 @@
+{
+  "model": "LSTM",
+  "residual_model": "xgboost",
+  "residual.target": "level",
+  "residual.feature_policy": {
+    "include_base_prediction": true,
+    "include_horizon_step": true,
+    "include_date_features": false,
+    "lag_features": {
+      "enabled": false,
+      "sources": [],
+      "steps": [],
+      "transforms": [
+        "raw"
+      ]
+    },
+    "exog_sources": {
+      "hist": [],
+      "futr": [],
+      "static": []
+    }
+  },
+  "active_feature_columns": [
+    "horizon_step",
+    "y_hat_base"
+  ],
+  "fold_count": 5,
+  "backcast_rows_total": 2480,
+  "corrected_eval_rows": 40,
+  "corrected_eval_mode": "per_fold_backcast_runtime",
+  "tscv_policy": {
+    "n_windows": 5,
+    "horizon": 8,
+    "step_size": 8,
+    "gap": 0,
+    "max_train_size": null
+  },
+  "artifact_layout": "residual/<model>/folds/fold_{i:03d}/(backcast_panel.csv, corrected_eval.csv, base_checkpoint/, residual_checkpoint/model.ubj)"
+}

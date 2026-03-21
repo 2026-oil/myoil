@@ -2946,3 +2946,168 @@ LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type          | Params | Mode 
+--------------------------------------------------------
+0 | loss          | MSE           | 0      | train
+1 | valid_loss    | MSE           | 0      | train
+2 | padder_train  | ConstantPad1d | 0      | train
+3 | scaler        | TemporalNorm  | 0      | train
+4 | decomp        | SeriesDecomp  | 0      | train
+5 | linear_trend  | Linear        | 200    | train
+6 | linear_season | Linear        | 200    | train
+--------------------------------------------------------
+400       Trainable params
+0         Non-trainable params
+400       Total params
+0.002     Total estimated model params size (MB)
+9         Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 20:06:51,804] A new study created in Journal with name: neuralforecast::wti_case4_HPT::DLinear::residual-search::f82f389db484
+[I 2026-03-21 20:06:51,888] Trial 0 finished with value: 39.266876570782024 and parameters: {'n_estimators': 32, 'max_depth': 2, 'learning_rate': 0.0016932999507037908, 'subsample': 0.5931301056888354, 'colsample_bytree': 0.6727803635215239}. Best is trial 0 with value: 39.266876570782024.
+[I 2026-03-21 20:06:51,992] Trial 1 finished with value: 40.14524728727866 and parameters: {'n_estimators': 128, 'max_depth': 3, 'learning_rate': 0.14969364581164232, 'subsample': 0.5136937965989631, 'colsample_bytree': 0.8352337550892011}. Best is trial 0 with value: 39.266876570782024.
+[I 2026-03-21 20:06:52,077] Trial 2 finished with value: 34.85172021338744 and parameters: {'n_estimators': 32, 'max_depth': 6, 'learning_rate': 0.25032333105810645, 'subsample': 0.6567120890796214, 'colsample_bytree': 0.846161307834657}. Best is trial 2 with value: 34.85172021338744.
+[I 2026-03-21 20:06:52,169] Trial 3 finished with value: 38.79539667503614 and parameters: {'n_estimators': 32, 'max_depth': 2, 'learning_rate': 0.14971505008038705, 'subsample': 0.549173416916525, 'colsample_bytree': 0.7105538125025261}. Best is trial 2 with value: 34.85172021338744.
+[I 2026-03-21 20:06:52,236] Trial 4 finished with value: 39.96095623140768 and parameters: {'n_estimators': 16, 'max_depth': 5, 'learning_rate': 0.11680703272479827, 'subsample': 0.5091441386720958, 'colsample_bytree': 0.8750721574724838}. Best is trial 2 with value: 34.85172021338744.
+[I 2026-03-21 20:06:52,298] Trial 5 finished with value: 39.22175399194204 and parameters: {'n_estimators': 16, 'max_depth': 2, 'learning_rate': 0.012867274725107765, 'subsample': 0.9542977515465478, 'colsample_bytree': 0.6468070741868397}. Best is trial 2 with value: 34.85172021338744.
+[I 2026-03-21 20:06:52,386] Trial 6 finished with value: 39.10034016140278 and parameters: {'n_estimators': 128, 'max_depth': 3, 'learning_rate': 0.0045476944121483, 'subsample': 0.7457865796401691, 'colsample_bytree': 0.5266812725585401}. Best is trial 2 with value: 34.85172021338744.
+[I 2026-03-21 20:06:52,473] Trial 7 finished with value: 39.305765666192066 and parameters: {'n_estimators': 128, 'max_depth': 2, 'learning_rate': 0.010608815292282874, 'subsample': 0.8472000788638725, 'colsample_bytree': 0.7070896347634513}. Best is trial 2 with value: 34.85172021338744.
+[I 2026-03-21 20:06:52,501] Trial 8 pruned. Pruned residual trial after fold 0 with mean_mse=31.5217
+[I 2026-03-21 20:06:52,569] Trial 9 finished with value: 38.676066046404614 and parameters: {'n_estimators': 32, 'max_depth': 6, 'learning_rate': 0.007268724405433989, 'subsample': 0.8754060515680777, 'colsample_bytree': 0.8629989926752257}. Best is trial 2 with value: 34.85172021338744.
+[I 2026-03-21 20:06:52,596] Trial 10 pruned. Pruned residual trial after fold 0 with mean_mse=34.7068
+[I 2026-03-21 20:06:52,675] Trial 11 finished with value: 39.1439976043101 and parameters: {'n_estimators': 32, 'max_depth': 6, 'learning_rate': 0.003348061092261843, 'subsample': 0.8210747466446215, 'colsample_bytree': 0.8328864197097774}. Best is trial 2 with value: 34.85172021338744.
+[I 2026-03-21 20:06:52,703] Trial 12 pruned. Pruned residual trial after fold 0 with mean_mse=28.5683
+[I 2026-03-21 20:06:52,783] Trial 13 finished with value: 38.74784927075978 and parameters: {'n_estimators': 32, 'max_depth': 6, 'learning_rate': 0.006600810041232777, 'subsample': 0.8652942168560573, 'colsample_bytree': 0.789565575848282}. Best is trial 2 with value: 34.85172021338744.
+[I 2026-03-21 20:06:52,812] Trial 14 pruned. Pruned residual trial after fold 0 with mean_mse=32.9827
+[I 2026-03-21 20:06:52,892] Trial 15 finished with value: 39.039781656335926 and parameters: {'n_estimators': 32, 'max_depth': 5, 'learning_rate': 0.001632907191803837, 'subsample': 0.9993628837271109, 'colsample_bytree': 0.7753445623384805}. Best is trial 2 with value: 34.85172021338744.
+[I 2026-03-21 20:06:52,921] Trial 16 pruned. Pruned residual trial after fold 0 with mean_mse=27.1189
+[I 2026-03-21 20:06:52,945] Trial 17 pruned. Pruned residual trial after fold 0 with mean_mse=28.6143
+[I 2026-03-21 20:06:52,980] Trial 18 pruned. Pruned residual trial after fold 0 with mean_mse=26.8796
+[I 2026-03-21 20:06:53,009] Trial 19 pruned. Pruned residual trial after fold 0 with mean_mse=27.1259

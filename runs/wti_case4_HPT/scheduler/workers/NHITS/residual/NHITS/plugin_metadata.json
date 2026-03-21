@@ -1,0 +1,157 @@
+{
+  "0": {
+    "plugin": "xgboost",
+    "n_estimators": 128,
+    "max_depth": 3,
+    "learning_rate": 0.28014357348457253,
+    "subsample": 0.7580181470176622,
+    "colsample_bytree": 0.786509990045193,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_HPT/scheduler/workers/NHITS/residual/NHITS/folds/fold_000/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": false,
+        "sources": [],
+        "steps": [],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base"
+    ]
+  },
+  "1": {
+    "plugin": "xgboost",
+    "n_estimators": 128,
+    "max_depth": 3,
+    "learning_rate": 0.28014357348457253,
+    "subsample": 0.7580181470176622,
+    "colsample_bytree": 0.786509990045193,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_HPT/scheduler/workers/NHITS/residual/NHITS/folds/fold_001/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": false,
+        "sources": [],
+        "steps": [],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base"
+    ]
+  },
+  "2": {
+    "plugin": "xgboost",
+    "n_estimators": 128,
+    "max_depth": 3,
+    "learning_rate": 0.28014357348457253,
+    "subsample": 0.7580181470176622,
+    "colsample_bytree": 0.786509990045193,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_HPT/scheduler/workers/NHITS/residual/NHITS/folds/fold_002/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": false,
+        "sources": [],
+        "steps": [],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base"
+    ]
+  },
+  "3": {
+    "plugin": "xgboost",
+    "n_estimators": 128,
+    "max_depth": 3,
+    "learning_rate": 0.28014357348457253,
+    "subsample": 0.7580181470176622,
+    "colsample_bytree": 0.786509990045193,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_HPT/scheduler/workers/NHITS/residual/NHITS/folds/fold_003/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": false,
+        "sources": [],
+        "steps": [],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base"
+    ]
+  },
+  "4": {
+    "plugin": "xgboost",
+    "n_estimators": 128,
+    "max_depth": 3,
+    "learning_rate": 0.28014357348457253,
+    "subsample": 0.7580181470176622,
+    "colsample_bytree": 0.786509990045193,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_HPT/scheduler/workers/NHITS/residual/NHITS/folds/fold_004/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": false,
+        "sources": [],
+        "steps": [],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base"
+    ]
+  }
+}

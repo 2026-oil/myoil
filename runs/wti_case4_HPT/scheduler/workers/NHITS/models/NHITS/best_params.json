@@ -1,0 +1,33 @@
+{
+  "n_pool_kernel_size": [
+    4,
+    2,
+    1
+  ],
+  "n_freq_downsample": [
+    4,
+    2,
+    1
+  ],
+  "n_blocks": [
+    1,
+    1,
+    1
+  ],
+  "mlp_units": [
+    [
+      512,
+      512
+    ],
+    [
+      512,
+      512
+    ],
+    [
+      512,
+      512
+    ]
+  ],
+  "dropout_prob_theta": 0.1,
+  "activation": "LeakyReLU"
+}

@@ -39,7 +39,9 @@
       "model_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_HPT/scheduler/workers/DLinear/models/DLinear/best_params.json",
       "model_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_HPT/scheduler/workers/DLinear/models/DLinear/optuna_study_summary.json",
       "training_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_HPT/scheduler/workers/DLinear/models/DLinear/training_best_params.json",
-      "training_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_HPT/scheduler/workers/DLinear/models/DLinear/training_optuna_study_summary.json"
+      "training_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_HPT/scheduler/workers/DLinear/models/DLinear/training_optuna_study_summary.json",
+      "residual_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_HPT/scheduler/workers/DLinear/residual/DLinear/best_params.json",
+      "residual_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_HPT/scheduler/workers/DLinear/residual/DLinear/optuna_study_summary.json"
     },
     {
       "model": "Naive",
@@ -142,7 +144,9 @@
     "active_feature_columns": [
       "horizon_step",
       "y_hat_base"
-    ]
+    ],
+    "best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_HPT/scheduler/workers/DLinear/residual/DLinear/best_params.json",
+    "optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_HPT/scheduler/workers/DLinear/residual/DLinear/optuna_study_summary.json"
   },
   "training": {
     "loss": "mse"
