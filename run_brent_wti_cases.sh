@@ -50,10 +50,7 @@ if [[ -n "${NF_CASE_CONFIGS:-}" ]]; then
   done
 else
   configs=(
-    "brentoil-case1.yaml"
-    "brentoil-case2.yaml"
     "brentoil-case3.yaml"
-    "brentoil-case4.yaml"
     "wti-case1.yaml"
     "wti-case2.yaml"
     "wti-case3.yaml"
