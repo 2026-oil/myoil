@@ -1,0 +1,12 @@
+{
+  "model": "NHITS",
+  "requested_mode": "learned_fixed",
+  "validated_mode": "learned_fixed",
+  "selected_search_params": [],
+  "selected_training_search_params": [],
+  "devices": 1,
+  "loss": "mse",
+  "evaluation_policy": "tscv_only",
+  "tuning_objective_metric": null,
+  "fold_count": 12
+}

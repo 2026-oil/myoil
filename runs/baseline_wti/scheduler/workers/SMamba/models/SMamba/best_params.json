@@ -1,0 +1,8 @@
+{
+  "hidden_size": 128,
+  "n_block": 1,
+  "expand_ratio": 2,
+  "kernel_size": 3,
+  "dropout": 0.07809452957356229,
+  "revin": true
+}

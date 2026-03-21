@@ -1,0 +1,112 @@
+[summary] completed=0/7 failed=0 queued=6 current=LSTM(1/7)
+[model:LSTM] idx=1/7 status=running [------------------] 0/1   0% gpu=0
+[model:NHITS] idx=2/7 status=queued [------------------] 0/1   0%
+[model:DLinear] idx=3/7 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/7 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=5/7 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=6/7 status=queued [------------------] 0/1   0%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=0/7 failed=0 queued=5 current=LSTM(1/7),NHITS(2/7)
+[model:LSTM] idx=1/7 status=running [------------------] 0/1   0% gpu=0
+[model:NHITS] idx=2/7 status=running [------------------] 0/1   0% gpu=1
+[model:DLinear] idx=3/7 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/7 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=5/7 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=6/7 status=queued [------------------] 0/1   0%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=0/7 failed=0 queued=5 current=LSTM(1/7),NHITS(2/7)
+[model:LSTM] idx=1/7 status=running [------------------] 0/72   0% mode=learned_auto output_root=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case1_HPT/scheduler/workers/LSTM
+[model:NHITS] idx=2/7 status=running [------------------] 0/1   0% gpu=1
+[model:DLinear] idx=3/7 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/7 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=5/7 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=6/7 status=queued [------------------] 0/1   0%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=0/7 failed=0 queued=5 current=LSTM(1/7),NHITS(2/7)
+[model:LSTM] idx=1/7 status=running [------------------] 0/72   0% mode=learned_auto output_root=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case1_HPT/scheduler/workers/LSTM
+[model:NHITS] idx=2/7 status=running [------------------] 0/72   0% mode=learned_auto output_root=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case1_HPT/scheduler/workers/NHITS
+[model:DLinear] idx=3/7 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/7 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=5/7 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=6/7 status=queued [------------------] 0/1   0%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=0/7 failed=0 queued=5 current=LSTM(1/7),NHITS(2/7)
+[model:LSTM] idx=1/7 status=running phase=tune-trial-1/5 fold=1/12 [------------------] 0/72   0%
+[model:NHITS] idx=2/7 status=running [------------------] 0/72   0% mode=learned_auto output_root=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case1_HPT/scheduler/workers/NHITS
+[model:DLinear] idx=3/7 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/7 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=5/7 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=6/7 status=queued [------------------] 0/1   0%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=0/7 failed=0 queued=5 current=LSTM(1/7),NHITS(2/7)
+[model:LSTM] idx=1/7 status=running phase=tune-trial-1/5 fold=1/12 [------------------] 0/72   0%
+[model:NHITS] idx=2/7 status=running phase=tune-trial-1/5 fold=1/12 [------------------] 0/72   0%
+[model:DLinear] idx=3/7 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/7 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=5/7 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=6/7 status=queued [------------------] 0/1   0%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=0/7 failed=0 queued=5 current=LSTM(1/7),NHITS(2/7)
+[model:LSTM] idx=1/7 status=running phase=tune-trial-1/5 fold=1/12 [------------------] 1/72   1% mse=12.4547
+[model:NHITS] idx=2/7 status=running phase=tune-trial-1/5 fold=1/12 [------------------] 0/72   0%
+[model:DLinear] idx=3/7 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/7 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=5/7 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=6/7 status=queued [------------------] 0/1   0%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=0/7 failed=0 queued=5 current=LSTM(1/7),NHITS(2/7)
+[model:LSTM] idx=1/7 status=running phase=tune-trial-1/5 fold=2/12 [------------------] 1/72   1%
+[model:NHITS] idx=2/7 status=running phase=tune-trial-1/5 fold=1/12 [------------------] 0/72   0%
+[model:DLinear] idx=3/7 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/7 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=5/7 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=6/7 status=queued [------------------] 0/1   0%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=0/7 failed=0 queued=5 current=LSTM(1/7),NHITS(2/7)
+[model:LSTM] idx=1/7 status=running phase=tune-trial-1/5 fold=2/12 [------------------] 2/72   3% mse=3.0326
+[model:NHITS] idx=2/7 status=running phase=tune-trial-1/5 fold=1/12 [------------------] 0/72   0%
+[model:DLinear] idx=3/7 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/7 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=5/7 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=6/7 status=queued [------------------] 0/1   0%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=0/7 failed=0 queued=5 current=LSTM(1/7),NHITS(2/7)
+[model:LSTM] idx=1/7 status=running phase=tune-trial-1/5 fold=3/12 [------------------] 2/72   3%
+[model:NHITS] idx=2/7 status=running phase=tune-trial-1/5 fold=1/12 [------------------] 0/72   0%
+[model:DLinear] idx=3/7 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/7 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=5/7 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=6/7 status=queued [------------------] 0/1   0%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=0/7 failed=0 queued=5 current=LSTM(1/7),NHITS(2/7)
+[model:LSTM] idx=1/7 status=running phase=tune-trial-1/5 fold=3/12 [#-----------------] 3/72   4% mse=74.0424
+[model:NHITS] idx=2/7 status=running phase=tune-trial-1/5 fold=1/12 [------------------] 0/72   0%
+[model:DLinear] idx=3/7 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/7 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=5/7 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=6/7 status=queued [------------------] 0/1   0%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=0/7 failed=0 queued=5 current=LSTM(1/7),NHITS(2/7)
+[model:LSTM] idx=1/7 status=running phase=tune-trial-1/5 fold=4/12 [#-----------------] 3/72   4%
+[model:NHITS] idx=2/7 status=running phase=tune-trial-1/5 fold=1/12 [------------------] 0/72   0%
+[model:DLinear] idx=3/7 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/7 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=5/7 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=6/7 status=queued [------------------] 0/1   0%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=0/7 failed=0 queued=5 current=LSTM(1/7),NHITS(2/7)
+[model:LSTM] idx=1/7 status=running phase=tune-trial-1/5 fold=4/12 [#-----------------] 4/72   6% mse=164.7916
+[model:NHITS] idx=2/7 status=running phase=tune-trial-1/5 fold=1/12 [------------------] 0/72   0%
+[model:DLinear] idx=3/7 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/7 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=5/7 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=6/7 status=queued [------------------] 0/1   0%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=0/7 failed=0 queued=5 current=LSTM(1/7),NHITS(2/7)
+[model:LSTM] idx=1/7 status=running phase=tune-trial-1/5 fold=5/12 [#-----------------] 4/72   6%
+[model:NHITS] idx=2/7 status=running phase=tune-trial-1/5 fold=1/12 [------------------] 0/72   0%
+[model:DLinear] idx=3/7 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/7 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=5/7 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=6/7 status=queued [------------------] 0/1   0%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%

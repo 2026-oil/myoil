@@ -1,0 +1,108 @@
+{
+  "manifest_version": "1",
+  "artifact_schema_version": "1",
+  "evaluation_protocol_version": "2",
+  "config_source_type": "yaml",
+  "config_source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/baseline-wti_uni.yaml",
+  "config_resolved_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/baseline_wti/scheduler/workers/SMamba/config/config.resolved.json",
+  "config_input_sha256": "ccaccf6638220f8c941d45183becf4b4cc634b3b6142bf05fe3c77d4b6935fc9",
+  "config_resolved_sha256": "0bbb4a44666689671b392881db319a342cfb492d3b0711fe27595da610d76cca",
+  "search_space_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/search_space.yaml",
+  "search_space_sha256": "75ccd97c0dc11dc0d69e514abb37fac465540aa550fe9dc54c457505ceb22af6",
+  "entrypoint_version": "neuralforecast-residual-v1",
+  "compat_mode": "dual_read",
+  "jobs": [
+    {
+      "model": "DLinear",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "moving_avg_window"
+      ]
+    },
+    {
+      "model": "PatchTST",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "n_heads",
+        "encoder_layers",
+        "patch_len"
+      ]
+    },
+    {
+      "model": "TimeMixer",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "d_model",
+        "d_ff",
+        "down_sampling_layers",
+        "top_k"
+      ]
+    },
+    {
+      "model": "NonstationaryTransformer",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "dropout",
+        "n_head",
+        "conv_hidden_size",
+        "encoder_layers",
+        "decoder_layers"
+      ]
+    },
+    {
+      "model": "SMamba",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "n_block",
+        "expand_ratio",
+        "kernel_size",
+        "dropout",
+        "revin"
+      ],
+      "model_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/baseline_wti/scheduler/workers/SMamba/models/SMamba/best_params.json",
+      "model_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/baseline_wti/scheduler/workers/SMamba/models/SMamba/optuna_study_summary.json",
+      "training_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/baseline_wti/scheduler/workers/SMamba/models/SMamba/training_best_params.json",
+      "training_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/baseline_wti/scheduler/workers/SMamba/models/SMamba/training_optuna_study_summary.json"
+    },
+    {
+      "model": "Naive",
+      "requested_mode": "baseline_fixed",
+      "validated_mode": "baseline_fixed",
+      "selected_search_params": []
+    }
+  ],
+  "training_search": {
+    "requested_mode": "training_auto_requested",
+    "validated_mode": "training_auto",
+    "selected_search_params": [
+      "input_size",
+      "season_length",
+      "batch_size",
+      "valid_batch_size",
+      "windows_batch_size",
+      "inference_windows_batch_size",
+      "learning_rate",
+      "max_steps",
+      "val_check_steps"
+    ],
+    "best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/baseline_wti/scheduler/workers/SMamba/models/SMamba/training_best_params.json",
+    "optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/baseline_wti/scheduler/workers/SMamba/models/SMamba/training_optuna_study_summary.json"
+  },
+  "residual": {
+    "model": "xgboost",
+    "requested_mode": "residual_disabled",
+    "validated_mode": "residual_disabled",
+    "selected_search_params": []
+  },
+  "training": {
+    "loss": "mse"
+  }
+}

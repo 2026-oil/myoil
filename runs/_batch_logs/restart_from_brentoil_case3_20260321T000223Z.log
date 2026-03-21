@@ -1,0 +1,2228 @@
+[batch] repo_root=/home/sonet/.openclaw/workspace/research/neuralforecast
+[batch] timestamp=20260321T000223Z
+[batch] log_dir=runs/_batch_logs/20260321T000223Z
+[batch] runner=python3 main.py
+[batch] use_pty=0 (NF_CASE_USE_PTY=auto)
+[batch] extra_args=<none>
+
+================================================================================
+[batch] start: brentoil-case3.yaml
+--------------------------------------------------------------------------------
+[summary] completed=0/9 failed=0 queued=8 current=LSTM(1/9)
+[model:LSTM] idx=1/9 status=running [------------------] 0/1   0% gpu=0
+[model:NHITS] idx=2/9 status=queued [------------------] 0/1   0%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running [------------------] 0/1   0% gpu=0
+[model:NHITS] idx=2/9 status=running [------------------] 0/1   0% gpu=1
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running [------------------] 0/12   0% mode=learned_fixed output_root=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3/scheduler/workers/LSTM
+[model:NHITS] idx=2/9 status=running [------------------] 0/1   0% gpu=1
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:NHITS] idx=2/9 status=running [------------------] 0/1   0% gpu=1
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:NHITS] idx=2/9 status=running [------------------] 0/12   0% mode=learned_fixed output_root=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3/scheduler/workers/NHITS
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:NHITS] idx=2/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:NHITS] idx=2/9 status=running phase=replay fold=1/12 [##----------------] 1/12   8% mse=3468.7429
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:NHITS] idx=2/9 status=running phase=replay fold=2/12 [##----------------] 1/12   8%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=1/12 [##----------------] 1/12   8% mse=4.2093
+[model:NHITS] idx=2/9 status=running phase=replay fold=2/12 [##----------------] 1/12   8%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=2/12 [##----------------] 1/12   8%
+[model:NHITS] idx=2/9 status=running phase=replay fold=2/12 [##----------------] 1/12   8%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=2/12 [##----------------] 1/12   8%
+[model:NHITS] idx=2/9 status=running phase=replay fold=2/12 [###---------------] 2/12  17% mse=1237.9670
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=2/12 [##----------------] 1/12   8%
+[model:NHITS] idx=2/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=2/12 [###---------------] 2/12  17% mse=14.9097
+[model:NHITS] idx=2/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:NHITS] idx=2/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:NHITS] idx=2/9 status=running phase=replay fold=3/12 [####--------------] 3/12  25% mse=1182.3404
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:NHITS] idx=2/9 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=3/12 [####--------------] 3/12  25% mse=41.0485
+[model:NHITS] idx=2/9 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:NHITS] idx=2/9 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:NHITS] idx=2/9 status=running phase=replay fold=4/12 [######------------] 4/12  33% mse=431.4040
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:NHITS] idx=2/9 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=4/12 [######------------] 4/12  33% mse=76.8406
+[model:NHITS] idx=2/9 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:NHITS] idx=2/9 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:NHITS] idx=2/9 status=running phase=replay fold=5/12 [########----------] 5/12  42% mse=1314.5331
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:NHITS] idx=2/9 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=5/12 [########----------] 5/12  42% mse=47.7904
+[model:NHITS] idx=2/9 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:NHITS] idx=2/9 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:NHITS] idx=2/9 status=running phase=replay fold=6/12 [#########---------] 6/12  50% mse=791.8994
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:NHITS] idx=2/9 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=6/12 [#########---------] 6/12  50% mse=30.9690
+[model:NHITS] idx=2/9 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:NHITS] idx=2/9 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:NHITS] idx=2/9 status=running phase=replay fold=7/12 [##########--------] 7/12  58% mse=981.2929
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:NHITS] idx=2/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=7/12 [##########--------] 7/12  58% mse=177.6471
+[model:NHITS] idx=2/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:NHITS] idx=2/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=8/12 [############------] 8/12  67% mse=36.0884
+[model:NHITS] idx=2/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:NHITS] idx=2/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:NHITS] idx=2/9 status=running phase=replay fold=8/12 [############------] 8/12  67% mse=706.8038
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:NHITS] idx=2/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=9/12 [##############----] 9/12  75% mse=30.3570
+[model:NHITS] idx=2/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:NHITS] idx=2/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:NHITS] idx=2/9 status=running phase=replay fold=9/12 [##############----] 9/12  75% mse=1346.3440
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:NHITS] idx=2/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=10/12 [###############---] 10/12  83% mse=36.2282
+[model:NHITS] idx=2/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:NHITS] idx=2/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:NHITS] idx=2/9 status=running phase=replay fold=10/12 [###############---] 10/12  83% mse=154.5978
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:NHITS] idx=2/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=11/12 [################--] 11/12  92% mse=13.9536
+[model:NHITS] idx=2/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=12/12 [################--] 11/12  92%
+[model:NHITS] idx=2/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=12/12 [################--] 11/12  92%
+[model:NHITS] idx=2/9 status=running phase=replay fold=11/12 [################--] 11/12  92% mse=495.3494
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=12/12 [################--] 11/12  92%
+[model:NHITS] idx=2/9 status=running phase=replay fold=12/12 [################--] 11/12  92%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=0/9 failed=0 queued=7 current=LSTM(1/9),NHITS(2/9)
+[model:LSTM] idx=1/9 status=running phase=replay fold=12/12 [##################] 12/12 100% mse=79.3828
+[model:NHITS] idx=2/9 status=running phase=replay fold=12/12 [################--] 11/12  92%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=1/9 failed=0 queued=7 current=NHITS(2/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% run-complete
+[model:NHITS] idx=2/9 status=running phase=replay fold=12/12 [################--] 11/12  92%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[worker:LSTM] {"ok": true, "executed_jobs": ["LSTM"], "summary_artifacts": {}}
+[summary] completed=1/9 failed=0 queued=7 current=NHITS(2/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=running phase=replay fold=12/12 [################--] 11/12  92%
+[model:DLinear] idx=3/9 status=queued [------------------] 0/1   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=1/9 failed=0 queued=6 current=NHITS(2/9),DLinear(3/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=running phase=replay fold=12/12 [################--] 11/12  92%
+[model:DLinear] idx=3/9 status=running [------------------] 0/1   0% gpu=0
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=1/9 failed=0 queued=6 current=NHITS(2/9),DLinear(3/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=running phase=replay fold=12/12 [################--] 11/12  92%
+[model:DLinear] idx=3/9 status=running [------------------] 0/12   0% mode=learned_fixed output_root=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3/scheduler/workers/DLinear
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=1/9 failed=0 queued=6 current=NHITS(2/9),DLinear(3/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=running phase=replay fold=12/12 [################--] 11/12  92%
+[model:DLinear] idx=3/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=1/9 failed=0 queued=6 current=NHITS(2/9),DLinear(3/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=running phase=replay fold=12/12 [##################] 12/12 100% mse=317.8504
+[model:DLinear] idx=3/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=6 current=DLinear(3/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% run-complete
+[model:DLinear] idx=3/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[worker:NHITS] {"ok": true, "executed_jobs": ["NHITS"], "summary_artifacts": {}}
+[summary] completed=2/9 failed=0 queued=6 current=DLinear(3/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:Autoformer] idx=4/9 status=queued [------------------] 0/1   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:Autoformer] idx=4/9 status=running [------------------] 0/1   0% gpu=1
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=1/12 [##----------------] 1/12   8% mse=7.3067
+[model:Autoformer] idx=4/9 status=running [------------------] 0/1   0% gpu=1
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=2/12 [##----------------] 1/12   8%
+[model:Autoformer] idx=4/9 status=running [------------------] 0/1   0% gpu=1
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=2/12 [###---------------] 2/12  17% mse=18.4665
+[model:Autoformer] idx=4/9 status=running [------------------] 0/1   0% gpu=1
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:Autoformer] idx=4/9 status=running [------------------] 0/1   0% gpu=1
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:Autoformer] idx=4/9 status=running [------------------] 0/12   0% mode=learned_fixed output_root=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3/scheduler/workers/Autoformer
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=3/12 [####--------------] 3/12  25% mse=37.0505
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=4/12 [######------------] 4/12  33% mse=41.8941
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=5/12 [########----------] 5/12  42% mse=8.0691
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=6/12 [#########---------] 6/12  50% mse=13.6100
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=7/12 [##########--------] 7/12  58% mse=11.7829
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=8/12 [############------] 8/12  67% mse=15.3414
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=9/12 [##############----] 9/12  75% mse=7.3377
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=10/12 [###############---] 10/12  83% mse=19.6636
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=11/12 [################--] 11/12  92% mse=3.9877
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=12/12 [################--] 11/12  92%
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=2/9 failed=0 queued=5 current=DLinear(3/9),Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=running phase=replay fold=12/12 [##################] 12/12 100% mse=213.3382
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=5 current=Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% run-complete
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[worker:DLinear] {"ok": true, "executed_jobs": ["DLinear"], "summary_artifacts": {}}
+[summary] completed=3/9 failed=0 queued=5 current=Autoformer(4/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=queued [------------------] 0/1   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=running [------------------] 0/1   0% gpu=0
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=running [------------------] 0/12   0% mode=learned_fixed output_root=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3/scheduler/workers/FEDformer
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=1/12 [##----------------] 1/12   8% mse=985.2516
+[model:FEDformer] idx=5/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=2/12 [##----------------] 1/12   8%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=2/12 [###---------------] 2/12  17% mse=262.2445
+[model:FEDformer] idx=5/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=1/12 [##----------------] 1/12   8% mse=145.0905
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=2/12 [##----------------] 1/12   8%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=3/12 [####--------------] 3/12  25% mse=1599.4348
+[model:FEDformer] idx=5/9 status=running phase=replay fold=2/12 [##----------------] 1/12   8%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=2/12 [##----------------] 1/12   8%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=2/12 [###---------------] 2/12  17% mse=36.8643
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=4/12 [######------------] 4/12  33% mse=116.4745
+[model:FEDformer] idx=5/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=5/12 [########----------] 5/12  42% mse=368.8344
+[model:FEDformer] idx=5/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=6/12 [#########---------] 6/12  50% mse=327.6954
+[model:FEDformer] idx=5/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=3/12 [####--------------] 3/12  25% mse=20.7322
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=7/12 [##########--------] 7/12  58% mse=653.5885
+[model:FEDformer] idx=5/9 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=4/12 [######------------] 4/12  33% mse=319.8855
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=8/12 [############------] 8/12  67% mse=895.8885
+[model:FEDformer] idx=5/9 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=5/12 [########----------] 5/12  42% mse=34.9369
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=9/12 [##############----] 9/12  75% mse=235.4786
+[model:FEDformer] idx=5/9 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=6/12 [#########---------] 6/12  50% mse=25.8223
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=10/12 [###############---] 10/12  83% mse=113.8191
+[model:FEDformer] idx=5/9 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=7/12 [##########--------] 7/12  58% mse=6.1283
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=11/12 [################--] 11/12  92% mse=1053.7783
+[model:FEDformer] idx=5/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=12/12 [################--] 11/12  92%
+[model:FEDformer] idx=5/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=3/9 failed=0 queued=4 current=Autoformer(4/9),FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=running phase=replay fold=12/12 [##################] 12/12 100% mse=376.7539
+[model:FEDformer] idx=5/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=4 current=FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% run-complete
+[model:FEDformer] idx=5/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[worker:Autoformer] {"ok": true, "executed_jobs": ["Autoformer"], "summary_artifacts": {}}
+[summary] completed=4/9 failed=0 queued=4 current=FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:PatchTST] idx=6/9 status=queued [------------------] 0/1   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:PatchTST] idx=6/9 status=running [------------------] 0/1   0% gpu=1
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:PatchTST] idx=6/9 status=running [------------------] 0/12   0% mode=learned_fixed output_root=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3/scheduler/workers/PatchTST
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=1/12 [##----------------] 1/12   8% mse=17.5586
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=2/12 [##----------------] 1/12   8%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=2/12 [###---------------] 2/12  17% mse=32.9459
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=8/12 [############------] 8/12  67% mse=17.4575
+[model:PatchTST] idx=6/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=3/12 [####--------------] 3/12  25% mse=6.3659
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=4/12 [######------------] 4/12  33% mse=19.0445
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=5/12 [########----------] 5/12  42% mse=7.4113
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=6/12 [#########---------] 6/12  50% mse=13.2509
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=7/12 [##########--------] 7/12  58% mse=6.1623
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=8/12 [############------] 8/12  67% mse=14.1261
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=9/12 [##############----] 9/12  75% mse=10.9301
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=10/12 [###############---] 10/12  83% mse=21.0109
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=11/12 [################--] 11/12  92% mse=1.9796
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=12/12 [################--] 11/12  92%
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=4/9 failed=0 queued=3 current=FEDformer(5/9),PatchTST(6/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=running phase=replay fold=12/12 [##################] 12/12 100% mse=246.9101
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=3 current=FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% run-complete
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[worker:PatchTST] {"ok": true, "executed_jobs": ["PatchTST"], "summary_artifacts": {}}
+[summary] completed=5/9 failed=0 queued=3 current=FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=queued [------------------] 0/1   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running [------------------] 0/1   0% gpu=0
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running [------------------] 0/12   0% mode=learned_fixed output_root=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3/scheduler/workers/iTransformer
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=1/12 [------------------] 0/12   0%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=1/12 [##----------------] 1/12   8% mse=20.7370
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=2/12 [##----------------] 1/12   8%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=2/12 [###---------------] 2/12  17% mse=21.8221
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=9/12 [##############----] 9/12  75% mse=2.2258
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=3/12 [####--------------] 3/12  25% mse=9.7804
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=4/12 [######------------] 4/12  33% mse=2.1715
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=5/12 [########----------] 5/12  42% mse=9.6530
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=6/12 [#########---------] 6/12  50% mse=13.7377
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=7/12 [##########--------] 7/12  58% mse=7.4369
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=8/12 [##########--------] 7/12  58%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=8/12 [############------] 8/12  67% mse=56.2066
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=9/12 [############------] 8/12  67%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=9/12 [##############----] 9/12  75% mse=66.3600
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=10/12 [###############---] 10/12  83% mse=10.0493
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=11/12 [################--] 11/12  92% mse=2.6237
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=12/12 [################--] 11/12  92%
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=5/9 failed=0 queued=2 current=FEDformer(5/9),iTransformer(7/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=running phase=replay fold=12/12 [##################] 12/12 100% mse=301.7149
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=6/9 failed=0 queued=2 current=FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% run-complete
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[worker:iTransformer] {"ok": true, "executed_jobs": ["iTransformer"], "summary_artifacts": {}}
+[summary] completed=6/9 failed=0 queued=2 current=FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=queued [------------------] 0/1   0%
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=6/9 failed=0 queued=1 current=FEDformer(5/9),TimesNet(8/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [##############----] 9/12  75%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=running [------------------] 0/1   0% gpu=1
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=6/9 failed=0 queued=1 current=FEDformer(5/9),TimesNet(8/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=10/12 [###############---] 10/12  83% mse=39.0817
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=running [------------------] 0/1   0% gpu=1
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=6/9 failed=0 queued=1 current=FEDformer(5/9),TimesNet(8/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=running [------------------] 0/1   0% gpu=1
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[worker:TimesNet] {"ok": true, "scheduled_jobs": [], "worker_results": [], "summary_artifacts": {}}
+[summary] completed=7/9 failed=0 queued=1 current=FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=queued [------------------] 0/1   0%
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running [------------------] 0/1   0% gpu=0
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running [------------------] 0/12   0% mode=baseline_fixed output_root=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3/scheduler/workers/Naive
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=1/12 [------------------] 0/12   0%
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=1/12 [##----------------] 1/12   8% mse=5.0828
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=2/12 [##----------------] 1/12   8%
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=2/12 [###---------------] 2/12  17% mse=44.7486
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=3/12 [###---------------] 2/12  17%
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=3/12 [####--------------] 3/12  25% mse=18.7678
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=4/12 [####--------------] 3/12  25%
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=4/12 [######------------] 4/12  33% mse=4.8682
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=5/12 [######------------] 4/12  33%
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=5/12 [########----------] 5/12  42% mse=16.7770
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=6/12 [########----------] 5/12  42%
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=6/12 [#########---------] 6/12  50% mse=29.2770
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=7/12 [#########---------] 6/12  50%
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=7/12 [##########--------] 7/12  58% mse=2.9956
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=8/12 [##########--------] 7/12  58%
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=8/12 [############------] 8/12  67% mse=27.1801
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=9/12 [############------] 8/12  67%
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=9/12 [##############----] 9/12  75% mse=12.4608
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=10/12 [##############----] 9/12  75%
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=10/12 [###############---] 10/12  83% mse=22.1163
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=11/12 [###############---] 10/12  83%
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=11/12 [################--] 11/12  92% mse=3.2302
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=12/12 [################--] 11/12  92%
+[summary] completed=7/9 failed=0 queued=0 current=FEDformer(5/9),Naive(9/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=running phase=baseline fold=12/12 [##################] 12/12 100% mse=231.4880
+[summary] completed=8/9 failed=0 queued=0 current=FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=completed phase=baseline [##################] 12/12 100% run-complete
+[worker:Naive] {"ok": true, "executed_jobs": ["Naive"], "summary_artifacts": {}}
+[summary] completed=8/9 failed=0 queued=0 current=FEDformer(5/9)
+[model:LSTM] idx=1/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:FEDformer] idx=5/9 status=running phase=replay fold=11/12 [###############---] 10/12  83%
+[model:PatchTST] idx=6/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=7/9 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:TimesNet] idx=8/9 status=completed [------------------] 0/1   0% returncode=0
+[model:Naive] idx=9/9 status=completed phase=baseline [##################] 12/12 100% returncode=0

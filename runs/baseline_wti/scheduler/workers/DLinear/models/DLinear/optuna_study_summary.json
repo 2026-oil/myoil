@@ -1,0 +1,64 @@
+{
+  "direction": "minimize",
+  "trial_count": 5,
+  "best_value": 25.285139088330023,
+  "best_trial_number": 4,
+  "objective_metric": "mean_fold_mse",
+  "requested_mode": "learned_auto_requested",
+  "validated_mode": "learned_auto",
+  "selected_search_params": [
+    "moving_avg_window"
+  ],
+  "selected_training_search_params": [
+    "input_size",
+    "season_length",
+    "batch_size",
+    "valid_batch_size",
+    "windows_batch_size",
+    "inference_windows_batch_size",
+    "learning_rate",
+    "max_steps",
+    "val_check_steps"
+  ],
+  "best_params": {
+    "moving_avg_window": 25
+  },
+  "best_training_params": {
+    "input_size": 64,
+    "season_length": 52,
+    "batch_size": 16,
+    "valid_batch_size": 32,
+    "windows_batch_size": 1024,
+    "inference_windows_batch_size": 256,
+    "learning_rate": 0.07976805266869877,
+    "max_steps": 1000,
+    "val_check_steps": 100
+  },
+  "fold_mse": [
+    26.57203531991508,
+    14.384688078800663,
+    32.262609657772785,
+    18.87427291967578,
+    43.75128907220057,
+    39.02325915319396,
+    16.634622567128613,
+    20.105543121308003,
+    20.574264872668387,
+    3.751758590128699,
+    49.77372774660178,
+    14.203140580520179,
+    14.357015790760494,
+    12.232659974045523,
+    27.39028924458991,
+    15.619911607166156,
+    2.129904874767832,
+    26.58794235665325,
+    8.661785443949679,
+    28.528647254437523,
+    3.613472185684831,
+    3.0345620894258536,
+    9.057721585010905,
+    155.7182140335142
+  ],
+  "objective_stage": "tuning_pre_replay_direct_predictions"
+}

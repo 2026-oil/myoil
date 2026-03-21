@@ -1,0 +1,10 @@
+{
+  "job_name": "PatchTST",
+  "gpu_id": 1,
+  "devices": 1,
+  "cuda_visible_devices": "1",
+  "returncode": 0,
+  "stdout_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/baseline_wti/scheduler/workers/PatchTST/stdout.log",
+  "stderr_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/baseline_wti/scheduler/workers/PatchTST/stderr.log",
+  "completed_at": "2026-03-20T11:49:04.607872+00:00"
+}

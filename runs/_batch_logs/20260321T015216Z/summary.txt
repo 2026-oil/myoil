@@ -1,0 +1,8 @@
+[batch] summary
+[batch] repo_root=/home/sonet/.openclaw/workspace/research/neuralforecast
+[batch] log_dir=runs/_batch_logs/20260321T015216Z
+[batch] started_at=2026-03-21T01:52:16Z
+[batch] finished_at=2026-03-21T02:07:23Z
+[batch] passed=1 failed=0 missing=0
+[batch] passed:
+  - brentoil-case4.yaml

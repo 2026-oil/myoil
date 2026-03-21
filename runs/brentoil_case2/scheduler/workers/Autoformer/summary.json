@@ -1,0 +1,10 @@
+{
+  "job_name": "Autoformer",
+  "gpu_id": 1,
+  "devices": 1,
+  "cuda_visible_devices": "1",
+  "returncode": 0,
+  "stdout_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case2/scheduler/workers/Autoformer/stdout.log",
+  "stderr_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case2/scheduler/workers/Autoformer/stderr.log",
+  "completed_at": "2026-03-20T22:03:50.977021+00:00"
+}

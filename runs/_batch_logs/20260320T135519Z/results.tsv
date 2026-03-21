@@ -1,0 +1,2 @@
+config	status	exit_code	log_path	started_at	finished_at
+brentoil-case1.yaml	passed	0	runs/_batch_logs/20260320T135519Z/brentoil-case1.log	2026-03-20T13:55:19Z	2026-03-20T16:00:24Z

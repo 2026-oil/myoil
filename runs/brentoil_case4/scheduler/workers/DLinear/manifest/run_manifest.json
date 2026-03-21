@@ -1,0 +1,72 @@
+{
+  "manifest_version": "1",
+  "artifact_schema_version": "1",
+  "evaluation_protocol_version": "2",
+  "config_source_type": "yaml",
+  "config_source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/brentoil-case4.yaml",
+  "config_resolved_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4/scheduler/workers/DLinear/config/config.resolved.json",
+  "config_input_sha256": "35a8af11cd6dcf7e61850a4372d9238c09a8ee07104cb520c311a64fe8dbd6ee",
+  "config_resolved_sha256": "5a2f098f5b938e6cb91282dcebdac02622cbc7d24749c452a4a46b201124cbe3",
+  "search_space_path": null,
+  "search_space_sha256": null,
+  "entrypoint_version": "neuralforecast-residual-v1",
+  "compat_mode": "dual_read",
+  "jobs": [
+    {
+      "model": "LSTM",
+      "requested_mode": "learned_fixed",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": []
+    },
+    {
+      "model": "NHITS",
+      "requested_mode": "learned_fixed",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": []
+    },
+    {
+      "model": "DLinear",
+      "requested_mode": "learned_fixed",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": []
+    },
+    {
+      "model": "Autoformer",
+      "requested_mode": "learned_fixed",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": []
+    },
+    {
+      "model": "PatchTST",
+      "requested_mode": "learned_fixed",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": []
+    },
+    {
+      "model": "iTransformer",
+      "requested_mode": "learned_fixed",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": []
+    },
+    {
+      "model": "Naive",
+      "requested_mode": "baseline_fixed",
+      "validated_mode": "baseline_fixed",
+      "selected_search_params": []
+    }
+  ],
+  "training_search": {
+    "requested_mode": "training_fixed",
+    "validated_mode": "training_fixed",
+    "selected_search_params": []
+  },
+  "residual": {
+    "model": "xgboost",
+    "requested_mode": "residual_disabled",
+    "validated_mode": "residual_disabled",
+    "selected_search_params": []
+  },
+  "training": {
+    "loss": "mse"
+  }
+}

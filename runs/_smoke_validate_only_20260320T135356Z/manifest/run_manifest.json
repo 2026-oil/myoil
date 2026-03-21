@@ -1,0 +1,129 @@
+{
+  "manifest_version": "1",
+  "artifact_schema_version": "1",
+  "evaluation_protocol_version": "2",
+  "config_source_type": "yaml",
+  "config_source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/wti-case4_HPT.yaml",
+  "config_resolved_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/_smoke_validate_only_20260320T135356Z/config/config.resolved.json",
+  "config_input_sha256": "74c732d8def92dd337c58cdd04a36b12221fe478307e1dc02a0e975b20526a4a",
+  "config_resolved_sha256": "e60f67992946b24876556bf23614df1c82e217dcb16e5d7f8a06d6ecade11449",
+  "search_space_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/search_space.yaml",
+  "search_space_sha256": "75ccd97c0dc11dc0d69e514abb37fac465540aa550fe9dc54c457505ceb22af6",
+  "entrypoint_version": "neuralforecast-residual-v1",
+  "compat_mode": "dual_read",
+  "jobs": [
+    {
+      "model": "LSTM",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "encoder_hidden_size",
+        "decoder_hidden_size",
+        "encoder_n_layers",
+        "context_size"
+      ]
+    },
+    {
+      "model": "NHITS",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "n_pool_kernel_size",
+        "n_freq_downsample",
+        "dropout_prob_theta"
+      ]
+    },
+    {
+      "model": "DLinear",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "moving_avg_window"
+      ]
+    },
+    {
+      "model": "Autoformer",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "dropout",
+        "factor",
+        "n_head"
+      ]
+    },
+    {
+      "model": "FEDformer",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "modes",
+        "dropout"
+      ]
+    },
+    {
+      "model": "PatchTST",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "n_heads",
+        "encoder_layers",
+        "patch_len"
+      ]
+    },
+    {
+      "model": "iTransformer",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "n_heads",
+        "e_layers",
+        "d_ff"
+      ]
+    },
+    {
+      "model": "TimesNet",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "conv_hidden_size",
+        "top_k",
+        "encoder_layers"
+      ]
+    },
+    {
+      "model": "Naive",
+      "requested_mode": "baseline_fixed",
+      "validated_mode": "baseline_fixed",
+      "selected_search_params": []
+    }
+  ],
+  "training_search": {
+    "requested_mode": "training_auto_requested",
+    "validated_mode": "training_auto",
+    "selected_search_params": [
+      "input_size",
+      "season_length",
+      "batch_size",
+      "valid_batch_size",
+      "windows_batch_size",
+      "inference_windows_batch_size",
+      "learning_rate",
+      "max_steps",
+      "val_check_steps"
+    ]
+  },
+  "residual": {
+    "model": "xgboost",
+    "requested_mode": "residual_disabled",
+    "validated_mode": "residual_disabled",
+    "selected_search_params": []
+  },
+  "training": {
+    "loss": "mse"
+  }
+}

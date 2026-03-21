@@ -1,0 +1,4 @@
+[2026-03-21T00:39:08Z] watcher started latest=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/_batch_logs/20260321T002117Z pid=3589347
+[2026-03-21T00:39:08Z] detected completion row for brentoil-case4.yaml
+[2026-03-21T00:39:11Z] stopped old batch pid=3589347
+[2026-03-21T00:39:11Z] restarted run_brent_wti_cases.sh pid=3669023 log=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/_batch_logs/restart_after_brentoil_case4_20260321T003908Z.log
