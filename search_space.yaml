@@ -11,9 +11,10 @@ models:
     - decoder_hidden_size
   LSTM:
     - encoder_hidden_size
-    - decoder_hidden_size
     - encoder_n_layers
-    - context_size
+    - encoder_dropout
+    - decoder_hidden_size
+    - decoder_layers
   TCN:
     - encoder_hidden_size
     - kernel_size
@@ -51,6 +52,8 @@ models:
   NHITS:
     - n_pool_kernel_size
     - n_freq_downsample
+    - n_blocks
+    - mlp_units
     - dropout_prob_theta
   DLinear:
     - moving_avg_window
@@ -74,6 +77,11 @@ models:
     - e_layers
     - patch_len
     - dropout
+  DeformableTST:
+    - dims
+    - depths
+    - drop
+    - heads
   TFT:
     - hidden_size
     - dropout
@@ -90,9 +98,12 @@ models:
     - n_head
   Autoformer:
     - hidden_size
-    - dropout
-    - factor
     - n_head
+    - encoder_layers
+    - decoder_layers
+    - factor
+    - MovingAvg_window
+    - dropout
   FEDformer:
     - hidden_size
     - modes
@@ -101,12 +112,22 @@ models:
     - hidden_size
     - n_heads
     - encoder_layers
+    - linear_hidden_size
     - patch_len
+    - stride
+    - dropout
+    - fc_dropout
+    - attn_dropout
+    - revin
   iTransformer:
     - hidden_size
     - n_heads
     - e_layers
     - d_ff
+    - d_layers
+    - factor
+    - dropout
+    - use_norm
   TimeLLM:
     - patch_len
     - stride

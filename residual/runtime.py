@@ -434,7 +434,7 @@ def _tune_main_job(
     progress: _ProgressLogger | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     sampler = build_optuna_sampler(optuna_seed(loaded.config.runtime.random_seed))
-    trial_count = optuna_num_trials()
+    trial_count = optuna_num_trials(loaded.config.runtime.opt_n_trial)
 
     def objective(trial: optuna.Trial) -> float:
         candidate_params = suggest_model_params(
@@ -864,7 +864,11 @@ def _apply_residual_plugin(
         study = optuna.create_study(
             sampler=sampler, direction=DEFAULT_OPTUNA_STUDY_DIRECTION
         )
-        study.optimize(objective, n_trials=optuna_num_trials(), show_progress_bar=False)
+        study.optimize(
+            objective,
+            n_trials=optuna_num_trials(loaded.config.runtime.opt_n_trial),
+            show_progress_bar=False,
+        )
         residual_params = {**DEFAULT_RESIDUAL_PARAMS, **study.best_trial.user_attrs["best_params"]}
         (residual_root / "best_params.json").write_text(
             json.dumps(residual_params, indent=2), encoding="utf-8"
@@ -1269,7 +1273,7 @@ def _run_single_job(
     models_dir.mkdir(parents=True, exist_ok=True)
     total_steps = len(splits)
     if job.validated_mode == "learned_auto":
-        total_steps *= optuna_num_trials() + 1
+        total_steps *= optuna_num_trials(loaded.config.runtime.opt_n_trial) + 1
     progress = _ProgressLogger(job.model, total_steps)
     progress.model_started(
         total_folds=len(splits),

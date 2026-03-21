@@ -21,10 +21,12 @@ from residual.models import (
     supports_auto_mode,
 )
 from residual.optuna_spaces import (
+    DEFAULT_OPTUNA_NUM_TRIALS,
     EXCLUDED_AUTO_MODEL_NAMES,
     MODEL_PARAM_REGISTRY,
     SUPPORTED_AUTO_MODEL_NAMES,
     TRAINING_PARAM_REGISTRY,
+    optuna_num_trials,
 )
 from residual.plugins_base import ResidualContext, ResidualPlugin
 from residual.progress import PROGRESS_EVENT_PREFIX
@@ -40,6 +42,7 @@ NEWLY_SUPPORTED_MODEL_ALIASES = {
     "xLSTMMixer": ("xlstmmixer", "autoxlstmmixer"),
     "DUET": ("duet", "autoduet"),
     "DeformTime": ("deformtime",),
+    "DeformableTST": ("deformabletst",),
     "ModernTCN": ("moderntcn",),
 }
 
@@ -177,6 +180,46 @@ def _payload() -> dict:
             },
         ],
     }
+
+
+def test_load_app_config_preserves_runtime_opt_n_trial(tmp_path: Path):
+    payload = _payload()
+    payload["runtime"]["opt_n_trial"] = 9
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n",
+        encoding="utf-8",
+    )
+
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    assert loaded.config.runtime.opt_n_trial == 9
+    assert loaded.normalized_payload["runtime"]["opt_n_trial"] == 9
+
+
+def test_optuna_num_trials_prefers_yaml_then_env_then_default(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("NEURALFORECAST_OPTUNA_NUM_TRIALS", "7")
+    assert optuna_num_trials(11) == 11
+    assert optuna_num_trials(None) == 7
+    monkeypatch.delenv("NEURALFORECAST_OPTUNA_NUM_TRIALS", raising=False)
+    assert optuna_num_trials(None) == DEFAULT_OPTUNA_NUM_TRIALS
+
+
+def test_load_app_config_rejects_non_positive_runtime_opt_n_trial(tmp_path: Path):
+    payload = _payload()
+    payload["runtime"]["opt_n_trial"] = 0
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="runtime.opt_n_trial must be a positive integer"):
+        load_app_config(
+            tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+        )
 
 
 def test_toml_and_yaml_normalize_to_same_typed_model(tmp_path: Path):
@@ -1824,6 +1867,54 @@ def test_runtime_auto_mode_records_selector_provenance_and_modes(
     assert (output_root / "models" / "TFT" / "optuna_study_summary.json").exists()
 
 
+def test_runtime_auto_mode_prefers_yaml_opt_n_trial_over_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    payload = _payload()
+    payload["runtime"]["opt_n_trial"] = 2
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n"
+        "2020-01-29,5\n2020-02-05,6\n2020-02-12,7\n2020-02-19,8\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(tmp_path)
+
+    from residual import runtime
+
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    monkeypatch.setenv("NEURALFORECAST_OPTUNA_NUM_TRIALS", "1")
+    monkeypatch.setenv("NEURALFORECAST_OPTUNA_SEED", "7")
+    monkeypatch.setattr(
+        runtime,
+        "load_app_config",
+        lambda _repo_root, **kwargs: load_app_config(tmp_path, **kwargs),
+    )
+
+    output_root = tmp_path / "run_auto_yaml_trials"
+    code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "TFT",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    assert code == 0
+    study_summary = json.loads(
+        (output_root / "models" / "TFT" / "optuna_study_summary.json").read_text()
+    )
+    assert study_summary["trial_count"] == 2
+
+
 def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -2031,7 +2122,7 @@ def test_package_exports_and_intentional_omissions_are_explicit():
     assert hasattr(nf_models, "DeformTime")
     assert not hasattr(nf_models, "DeepEDM")
     assert not hasattr(nf_models, "NonstationaryTransformer")
-    assert not hasattr(nf_models, "DeformableTST")
+    assert hasattr(nf_models, "DeformableTST")
     assert "DeformTime" in SUPPORTED_AUTO_MODEL_NAMES
     assert "DeformTime" in MODEL_CLASSES
     assert "DeepEDM" not in SUPPORTED_AUTO_MODEL_NAMES
@@ -2042,13 +2133,13 @@ def test_package_exports_and_intentional_omissions_are_explicit():
     assert "autodeepedm" not in MODEL_FILENAME_DICT
     assert "nonstationarytransformer" not in MODEL_FILENAME_DICT
     assert "autononstationarytransformer" not in MODEL_FILENAME_DICT
-    assert "DeformableTST" not in SUPPORTED_AUTO_MODEL_NAMES
-    assert "DeformableTST" not in MODEL_CLASSES
+    assert "DeformableTST" in SUPPORTED_AUTO_MODEL_NAMES
+    assert "DeformableTST" in MODEL_CLASSES
     search_space = yaml.safe_load((REPO_ROOT / "search_space.yaml").read_text())
     assert "DeformTime" in search_space["models"]
     assert "DeepEDM" not in search_space["models"]
     assert "NonstationaryTransformer" not in search_space["models"]
-    assert "DeformableTST" not in search_space["models"]
+    assert "DeformableTST" in search_space["models"]
 
 
 @pytest.mark.parametrize(
@@ -2069,6 +2160,7 @@ def test_supports_auto_mode_expands_to_newly_added_models():
         "RNN",
         "DeepAR",
         "DeformTime",
+        "DeformableTST",
         "TimeMixer",
         "ModernTCN",
         "DUET",
@@ -2095,6 +2187,15 @@ def test_build_model_supports_new_official_model_ports(tmp_path: Path):
             "params": {"d_model": 16, "patch_len": 4},
         },
         {
+            "model": "DeformableTST",
+            "params": {
+                "dims": [32, 64, 128, 256],
+                "depths": [1, 1, 2, 1],
+                "drop": 0.1,
+                "heads": [2, 4, 8, 16],
+            },
+        },
+        {
             "model": "ModernTCN",
             "params": {
                 "patch_size": 8,
@@ -2109,9 +2210,11 @@ def test_build_model_supports_new_official_model_ports(tmp_path: Path):
     loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
 
     deform = build_model(loaded.config, loaded.config.jobs[0], n_series=1)
-    modern = build_model(loaded.config, loaded.config.jobs[1], n_series=1)
+    deformabletst = build_model(loaded.config, loaded.config.jobs[1], n_series=1)
+    modern = build_model(loaded.config, loaded.config.jobs[2], n_series=1)
 
     assert deform.__class__.__name__ == "DeformTime"
+    assert deformabletst.__class__.__name__ == "DeformableTST"
     assert modern.__class__.__name__ == "ModernTCN"
 
 
@@ -2385,6 +2488,19 @@ HPT_CASE12_YAML_FILES = [
     REPO_ROOT / 'yaml' / 'feature_set_HPT' / 'wti-case2.yaml',
 ]
 
+OPTUNA_CONFIG_YAML_FILES = [
+    REPO_ROOT / 'baseline-brentoil.yaml',
+    REPO_ROOT / 'baseline-brentoil_uni.yaml',
+    REPO_ROOT / 'baseline-wti.yaml',
+    REPO_ROOT / 'baseline-wti_uni.yaml',
+    REPO_ROOT / 'yaml' / 'blackswan' / 'swan_test.yaml',
+    *HPT_CASE12_YAML_FILES,
+    REPO_ROOT / 'tests' / 'fixtures' / 'optuna_learned_auto.yaml',
+    REPO_ROOT / 'tests' / 'fixtures' / 'optuna_learned_auto_with_residual.yaml',
+    REPO_ROOT / 'tests' / 'fixtures' / 'optuna_relocated_config.yaml',
+    REPO_ROOT / 'tests' / 'fixtures' / 'optuna_unsupported_learned_empty_params.yaml',
+]
+
 EXPECTED_CASE_TRAINING = {
     'input_size': 64,
     'season_length': 52,
@@ -2456,6 +2572,55 @@ EXPECTED_HPT_CASE12_MODELS = [
 SEARCH_SPACE_MODELS = yaml.safe_load(
     (REPO_ROOT / 'search_space.yaml').read_text(encoding='utf-8')
 )['models']
+
+EXPECTED_REPO_AUTO_SELECTORS = {
+    'LSTM': [
+        'encoder_hidden_size',
+        'encoder_n_layers',
+        'encoder_dropout',
+        'decoder_hidden_size',
+        'decoder_layers',
+    ],
+    'NHITS': [
+        'n_pool_kernel_size',
+        'n_freq_downsample',
+        'n_blocks',
+        'mlp_units',
+        'dropout_prob_theta',
+    ],
+    'DLinear': ['moving_avg_window'],
+    'Autoformer': [
+        'hidden_size',
+        'n_head',
+        'encoder_layers',
+        'decoder_layers',
+        'factor',
+        'MovingAvg_window',
+        'dropout',
+    ],
+    'PatchTST': [
+        'hidden_size',
+        'n_heads',
+        'encoder_layers',
+        'linear_hidden_size',
+        'patch_len',
+        'stride',
+        'dropout',
+        'fc_dropout',
+        'attn_dropout',
+        'revin',
+    ],
+    'iTransformer': [
+        'hidden_size',
+        'n_heads',
+        'e_layers',
+        'd_ff',
+        'd_layers',
+        'factor',
+        'dropout',
+        'use_norm',
+    ],
+}
 
 EXPECTED_CASE_METADATA = {
     'brentoil-case1.yaml': {
@@ -2636,6 +2801,12 @@ def test_feature_set_hpt_directory_only_contains_case12_files():
     assert actual == sorted(path.name for path in HPT_CASE12_YAML_FILES)
 
 
+@pytest.mark.parametrize('path', OPTUNA_CONFIG_YAML_FILES, ids=lambda p: p.name)
+def test_optuna_config_yamls_pin_runtime_opt_n_trial(path: Path):
+    payload = _load_case_yaml(path)
+    assert payload["runtime"]["opt_n_trial"] == 20
+
+
 @pytest.mark.parametrize('path', HPT_CASE12_YAML_FILES, ids=lambda p: p.name)
 def test_feature_set_hpt_case12_cv_and_jobs_follow_optuna_scope(path: Path):
     payload = _load_case_yaml(path)
@@ -2676,6 +2847,19 @@ def test_feature_set_hpt_case12_normalizes_to_auto_training_and_learned_jobs(pat
             assert job.requested_mode == 'learned_auto_requested'
             assert job.validated_mode == 'learned_auto'
             assert list(job.selected_search_params) == list(SEARCH_SPACE_MODELS[job.model])
+
+
+def test_repo_search_space_updates_requested_auto_selectors_only():
+    for model_name, expected in EXPECTED_REPO_AUTO_SELECTORS.items():
+        assert SEARCH_SPACE_MODELS[model_name] == expected
+
+    assert SEARCH_SPACE_MODELS["GRU"] == [
+        "encoder_hidden_size",
+        "encoder_n_layers",
+        "context_size",
+        "decoder_hidden_size",
+    ]
+    assert SEARCH_SPACE_MODELS["TFT"] == ["hidden_size", "dropout", "n_head"]
 
 
 def _residual_target_panel(rows: list[dict[str, object]]) -> pd.DataFrame:
@@ -2888,3 +3072,114 @@ def test_apply_residual_plugin_writes_residual_target_to_diagnostics(
     )
 
     assert diagnostics["residual.target"] == "delta"
+
+
+def test_apply_residual_plugin_prefers_yaml_opt_n_trial_over_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from residual import runtime
+
+    class _ZeroResidualPlugin(ResidualPlugin):
+        name = "zero"
+
+        def fit(self, panel_df: pd.DataFrame, context: ResidualContext) -> None:
+            return None
+
+        def predict(self, panel_df: pd.DataFrame) -> pd.DataFrame:
+            return panel_df.copy().assign(residual_hat=0.0)
+
+        def metadata(self) -> dict[str, object]:
+            return {"plugin": self.name}
+
+    monkeypatch.setattr(
+        runtime,
+        "build_residual_plugin",
+        lambda _config: _ZeroResidualPlugin(),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_score_residual_params",
+        lambda *_args, **_kwargs: 1.0,
+    )
+    monkeypatch.setenv("NEURALFORECAST_OPTUNA_NUM_TRIALS", "1")
+    monkeypatch.setenv("NEURALFORECAST_OPTUNA_SEED", "7")
+
+    payload = _payload()
+    payload["runtime"]["opt_n_trial"] = 2
+    payload["residual"] = {"enabled": True, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n",
+        encoding="utf-8",
+    )
+    _write_search_space(tmp_path)
+    loaded = load_app_config(
+        tmp_path,
+        config_path=_write_config(tmp_path, payload, ".yaml"),
+    )
+    job = loaded.config.jobs[0]
+    run_root = tmp_path / "run"
+    manifest_path = run_root / "manifest" / "run_manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps({"jobs": [{"model": job.model}], "residual": {}}, indent=2),
+        encoding="utf-8",
+    )
+    fold_payloads = [
+        {
+            "fold_idx": 0,
+            "trial_dir": run_root / "residual" / job.model / "_optuna_trial",
+            "backcast_panel": _residual_target_panel(
+                [
+                    {
+                        "model_name": job.model,
+                        "fold_idx": 0,
+                        "panel_split": "backcast_train",
+                        "unique_id": "target",
+                        "cutoff": "2020-01-15",
+                        "train_end_ds": "2020-01-15",
+                        "ds": "2020-01-22",
+                        "horizon_step": 1,
+                        "y_hat_base": 12.0,
+                        "y": 13.0,
+                        "residual_target": 1.0,
+                    }
+                ]
+            ),
+            "eval_panel": _residual_target_panel(
+                [
+                    {
+                        "model_name": job.model,
+                        "fold_idx": 0,
+                        "panel_split": "fold_eval",
+                        "unique_id": "target",
+                        "cutoff": "2020-01-15",
+                        "train_end_ds": "2020-01-15",
+                        "ds": "2020-01-22",
+                        "horizon_step": 1,
+                        "y_hat_base": 12.0,
+                        "y": 13.0,
+                        "residual_target": 1.0,
+                    }
+                ]
+            ),
+            "base_summary": {"fold_idx": 0},
+        }
+    ]
+
+    runtime._apply_residual_plugin(
+        loaded,
+        job,
+        run_root,
+        fold_payloads,
+        manifest_path=manifest_path,
+    )
+
+    summary = json.loads(
+        (
+            run_root
+            / "residual"
+            / job.model
+            / "optuna_study_summary.json"
+        ).read_text()
+    )
+    assert summary["trial_count"] == 2

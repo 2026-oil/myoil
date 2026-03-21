@@ -30,6 +30,7 @@ SUPPORTED_AUTO_MODEL_NAMES = {
     "TiDE",
     "DeepNPTS",
     "DeformTime",
+    "DeformableTST",
     "KAN",
     "TFT",
     "VanillaTransformer",
@@ -57,7 +58,7 @@ SUPPORTED_AUTO_MODEL_NAMES = {
     "XLinear",
 }
 SUPPORTED_RESIDUAL_MODELS = {"xgboost"}
-DEFAULT_OPTUNA_NUM_TRIALS = 5
+DEFAULT_OPTUNA_NUM_TRIALS = 20
 DEFAULT_OPTUNA_STUDY_DIRECTION = "minimize"
 
 DEFAULT_RESIDUAL_PARAMS = {
@@ -118,8 +119,12 @@ def load_search_space_contract(repo_root: Path) -> SearchSpaceContract:
     return SearchSpaceContract(path=path, payload=payload, sha256=_hash_text(text))
 
 
-def optuna_num_trials() -> int:
-    return int(os.environ.get("NEURALFORECAST_OPTUNA_NUM_TRIALS", DEFAULT_OPTUNA_NUM_TRIALS))
+def optuna_num_trials(runtime_opt_n_trial: int | None = None) -> int:
+    if runtime_opt_n_trial is not None:
+        return int(runtime_opt_n_trial)
+    return int(
+        os.environ.get("NEURALFORECAST_OPTUNA_NUM_TRIALS", DEFAULT_OPTUNA_NUM_TRIALS)
+    )
 
 
 def optuna_seed(default: int) -> int:
@@ -182,10 +187,13 @@ MODEL_PARAM_REGISTRY = {
         "n_head": _categorical([4, 8]),
     },
     "Autoformer": {
-        "hidden_size": _categorical([32, 64, 128, 256]),
-        "dropout": _float(0.0, 0.3),
-        "factor": _int(1, 5),
+        "hidden_size": _categorical([64, 128, 256]),
         "n_head": _categorical([4, 8]),
+        "encoder_layers": _int(1, 3),
+        "decoder_layers": _int(1, 2),
+        "factor": _categorical([1, 3, 5]),
+        "MovingAvg_window": _categorical([5, 13, 25]),
+        "dropout": _categorical([0.0, 0.1, 0.2, 0.3]),
     },
     "FEDformer": {
         "hidden_size": _categorical([32, 64, 128, 256]),
@@ -194,16 +202,23 @@ MODEL_PARAM_REGISTRY = {
         "n_head": _categorical([4, 8]),
     },
     "PatchTST": {
-        "hidden_size": _categorical([16, 64, 128, 256]),
-        "n_heads": _categorical([4, 8, 16]),
-        "encoder_layers": _int(1, 4),
-        "patch_len": _categorical([8, 16, 24]),
-        "dropout": _float(0.0, 0.3),
+        "hidden_size": _categorical([64, 128, 256]),
+        "n_heads": _categorical([4, 8]),
+        "encoder_layers": _int(2, 4),
+        "linear_hidden_size": _categorical([128, 256, 512]),
+        "patch_len": _categorical([4, 8, 12, 16]),
+        "stride": _categorical([2, 4, 8]),
+        "dropout": _categorical([0.0, 0.1, 0.2, 0.3]),
+        "fc_dropout": _categorical([0.0, 0.1, 0.2]),
+        "attn_dropout": _categorical([0.0, 0.1]),
+        "revin": _categorical([True, False]),
     },
     "LSTM": {
-        "encoder_hidden_size": _categorical([16, 32, 64, 128]),
-        "decoder_hidden_size": _categorical([16, 32, 64, 128]),
+        "encoder_hidden_size": _categorical([32, 64, 128, 256]),
         "encoder_n_layers": _int(1, 3),
+        "encoder_dropout": _categorical([0.0, 0.1, 0.2, 0.3]),
+        "decoder_hidden_size": _categorical([32, 64, 128, 256]),
+        "decoder_layers": _int(1, 3),
         "context_size": _categorical([5, 10, 50]),
     },
     "TCN": {
@@ -260,15 +275,23 @@ MODEL_PARAM_REGISTRY = {
     },
     "NHITS": {
         "n_pool_kernel_size": _categorical(
-            [[2, 2, 1], [1, 1, 1], [2, 2, 2], [4, 2, 1]]
+            [[2, 2, 1], [4, 2, 1], [8, 4, 1]]
         ),
         "n_freq_downsample": _categorical(
-            [[24, 12, 1], [60, 8, 1], [40, 20, 1], [1, 1, 1]]
+            [[4, 2, 1], [8, 4, 1], [12, 3, 1]]
         ),
-        "dropout_prob_theta": _float(0.0, 0.3),
+        "n_blocks": _categorical([[1, 1, 1], [1, 2, 2], [2, 2, 2]]),
+        "mlp_units": _categorical(
+            [
+                [[128, 128], [128, 128], [128, 128]],
+                [[256, 256], [256, 256], [256, 256]],
+                [[512, 512], [512, 512], [512, 512]],
+            ]
+        ),
+        "dropout_prob_theta": _categorical([0.0, 0.1, 0.2]),
     },
     "DLinear": {
-        "moving_avg_window": _categorical([3, 5, 7, 25]),
+        "moving_avg_window": _categorical([5, 9, 13, 25, 51]),
     },
     "NLinear": {
         "learning_rate": _float(1e-4, 1e-1, log=True),
@@ -296,12 +319,21 @@ MODEL_PARAM_REGISTRY = {
         "patch_len": _categorical([4, 8, 16]),
         "dropout": _float(0.0, 0.3),
     },
+    "DeformableTST": {
+        "dims": _categorical([[64, 128, 256, 512], [32, 64, 128, 256]]),
+        "depths": _categorical([[1, 1, 3, 1], [1, 1, 2, 1]]),
+        "drop": _float(0.0, 0.3),
+        "heads": _categorical([[4, 8, 16, 32], [2, 4, 8, 16]]),
+    },
     "iTransformer": {
-        "hidden_size": _categorical([32, 64, 128, 256]),
+        "hidden_size": _categorical([64, 128, 256]),
         "n_heads": _categorical([4, 8]),
-        "e_layers": _int(1, 4),
+        "e_layers": _int(1, 3),
         "d_ff": _categorical([128, 256, 512]),
-        "dropout": _float(0.0, 0.3),
+        "d_layers": _int(1, 2),
+        "factor": _categorical([1, 3, 5]),
+        "dropout": _categorical([0.0, 0.1, 0.2, 0.3]),
+        "use_norm": _categorical([True, False]),
     },
     "TimeLLM": {
         "patch_len": _categorical([8, 16, 24]),
@@ -428,15 +460,15 @@ RESIDUAL_PARAM_REGISTRY = {
 }
 
 TRAINING_PARAM_REGISTRY = {
-    "input_size": _categorical([16, 32, 64, 128]),
-    "season_length": _categorical([12, 24, 52]),
+    "input_size": _categorical([24, 36, 48, 64, 72, 96]),
+    "season_length": _categorical([26, 52]),
     "batch_size": _categorical([16, 32, 64]),
     "valid_batch_size": _categorical([16, 32, 64]),
-    "windows_batch_size": _categorical([256, 512, 1024]),
+    "windows_batch_size": _categorical([128, 256, 512, 1024]),
     "inference_windows_batch_size": _categorical([256, 512, 1024]),
-    "learning_rate": _float(1e-4, 1e-1, log=True),
-    "max_steps": _categorical([100, 300, 500, 1000]),
-    "val_check_steps": _categorical([25, 50, 100, 200]),
+    "learning_rate": _float(3e-4, 1e-2, log=True),
+    "max_steps": _categorical([300, 500, 800, 1200]),
+    "val_check_steps": _categorical([50, 100, 200]),
 }
 
 

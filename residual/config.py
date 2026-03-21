@@ -59,6 +59,7 @@ class DatasetConfig:
 @dataclass(frozen=True)
 class RuntimeConfig:
     random_seed: int = 1
+    opt_n_trial: int | None = None
 
 
 @dataclass(frozen=True)
@@ -408,6 +409,11 @@ def _normalize_payload(
     dataset_path = Path(dataset.get("path", "df.csv"))
     if not dataset_path.is_absolute():
         dataset_path = (base_dir / dataset_path).resolve()
+
+    if runtime.get("opt_n_trial") is not None:
+        runtime["opt_n_trial"] = int(runtime["opt_n_trial"])
+        if runtime["opt_n_trial"] <= 0:
+            raise ValueError("runtime.opt_n_trial must be a positive integer")
 
     training.setdefault("loss", "mse")
     loss = str(training["loss"]).lower()

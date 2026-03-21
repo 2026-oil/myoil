@@ -1,34 +1,35 @@
+task:
+  name: ralph_new_model_smoke
 dataset:
-  path: optuna_smoke_data.csv
+  path: /home/sonet/.openclaw/workspace/research/neuralforecast/.tmp_ralph_model_smokes/data.csv
   target_col: target
   dt_col: dt
   hist_exog_cols: []
   futr_exog_cols: []
   static_exog_cols: []
 runtime:
-  random_seed: 7
-  opt_n_trial: 20
+  random_seed: 1
 training:
-  input_size: 1
+  input_size: 4
   season_length: 1
-  batch_size: 1
-  valid_batch_size: 1
+  batch_size: 4
+  valid_batch_size: 4
   windows_batch_size: 8
   inference_windows_batch_size: 8
   learning_rate: 0.001
   max_steps: 1
   val_size: 1
   val_check_steps: 1
-  early_stop_patience_steps: -1
   loss: mse
 cv:
   horizon: 1
   step_size: 1
-  n_windows: 2
+  n_windows: 1
   gap: 0
   overlap_eval_policy: by_cutoff_mean
 scheduler:
-  gpu_ids: [0]
+  gpu_ids:
+  - 0
   max_concurrent_jobs: 1
   worker_devices: 1
 residual:
@@ -36,5 +37,10 @@ residual:
   model: xgboost
   params: {}
 jobs:
-  - model: DummyUnivariate
-    params: {}
+- model: DeformTime
+  params:
+    d_model: 16
+    patch_len: 4
+    n_heads: 4
+    e_layers: 1
+    stride: 1

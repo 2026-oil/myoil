@@ -12,7 +12,8 @@
     "static_exog_cols": []
   },
   "runtime": {
-    "random_seed": 1
+    "random_seed": 1,
+    "opt_n_trial": null
   },
   "training": {
     "train_protocol": "expanding_window_tscv",
@@ -63,9 +64,9 @@
       "model": "DeformTime",
       "params": {
         "d_model": 16,
+        "patch_len": 4,
         "n_heads": 4,
         "e_layers": 1,
-        "patch_len": 2,
         "stride": 1
       },
       "requested_mode": "learned_fixed",

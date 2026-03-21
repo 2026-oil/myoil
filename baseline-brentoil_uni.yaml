@@ -9,6 +9,7 @@ dataset:
   static_exog_cols: []
 runtime:
   random_seed: 1
+  opt_n_trial: 20
 training:
   train_protocol: expanding_window_tscv
   early_stop_patience_steps: -1

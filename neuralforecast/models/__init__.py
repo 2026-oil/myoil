@@ -3,7 +3,7 @@ __all__ = ['RNN', 'GRU', 'LSTM', 'TCN', 'DeepAR', 'DilatedRNN',
            'TFT', 'VanillaTransformer', 'Informer', 'Autoformer', 'PatchTST', 'FEDformer',
            'StemGNN', 'HINT', 'TimesNet', 'TimeLLM', 'TSMixer', 'TSMixerx', 'MLPMultivariate',
            'iTransformer', 'BiTCN', 'TiDE', 'DeepNPTS', 'SOFTS', 'TimeMixer', 'KAN', 'RMoK',
-           'DeformTime', 'ModernTCN',
+           'DeformTime', 'DeformableTST', 'ModernTCN',
            'Mamba', 'SMamba', 'CMamba', 'xLSTMMixer', 'DUET',
            'TimeXer', 'xLSTM', 'XLinear'
            ]
@@ -38,6 +38,7 @@ from .bitcn import BiTCN
 from .tide import TiDE
 from .deepnpts import DeepNPTS
 from .deformtime import DeformTime
+from .deformabletst import DeformableTST
 from .softs import SOFTS
 from .timemixer import TimeMixer
 from .moderntcn import ModernTCN
