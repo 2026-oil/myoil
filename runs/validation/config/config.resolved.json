@@ -10,37 +10,29 @@
   },
   "runtime": {
     "random_seed": 7,
-    "opt_n_trial": 20
+    "opt_n_trial": null
   },
   "training": {
     "train_protocol": "expanding_window_tscv",
     "input_size": 1,
-    "season_length": 1,
     "batch_size": 1,
     "valid_batch_size": 1,
     "windows_batch_size": 8,
     "inference_windows_batch_size": 8,
     "learning_rate": 0.001,
+    "scaler_type": null,
     "max_steps": 1,
     "val_size": 1,
     "val_check_steps": 1,
     "early_stop_patience_steps": -1,
-    "loss": "mse"
+    "num_lr_decays": -1,
+    "loss": "mse",
+    "step_size": 1
   },
   "training_search": {
-    "requested_mode": "training_auto_requested",
-    "validated_mode": "training_auto",
-    "selected_search_params": [
-      "input_size",
-      "season_length",
-      "batch_size",
-      "valid_batch_size",
-      "windows_batch_size",
-      "inference_windows_batch_size",
-      "learning_rate",
-      "max_steps",
-      "val_check_steps"
-    ]
+    "requested_mode": "training_fixed",
+    "validated_mode": "training_fixed",
+    "selected_search_params": []
   },
   "cv": {
     "horizon": 1,
@@ -59,31 +51,48 @@
   },
   "residual": {
     "enabled": true,
-    "model": "randomforest",
+    "model": "xgboost",
     "target": "level",
-    "params": {},
-    "requested_mode": "residual_auto_requested",
-    "validated_mode": "residual_auto",
-    "selected_search_params": [
-      "n_estimators",
-      "max_depth",
-      "min_samples_leaf",
-      "max_features"
-    ]
+    "params": {
+      "n_estimators": 8,
+      "max_depth": 2,
+      "learning_rate": 0.2
+    },
+    "features": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": false,
+        "sources": [],
+        "steps": [],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [],
+        "futr": [],
+        "static": []
+      }
+    },
+    "requested_mode": "residual_fixed",
+    "validated_mode": "residual_fixed",
+    "selected_search_params": []
   },
   "jobs": [
     {
       "model": "TFT",
-      "params": {},
-      "requested_mode": "learned_auto_requested",
-      "validated_mode": "learned_auto",
-      "selected_search_params": [
-        "hidden_size",
-        "dropout",
-        "n_head"
-      ]
+      "params": {
+        "hidden_size": 32,
+        "n_head": 4,
+        "dropout": 0.1
+      },
+      "requested_mode": "learned_fixed",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": []
     }
   ],
-  "search_space_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/search_space.yaml",
-  "search_space_sha256": "759dbe91fa232ba8e3b200c8a63162e40c59e03291685991b2006cadc70fd0d4"
+  "search_space_path": null,
+  "search_space_sha256": null
 }

@@ -191,3 +191,2440 @@ LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
 0.289     Total estimated model params size (MB)
 37        Modules in train mode
 0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.7 K  | train
+5 | encoder       | TransEncoder           | 67.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+72.3 K    Trainable params
+0         Non-trainable params
+72.3 K    Total params
+0.289     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.7 K  | train
+5 | encoder       | TransEncoder           | 67.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+72.3 K    Trainable params
+0         Non-trainable params
+72.3 K    Total params
+0.289     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.7 K  | train
+5 | encoder       | TransEncoder           | 67.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+72.3 K    Trainable params
+0         Non-trainable params
+72.3 K    Total params
+0.289     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[W 2026-03-21 19:42:30,850] Trial 1 failed with parameters: {'hidden_size': 64, 'n_heads': 8, 'e_layers': 2, 'd_ff': 128, 'd_layers': 1, 'factor': 3, 'dropout': 0.1, 'use_norm': False, 'input_size': 72, 'batch_size': 16, 'valid_batch_size': 32, 'windows_batch_size': 1024, 'inference_windows_batch_size': 1024, 'learning_rate': 0.000943108877474728, 'scaler_type': 'identity', 'step_size': 8, 'max_steps': 300, 'val_check_steps': 200, 'early_stop_patience_steps': 5, 'num_lr_decays': 3} because of the following error: The value nan is not acceptable.
+[W 2026-03-21 19:42:30,850] Trial 1 failed with value nan.
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.7 K  | train
+5 | encoder       | TransEncoder           | 50.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+55.3 K    Trainable params
+0         Non-trainable params
+55.3 K    Total params
+0.221     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.7 K  | train
+5 | encoder       | TransEncoder           | 50.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+55.3 K    Trainable params
+0         Non-trainable params
+55.3 K    Total params
+0.221     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.7 K  | train
+5 | encoder       | TransEncoder           | 50.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+55.3 K    Trainable params
+0         Non-trainable params
+55.3 K    Total params
+0.221     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.7 K  | train
+5 | encoder       | TransEncoder           | 50.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+55.3 K    Trainable params
+0         Non-trainable params
+55.3 K    Total params
+0.221     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.7 K  | train
+5 | encoder       | TransEncoder           | 50.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+55.3 K    Trainable params
+0         Non-trainable params
+55.3 K    Total params
+0.221     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:42:40,884] Trial 2 finished with value: 83.00202572453716 and parameters: {'hidden_size': 64, 'n_heads': 4, 'e_layers': 1, 'd_ff': 256, 'd_layers': 1, 'factor': 5, 'dropout': 0.1, 'use_norm': True, 'input_size': 72, 'batch_size': 64, 'valid_batch_size': 16, 'windows_batch_size': 1024, 'inference_windows_batch_size': 256, 'learning_rate': 0.0026377804263920113, 'scaler_type': None, 'step_size': 4, 'max_steps': 300, 'val_check_steps': 50, 'early_stop_patience_steps': 10, 'num_lr_decays': 3}. Best is trial 0 with value: 47.6195617828331.
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 8.3 K  | train
+5 | encoder       | TransEncoder           | 198 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+207 K     Trainable params
+0         Non-trainable params
+207 K     Total params
+0.832     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 8.3 K  | train
+5 | encoder       | TransEncoder           | 198 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+207 K     Trainable params
+0         Non-trainable params
+207 K     Total params
+0.832     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 8.3 K  | train
+5 | encoder       | TransEncoder           | 198 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+207 K     Trainable params
+0         Non-trainable params
+207 K     Total params
+0.832     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 8.3 K  | train
+5 | encoder       | TransEncoder           | 198 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+207 K     Trainable params
+0         Non-trainable params
+207 K     Total params
+0.832     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 8.3 K  | train
+5 | encoder       | TransEncoder           | 198 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+207 K     Trainable params
+0         Non-trainable params
+207 K     Total params
+0.832     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:43:07,559] Trial 3 finished with value: 88.48461105947398 and parameters: {'hidden_size': 128, 'n_heads': 4, 'e_layers': 1, 'd_ff': 512, 'd_layers': 2, 'factor': 5, 'dropout': 0.1, 'use_norm': True, 'input_size': 64, 'batch_size': 16, 'valid_batch_size': 32, 'windows_batch_size': 128, 'inference_windows_batch_size': 1024, 'learning_rate': 0.0010048780869509313, 'scaler_type': None, 'step_size': 1, 'max_steps': 800, 'val_check_steps': 200, 'early_stop_patience_steps': 5, 'num_lr_decays': -1}. Best is trial 0 with value: 47.6195617828331.
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 12.4 K | train
+5 | encoder       | TransEncoder           | 397 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+411 K     Trainable params
+0         Non-trainable params
+411 K     Total params
+1.645     Total estimated model params size (MB)
+50        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 12.4 K | train
+5 | encoder       | TransEncoder           | 397 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+411 K     Trainable params
+0         Non-trainable params
+411 K     Total params
+1.645     Total estimated model params size (MB)
+50        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 12.4 K | train
+5 | encoder       | TransEncoder           | 397 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+411 K     Trainable params
+0         Non-trainable params
+411 K     Total params
+1.645     Total estimated model params size (MB)
+50        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 12.4 K | train
+5 | encoder       | TransEncoder           | 397 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+411 K     Trainable params
+0         Non-trainable params
+411 K     Total params
+1.645     Total estimated model params size (MB)
+50        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 12.4 K | train
+5 | encoder       | TransEncoder           | 397 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+411 K     Trainable params
+0         Non-trainable params
+411 K     Total params
+1.645     Total estimated model params size (MB)
+50        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[W 2026-03-21 19:44:08,364] Trial 4 failed with parameters: {'hidden_size': 128, 'n_heads': 4, 'e_layers': 3, 'd_ff': 256, 'd_layers': 2, 'factor': 5, 'dropout': 0.3, 'use_norm': False, 'input_size': 96, 'batch_size': 32, 'valid_batch_size': 32, 'windows_batch_size': 512, 'inference_windows_batch_size': 1024, 'learning_rate': 0.0019088274561054328, 'scaler_type': None, 'step_size': 1, 'max_steps': 1200, 'val_check_steps': 200, 'early_stop_patience_steps': -1, 'num_lr_decays': 2} because of the following error: The value nan is not acceptable.
+[W 2026-03-21 19:44:08,364] Trial 4 failed with value nan.
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.2 K  | train
+5 | encoder       | TransEncoder           | 67.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+73.8 K    Trainable params
+0         Non-trainable params
+73.8 K    Total params
+0.295     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.2 K  | train
+5 | encoder       | TransEncoder           | 67.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+73.8 K    Trainable params
+0         Non-trainable params
+73.8 K    Total params
+0.295     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.2 K  | train
+5 | encoder       | TransEncoder           | 67.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+73.8 K    Trainable params
+0         Non-trainable params
+73.8 K    Total params
+0.295     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.2 K  | train
+5 | encoder       | TransEncoder           | 67.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+73.8 K    Trainable params
+0         Non-trainable params
+73.8 K    Total params
+0.295     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.2 K  | train
+5 | encoder       | TransEncoder           | 67.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+73.8 K    Trainable params
+0         Non-trainable params
+73.8 K    Total params
+0.295     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:44:40,226] Trial 5 finished with value: 62.068918083838845 and parameters: {'hidden_size': 64, 'n_heads': 8, 'e_layers': 2, 'd_ff': 128, 'd_layers': 2, 'factor': 3, 'dropout': 0.1, 'use_norm': True, 'input_size': 96, 'batch_size': 64, 'valid_batch_size': 64, 'windows_batch_size': 128, 'inference_windows_batch_size': 512, 'learning_rate': 0.0049526580216490024, 'scaler_type': 'robust', 'step_size': 12, 'max_steps': 800, 'val_check_steps': 100, 'early_stop_patience_steps': 10, 'num_lr_decays': -1}. Best is trial 0 with value: 47.6195617828331.
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 9.3 K  | train
+5 | encoder       | TransEncoder           | 299 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+309 K     Trainable params
+0         Non-trainable params
+309 K     Total params
+1.238     Total estimated model params size (MB)
+50        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 9.3 K  | train
+5 | encoder       | TransEncoder           | 299 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+309 K     Trainable params
+0         Non-trainable params
+309 K     Total params
+1.238     Total estimated model params size (MB)
+50        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 9.3 K  | train
+5 | encoder       | TransEncoder           | 299 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+309 K     Trainable params
+0         Non-trainable params
+309 K     Total params
+1.238     Total estimated model params size (MB)
+50        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 9.3 K  | train
+5 | encoder       | TransEncoder           | 299 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+309 K     Trainable params
+0         Non-trainable params
+309 K     Total params
+1.238     Total estimated model params size (MB)
+50        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 9.3 K  | train
+5 | encoder       | TransEncoder           | 299 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+309 K     Trainable params
+0         Non-trainable params
+309 K     Total params
+1.238     Total estimated model params size (MB)
+50        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:44:56,766] Trial 6 finished with value: 79.06786810127424 and parameters: {'hidden_size': 128, 'n_heads': 8, 'e_layers': 3, 'd_ff': 128, 'd_layers': 2, 'factor': 1, 'dropout': 0.1, 'use_norm': True, 'input_size': 72, 'batch_size': 16, 'valid_batch_size': 16, 'windows_batch_size': 512, 'inference_windows_batch_size': 1024, 'learning_rate': 0.0004396869878851078, 'scaler_type': 'robust', 'step_size': 4, 'max_steps': 300, 'val_check_steps': 100, 'early_stop_patience_steps': 5, 'num_lr_decays': 2}. Best is trial 0 with value: 47.6195617828331.
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.4 K  | train
+5 | encoder       | TransEncoder           | 330 K  | train
+6 | projector     | Linear                 | 2.1 K  | train
+-----------------------------------------------------------------
+339 K     Trainable params
+0         Non-trainable params
+339 K     Total params
+1.356     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.4 K  | train
+5 | encoder       | TransEncoder           | 330 K  | train
+6 | projector     | Linear                 | 2.1 K  | train
+-----------------------------------------------------------------
+339 K     Trainable params
+0         Non-trainable params
+339 K     Total params
+1.356     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.4 K  | train
+5 | encoder       | TransEncoder           | 330 K  | train
+6 | projector     | Linear                 | 2.1 K  | train
+-----------------------------------------------------------------
+339 K     Trainable params
+0         Non-trainable params
+339 K     Total params
+1.356     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.4 K  | train
+5 | encoder       | TransEncoder           | 330 K  | train
+6 | projector     | Linear                 | 2.1 K  | train
+-----------------------------------------------------------------
+339 K     Trainable params
+0         Non-trainable params
+339 K     Total params
+1.356     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:45:03,913] Trial 7 pruned. Pruned after fold 3 with mean_mse=48.5911
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.7 K  | train
+5 | encoder       | TransEncoder           | 83.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+88.3 K    Trainable params
+0         Non-trainable params
+88.3 K    Total params
+0.353     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.7 K  | train
+5 | encoder       | TransEncoder           | 83.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+88.3 K    Trainable params
+0         Non-trainable params
+88.3 K    Total params
+0.353     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.7 K  | train
+5 | encoder       | TransEncoder           | 83.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+88.3 K    Trainable params
+0         Non-trainable params
+88.3 K    Total params
+0.353     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.7 K  | train
+5 | encoder       | TransEncoder           | 83.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+88.3 K    Trainable params
+0         Non-trainable params
+88.3 K    Total params
+0.353     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.7 K  | train
+5 | encoder       | TransEncoder           | 83.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+88.3 K    Trainable params
+0         Non-trainable params
+88.3 K    Total params
+0.353     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:45:52,234] Trial 8 finished with value: 44.51857402959239 and parameters: {'hidden_size': 64, 'n_heads': 4, 'e_layers': 1, 'd_ff': 512, 'd_layers': 1, 'factor': 1, 'dropout': 0.1, 'use_norm': False, 'input_size': 72, 'batch_size': 32, 'valid_batch_size': 16, 'windows_batch_size': 1024, 'inference_windows_batch_size': 512, 'learning_rate': 0.00539927616722576, 'scaler_type': 'robust', 'step_size': 8, 'max_steps': 1200, 'val_check_steps': 100, 'early_stop_patience_steps': 10, 'num_lr_decays': 3}. Best is trial 8 with value: 44.51857402959239.
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.2 K  | train
+5 | encoder       | TransEncoder           | 50.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+54.8 K    Trainable params
+0         Non-trainable params
+54.8 K    Total params
+0.219     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.2 K  | train
+5 | encoder       | TransEncoder           | 50.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+54.8 K    Trainable params
+0         Non-trainable params
+54.8 K    Total params
+0.219     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.2 K  | train
+5 | encoder       | TransEncoder           | 50.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+54.8 K    Trainable params
+0         Non-trainable params
+54.8 K    Total params
+0.219     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:45:57,157] Trial 9 pruned. Pruned after fold 2 with mean_mse=56.2148
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.3 K  | train
+5 | encoder       | TransEncoder           | 132 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+140 K     Trainable params
+0         Non-trainable params
+140 K     Total params
+0.560     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.3 K  | train
+5 | encoder       | TransEncoder           | 132 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+140 K     Trainable params
+0         Non-trainable params
+140 K     Total params
+0.560     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.3 K  | train
+5 | encoder       | TransEncoder           | 132 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+140 K     Trainable params
+0         Non-trainable params
+140 K     Total params
+0.560     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.3 K  | train
+5 | encoder       | TransEncoder           | 132 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+140 K     Trainable params
+0         Non-trainable params
+140 K     Total params
+0.560     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.3 K  | train
+5 | encoder       | TransEncoder           | 132 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+140 K     Trainable params
+0         Non-trainable params
+140 K     Total params
+0.560     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:46:20,775] Trial 10 finished with value: 39.63909526621641 and parameters: {'hidden_size': 128, 'n_heads': 8, 'e_layers': 1, 'd_ff': 256, 'd_layers': 2, 'factor': 5, 'dropout': 0.3, 'use_norm': False, 'input_size': 48, 'batch_size': 32, 'valid_batch_size': 16, 'windows_batch_size': 1024, 'inference_windows_batch_size': 512, 'learning_rate': 0.004740279201659436, 'scaler_type': 'standard', 'step_size': 8, 'max_steps': 500, 'val_check_steps': 200, 'early_stop_patience_steps': 5, 'num_lr_decays': -1}. Best is trial 10 with value: 39.63909526621641.
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 12.4 K | train
+5 | encoder       | TransEncoder           | 265 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+278 K     Trainable params
+0         Non-trainable params
+278 K     Total params
+1.115     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:46:22,985] Trial 11 pruned. Pruned after fold 0 with mean_mse=107.3699
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 12.5 K | train
+5 | encoder       | TransEncoder           | 1.2 M  | train
+6 | projector     | Linear                 | 2.1 K  | train
+-----------------------------------------------------------------
+1.2 M     Trainable params
+0         Non-trainable params
+1.2 M     Total params
+4.810     Total estimated model params size (MB)
+50        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:46:34,414] Trial 12 pruned. Pruned after fold 0 with mean_mse=41.8354
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 2.4 K  | train
+5 | encoder       | TransEncoder           | 166 K  | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+169 K     Trainable params
+0         Non-trainable params
+169 K     Total params
+0.676     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:46:47,157] Trial 13 pruned. Pruned after fold 0 with mean_mse=39.6763
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.3 K  | train
+5 | encoder       | TransEncoder           | 198 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+205 K     Trainable params
+0         Non-trainable params
+205 K     Total params
+0.823     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.3 K  | train
+5 | encoder       | TransEncoder           | 198 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+205 K     Trainable params
+0         Non-trainable params
+205 K     Total params
+0.823     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.3 K  | train
+5 | encoder       | TransEncoder           | 198 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+205 K     Trainable params
+0         Non-trainable params
+205 K     Total params
+0.823     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.3 K  | train
+5 | encoder       | TransEncoder           | 198 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+205 K     Trainable params
+0         Non-trainable params
+205 K     Total params
+0.823     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.3 K  | train
+5 | encoder       | TransEncoder           | 198 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+205 K     Trainable params
+0         Non-trainable params
+205 K     Total params
+0.823     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:47:40,403] Trial 14 finished with value: 47.80139866208311 and parameters: {'hidden_size': 128, 'n_heads': 4, 'e_layers': 1, 'd_ff': 512, 'd_layers': 1, 'factor': 1, 'dropout': 0.3, 'use_norm': False, 'input_size': 48, 'batch_size': 32, 'valid_batch_size': 16, 'windows_batch_size': 1024, 'inference_windows_batch_size': 512, 'learning_rate': 0.008866415409656589, 'scaler_type': 'standard', 'step_size': 8, 'max_steps': 1200, 'val_check_steps': 200, 'early_stop_patience_steps': 5, 'num_lr_decays': 3}. Best is trial 10 with value: 39.63909526621641.
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 4.7 K  | train
+5 | encoder       | TransEncoder           | 166 K  | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+171 K     Trainable params
+0         Non-trainable params
+171 K     Total params
+0.685     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/pruners/_percentile.py:21: RuntimeWarning: All-NaN slice encountered
+  return np.nanmin(values)
+[I 2026-03-21 19:47:46,809] Trial 15 pruned. Pruned after fold 0 with mean_mse=nan
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 9.5 K  | train
+5 | encoder       | TransEncoder           | 396 K  | train
+6 | projector     | Linear                 | 2.1 K  | train
+-----------------------------------------------------------------
+407 K     Trainable params
+0         Non-trainable params
+407 K     Total params
+1.631     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:47:54,746] Trial 16 pruned. Pruned after fold 0 with mean_mse=52.5204
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 3.2 K  | train
+5 | encoder       | TransEncoder           | 265 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+269 K     Trainable params
+0         Non-trainable params
+269 K     Total params
+1.078     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 3.2 K  | train
+5 | encoder       | TransEncoder           | 265 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+269 K     Trainable params
+0         Non-trainable params
+269 K     Total params
+1.078     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 3.2 K  | train
+5 | encoder       | TransEncoder           | 265 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+269 K     Trainable params
+0         Non-trainable params
+269 K     Total params
+1.078     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 3.2 K  | train
+5 | encoder       | TransEncoder           | 265 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+269 K     Trainable params
+0         Non-trainable params
+269 K     Total params
+1.078     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 3.2 K  | train
+5 | encoder       | TransEncoder           | 265 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+269 K     Trainable params
+0         Non-trainable params
+269 K     Total params
+1.078     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:48:29,749] Trial 17 finished with value: 67.61626974515126 and parameters: {'hidden_size': 128, 'n_heads': 8, 'e_layers': 2, 'd_ff': 256, 'd_layers': 1, 'factor': 1, 'dropout': 0.1, 'use_norm': False, 'input_size': 24, 'batch_size': 32, 'valid_batch_size': 64, 'windows_batch_size': 1024, 'inference_windows_batch_size': 256, 'learning_rate': 0.002579222285664921, 'scaler_type': 'robust', 'step_size': 8, 'max_steps': 500, 'val_check_steps': 100, 'early_stop_patience_steps': 10, 'num_lr_decays': -1}. Best is trial 10 with value: 39.63909526621641.
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 3.1 K  | train
+5 | encoder       | TransEncoder           | 83.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+86.8 K    Trainable params
+0         Non-trainable params
+86.8 K    Total params
+0.347     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 3.1 K  | train
+5 | encoder       | TransEncoder           | 83.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+86.8 K    Trainable params
+0         Non-trainable params
+86.8 K    Total params
+0.347     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 3.1 K  | train
+5 | encoder       | TransEncoder           | 83.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+86.8 K    Trainable params
+0         Non-trainable params
+86.8 K    Total params
+0.347     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 3.1 K  | train
+5 | encoder       | TransEncoder           | 83.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+86.8 K    Trainable params
+0         Non-trainable params
+86.8 K    Total params
+0.347     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 3.1 K  | train
+5 | encoder       | TransEncoder           | 83.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+86.8 K    Trainable params
+0         Non-trainable params
+86.8 K    Total params
+0.347     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:48:50,428] Trial 18 finished with value: 39.09581792508802 and parameters: {'hidden_size': 64, 'n_heads': 4, 'e_layers': 1, 'd_ff': 512, 'd_layers': 1, 'factor': 5, 'dropout': 0.3, 'use_norm': False, 'input_size': 48, 'batch_size': 32, 'valid_batch_size': 16, 'windows_batch_size': 1024, 'inference_windows_batch_size': 512, 'learning_rate': 0.0023280352356754787, 'scaler_type': 'standard', 'step_size': 8, 'max_steps': 500, 'val_check_steps': 200, 'early_stop_patience_steps': -1, 'num_lr_decays': 1}. Best is trial 18 with value: 39.09581792508802.
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.3 K  | train
+5 | encoder       | TransEncoder           | 396 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+404 K     Trainable params
+0         Non-trainable params
+404 K     Total params
+1.616     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.3 K  | train
+5 | encoder       | TransEncoder           | 396 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+404 K     Trainable params
+0         Non-trainable params
+404 K     Total params
+1.616     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.3 K  | train
+5 | encoder       | TransEncoder           | 396 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+404 K     Trainable params
+0         Non-trainable params
+404 K     Total params
+1.616     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.3 K  | train
+5 | encoder       | TransEncoder           | 396 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+404 K     Trainable params
+0         Non-trainable params
+404 K     Total params
+1.616     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 6.3 K  | train
+5 | encoder       | TransEncoder           | 396 K  | train
+6 | projector     | Linear                 | 1.0 K  | train
+-----------------------------------------------------------------
+404 K     Trainable params
+0         Non-trainable params
+404 K     Total params
+1.616     Total estimated model params size (MB)
+37        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:49:30,948] Trial 19 finished with value: 39.95533952772628 and parameters: {'hidden_size': 128, 'n_heads': 8, 'e_layers': 2, 'd_ff': 512, 'd_layers': 2, 'factor': 5, 'dropout': 0.3, 'use_norm': False, 'input_size': 48, 'batch_size': 32, 'valid_batch_size': 16, 'windows_batch_size': 1024, 'inference_windows_batch_size': 512, 'learning_rate': 0.002499358658954276, 'scaler_type': 'standard', 'step_size': 8, 'max_steps': 500, 'val_check_steps': 200, 'early_stop_patience_steps': -1, 'num_lr_decays': 1}. Best is trial 18 with value: 39.09581792508802.
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 3.1 K  | train
+5 | encoder       | TransEncoder           | 83.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+86.8 K    Trainable params
+0         Non-trainable params
+86.8 K    Total params
+0.347     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 3.1 K  | train
+5 | encoder       | TransEncoder           | 83.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+86.8 K    Trainable params
+0         Non-trainable params
+86.8 K    Total params
+0.347     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 3.1 K  | train
+5 | encoder       | TransEncoder           | 83.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+86.8 K    Trainable params
+0         Non-trainable params
+86.8 K    Total params
+0.347     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 3.1 K  | train
+5 | encoder       | TransEncoder           | 83.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+86.8 K    Trainable params
+0         Non-trainable params
+86.8 K    Total params
+0.347     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name          | Type                   | Params | Mode 
+-----------------------------------------------------------------
+0 | loss          | MSE                    | 0      | train
+1 | valid_loss    | MSE                    | 0      | train
+2 | padder_train  | ConstantPad1d          | 0      | train
+3 | scaler        | TemporalNorm           | 0      | train
+4 | enc_embedding | DataEmbedding_inverted | 3.1 K  | train
+5 | encoder       | TransEncoder           | 83.1 K | train
+6 | projector     | Linear                 | 520    | train
+-----------------------------------------------------------------
+86.8 K    Trainable params
+0         Non-trainable params
+86.8 K    Total params
+0.347     Total estimated model params size (MB)
+24        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 19:49:58,247] A new study created in Journal with name: neuralforecast::wti_case3_HPT::iTransformer::residual-search::50b476d56ff3
+[I 2026-03-21 19:49:58,319] Trial 0 finished with value: 38.637199939150264 and parameters: {'n_estimators': 32, 'max_depth': 2, 'learning_rate': 0.0016932999507037908, 'subsample': 0.5931301056888354, 'colsample_bytree': 0.6727803635215239}. Best is trial 0 with value: 38.637199939150264.
+[I 2026-03-21 19:49:58,410] Trial 1 finished with value: 30.308265358350116 and parameters: {'n_estimators': 128, 'max_depth': 3, 'learning_rate': 0.14969364581164232, 'subsample': 0.5136937965989631, 'colsample_bytree': 0.8352337550892011}. Best is trial 1 with value: 30.308265358350116.
+[I 2026-03-21 19:49:58,665] Trial 2 finished with value: 30.29943267264158 and parameters: {'n_estimators': 32, 'max_depth': 6, 'learning_rate': 0.25032333105810645, 'subsample': 0.6567120890796214, 'colsample_bytree': 0.846161307834657}. Best is trial 2 with value: 30.29943267264158.
+[I 2026-03-21 19:49:58,736] Trial 3 finished with value: 33.58820346702188 and parameters: {'n_estimators': 32, 'max_depth': 2, 'learning_rate': 0.14971505008038705, 'subsample': 0.549173416916525, 'colsample_bytree': 0.7105538125025261}. Best is trial 2 with value: 30.29943267264158.
+[I 2026-03-21 19:49:58,808] Trial 4 finished with value: 34.66330132106452 and parameters: {'n_estimators': 16, 'max_depth': 5, 'learning_rate': 0.11680703272479827, 'subsample': 0.5091441386720958, 'colsample_bytree': 0.8750721574724838}. Best is trial 2 with value: 30.29943267264158.
+[I 2026-03-21 19:49:58,880] Trial 5 finished with value: 37.51758063680843 and parameters: {'n_estimators': 16, 'max_depth': 2, 'learning_rate': 0.012867274725107765, 'subsample': 0.9542977515465478, 'colsample_bytree': 0.6468070741868397}. Best is trial 2 with value: 30.29943267264158.
+[I 2026-03-21 19:49:59,005] Trial 6 finished with value: 34.599310609179994 and parameters: {'n_estimators': 128, 'max_depth': 3, 'learning_rate': 0.0045476944121483, 'subsample': 0.7457865796401691, 'colsample_bytree': 0.5266812725585401}. Best is trial 2 with value: 30.29943267264158.
+[I 2026-03-21 19:49:59,105] Trial 7 finished with value: 33.92429340356665 and parameters: {'n_estimators': 128, 'max_depth': 2, 'learning_rate': 0.010608815292282874, 'subsample': 0.8472000788638725, 'colsample_bytree': 0.7070896347634513}. Best is trial 2 with value: 30.29943267264158.
+[I 2026-03-21 19:49:59,137] Trial 8 pruned. Pruned residual trial after fold 0 with mean_mse=16.5051
+[I 2026-03-21 19:49:59,161] Trial 9 pruned. Pruned residual trial after fold 0 with mean_mse=14.3451
+[I 2026-03-21 19:49:59,191] Trial 10 pruned. Pruned residual trial after fold 0 with mean_mse=16.7975
+[I 2026-03-21 19:49:59,227] Trial 11 pruned. Pruned residual trial after fold 0 with mean_mse=18.6806
+[I 2026-03-21 19:49:59,263] Trial 12 pruned. Pruned residual trial after fold 0 with mean_mse=17.1458
+[I 2026-03-21 19:49:59,288] Trial 13 pruned. Pruned residual trial after fold 0 with mean_mse=16.8907
+[I 2026-03-21 19:49:59,314] Trial 14 pruned. Pruned residual trial after fold 0 with mean_mse=14.8126
+[I 2026-03-21 19:49:59,350] Trial 15 pruned. Pruned residual trial after fold 0 with mean_mse=17.7187
+[I 2026-03-21 19:49:59,376] Trial 16 pruned. Pruned residual trial after fold 0 with mean_mse=13.6256
+[I 2026-03-21 19:49:59,410] Trial 17 pruned. Pruned residual trial after fold 0 with mean_mse=19.4079
+[I 2026-03-21 19:49:59,435] Trial 18 pruned. Pruned residual trial after fold 0 with mean_mse=15.1952
+[I 2026-03-21 19:49:59,474] Trial 19 pruned. Pruned residual trial after fold 0 with mean_mse=13.6150

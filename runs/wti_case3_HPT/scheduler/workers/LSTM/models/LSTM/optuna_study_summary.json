@@ -1,0 +1,73 @@
+{
+  "direction": "minimize",
+  "trial_count": 20,
+  "finished_trial_count": 20,
+  "state_counts": {
+    "complete": 12,
+    "pruned": 8
+  },
+  "best_value": 35.445695930682476,
+  "best_trial_number": 4,
+  "objective_metric": "mean_fold_mse",
+  "study_name": "neuralforecast::wti_case3_HPT::LSTM::main-search::50b476d56ff3",
+  "storage_backend": "journal",
+  "storage_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/LSTM/models/LSTM/.optuna/main-search.journal",
+  "requested_trial_count": 20,
+  "existing_trial_count_before_optimize": 0,
+  "existing_finished_trial_count_before_optimize": 0,
+  "remaining_trial_count": 20,
+  "requested_mode": "learned_auto_requested",
+  "validated_mode": "learned_auto",
+  "selected_search_params": [
+    "encoder_hidden_size",
+    "encoder_n_layers",
+    "inference_input_size",
+    "encoder_dropout",
+    "decoder_hidden_size",
+    "decoder_layers"
+  ],
+  "selected_training_search_params": [
+    "input_size",
+    "batch_size",
+    "valid_batch_size",
+    "windows_batch_size",
+    "inference_windows_batch_size",
+    "learning_rate",
+    "scaler_type",
+    "step_size",
+    "max_steps",
+    "val_check_steps",
+    "early_stop_patience_steps",
+    "num_lr_decays"
+  ],
+  "best_params": {
+    "encoder_hidden_size": 32,
+    "encoder_n_layers": 3,
+    "inference_input_size": 48,
+    "encoder_dropout": 0.0,
+    "decoder_hidden_size": 256,
+    "decoder_layers": 3
+  },
+  "best_training_params": {
+    "input_size": 48,
+    "batch_size": 32,
+    "valid_batch_size": 32,
+    "windows_batch_size": 128,
+    "inference_windows_batch_size": 1024,
+    "learning_rate": 0.0071377767178455506,
+    "scaler_type": "identity",
+    "step_size": 4,
+    "max_steps": 500,
+    "val_check_steps": 200,
+    "early_stop_patience_steps": 5,
+    "num_lr_decays": -1
+  },
+  "fold_mse": [
+    6.296366317021618,
+    0.38841493116669157,
+    3.0643462705395557,
+    1.4750808870179393,
+    166.0042712476666
+  ],
+  "objective_stage": "tuning_pre_replay_direct_predictions"
+}
