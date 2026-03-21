@@ -82,7 +82,13 @@
         "mlp_units",
         "dropout_prob_theta",
         "activation"
-      ]
+      ],
+      "model_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/NHITS/models/NHITS/best_params.json",
+      "model_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/NHITS/models/NHITS/optuna_study_summary.json",
+      "training_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/NHITS/models/NHITS/training_best_params.json",
+      "training_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/NHITS/models/NHITS/training_optuna_study_summary.json",
+      "residual_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/NHITS/residual/NHITS/best_params.json",
+      "residual_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/NHITS/residual/NHITS/optuna_study_summary.json"
     }
   ],
   "training_search": {
@@ -101,7 +107,9 @@
       "val_check_steps",
       "early_stop_patience_steps",
       "num_lr_decays"
-    ]
+    ],
+    "best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/NHITS/models/NHITS/training_best_params.json",
+    "optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/NHITS/models/NHITS/training_optuna_study_summary.json"
   },
   "residual": {
     "model": "xgboost",
@@ -136,7 +144,9 @@
     "active_feature_columns": [
       "horizon_step",
       "y_hat_base"
-    ]
+    ],
+    "best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/NHITS/residual/NHITS/best_params.json",
+    "optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/NHITS/residual/NHITS/optuna_study_summary.json"
   },
   "training": {
     "loss": "mse"

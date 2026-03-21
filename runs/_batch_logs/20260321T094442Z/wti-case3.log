@@ -4737,4 +4737,240 @@
 [2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
 [2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
 [2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
-[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-15/20 fold=5/5 [#########---------] 53/105  50%
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-15/20 fold=5/5 [#########---------] 53/105  50%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-15/20 fold=5/5 [#########---------] 54/105  51% mse=77.9364[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-16/20 fold=1/5 [#########---------] 54/105  51%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-16/20 fold=1/5 [#########---------] 55/105  52% mse=8.3692[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-16/20 fold=2/5 [#########---------] 55/105  52%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-16/20 fold=2/5 [##########--------] 56/105  53% mse=13.6922[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-16/20 fold=3/5 [##########--------] 56/105  53%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-16/20 fold=3/5 [##########--------] 57/105  54% mse=27.5516[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-16/20 fold=4/5 [##########--------] 57/105  54%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-16/20 fold=4/5 [##########--------] 58/105  55% mse=9.5303[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-16/20 fold=5/5 [##########--------] 58/105  55%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-16/20 fold=5/5 [##########--------] 59/105  56% mse=76.6037[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-17/20 fold=1/5 [##########--------] 59/105  56%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-17/20 fold=1/5 [##########--------] 60/105  57% mse=9.1702[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-17/20 fold=2/5 [##########--------] 60/105  57%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-17/20 fold=2/5 [##########--------] 61/105  58% mse=13.1170[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-17/20 fold=3/5 [##########--------] 61/105  58%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-17/20 fold=3/5 [###########-------] 62/105  59% mse=37.6225[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-17/20 fold=4/5 [###########-------] 62/105  59%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-17/20 fold=4/5 [###########-------] 63/105  60% mse=8.9929[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-17/20 fold=5/5 [###########-------] 63/105  60%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-17/20 fold=5/5 [###########-------] 64/105  61% mse=78.5803[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-18/20 fold=1/5 [###########-------] 64/105  61%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-18/20 fold=1/5 [###########-------] 65/105  62% pruned mean_mse=16.9782[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-19/20 fold=1/5 [###########-------] 65/105  62%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-19/20 fold=1/5 [###########-------] 66/105  63% pruned mean_mse=46.0256[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-20/20 fold=1/5 [###########-------] 66/105  63%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=tune-trial-20/20 fold=1/5 [###########-------] 67/105  64% pruned mean_mse=41.9006[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=replay fold=1/5 [###########-------] 67/105  64%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=replay fold=1/5 [############------] 68/105  65% mse=8.3692[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=replay fold=2/5 [############------] 68/105  65%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=replay fold=2/5 [############------] 69/105  66% mse=13.6922[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=replay fold=3/5 [############------] 69/105  66%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=replay fold=3/5 [############------] 70/105  67% mse=27.5516[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=replay fold=4/5 [############------] 70/105  67%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=replay fold=4/5 [############------] 71/105  68% mse=9.5303[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=replay fold=5/5 [############------] 71/105  68%[7F[2K[summary] completed=5/6 failed=0 queued=0 current=NHITS(6/6)
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=running phase=replay fold=5/5 [############------] 72/105  69% mse=76.6037[7F[2K[summary] completed=6/6 failed=0 queued=0 current=-
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=completed phase=replay [############------] 72/105  69% run-complete[worker:NHITS] {"ok": true, "executed_jobs": ["NHITS"], "summary_artifacts": {}}
+[7F[2K[summary] completed=6/6 failed=0 queued=0 current=-
+[2K[model:PatchTST] idx=1/6 status=completed phase=replay [############------] 69/105  66% returncode=0
+[2K[model:DLinear] idx=2/6 status=completed phase=replay [#################-] 101/105  96% returncode=0
+[2K[model:Naive] idx=3/6 status=completed phase=baseline [##################] 5/5 100% returncode=0
+[2K[model:iTransformer] idx=4/6 status=completed phase=replay [##############----] 82/105  78% returncode=0
+[2K[model:LSTM] idx=5/6 status=completed phase=replay [#############-----] 73/105  70% returncode=0
+[2K[model:NHITS] idx=6/6 status=completed phase=replay [############------] 72/105  69% returncode=0
+{"ok": true, "scheduled_jobs": [{"job_name": "PatchTST", "gpu_id": 0, "devices": 1}, {"job_name": "DLinear", "gpu_id": 1, "devices": 1}, {"job_name": "Naive", "gpu_id": 0, "devices": 1}, {"job_name": "iTransformer", "gpu_id": 1, "devices": 1}, {"job_name": "LSTM", "gpu_id": 0, "devices": 1}, {"job_name": "NHITS", "gpu_id": 1, "devices": 1}], "worker_results": [{"job_name": "DLinear", "gpu_id": 1, "devices": 1, "cuda_visible_devices": "1", "returncode": 0, "stdout_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/DLinear/stdout.log", "stderr_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/DLinear/stderr.log", "completed_at": "2026-03-21T10:41:53.138699+00:00"}, {"job_name": "Naive", "gpu_id": 0, "devices": 1, "cuda_visible_devices": "0", "returncode": 0, "stdout_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/Naive/stdout.log", "stderr_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/Naive/stderr.log", "completed_at": "2026-03-21T10:41:58.145404+00:00"}, {"job_name": "iTransformer", "gpu_id": 1, "devices": 1, "cuda_visible_devices": "1", "returncode": 0, "stdout_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/iTransformer/stdout.log", "stderr_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/iTransformer/stderr.log", "completed_at": "2026-03-21T10:50:00.532667+00:00"}, {"job_name": "PatchTST", "gpu_id": 0, "devices": 1, "cuda_visible_devices": "0", "returncode": 0, "stdout_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/PatchTST/stdout.log", "stderr_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/PatchTST/stderr.log", "completed_at": "2026-03-21T10:51:08.537350+00:00"}, {"job_name": "LSTM", "gpu_id": 0, "devices": 1, "cuda_visible_devices": "0", "returncode": 0, "stdout_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/LSTM/stdout.log", "stderr_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/LSTM/stderr.log", "completed_at": "2026-03-21T10:56:05.033461+00:00"}, {"job_name": "NHITS", "gpu_id": 1, "devices": 1, "cuda_visible_devices": "1", "returncode": 0, "stdout_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/NHITS/stdout.log", "stderr_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/NHITS/stderr.log", "completed_at": "2026-03-21T11:00:14.915736+00:00"}], "summary_artifacts": {"leaderboard": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/summary/leaderboard.csv", "markdown": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/summary/sample.md", "all_models": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/summary/last_fold_all_models.png", "top3": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/summary/last_fold_top3.png", "top5": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/summary/last_fold_top5.png"}}

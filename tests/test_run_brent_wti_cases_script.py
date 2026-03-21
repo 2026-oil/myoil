@@ -95,25 +95,27 @@ fi
     assert "[batch] passed=1 failed=1 missing=1" in summary_txt
 
 
-def test_run_brent_wti_cases_script_default_config_list_includes_all_feature_set_cases():
+def test_run_brent_wti_cases_script_default_config_list_includes_all_residual_feature_set_cases():
     script = SCRIPT_PATH.read_text(encoding="utf-8")
 
-    expected_feature_set = [
-        "yaml/feature_set/brentoil-case1.yaml",
-        "yaml/feature_set/brentoil-case2.yaml",
-        "yaml/feature_set/brentoil-case3.yaml",
-        "yaml/feature_set/brentoil-case4.yaml",
-        "yaml/feature_set/wti-case1.yaml",
-        "yaml/feature_set/wti-case2.yaml",
-        "yaml/feature_set/wti-case3.yaml",
-        "yaml/feature_set/wti-case4.yaml",
+    expected_groups = [
+        "yaml/feature_set_res_level_lag_exg_xgb",
+        "yaml/feature_set_res_level_lag_exg_lgbm",
+        "yaml/feature_set_res_delta_lag_exg_xgb",
+        "yaml/feature_set_res_delta_lag_exg_lgbm",
     ]
-    expected_hpt = [
-        "yaml/feature_set_HPT/brentoil-case1.yaml",
-        "yaml/feature_set_HPT/brentoil-case2.yaml",
-        "yaml/feature_set_HPT/wti-case1.yaml",
-        "yaml/feature_set_HPT/wti-case2.yaml",
+    expected_cases = [
+        "brentoil-case1.yaml",
+        "brentoil-case2.yaml",
+        "brentoil-case3.yaml",
+        "brentoil-case4.yaml",
+        "wti-case1.yaml",
+        "wti-case2.yaml",
+        "wti-case3.yaml",
+        "wti-case4.yaml",
     ]
 
-    for config_path in [*expected_feature_set, *expected_hpt]:
-        assert f'"{config_path}"' in script
+    for group in expected_groups:
+        for case in expected_cases:
+            config_path = f"{group}/{case}"
+            assert f'"{config_path}"' in script

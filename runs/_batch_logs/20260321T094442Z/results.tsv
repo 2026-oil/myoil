@@ -1,3 +1,4 @@
 config	status	exit_code	log_path	started_at	finished_at
 yaml/feature_set_HPT/brentoil-case3.yaml	passed	0	runs/_batch_logs/20260321T094442Z/brentoil-case3.log	2026-03-21T09:44:42Z	2026-03-21T10:09:19Z
 yaml/feature_set_HPT/brentoil-case4.yaml	passed	0	runs/_batch_logs/20260321T094442Z/brentoil-case4.log	2026-03-21T10:09:19Z	2026-03-21T10:34:20Z
+yaml/feature_set_HPT/wti-case3.yaml	passed	0	runs/_batch_logs/20260321T094442Z/wti-case3.log	2026-03-21T10:34:20Z	2026-03-21T11:00:16Z

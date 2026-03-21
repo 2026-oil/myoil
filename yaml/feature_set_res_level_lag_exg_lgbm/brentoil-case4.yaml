@@ -1,0 +1,146 @@
+task:
+  name: brentoil_case4_res_level_lag_exg_lgbm
+dataset:
+  path: data/df.csv
+  target_col: Com_BrentCrudeOil
+  dt_col: dt
+  hist_exog_cols:
+  - Com_Gasoline
+  - Com_BloombergCommodity_BCOM
+  - Com_LME_Ni_Cash
+  - Com_Coal
+  - Com_Cotton
+  - Com_LME_Al_Cash
+  - Bonds_KOR_10Y
+  - Com_Barley
+  - Com_Canola
+  - Com_LMEX
+  - Com_LME_Ni_Inv
+  - Com_Corn
+  - Com_Wheat
+  - Com_NaturalGas
+  - Idx_OVX
+  - Com_Gold
+  futr_exog_cols: []
+  static_exog_cols: []
+runtime:
+  random_seed: 1
+training:
+  train_protocol: expanding_window_tscv
+  input_size: 64
+  season_length: 52
+  batch_size: 32
+  valid_batch_size: 32
+  windows_batch_size: 1024
+  inference_windows_batch_size: 1024
+  learning_rate: 0.001
+  max_steps: 1000
+  val_size: 8
+  val_check_steps: 100
+  early_stop_patience_steps: 5
+  loss: mse
+cv:
+  horizon: 8
+  step_size: 8
+  n_windows: 12
+  gap: 0
+  max_train_size: null
+  overlap_eval_policy: by_cutoff_mean
+scheduler:
+  gpu_ids:
+  - 0
+  - 1
+  max_concurrent_jobs: 2
+  worker_devices: 1
+residual:
+  enabled: true
+  model: lightgbm
+  target: level
+  params:
+    n_estimators: 64
+    max_depth: 6
+    learning_rate: 0.001
+    num_leaves: 31
+    min_child_samples: 20
+    feature_fraction: 1.0
+  features:
+    include_base_prediction: true
+    include_horizon_step: true
+    include_date_features: false
+    lag_features:
+      enabled: true
+      sources:
+      - y_hat_base
+      steps:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 6
+      - 12
+      - 24
+      transforms:
+      - raw
+    exog_sources:
+      hist:
+      - Com_Gasoline
+      - Com_BloombergCommodity_BCOM
+      - Com_LME_Ni_Cash
+      - Com_Coal
+      - Com_Cotton
+      - Com_LME_Al_Cash
+      - Bonds_KOR_10Y
+      - Com_Barley
+      - Com_Canola
+      - Com_LMEX
+      - Com_LME_Ni_Inv
+      - Com_Corn
+      - Com_Wheat
+      - Com_NaturalGas
+      - Idx_OVX
+      - Com_Gold
+      futr: []
+      static: []
+jobs:
+- model: LSTM
+  params:
+    encoder_hidden_size: 64
+    decoder_hidden_size: 64
+    encoder_n_layers: 2
+    context_size: 10
+- model: NHITS
+  params:
+    n_pool_kernel_size:
+    - 2
+    - 2
+    - 1
+    n_freq_downsample:
+    - 24
+    - 12
+    - 1
+    dropout_prob_theta: 0.0
+- model: DLinear
+  params:
+    moving_avg_window: 7
+- model: Autoformer
+  params:
+    hidden_size: 64
+    dropout: 0.1
+    factor: 3
+    n_head: 4
+- model: PatchTST
+  params:
+    hidden_size: 64
+    n_heads: 4
+    encoder_layers: 2
+    patch_len: 16
+    dropout: 0.1
+- model: iTransformer
+  params:
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 2
+    d_ff: 256
+    dropout: 0.1
+- model: Naive
+  params: {}
