@@ -1,0 +1,126 @@
+{
+  "manifest_version": "1",
+  "artifact_schema_version": "1",
+  "evaluation_protocol_version": "2",
+  "config_source_type": "yaml",
+  "config_source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/yaml/feature_set_HPT/wti-case2.yaml",
+  "config_resolved_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/LSTM/config/config.resolved.json",
+  "config_input_sha256": "89dbd2e58a50c2be085feadf054c8c81651adb84237a10735a491ddaade75045",
+  "config_resolved_sha256": "b85ee2b73868f6f6bd5e73b7f1f14c90490f294ccce74eac8333670ab1aa55e1",
+  "search_space_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/search_space.yaml",
+  "search_space_sha256": "9a59b4c00b1334bff3ceb231e1af1bd878b09089af3948986152990b01385676",
+  "entrypoint_version": "neuralforecast-residual-v1",
+  "compat_mode": "dual_read",
+  "jobs": [
+    {
+      "model": "PatchTST",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "n_heads",
+        "encoder_layers",
+        "linear_hidden_size",
+        "patch_len",
+        "stride",
+        "dropout",
+        "fc_dropout",
+        "attn_dropout",
+        "revin"
+      ]
+    },
+    {
+      "model": "DLinear",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "moving_avg_window"
+      ]
+    },
+    {
+      "model": "Naive",
+      "requested_mode": "baseline_fixed",
+      "validated_mode": "baseline_fixed",
+      "selected_search_params": []
+    },
+    {
+      "model": "iTransformer",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "n_heads",
+        "e_layers",
+        "d_ff",
+        "d_layers",
+        "factor",
+        "dropout",
+        "use_norm"
+      ]
+    },
+    {
+      "model": "LSTM",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "encoder_hidden_size",
+        "encoder_n_layers",
+        "encoder_dropout",
+        "decoder_hidden_size",
+        "decoder_layers"
+      ],
+      "model_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/LSTM/models/LSTM/best_params.json",
+      "model_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/LSTM/models/LSTM/optuna_study_summary.json",
+      "training_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/LSTM/models/LSTM/training_best_params.json",
+      "training_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/LSTM/models/LSTM/training_optuna_study_summary.json",
+      "residual_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/LSTM/residual/LSTM/best_params.json",
+      "residual_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/LSTM/residual/LSTM/optuna_study_summary.json"
+    },
+    {
+      "model": "NHITS",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "n_pool_kernel_size",
+        "n_freq_downsample",
+        "n_blocks",
+        "mlp_units",
+        "dropout_prob_theta"
+      ]
+    }
+  ],
+  "training_search": {
+    "requested_mode": "training_auto_requested",
+    "validated_mode": "training_auto",
+    "selected_search_params": [
+      "input_size",
+      "season_length",
+      "batch_size",
+      "valid_batch_size",
+      "windows_batch_size",
+      "inference_windows_batch_size",
+      "learning_rate",
+      "max_steps",
+      "val_check_steps"
+    ],
+    "best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/LSTM/models/LSTM/training_best_params.json",
+    "optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/LSTM/models/LSTM/training_optuna_study_summary.json"
+  },
+  "residual": {
+    "model": "xgboost",
+    "requested_mode": "residual_auto_requested",
+    "validated_mode": "residual_auto",
+    "selected_search_params": [
+      "n_estimators",
+      "max_depth",
+      "learning_rate",
+      "subsample",
+      "colsample_bytree"
+    ],
+    "best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/LSTM/residual/LSTM/best_params.json",
+    "optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/LSTM/residual/LSTM/optuna_study_summary.json"
+  },
+  "training": {
+    "loss": "mse"
+  }
+}

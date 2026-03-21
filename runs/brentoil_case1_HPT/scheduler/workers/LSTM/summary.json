@@ -1,0 +1,10 @@
+{
+  "job_name": "LSTM",
+  "gpu_id": 0,
+  "devices": 1,
+  "cuda_visible_devices": "0",
+  "returncode": 0,
+  "stdout_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case1_HPT/scheduler/workers/LSTM/stdout.log",
+  "stderr_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case1_HPT/scheduler/workers/LSTM/stderr.log",
+  "completed_at": "2026-03-21T07:50:25.122847+00:00"
+}

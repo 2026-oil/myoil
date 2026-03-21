@@ -1,0 +1,11 @@
+{
+  "input_size": 96,
+  "season_length": 26,
+  "batch_size": 64,
+  "valid_batch_size": 64,
+  "windows_batch_size": 1024,
+  "inference_windows_batch_size": 512,
+  "learning_rate": 0.0033310329302351513,
+  "max_steps": 1200,
+  "val_check_steps": 200
+}

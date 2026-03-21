@@ -1,0 +1,22 @@
+{
+  "model": "Naive",
+  "requested_mode": "baseline_fixed",
+  "validated_mode": "baseline_fixed",
+  "selected_search_params": [],
+  "selected_training_search_params": [
+    "input_size",
+    "season_length",
+    "batch_size",
+    "valid_batch_size",
+    "windows_batch_size",
+    "inference_windows_batch_size",
+    "learning_rate",
+    "max_steps",
+    "val_check_steps"
+  ],
+  "devices": 1,
+  "loss": "mse",
+  "evaluation_policy": "tscv_only",
+  "tuning_objective_metric": null,
+  "fold_count": 5
+}

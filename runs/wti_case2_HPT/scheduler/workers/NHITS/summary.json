@@ -1,0 +1,10 @@
+{
+  "job_name": "NHITS",
+  "gpu_id": 1,
+  "devices": 1,
+  "cuda_visible_devices": "1",
+  "returncode": 0,
+  "stdout_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/NHITS/stdout.log",
+  "stderr_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/NHITS/stderr.log",
+  "completed_at": "2026-03-21T08:53:11.857214+00:00"
+}

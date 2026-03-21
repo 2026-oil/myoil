@@ -1,0 +1,89 @@
+{
+  "dataset": {
+    "path": "/home/sonet/.openclaw/workspace/research/neuralforecast/tests/fixtures/optuna_smoke_data.csv",
+    "target_col": "target",
+    "dt_col": "dt",
+    "freq": null,
+    "hist_exog_cols": [],
+    "futr_exog_cols": [],
+    "static_exog_cols": []
+  },
+  "runtime": {
+    "random_seed": 7,
+    "opt_n_trial": 20
+  },
+  "training": {
+    "train_protocol": "expanding_window_tscv",
+    "input_size": 1,
+    "season_length": 1,
+    "batch_size": 1,
+    "valid_batch_size": 1,
+    "windows_batch_size": 8,
+    "inference_windows_batch_size": 8,
+    "learning_rate": 0.001,
+    "max_steps": 1,
+    "val_size": 1,
+    "val_check_steps": 1,
+    "early_stop_patience_steps": -1,
+    "loss": "mse"
+  },
+  "training_search": {
+    "requested_mode": "training_auto_requested",
+    "validated_mode": "training_auto",
+    "selected_search_params": [
+      "input_size",
+      "season_length",
+      "batch_size",
+      "valid_batch_size",
+      "windows_batch_size",
+      "inference_windows_batch_size",
+      "learning_rate",
+      "max_steps",
+      "val_check_steps"
+    ]
+  },
+  "cv": {
+    "horizon": 1,
+    "step_size": 1,
+    "n_windows": 2,
+    "gap": 0,
+    "max_train_size": null,
+    "overlap_eval_policy": "by_cutoff_mean"
+  },
+  "scheduler": {
+    "gpu_ids": [
+      0
+    ],
+    "max_concurrent_jobs": 1,
+    "worker_devices": 1
+  },
+  "residual": {
+    "enabled": true,
+    "model": "randomforest",
+    "target": "level",
+    "params": {},
+    "requested_mode": "residual_auto_requested",
+    "validated_mode": "residual_auto",
+    "selected_search_params": [
+      "n_estimators",
+      "max_depth",
+      "min_samples_leaf",
+      "max_features"
+    ]
+  },
+  "jobs": [
+    {
+      "model": "TFT",
+      "params": {},
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "dropout",
+        "n_head"
+      ]
+    }
+  ],
+  "search_space_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/search_space.yaml",
+  "search_space_sha256": "759dbe91fa232ba8e3b200c8a63162e40c59e03291685991b2006cadc70fd0d4"
+}

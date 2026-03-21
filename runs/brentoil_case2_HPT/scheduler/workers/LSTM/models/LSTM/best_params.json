@@ -1,0 +1,7 @@
+{
+  "encoder_hidden_size": 64,
+  "encoder_n_layers": 2,
+  "encoder_dropout": 0.0,
+  "decoder_hidden_size": 64,
+  "decoder_layers": 3
+}

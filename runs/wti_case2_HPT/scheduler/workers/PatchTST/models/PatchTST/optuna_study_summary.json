@@ -1,0 +1,75 @@
+{
+  "direction": "minimize",
+  "trial_count": 20,
+  "finished_trial_count": 20,
+  "state_counts": {
+    "complete": 9,
+    "pruned": 11
+  },
+  "best_value": 51.94935075468091,
+  "best_trial_number": 0,
+  "objective_metric": "mean_fold_mse",
+  "study_name": "neuralforecast::wti_case2_HPT::PatchTST::main-search::89dbd2e58a50",
+  "storage_backend": "journal",
+  "storage_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/PatchTST/models/PatchTST/.optuna/main-search.journal",
+  "requested_trial_count": 20,
+  "existing_trial_count_before_optimize": 0,
+  "existing_finished_trial_count_before_optimize": 0,
+  "remaining_trial_count": 20,
+  "requested_mode": "learned_auto_requested",
+  "validated_mode": "learned_auto",
+  "selected_search_params": [
+    "hidden_size",
+    "n_heads",
+    "encoder_layers",
+    "linear_hidden_size",
+    "patch_len",
+    "stride",
+    "dropout",
+    "fc_dropout",
+    "attn_dropout",
+    "revin"
+  ],
+  "selected_training_search_params": [
+    "input_size",
+    "season_length",
+    "batch_size",
+    "valid_batch_size",
+    "windows_batch_size",
+    "inference_windows_batch_size",
+    "learning_rate",
+    "max_steps",
+    "val_check_steps"
+  ],
+  "best_params": {
+    "hidden_size": 128,
+    "n_heads": 4,
+    "encoder_layers": 2,
+    "linear_hidden_size": 512,
+    "patch_len": 12,
+    "stride": 2,
+    "dropout": 0.1,
+    "fc_dropout": 0.1,
+    "attn_dropout": 0.1,
+    "revin": true
+  },
+  "best_training_params": {
+    "input_size": 96,
+    "season_length": 52,
+    "batch_size": 64,
+    "valid_batch_size": 64,
+    "windows_batch_size": 512,
+    "inference_windows_batch_size": 512,
+    "learning_rate": 0.0008229400549891581,
+    "max_steps": 800,
+    "val_check_steps": 100
+  },
+  "fold_mse": [
+    11.959425077796404,
+    36.119175327769405,
+    18.72290818045343,
+    5.331063653908812,
+    187.61418153347645
+  ],
+  "objective_stage": "tuning_pre_replay_direct_predictions"
+}

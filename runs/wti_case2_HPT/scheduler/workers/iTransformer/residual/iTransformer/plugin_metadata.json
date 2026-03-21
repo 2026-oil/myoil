@@ -1,0 +1,47 @@
+{
+  "0": {
+    "plugin": "xgboost",
+    "n_estimators": 128,
+    "max_depth": 3,
+    "learning_rate": 0.0045476944121483,
+    "subsample": 0.7457865796401691,
+    "colsample_bytree": 0.5266812725585401,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/iTransformer/residual/iTransformer/folds/fold_000/residual_checkpoint/model.ubj"
+  },
+  "1": {
+    "plugin": "xgboost",
+    "n_estimators": 128,
+    "max_depth": 3,
+    "learning_rate": 0.0045476944121483,
+    "subsample": 0.7457865796401691,
+    "colsample_bytree": 0.5266812725585401,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/iTransformer/residual/iTransformer/folds/fold_001/residual_checkpoint/model.ubj"
+  },
+  "2": {
+    "plugin": "xgboost",
+    "n_estimators": 128,
+    "max_depth": 3,
+    "learning_rate": 0.0045476944121483,
+    "subsample": 0.7457865796401691,
+    "colsample_bytree": 0.5266812725585401,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/iTransformer/residual/iTransformer/folds/fold_002/residual_checkpoint/model.ubj"
+  },
+  "3": {
+    "plugin": "xgboost",
+    "n_estimators": 128,
+    "max_depth": 3,
+    "learning_rate": 0.0045476944121483,
+    "subsample": 0.7457865796401691,
+    "colsample_bytree": 0.5266812725585401,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/iTransformer/residual/iTransformer/folds/fold_003/residual_checkpoint/model.ubj"
+  },
+  "4": {
+    "plugin": "xgboost",
+    "n_estimators": 128,
+    "max_depth": 3,
+    "learning_rate": 0.0045476944121483,
+    "subsample": 0.7457865796401691,
+    "colsample_bytree": 0.5266812725585401,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/iTransformer/residual/iTransformer/folds/fold_004/residual_checkpoint/model.ubj"
+  }
+}

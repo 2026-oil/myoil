@@ -1,0 +1,2479 @@
+[I 2026-03-21 16:42:51,133] A new study created in Journal with name: neuralforecast::brentoil_case1_HPT::NHITS::main-search::0bb57e779ea6
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+You are using a CUDA device ('NVIDIA RTX A5000') that has Tensor Cores. To properly utilize them, you should set `torch.set_float32_matmul_precision('medium' | 'high')` which will trade-off precision for performance. For more details, read https://pytorch.org/docs/stable/generated/torch.set_float32_matmul_precision.html#torch.set_float32_matmul_precision
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.861    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.861    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.861    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.861    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.861    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:44:32,519] Trial 0 finished with value: 42.39077792247416 and parameters: {'n_pool_kernel_size': [4, 2, 1], 'n_freq_downsample': [4, 2, 1], 'n_blocks': [2, 2, 2], 'mlp_units': [[512, 512], [512, 512], [512, 512]], 'dropout_prob_theta': 0.1, 'input_size': 96, 'season_length': 26, 'batch_size': 64, 'valid_batch_size': 64, 'windows_batch_size': 1024, 'inference_windows_batch_size': 512, 'learning_rate': 0.0033310329302351513, 'max_steps': 1200, 'val_check_steps': 200}. Best is trial 0 with value: 42.39077792247416.
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 1.3 M  | train
+-------------------------------------------------------
+1.3 M     Trainable params
+0         Non-trainable params
+1.3 M     Total params
+5.199     Total estimated model params size (MB)
+70        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 1.3 M  | train
+-------------------------------------------------------
+1.3 M     Trainable params
+0         Non-trainable params
+1.3 M     Total params
+5.199     Total estimated model params size (MB)
+70        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 1.3 M  | train
+-------------------------------------------------------
+1.3 M     Trainable params
+0         Non-trainable params
+1.3 M     Total params
+5.199     Total estimated model params size (MB)
+70        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 1.3 M  | train
+-------------------------------------------------------
+1.3 M     Trainable params
+0         Non-trainable params
+1.3 M     Total params
+5.199     Total estimated model params size (MB)
+70        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 1.3 M  | train
+-------------------------------------------------------
+1.3 M     Trainable params
+0         Non-trainable params
+1.3 M     Total params
+5.199     Total estimated model params size (MB)
+70        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:45:03,139] Trial 1 finished with value: 59.23202743010713 and parameters: {'n_pool_kernel_size': [8, 4, 1], 'n_freq_downsample': [4, 2, 1], 'n_blocks': [1, 2, 2], 'mlp_units': [[256, 256], [256, 256], [256, 256]], 'dropout_prob_theta': 0.2, 'input_size': 24, 'season_length': 52, 'batch_size': 32, 'valid_batch_size': 16, 'windows_batch_size': 1024, 'inference_windows_batch_size': 512, 'learning_rate': 0.00664185402763412, 'max_steps': 500, 'val_check_steps': 200}. Best is trial 0 with value: 42.39077792247416.
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 7.5 M  | train
+-------------------------------------------------------
+7.5 M     Trainable params
+0         Non-trainable params
+7.5 M     Total params
+29.894    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 7.5 M  | train
+-------------------------------------------------------
+7.5 M     Trainable params
+0         Non-trainable params
+7.5 M     Total params
+29.894    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 7.5 M  | train
+-------------------------------------------------------
+7.5 M     Trainable params
+0         Non-trainable params
+7.5 M     Total params
+29.894    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 7.5 M  | train
+-------------------------------------------------------
+7.5 M     Trainable params
+0         Non-trainable params
+7.5 M     Total params
+29.894    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 7.5 M  | train
+-------------------------------------------------------
+7.5 M     Trainable params
+0         Non-trainable params
+7.5 M     Total params
+29.894    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:45:52,521] Trial 2 finished with value: 90.39349260441443 and parameters: {'n_pool_kernel_size': [2, 2, 1], 'n_freq_downsample': [4, 2, 1], 'n_blocks': [2, 2, 2], 'mlp_units': [[512, 512], [512, 512], [512, 512]], 'dropout_prob_theta': 0.2, 'input_size': 72, 'season_length': 26, 'batch_size': 32, 'valid_batch_size': 32, 'windows_batch_size': 128, 'inference_windows_batch_size': 1024, 'learning_rate': 0.006121241840437704, 'max_steps': 800, 'val_check_steps': 200}. Best is trial 0 with value: 42.39077792247416.
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 393 K  | train
+-------------------------------------------------------
+393 K     Trainable params
+0         Non-trainable params
+393 K     Total params
+1.575     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 393 K  | train
+-------------------------------------------------------
+393 K     Trainable params
+0         Non-trainable params
+393 K     Total params
+1.575     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 393 K  | train
+-------------------------------------------------------
+393 K     Trainable params
+0         Non-trainable params
+393 K     Total params
+1.575     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 393 K  | train
+-------------------------------------------------------
+393 K     Trainable params
+0         Non-trainable params
+393 K     Total params
+1.575     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 393 K  | train
+-------------------------------------------------------
+393 K     Trainable params
+0         Non-trainable params
+393 K     Total params
+1.575     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:46:25,922] Trial 3 finished with value: 52.98289623678113 and parameters: {'n_pool_kernel_size': [8, 4, 1], 'n_freq_downsample': [8, 4, 1], 'n_blocks': [1, 1, 1], 'mlp_units': [[128, 128], [128, 128], [128, 128]], 'dropout_prob_theta': 0.2, 'input_size': 72, 'season_length': 52, 'batch_size': 16, 'valid_batch_size': 16, 'windows_batch_size': 512, 'inference_windows_batch_size': 1024, 'learning_rate': 0.00251470765895749, 'max_steps': 800, 'val_check_steps': 200}. Best is trial 0 with value: 42.39077792247416.
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 491 K  | train
+-------------------------------------------------------
+491 K     Trainable params
+0         Non-trainable params
+491 K     Total params
+1.966     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 491 K  | train
+-------------------------------------------------------
+491 K     Trainable params
+0         Non-trainable params
+491 K     Total params
+1.966     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 491 K  | train
+-------------------------------------------------------
+491 K     Trainable params
+0         Non-trainable params
+491 K     Total params
+1.966     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 491 K  | train
+-------------------------------------------------------
+491 K     Trainable params
+0         Non-trainable params
+491 K     Total params
+1.966     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 491 K  | train
+-------------------------------------------------------
+491 K     Trainable params
+0         Non-trainable params
+491 K     Total params
+1.966     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:46:42,031] Trial 4 finished with value: 64.8436791955965 and parameters: {'n_pool_kernel_size': [2, 2, 1], 'n_freq_downsample': [8, 4, 1], 'n_blocks': [1, 1, 1], 'mlp_units': [[128, 128], [128, 128], [128, 128]], 'dropout_prob_theta': 0.1, 'input_size': 72, 'season_length': 52, 'batch_size': 32, 'valid_batch_size': 16, 'windows_batch_size': 1024, 'inference_windows_batch_size': 1024, 'learning_rate': 0.0005521214782937652, 'max_steps': 800, 'val_check_steps': 50}. Best is trial 0 with value: 42.39077792247416.
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 806 K  | train
+-------------------------------------------------------
+806 K     Trainable params
+0         Non-trainable params
+806 K     Total params
+3.227     Total estimated model params size (MB)
+55        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:46:45,946] Trial 5 pruned. Pruned after fold 0 with mean_mse=43.0802
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 2.1 M  | train
+-------------------------------------------------------
+2.1 M     Trainable params
+0         Non-trainable params
+2.1 M     Total params
+8.410     Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:46:49,606] Trial 6 pruned. Pruned after fold 0 with mean_mse=26.5839
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 6.7 M  | train
+-------------------------------------------------------
+6.7 M     Trainable params
+0         Non-trainable params
+6.7 M     Total params
+26.761    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 6.7 M  | train
+-------------------------------------------------------
+6.7 M     Trainable params
+0         Non-trainable params
+6.7 M     Total params
+26.761    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 6.7 M  | train
+-------------------------------------------------------
+6.7 M     Trainable params
+0         Non-trainable params
+6.7 M     Total params
+26.761    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 6.7 M  | train
+-------------------------------------------------------
+6.7 M     Trainable params
+0         Non-trainable params
+6.7 M     Total params
+26.761    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 6.7 M  | train
+-------------------------------------------------------
+6.7 M     Trainable params
+0         Non-trainable params
+6.7 M     Total params
+26.761    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:47:45,687] Trial 7 finished with value: 63.64226729033445 and parameters: {'n_pool_kernel_size': [8, 4, 1], 'n_freq_downsample': [4, 2, 1], 'n_blocks': [2, 2, 2], 'mlp_units': [[512, 512], [512, 512], [512, 512]], 'dropout_prob_theta': 0.1, 'input_size': 72, 'season_length': 26, 'batch_size': 16, 'valid_batch_size': 16, 'windows_batch_size': 128, 'inference_windows_batch_size': 256, 'learning_rate': 0.0004241265722398833, 'max_steps': 1200, 'val_check_steps': 100}. Best is trial 0 with value: 42.39077792247416.
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 1.3 M  | train
+-------------------------------------------------------
+1.3 M     Trainable params
+0         Non-trainable params
+1.3 M     Total params
+5.194     Total estimated model params size (MB)
+70        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=800` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:47:56,852] Trial 8 pruned. Pruned after fold 0 with mean_mse=35.4494
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 991 K  | train
+-------------------------------------------------------
+991 K     Trainable params
+0         Non-trainable params
+991 K     Total params
+3.967     Total estimated model params size (MB)
+70        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:48:05,126] Trial 9 pruned. Pruned after fold 0 with mean_mse=52.2876
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.849    Total estimated model params size (MB)
+65        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.849    Total estimated model params size (MB)
+65        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.849    Total estimated model params size (MB)
+65        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.849    Total estimated model params size (MB)
+65        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.849    Total estimated model params size (MB)
+65        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:48:29,819] Trial 10 finished with value: 54.34637360804906 and parameters: {'n_pool_kernel_size': [4, 2, 1], 'n_freq_downsample': [12, 3, 1], 'n_blocks': [2, 2, 2], 'mlp_units': [[512, 512], [512, 512], [512, 512]], 'dropout_prob_theta': 0.0, 'input_size': 96, 'season_length': 26, 'batch_size': 64, 'valid_batch_size': 64, 'windows_batch_size': 1024, 'inference_windows_batch_size': 512, 'learning_rate': 0.0016380644828126142, 'max_steps': 300, 'val_check_steps': 200}. Best is trial 0 with value: 42.39077792247416.
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 418 K  | train
+-------------------------------------------------------
+418 K     Trainable params
+0         Non-trainable params
+418 K     Total params
+1.676     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 418 K  | train
+-------------------------------------------------------
+418 K     Trainable params
+0         Non-trainable params
+418 K     Total params
+1.676     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 418 K  | train
+-------------------------------------------------------
+418 K     Trainable params
+0         Non-trainable params
+418 K     Total params
+1.676     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 418 K  | train
+-------------------------------------------------------
+418 K     Trainable params
+0         Non-trainable params
+418 K     Total params
+1.676     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 418 K  | train
+-------------------------------------------------------
+418 K     Trainable params
+0         Non-trainable params
+418 K     Total params
+1.676     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:48:48,452] Trial 11 finished with value: 47.2692753955944 and parameters: {'n_pool_kernel_size': [4, 2, 1], 'n_freq_downsample': [8, 4, 1], 'n_blocks': [1, 1, 1], 'mlp_units': [[128, 128], [128, 128], [128, 128]], 'dropout_prob_theta': 0.2, 'input_size': 64, 'season_length': 52, 'batch_size': 64, 'valid_batch_size': 64, 'windows_batch_size': 512, 'inference_windows_batch_size': 1024, 'learning_rate': 0.0028259749552783132, 'max_steps': 500, 'val_check_steps': 200}. Best is trial 0 with value: 42.39077792247416.
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 3.4 M  | train
+-------------------------------------------------------
+3.4 M     Trainable params
+0         Non-trainable params
+3.4 M     Total params
+13.784    Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:48:52,458] Trial 12 pruned. Pruned after fold 0 with mean_mse=25.9117
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 3.4 M  | train
+-------------------------------------------------------
+3.4 M     Trainable params
+0         Non-trainable params
+3.4 M     Total params
+13.778    Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 3.4 M  | train
+-------------------------------------------------------
+3.4 M     Trainable params
+0         Non-trainable params
+3.4 M     Total params
+13.778    Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 3.4 M  | train
+-------------------------------------------------------
+3.4 M     Trainable params
+0         Non-trainable params
+3.4 M     Total params
+13.778    Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 3.4 M  | train
+-------------------------------------------------------
+3.4 M     Trainable params
+0         Non-trainable params
+3.4 M     Total params
+13.778    Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 3.4 M  | train
+-------------------------------------------------------
+3.4 M     Trainable params
+0         Non-trainable params
+3.4 M     Total params
+13.778    Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:49:13,980] Trial 13 finished with value: 54.163899826497186 and parameters: {'n_pool_kernel_size': [4, 2, 1], 'n_freq_downsample': [8, 4, 1], 'n_blocks': [1, 1, 1], 'mlp_units': [[512, 512], [512, 512], [512, 512]], 'dropout_prob_theta': 0.1, 'input_size': 64, 'season_length': 52, 'batch_size': 64, 'valid_batch_size': 64, 'windows_batch_size': 512, 'inference_windows_batch_size': 1024, 'learning_rate': 0.001021145328299241, 'max_steps': 500, 'val_check_steps': 200}. Best is trial 0 with value: 42.39077792247416.
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 602 K  | train
+-------------------------------------------------------
+602 K     Trainable params
+0         Non-trainable params
+602 K     Total params
+2.411     Total estimated model params size (MB)
+65        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 602 K  | train
+-------------------------------------------------------
+602 K     Trainable params
+0         Non-trainable params
+602 K     Total params
+2.411     Total estimated model params size (MB)
+65        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:49:24,790] Trial 14 pruned. Pruned after fold 1 with mean_mse=26.9146
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 418 K  | train
+-------------------------------------------------------
+418 K     Trainable params
+0         Non-trainable params
+418 K     Total params
+1.676     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:49:29,719] Trial 15 pruned. Pruned after fold 0 with mean_mse=25.7290
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.861    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:49:50,279] Trial 16 pruned. Pruned after fold 0 with mean_mse=25.9161
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 301 K  | train
+-------------------------------------------------------
+301 K     Trainable params
+0         Non-trainable params
+301 K     Total params
+1.206     Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:49:54,344] Trial 17 pruned. Pruned after fold 0 with mean_mse=19.4794
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 3.2 M  | train
+-------------------------------------------------------
+3.2 M     Trainable params
+0         Non-trainable params
+3.2 M     Total params
+12.711    Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 3.2 M  | train
+-------------------------------------------------------
+3.2 M     Trainable params
+0         Non-trainable params
+3.2 M     Total params
+12.711    Total estimated model params size (MB)
+44        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=300` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:49:59,970] Trial 18 pruned. Pruned after fold 1 with mean_mse=16.6045
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [4, 2, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [8, 4, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [12, 3, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 1, 1] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [1, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [2, 2, 2] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[128, 128], [128, 128], [128, 128]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[256, 256], [256, 256], [256, 256]] which is of type list.
+  warnings.warn(message)
+/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/optuna/distributions.py:518: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains [[512, 512], [512, 512], [512, 512]] which is of type list.
+  warnings.warn(message)
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 2.4 M  | train
+-------------------------------------------------------
+2.4 M     Trainable params
+0         Non-trainable params
+2.4 M     Total params
+9.617     Total estimated model params size (MB)
+65        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 2.4 M  | train
+-------------------------------------------------------
+2.4 M     Trainable params
+0         Non-trainable params
+2.4 M     Total params
+9.617     Total estimated model params size (MB)
+65        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=500` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 2.4 M  | train
+-------------------------------------------------------
+2.4 M     Trainable params
+0         Non-trainable params
+2.4 M     Total params
+9.617     Total estimated model params size (MB)
+65        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 2.4 M  | train
+-------------------------------------------------------
+2.4 M     Trainable params
+0         Non-trainable params
+2.4 M     Total params
+9.617     Total estimated model params size (MB)
+65        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 2.4 M  | train
+-------------------------------------------------------
+2.4 M     Trainable params
+0         Non-trainable params
+2.4 M     Total params
+9.617     Total estimated model params size (MB)
+65        Modules in train mode
+0         Modules in eval mode
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:50:26,071] Trial 19 finished with value: 59.34270013366322 and parameters: {'n_pool_kernel_size': [2, 2, 1], 'n_freq_downsample': [12, 3, 1], 'n_blocks': [2, 2, 2], 'mlp_units': [[256, 256], [256, 256], [256, 256]], 'dropout_prob_theta': 0.0, 'input_size': 64, 'season_length': 26, 'batch_size': 64, 'valid_batch_size': 64, 'windows_batch_size': 512, 'inference_windows_batch_size': 256, 'learning_rate': 0.002488398985287275, 'max_steps': 500, 'val_check_steps': 50}. Best is trial 0 with value: 42.39077792247416.
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.861    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.861    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.861    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.861    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+Seed set to 1
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+
+  | Name         | Type          | Params | Mode 
+-------------------------------------------------------
+0 | loss         | MSE           | 0      | train
+1 | valid_loss   | MSE           | 0      | train
+2 | padder_train | ConstantPad1d | 0      | train
+3 | scaler       | TemporalNorm  | 0      | train
+4 | blocks       | ModuleList    | 8.0 M  | train
+-------------------------------------------------------
+8.0 M     Trainable params
+0         Non-trainable params
+8.0 M     Total params
+31.861    Total estimated model params size (MB)
+83        Modules in train mode
+0         Modules in eval mode
+`Trainer.fit` stopped: `max_steps=1200` reached.
+Trainer already configured with model summary callbacks: [<class 'pytorch_lightning.callbacks.model_summary.ModelSummary'>]. Skipping setting a default `ModelSummary` callback.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [1]
+[I 2026-03-21 16:52:13,670] A new study created in Journal with name: neuralforecast::brentoil_case1_HPT::NHITS::residual-search::0bb57e779ea6
+[I 2026-03-21 16:52:13,751] Trial 0 finished with value: 45.44697362485217 and parameters: {'n_estimators': 32, 'max_depth': 2, 'learning_rate': 0.0016932999507037908, 'subsample': 0.5931301056888354, 'colsample_bytree': 0.6727803635215239}. Best is trial 0 with value: 45.44697362485217.
+[I 2026-03-21 16:52:13,867] Trial 1 finished with value: 72.08443538258004 and parameters: {'n_estimators': 128, 'max_depth': 3, 'learning_rate': 0.14969364581164232, 'subsample': 0.5136937965989631, 'colsample_bytree': 0.8352337550892011}. Best is trial 0 with value: 45.44697362485217.
+[I 2026-03-21 16:52:13,971] Trial 2 finished with value: 79.22539098572356 and parameters: {'n_estimators': 32, 'max_depth': 6, 'learning_rate': 0.25032333105810645, 'subsample': 0.6567120890796214, 'colsample_bytree': 0.846161307834657}. Best is trial 0 with value: 45.44697362485217.
+[I 2026-03-21 16:52:14,037] Trial 3 finished with value: 64.55315812363494 and parameters: {'n_estimators': 32, 'max_depth': 2, 'learning_rate': 0.14971505008038705, 'subsample': 0.549173416916525, 'colsample_bytree': 0.7105538125025261}. Best is trial 0 with value: 45.44697362485217.
+[I 2026-03-21 16:52:14,100] Trial 4 finished with value: 59.68390115088639 and parameters: {'n_estimators': 16, 'max_depth': 5, 'learning_rate': 0.11680703272479827, 'subsample': 0.5091441386720958, 'colsample_bytree': 0.8750721574724838}. Best is trial 0 with value: 45.44697362485217.
+[I 2026-03-21 16:52:14,121] Trial 5 pruned. Pruned residual trial after fold 0 with mean_mse=26.2227
+[I 2026-03-21 16:52:14,150] Trial 6 pruned. Pruned residual trial after fold 0 with mean_mse=29.0104
+[I 2026-03-21 16:52:14,180] Trial 7 pruned. Pruned residual trial after fold 0 with mean_mse=30.8973
+[I 2026-03-21 16:52:14,212] Trial 8 pruned. Pruned residual trial after fold 0 with mean_mse=28.2082
+[I 2026-03-21 16:52:14,297] Trial 9 finished with value: 48.67945916453586 and parameters: {'n_estimators': 32, 'max_depth': 6, 'learning_rate': 0.007268724405433989, 'subsample': 0.8754060515680777, 'colsample_bytree': 0.8629989926752257}. Best is trial 0 with value: 45.44697362485217.
+[I 2026-03-21 16:52:14,327] Trial 10 pruned. Pruned residual trial after fold 0 with mean_mse=25.0228
+[I 2026-03-21 16:52:14,354] Trial 11 pruned. Pruned residual trial after fold 0 with mean_mse=25.2037
+[I 2026-03-21 16:52:14,383] Trial 12 pruned. Pruned residual trial after fold 0 with mean_mse=25.1293
+[I 2026-03-21 16:52:14,411] Trial 13 pruned. Pruned residual trial after fold 0 with mean_mse=25.9147
+[I 2026-03-21 16:52:14,439] Trial 14 pruned. Pruned residual trial after fold 0 with mean_mse=31.0117
+[I 2026-03-21 16:52:14,514] Trial 15 finished with value: 46.0908156036989 and parameters: {'n_estimators': 32, 'max_depth': 4, 'learning_rate': 0.002241042501040543, 'subsample': 0.9993628837271109, 'colsample_bytree': 0.9128570349965531}. Best is trial 0 with value: 45.44697362485217.
+[I 2026-03-21 16:52:14,541] Trial 16 pruned. Pruned residual trial after fold 0 with mean_mse=25.0366
+[I 2026-03-21 16:52:14,563] Trial 17 pruned. Pruned residual trial after fold 0 with mean_mse=25.3029
+[I 2026-03-21 16:52:14,591] Trial 18 pruned. Pruned residual trial after fold 0 with mean_mse=30.5395
+[I 2026-03-21 16:52:14,614] Trial 19 pruned. Pruned residual trial after fold 0 with mean_mse=25.6810

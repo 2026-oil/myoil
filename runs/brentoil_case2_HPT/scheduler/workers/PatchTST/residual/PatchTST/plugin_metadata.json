@@ -1,0 +1,47 @@
+{
+  "0": {
+    "plugin": "xgboost",
+    "n_estimators": 16,
+    "max_depth": 4,
+    "learning_rate": 0.024196535792497757,
+    "subsample": 0.9938280908923742,
+    "colsample_bytree": 0.9720833380650836,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case2_HPT/scheduler/workers/PatchTST/residual/PatchTST/folds/fold_000/residual_checkpoint/model.ubj"
+  },
+  "1": {
+    "plugin": "xgboost",
+    "n_estimators": 16,
+    "max_depth": 4,
+    "learning_rate": 0.024196535792497757,
+    "subsample": 0.9938280908923742,
+    "colsample_bytree": 0.9720833380650836,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case2_HPT/scheduler/workers/PatchTST/residual/PatchTST/folds/fold_001/residual_checkpoint/model.ubj"
+  },
+  "2": {
+    "plugin": "xgboost",
+    "n_estimators": 16,
+    "max_depth": 4,
+    "learning_rate": 0.024196535792497757,
+    "subsample": 0.9938280908923742,
+    "colsample_bytree": 0.9720833380650836,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case2_HPT/scheduler/workers/PatchTST/residual/PatchTST/folds/fold_002/residual_checkpoint/model.ubj"
+  },
+  "3": {
+    "plugin": "xgboost",
+    "n_estimators": 16,
+    "max_depth": 4,
+    "learning_rate": 0.024196535792497757,
+    "subsample": 0.9938280908923742,
+    "colsample_bytree": 0.9720833380650836,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case2_HPT/scheduler/workers/PatchTST/residual/PatchTST/folds/fold_003/residual_checkpoint/model.ubj"
+  },
+  "4": {
+    "plugin": "xgboost",
+    "n_estimators": 16,
+    "max_depth": 4,
+    "learning_rate": 0.024196535792497757,
+    "subsample": 0.9938280908923742,
+    "colsample_bytree": 0.9720833380650836,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case2_HPT/scheduler/workers/PatchTST/residual/PatchTST/folds/fold_004/residual_checkpoint/model.ubj"
+  }
+}

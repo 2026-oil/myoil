@@ -1,0 +1,55 @@
+{
+  "manifest_version": "1",
+  "artifact_schema_version": "1",
+  "evaluation_protocol_version": "2",
+  "config_source_type": "yaml",
+  "config_source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/tests/fixtures/optuna_learned_auto_with_residual_randomforest.yaml",
+  "config_resolved_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/validation/config/config.resolved.json",
+  "config_input_sha256": "944ba6c4e8ab5bbeb32f684aa9cc147e34a1967873dade576a783671ac13917e",
+  "config_resolved_sha256": "5f6eaa5711eb30d1c0f1ce31653641cf0ca5396fe4c41bffe1d67df92666a768",
+  "search_space_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/search_space.yaml",
+  "search_space_sha256": "759dbe91fa232ba8e3b200c8a63162e40c59e03291685991b2006cadc70fd0d4",
+  "entrypoint_version": "neuralforecast-residual-v1",
+  "compat_mode": "dual_read",
+  "jobs": [
+    {
+      "model": "TFT",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "dropout",
+        "n_head"
+      ]
+    }
+  ],
+  "training_search": {
+    "requested_mode": "training_auto_requested",
+    "validated_mode": "training_auto",
+    "selected_search_params": [
+      "input_size",
+      "season_length",
+      "batch_size",
+      "valid_batch_size",
+      "windows_batch_size",
+      "inference_windows_batch_size",
+      "learning_rate",
+      "max_steps",
+      "val_check_steps"
+    ]
+  },
+  "residual": {
+    "model": "randomforest",
+    "requested_mode": "residual_auto_requested",
+    "validated_mode": "residual_auto",
+    "selected_search_params": [
+      "n_estimators",
+      "max_depth",
+      "min_samples_leaf",
+      "max_features"
+    ]
+  },
+  "training": {
+    "loss": "mse"
+  }
+}
