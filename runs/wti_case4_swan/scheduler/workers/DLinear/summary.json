@@ -1,0 +1,10 @@
+{
+  "job_name": "DLinear",
+  "gpu_id": 0,
+  "devices": 1,
+  "cuda_visible_devices": "0",
+  "returncode": 0,
+  "stdout_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_swan/scheduler/workers/DLinear/stdout.log",
+  "stderr_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_swan/scheduler/workers/DLinear/stderr.log",
+  "completed_at": "2026-03-21T04:41:16.305849+00:00"
+}

@@ -10,6 +10,8 @@ import pandas as pd
 import pytest
 import yaml
 
+import neuralforecast.models as nf_models
+from neuralforecast.core import MODEL_FILENAME_DICT
 from residual.adapters import build_multivariate_inputs, build_univariate_inputs
 from residual.config import load_app_config
 from residual.models import (
@@ -30,6 +32,18 @@ from residual.scheduler import build_launch_plan, run_parallel_jobs, worker_env
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+NEWLY_SUPPORTED_MODEL_ALIASES = {
+    "DeepEDM": ("deepedm", "autodeepedm"),
+    "NonstationaryTransformer": (
+        "nonstationarytransformer",
+        "autononstationarytransformer",
+    ),
+    "Mamba": ("mamba", "automamba"),
+    "SMamba": ("smamba", "autosmamba"),
+    "CMamba": ("cmamba", "autocmamba"),
+    "xLSTMMixer": ("xlstmmixer", "autoxlstmmixer"),
+    "DUET": ("duet", "autoduet"),
+}
 
 
 def _write_search_space(
@@ -59,6 +73,7 @@ def _write_config(tmp_path: Path, payload: dict, suffix: str) -> Path:
     if suffix == ".toml":
         task_block = ""
         task_name = payload.get("task", {}).get("name")
+        residual_target = payload.get("residual", {}).get("target", "level")
         if task_name:
             task_block = f"\n[task]\nname = {task_name!r}\n"
         text = """
@@ -99,6 +114,7 @@ worker_devices = 1
 [residual]
 enabled = true
 model = 'xgboost'
+target = '__RESIDUAL_TARGET__'
 
 [residual.params]
 n_estimators = 8
@@ -113,7 +129,7 @@ params = { hidden_size = 32 }
 model = 'iTransformer'
 params = { hidden_size = 32, n_heads = 4, e_layers = 2, d_ff = 64 }
 """
-        text = f"{task_block}{text}"
+        text = f"{task_block}{text}".replace("__RESIDUAL_TARGET__", residual_target)
         path.write_text(text, encoding="utf-8")
     else:
         path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
@@ -191,6 +207,23 @@ def test_task_name_is_loaded_into_normalized_config(tmp_path: Path):
 
     assert loaded.config.task.name == "semi_test"
     assert loaded.normalized_payload["task"] == {"name": "semi_test"}
+
+
+def test_load_app_config_preserves_residual_target_yaml_toml_parity(tmp_path: Path):
+    payload = _payload()
+    payload["residual"]["target"] = "delta"
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n",
+        encoding="utf-8",
+    )
+    yaml_path = _write_config(tmp_path, payload, ".yaml")
+    toml_path = _write_config(tmp_path, payload, ".toml")
+
+    loaded_yaml = load_app_config(tmp_path, config_path=yaml_path)
+    loaded_toml = load_app_config(tmp_path, config_toml_path=toml_path)
+
+    assert loaded_yaml.config.residual.target == "delta"
+    assert loaded_yaml.config.to_dict() == loaded_toml.config.to_dict()
 
 
 def test_adapters_materialize_expected_frames(tmp_path: Path):
@@ -300,6 +333,47 @@ def test_model_builder_disables_logger_and_keeps_timemixer_without_future_featur
     assert timemixer.trainer_kwargs["logger"] is False
     assert timemixer.trainer_kwargs["enable_progress_bar"] is False
     assert timemixer.use_future_temporal_feature == 0
+
+
+def test_build_model_supports_deepedm_and_duet(tmp_path: Path):
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["dataset"]["futr_exog_cols"] = []
+    payload["jobs"] = [
+        {
+            "model": "DeepEDM",
+            "params": {
+                "n_edm_blocks": 2,
+                "mlp_layers": 2,
+                "delay": 4,
+                "projection_dim": 32,
+            },
+        },
+        {
+            "model": "DUET",
+            "params": {
+                "n_block": 2,
+                "hidden_size": 32,
+                "ff_dim": 64,
+                "moving_avg_window": 5,
+            },
+        },
+    ]
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n",
+        encoding="utf-8",
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    deepedm = build_model(loaded.config, loaded.config.jobs[0])
+    duet = build_model(loaded.config, loaded.config.jobs[1], n_series=1)
+
+    assert deepedm.hparams.n_edm_blocks == 2
+    assert deepedm.hparams.projection_dim == 32
+    assert getattr(duet.hparams, "n_series", 1) == 1
+    assert duet.hparams.hidden_size == 32
 
 
 def test_scheduler_plan_and_worker_env_use_single_device(tmp_path: Path):
@@ -891,6 +965,27 @@ def test_load_app_config_rejects_removed_cv_final_holdout(tmp_path: Path):
         load_app_config(tmp_path, config_path=path)
 
 
+@pytest.mark.parametrize("enabled", [True, False], ids=["enabled", "disabled"])
+def test_load_app_config_rejects_invalid_residual_target_values(
+    tmp_path: Path, enabled: bool
+):
+    payload = _payload()
+    payload["residual"] = {
+        "enabled": enabled,
+        "model": "xgboost",
+        "target": "weird",
+        "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+    }
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n",
+        encoding="utf-8",
+    )
+    path = _write_config(tmp_path, payload, ".yaml")
+
+    with pytest.raises(ValueError, match="residual.target must be one of: level, delta"):
+        load_app_config(tmp_path, config_path=path)
+
+
 def test_residual_registry_builds_xgboost_plugin():
     plugin = build_residual_plugin(
         {
@@ -951,6 +1046,7 @@ def test_runtime_generates_per_fold_residual_artifacts_with_dummy_model(tmp_path
     diagnostics = pd.read_json(residual_root / "diagnostics.json", typ="series")
     assert diagnostics["corrected_eval_mode"] == "per_fold_backcast_runtime"
     assert diagnostics["fold_count"] == 4
+    assert diagnostics["residual.target"] == "level"
     assert diagnostics["tscv_policy"]["gap"] == 0
 
 
@@ -1193,6 +1289,83 @@ def test_apply_residual_plugin_uses_fold_local_backcasts_only(
     assert not (residual_root / "corrected_holdout.csv").exists()
 
 
+def test_build_residual_target_preserves_level_mode_parity():
+    from residual import runtime
+
+    panel = pd.DataFrame(
+        {
+            "fold_idx": [0, 0],
+            "cutoff": pd.to_datetime(["2020-01-08", "2020-01-08"]),
+            "horizon_step": [2, 1],
+            "y_hat_base": [11.0, 10.0],
+            "y": [12.0, 11.0],
+        }
+    )
+
+    residual_target = runtime.build_residual_target(panel, "level")
+
+    assert residual_target.tolist() == [1.0, 1.0]
+
+
+def test_build_residual_target_delta_resets_per_cutoff_and_preserves_row_order():
+    from residual import runtime
+
+    panel = pd.DataFrame(
+        {
+            "fold_idx": [0, 0, 0, 0],
+            "cutoff": pd.to_datetime(
+                ["2020-01-08", "2020-01-15", "2020-01-08", "2020-01-15"]
+            ),
+            "horizon_step": [2, 1, 1, 2],
+            "y_hat_base": [11.0, 20.0, 10.0, 22.0],
+            "y": [12.0, 21.0, 11.0, 25.0],
+        }
+    )
+
+    residual_target = runtime.build_residual_target(panel, "delta")
+
+    assert residual_target.tolist() == [0.0, 1.0, 1.0, 2.0]
+    assert not residual_target.isna().any()
+
+
+def test_reconstruct_corrected_forecast_delta_uses_grouped_cumsum_and_preserves_row_order():
+    from residual import runtime
+
+    panel = pd.DataFrame(
+        {
+            "fold_idx": [0, 0, 0, 0],
+            "cutoff": pd.to_datetime(
+                ["2020-01-08", "2020-01-15", "2020-01-08", "2020-01-15"]
+            ),
+            "horizon_step": [2, 1, 1, 2],
+            "y_hat_base": [11.0, 20.0, 10.0, 22.0],
+            "residual_hat": [1.0, 1.0, 1.0, 2.0],
+        }
+    )
+
+    corrected = runtime.reconstruct_corrected_forecast(panel, "delta")
+
+    assert corrected.tolist() == [13.0, 21.0, 11.0, 25.0]
+
+
+def test_reconstruct_corrected_forecast_level_mode_parity():
+    from residual import runtime
+
+    panel = pd.DataFrame(
+        {
+            "fold_idx": [0, 0],
+            "cutoff": pd.to_datetime(["2020-01-08", "2020-01-08"]),
+            "horizon_step": [2, 1],
+            "y_hat_base": [11.0, 10.0],
+            "residual_hat": [1.5, 0.5],
+        }
+    )
+
+    corrected = runtime.reconstruct_corrected_forecast(panel, "level")
+
+    assert corrected.tolist() == [12.5, 10.5]
+
+
 def test_xgboost_plugin_predicts_panel_and_writes_checkpoint(tmp_path: Path):
     plugin = cast(
         Any,
@@ -1302,7 +1475,6 @@ def test_repo_config_conservative_fairness_matrix():
         "VanillaTransformer",
         "Informer",
         "Autoformer",
-        "FEDformer",
         "PatchTST",
         "iTransformer",
     ):
@@ -1313,7 +1485,6 @@ def test_repo_config_conservative_fairness_matrix():
 
     assert params_by_model["PatchTST"]["n_heads"] == 16
     assert params_by_model["PatchTST"]["patch_len"] == 16
-    assert params_by_model["FEDformer"]["modes"] == 64
     assert params_by_model["NHITS"] == {
         "mlp_units": [[64, 64], [64, 64], [64, 64]],
         "n_pool_kernel_size": [2, 2, 1],
@@ -1582,6 +1753,25 @@ def test_load_app_config_uses_repo_root_search_space_not_config_parent(tmp_path:
     ]
 
 
+def test_load_app_config_resolves_relative_dataset_path_from_repo_root(tmp_path: Path):
+    repo_root = tmp_path / "repo"
+    config_dir = repo_root / "yaml" / "blackswan"
+    data_dir = repo_root / "data"
+    config_dir.mkdir(parents=True)
+    data_dir.mkdir(parents=True)
+    (data_dir / "df.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    payload = _payload()
+    payload["dataset"]["path"] = "data/df.csv"
+    config_path = _write_config(config_dir, payload, ".yaml")
+
+    loaded = load_app_config(repo_root, config_path=config_path)
+
+    assert loaded.config.dataset.path == (repo_root / "data" / "df.csv").resolve()
+
+
 def test_runtime_auto_mode_records_selector_provenance_and_modes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -1811,6 +2001,7 @@ def test_supported_auto_model_matrix_includes_v3_expansion():
         "NLinear",
         "TiDE",
         "DeepNPTS",
+        "DeepEDM",
         "KAN",
         "TimeLLM",
         "TimeXer",
@@ -1822,6 +2013,7 @@ def test_supported_auto_model_matrix_includes_v3_expansion():
         "MLPMultivariate",
         "SOFTS",
         "TimeMixer",
+        "DUET",
         "Mamba",
         "SMamba",
         "CMamba",
@@ -1833,11 +2025,33 @@ def test_supported_auto_model_matrix_includes_v3_expansion():
     assert EXCLUDED_AUTO_MODEL_NAMES == {"HINT"}
 
 
+def test_package_exports_and_intentional_omissions_are_explicit():
+    for model_name in NEWLY_SUPPORTED_MODEL_ALIASES:
+        assert hasattr(nf_models, model_name)
+    assert hasattr(nf_models, "HINT")
+    assert "HINT" not in SUPPORTED_AUTO_MODEL_NAMES
+
+
+@pytest.mark.parametrize(
+    ("model_name", "aliases"),
+    NEWLY_SUPPORTED_MODEL_ALIASES.items(),
+    ids=NEWLY_SUPPORTED_MODEL_ALIASES.keys(),
+)
+def test_model_filename_dict_includes_newly_supported_aliases(
+    model_name: str, aliases: tuple[str, str]
+):
+    expected_cls = getattr(nf_models, model_name)
+    for alias in aliases:
+        assert MODEL_FILENAME_DICT[alias] is expected_cls
+
+
 def test_supports_auto_mode_expands_to_newly_added_models():
     for model_name in (
         "RNN",
         "DeepAR",
+        "DeepEDM",
         "TimeMixer",
+        "DUET",
         "XLinear",
         "StemGNN",
         "TimeLLM",
@@ -2104,14 +2318,14 @@ def test_source_baseline_yaml_files_unchanged():
 
 
 CASE_YAML_FILES = [
-    REPO_ROOT / 'brentoil-case1.yaml',
-    REPO_ROOT / 'brentoil-case2.yaml',
-    REPO_ROOT / 'brentoil-case3.yaml',
-    REPO_ROOT / 'brentoil-case4.yaml',
-    REPO_ROOT / 'wti-case1.yaml',
-    REPO_ROOT / 'wti-case2.yaml',
-    REPO_ROOT / 'wti-case3.yaml',
-    REPO_ROOT / 'wti-case4.yaml',
+    REPO_ROOT / 'yaml' / 'feature_set' / 'brentoil-case1.yaml',
+    REPO_ROOT / 'yaml' / 'feature_set' / 'brentoil-case2.yaml',
+    REPO_ROOT / 'yaml' / 'feature_set' / 'brentoil-case3.yaml',
+    REPO_ROOT / 'yaml' / 'feature_set' / 'brentoil-case4.yaml',
+    REPO_ROOT / 'yaml' / 'feature_set' / 'wti-case1.yaml',
+    REPO_ROOT / 'yaml' / 'feature_set' / 'wti-case2.yaml',
+    REPO_ROOT / 'yaml' / 'feature_set' / 'wti-case3.yaml',
+    REPO_ROOT / 'yaml' / 'feature_set' / 'wti-case4.yaml',
 ]
 
 EXPECTED_CASE_TRAINING = {
@@ -2126,7 +2340,7 @@ EXPECTED_CASE_TRAINING = {
     'val_size': 8,
     'val_check_steps': 100,
     'train_protocol': 'expanding_window_tscv',
-    'early_stop_patience_steps': -1,
+    'early_stop_patience_steps': 5,
     'loss': 'mse',
 }
 
@@ -2149,12 +2363,6 @@ EXPECTED_CASE_MODEL_PARAMS = {
         'factor': 3,
         'n_head': 4,
     },
-    'FEDformer': {
-        'hidden_size': 64,
-        'modes': 32,
-        'dropout': 0.1,
-        'n_head': 8,
-    },
     'PatchTST': {
         'hidden_size': 64,
         'n_heads': 4,
@@ -2169,18 +2377,12 @@ EXPECTED_CASE_MODEL_PARAMS = {
         'd_ff': 256,
         'dropout': 0.1,
     },
-    'TimesNet': {
-        'hidden_size': 64,
-        'conv_hidden_size': 64,
-        'top_k': 5,
-        'encoder_layers': 2,
-    },
     'Naive': {},
 }
 
 EXPECTED_CASE_METADATA = {
     'brentoil-case1.yaml': {
-        'task_name': 'brentoil_case1',
+        'task_name': 'brentoil_case1_re',
         'target_col': 'Com_BrentCrudeOil',
         'hist_exog_cols': [
             'Com_Gasoline', 'Com_Steel', 'Bonds_US_Spread_10Y_1Y',
@@ -2326,7 +2528,10 @@ def test_case_yaml_normalizes_to_fixed_modes_without_auto(path: Path):
 
 
 def test_case_yaml_build_model_preserves_expected_fixed_params():
-    loaded = load_app_config(REPO_ROOT, config_path=REPO_ROOT / 'brentoil-case1.yaml')
+    loaded = load_app_config(
+        REPO_ROOT,
+        config_path=REPO_ROOT / 'yaml' / 'feature_set' / 'brentoil-case1.yaml',
+    )
 
     for job in loaded.config.jobs:
         if job.model == 'Naive':
@@ -2341,3 +2546,215 @@ def test_case_yaml_build_model_preserves_expected_fixed_params():
             if actual_value is None and hasattr(model, 'hparams'):
                 actual_value = getattr(model.hparams, key, None)
             assert actual_value == expected_value
+
+
+def _residual_target_panel(rows: list[dict[str, object]]) -> pd.DataFrame:
+    return pd.DataFrame(rows).assign(
+        cutoff=lambda frame: pd.to_datetime(frame["cutoff"]),
+        train_end_ds=lambda frame: pd.to_datetime(frame["train_end_ds"]),
+        ds=lambda frame: pd.to_datetime(frame["ds"]),
+    )
+
+
+def test_build_residual_target_delta_matches_horizon_differences():
+    from residual.runtime import build_residual_target
+
+    panel = _residual_target_panel(
+        [
+            {
+                "fold_idx": 0,
+                "cutoff": "2020-01-08",
+                "train_end_ds": "2020-01-08",
+                "ds": "2020-01-15",
+                "horizon_step": 1,
+                "y": 11.0,
+                "y_hat_base": 10.0,
+            },
+            {
+                "fold_idx": 0,
+                "cutoff": "2020-01-08",
+                "train_end_ds": "2020-01-08",
+                "ds": "2020-01-22",
+                "horizon_step": 2,
+                "y": 16.0,
+                "y_hat_base": 12.0,
+            },
+            {
+                "fold_idx": 0,
+                "cutoff": "2020-01-08",
+                "train_end_ds": "2020-01-08",
+                "ds": "2020-01-29",
+                "horizon_step": 3,
+                "y": 22.0,
+                "y_hat_base": 15.0,
+            },
+        ]
+    )
+
+    residual_target = build_residual_target(panel, "delta")
+
+    assert residual_target.tolist() == [1.0, 3.0, 3.0]
+
+
+def test_build_residual_target_delta_does_not_leak_across_fold_and_cutoff_groups():
+    from residual.runtime import build_residual_target
+
+    panel = _residual_target_panel(
+        [
+            {
+                "fold_idx": 0,
+                "cutoff": "2020-01-15",
+                "train_end_ds": "2020-01-15",
+                "ds": "2020-01-29",
+                "horizon_step": 2,
+                "y": 17.0,
+                "y_hat_base": 14.0,
+            },
+            {
+                "fold_idx": 0,
+                "cutoff": "2020-01-08",
+                "train_end_ds": "2020-01-08",
+                "ds": "2020-01-15",
+                "horizon_step": 1,
+                "y": 11.0,
+                "y_hat_base": 10.0,
+            },
+            {
+                "fold_idx": 0,
+                "cutoff": "2020-01-15",
+                "train_end_ds": "2020-01-15",
+                "ds": "2020-01-22",
+                "horizon_step": 1,
+                "y": 14.0,
+                "y_hat_base": 12.0,
+            },
+            {
+                "fold_idx": 0,
+                "cutoff": "2020-01-08",
+                "train_end_ds": "2020-01-08",
+                "ds": "2020-01-22",
+                "horizon_step": 2,
+                "y": 16.0,
+                "y_hat_base": 12.0,
+            },
+            {
+                "fold_idx": 1,
+                "cutoff": "2020-01-08",
+                "train_end_ds": "2020-01-08",
+                "ds": "2020-01-15",
+                "horizon_step": 1,
+                "y": 20.0,
+                "y_hat_base": 18.0,
+            },
+            {
+                "fold_idx": 1,
+                "cutoff": "2020-01-08",
+                "train_end_ds": "2020-01-08",
+                "ds": "2020-01-22",
+                "horizon_step": 2,
+                "y": 25.0,
+                "y_hat_base": 22.0,
+            },
+        ]
+    )
+
+    residual_target = build_residual_target(panel, "delta")
+
+    assert residual_target.tolist() == [1.0, 1.0, 2.0, 3.0, 2.0, 1.0]
+
+
+def test_apply_residual_plugin_writes_residual_target_to_diagnostics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from residual import runtime
+
+    class _ZeroResidualPlugin(ResidualPlugin):
+        name = "zero"
+
+        def fit(self, panel_df: pd.DataFrame, context: ResidualContext) -> None:
+            return None
+
+        def predict(self, panel_df: pd.DataFrame) -> pd.DataFrame:
+            return panel_df.copy().assign(residual_hat=0.0)
+
+        def metadata(self) -> dict[str, object]:
+            return {"plugin": self.name}
+
+    monkeypatch.setattr(
+        runtime,
+        "build_residual_plugin",
+        lambda _config: _ZeroResidualPlugin(),
+    )
+    payload = _payload()
+    payload["residual"]["target"] = "delta"
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n",
+        encoding="utf-8",
+    )
+    loaded = load_app_config(
+        tmp_path,
+        config_path=_write_config(tmp_path, payload, ".yaml"),
+    )
+    job = loaded.config.jobs[0]
+    run_root = tmp_path / "run"
+    manifest_path = run_root / "manifest" / "run_manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps({"jobs": [{"model": job.model}], "residual": {}}, indent=2),
+        encoding="utf-8",
+    )
+    fold_payloads = [
+        {
+            "fold_idx": 0,
+            "backcast_panel": _residual_target_panel(
+                [
+                    {
+                        "model_name": job.model,
+                        "fold_idx": 0,
+                        "panel_split": "backcast_train",
+                        "unique_id": "target",
+                        "cutoff": "2020-01-08",
+                        "train_end_ds": "2020-01-08",
+                        "ds": "2020-01-15",
+                        "horizon_step": 1,
+                        "y_hat_base": 10.0,
+                        "y": 11.0,
+                        "residual_target": 1.0,
+                    }
+                ]
+            ),
+            "eval_panel": _residual_target_panel(
+                [
+                    {
+                        "model_name": job.model,
+                        "fold_idx": 0,
+                        "panel_split": "fold_eval",
+                        "unique_id": "target",
+                        "cutoff": "2020-01-15",
+                        "train_end_ds": "2020-01-15",
+                        "ds": "2020-01-22",
+                        "horizon_step": 1,
+                        "y_hat_base": 12.0,
+                        "y": 13.0,
+                        "residual_target": 1.0,
+                    }
+                ]
+            ),
+            "base_summary": {"fold_idx": 0},
+        }
+    ]
+
+    runtime._apply_residual_plugin(
+        loaded,
+        job,
+        run_root,
+        fold_payloads,
+        manifest_path=manifest_path,
+    )
+
+    diagnostics = pd.read_json(
+        run_root / "residual" / job.model / "diagnostics.json",
+        typ="series",
+    )
+
+    assert diagnostics["residual.target"] == "delta"

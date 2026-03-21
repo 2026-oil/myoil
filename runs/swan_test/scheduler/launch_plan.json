@@ -1,0 +1,32 @@
+[
+  {
+    "job_name": "LSTM",
+    "gpu_id": 0,
+    "devices": 1
+  },
+  {
+    "job_name": "NHITS",
+    "gpu_id": 1,
+    "devices": 1
+  },
+  {
+    "job_name": "DLinear",
+    "gpu_id": 0,
+    "devices": 1
+  },
+  {
+    "job_name": "PatchTST",
+    "gpu_id": 1,
+    "devices": 1
+  },
+  {
+    "job_name": "iTransformer",
+    "gpu_id": 0,
+    "devices": 1
+  },
+  {
+    "job_name": "Naive",
+    "gpu_id": 1,
+    "devices": 1
+  }
+]

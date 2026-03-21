@@ -93,3 +93,31 @@ fi
 
     summary_txt = (log_dir / "summary.txt").read_text(encoding="utf-8")
     assert "[batch] passed=1 failed=1 missing=1" in summary_txt
+
+
+def test_run_brent_wti_cases_script_default_config_list_includes_all_feature_set_cases():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+
+    expected_feature_set = [
+        "yaml/feature_set/brentoil-case1.yaml",
+        "yaml/feature_set/brentoil-case2.yaml",
+        "yaml/feature_set/brentoil-case3.yaml",
+        "yaml/feature_set/brentoil-case4.yaml",
+        "yaml/feature_set/wti-case1.yaml",
+        "yaml/feature_set/wti-case2.yaml",
+        "yaml/feature_set/wti-case3.yaml",
+        "yaml/feature_set/wti-case4.yaml",
+    ]
+    expected_hpt = [
+        "yaml/feature_set/brentoil-case1_HPT.yaml",
+        "yaml/feature_set/brentoil-case2_HPT.yaml",
+        "yaml/feature_set/brentoil-case3_HPT.yaml",
+        "yaml/feature_set/brentoil-case4_HPT.yaml",
+        "yaml/feature_set/wti-case1_HPT.yaml",
+        "yaml/feature_set/wti-case2_HPT.yaml",
+        "yaml/feature_set/wti-case3_HPT.yaml",
+        "yaml/feature_set/wti-case4_HPT.yaml",
+    ]
+
+    for config_path in [*expected_feature_set, *expected_hpt]:
+        assert f'"{config_path}"' in script

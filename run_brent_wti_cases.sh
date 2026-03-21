@@ -50,19 +50,22 @@ if [[ -n "${NF_CASE_CONFIGS:-}" ]]; then
   done
 else
   configs=(
-    "brentoil-case3.yaml"
-    "wti-case1.yaml"
-    "wti-case2.yaml"
-    "wti-case3.yaml"
-    "wti-case4.yaml"
-    "brentoil-case1_HPT.yaml"
-    "brentoil-case2_HPT.yaml"
-    "brentoil-case3_HPT.yaml"
-    "brentoil-case4_HPT.yaml"
-    "wti-case1_HPT.yaml"
-    "wti-case2_HPT.yaml"
-    "wti-case3_HPT.yaml"
-    "wti-case4_HPT.yaml"
+    "yaml/feature_set/brentoil-case1.yaml"
+    "yaml/feature_set/brentoil-case2.yaml"
+    "yaml/feature_set/brentoil-case3.yaml"
+    "yaml/feature_set/brentoil-case4.yaml"
+    "yaml/feature_set/wti-case1.yaml"
+    "yaml/feature_set/wti-case2.yaml"
+    "yaml/feature_set/wti-case3.yaml"
+    "yaml/feature_set/wti-case4.yaml"
+    "yaml/feature_set/brentoil-case1_HPT.yaml"
+    "yaml/feature_set/brentoil-case2_HPT.yaml"
+    "yaml/feature_set/brentoil-case3_HPT.yaml"
+    "yaml/feature_set/brentoil-case4_HPT.yaml"
+    "yaml/feature_set/wti-case1_HPT.yaml"
+    "yaml/feature_set/wti-case2_HPT.yaml"
+    "yaml/feature_set/wti-case3_HPT.yaml"
+    "yaml/feature_set/wti-case4_HPT.yaml"
   )
 fi
 

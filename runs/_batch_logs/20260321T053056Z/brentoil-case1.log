@@ -1,0 +1,28 @@
+Traceback (most recent call last):
+  File "/home/sonet/.openclaw/workspace/research/neuralforecast/main.py", line 51, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/home/sonet/.openclaw/workspace/research/neuralforecast/main.py", line 47, in main
+    return residual_main(args)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/sonet/.openclaw/workspace/research/neuralforecast/residual/runtime.py", line 1406, in main
+    _validate_adapters(loaded, selected_jobs)
+  File "/home/sonet/.openclaw/workspace/research/neuralforecast/residual/runtime.py", line 334, in _validate_adapters
+    source_df = pd.read_csv(loaded.config.dataset.path)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/pandas/io/parsers/readers.py", line 1026, in read_csv
+    return _read(filepath_or_buffer, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/pandas/io/parsers/readers.py", line 620, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/pandas/io/parsers/readers.py", line 1620, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/pandas/io/parsers/readers.py", line 1880, in _make_engine
+    self.handles = get_handle(
+                   ^^^^^^^^^^^
+  File "/home/sonet/.openclaw/workspace/research/neuralforecast/.venv/lib/python3.11/site-packages/pandas/io/common.py", line 873, in get_handle
+    handle = open(
+             ^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/sonet/.openclaw/workspace/research/neuralforecast/yaml/feature_set/data/df.csv'

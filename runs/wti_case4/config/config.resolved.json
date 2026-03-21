@@ -73,6 +73,7 @@
   "residual": {
     "enabled": false,
     "model": "xgboost",
+    "target": "level",
     "params": {},
     "requested_mode": "residual_disabled",
     "validated_mode": "residual_disabled",

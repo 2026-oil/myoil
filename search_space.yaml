@@ -64,6 +64,12 @@ models:
     - hidden_size
     - dropout
     - n_layers
+  DeepEDM:
+    - n_edm_blocks
+    - mlp_layers
+    - delay
+    - projection_dim
+    - dropout
   KAN:
     - grid_size
     - spline_order
@@ -151,6 +157,13 @@ models:
     - d_ff
     - down_sampling_layers
     - top_k
+  DUET:
+    - n_block
+    - hidden_size
+    - ff_dim
+    - moving_avg_window
+    - dropout
+    - revin
   Mamba:
     - hidden_size
     - n_block

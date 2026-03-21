@@ -1,0 +1,13 @@
+{
+  "n_pool_kernel_size": [
+    4,
+    2,
+    1
+  ],
+  "n_freq_downsample": [
+    40,
+    20,
+    1
+  ],
+  "dropout_prob_theta": 0.13436805785277153
+}

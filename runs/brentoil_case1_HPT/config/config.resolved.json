@@ -80,6 +80,7 @@
   "residual": {
     "enabled": false,
     "model": "xgboost",
+    "target": "level",
     "params": {},
     "requested_mode": "residual_disabled",
     "validated_mode": "residual_disabled",
@@ -163,5 +164,5 @@
     }
   ],
   "search_space_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/search_space.yaml",
-  "search_space_sha256": "75ccd97c0dc11dc0d69e514abb37fac465540aa550fe9dc54c457505ceb22af6"
+  "search_space_sha256": "b2f9cddaa38d9cf524ebd4d6773607916472bc82619b1005e7404cf7b285093c"
 }

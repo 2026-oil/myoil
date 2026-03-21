@@ -1,0 +1,10 @@
+{
+  "job_name": "iTransformer",
+  "gpu_id": 0,
+  "devices": 1,
+  "cuda_visible_devices": "0",
+  "returncode": 0,
+  "stdout_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/swan_test/scheduler/workers/iTransformer/stdout.log",
+  "stderr_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/swan_test/scheduler/workers/iTransformer/stderr.log",
+  "completed_at": "2026-03-21T05:26:37.910140+00:00"
+}

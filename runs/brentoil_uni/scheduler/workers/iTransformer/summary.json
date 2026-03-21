@@ -1,0 +1,10 @@
+{
+  "job_name": "iTransformer",
+  "gpu_id": 1,
+  "devices": 1,
+  "cuda_visible_devices": "1",
+  "returncode": 0,
+  "stdout_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case1_re/scheduler/workers/iTransformer/stdout.log",
+  "stderr_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case1_re/scheduler/workers/iTransformer/stderr.log",
+  "completed_at": "2026-03-21T02:57:55.747686+00:00"
+}

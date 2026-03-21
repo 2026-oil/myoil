@@ -42,6 +42,7 @@ CENTRALIZED_TRAINING_KEYS = {
     "early_stop_patience_steps",
     "loss",
 }
+ResidualTargetMode = Literal["level", "delta"]
 
 
 @dataclass(frozen=True)
@@ -114,6 +115,7 @@ class SchedulerConfig:
 class ResidualConfig:
     enabled: bool = True
     model: str = "xgboost"
+    target: ResidualTargetMode = "level"
     params: dict[str, Any] = field(default_factory=dict)
     requested_mode: ResidualMode = "residual_fixed"
     validated_mode: ResidualMode = "residual_fixed"
@@ -335,6 +337,7 @@ def _normalize_job(
     job: dict[str, Any],
     *,
     search_space: dict[str, dict[str, tuple[str, ...]]] | None,
+    allow_missing_search_space: bool = False,
 ) -> JobConfig:
     model_name = str(job["model"])
     params = dict(job.get("params", {}))
@@ -350,6 +353,15 @@ def _normalize_job(
                 f"jobs[{model_name}] uses empty params but has no supported learned_auto Optuna mapping"
             )
         if search_space is None or model_name not in search_space["models"]:
+            if allow_missing_search_space:
+                validated_mode = "learned_fixed"
+                return JobConfig(
+                    model=model_name,
+                    params=params,
+                    requested_mode=requested_mode,
+                    validated_mode=validated_mode,
+                    selected_search_params=selected,
+                )
             raise ValueError(
                 f"jobs[{model_name}] requires search_space.models.{model_name} for learned_auto execution"
             )
@@ -374,6 +386,7 @@ def _normalize_payload(
     base_dir: Path,
     *,
     search_space: dict[str, dict[str, tuple[str, ...]]] | None,
+    allow_missing_search_space: bool = False,
 ) -> AppConfig:
     task = dict(payload.get("task", {}))
     dataset = dict(payload.get("dataset", {}))
@@ -409,6 +422,7 @@ def _normalize_payload(
 
     residual.setdefault("enabled", True)
     residual.setdefault("model", "xgboost")
+    residual.setdefault("target", "level")
     residual.setdefault("params", {})
     if "train_source" in residual:
         raise ValueError(
@@ -418,7 +432,13 @@ def _normalize_payload(
     residual_model = str(residual["model"]).lower()
     if residual_model not in SUPPORTED_RESIDUAL_MODELS:
         raise ValueError(f"Unsupported residual model: {residual_model}")
+    residual_target = str(residual["target"]).lower()
+    if residual_target not in {"level", "delta"}:
+        raise ValueError(
+            "residual.target must be one of: level, delta"
+        )
     residual["model"] = residual_model
+    residual["target"] = residual_target
     residual["params"] = dict(residual.get("params", {}))
     residual_requested_mode = _requested_residual_mode(
         bool(residual["enabled"]), residual["params"]
@@ -430,23 +450,33 @@ def _normalize_payload(
                 f"residual[{residual_model}] has no supported auto-tuning mapping"
             )
         if search_space is None or residual_model not in search_space["residual"]:
-            raise ValueError(
-                f"residual[{residual_model}] requires search_space.residual.{residual_model} for auto tuning"
+            if allow_missing_search_space:
+                residual_validated_mode = "residual_fixed"
+                residual_selected = ()
+            else:
+                raise ValueError(
+                    f"residual[{residual_model}] requires search_space.residual.{residual_model} for auto tuning"
+                )
+        else:
+            residual_selected = search_space["residual"][residual_model]
+            unknown = sorted(
+                set(residual_selected).difference(RESIDUAL_PARAM_REGISTRY[residual_model])
             )
-        residual_selected = search_space["residual"][residual_model]
-        unknown = sorted(
-            set(residual_selected).difference(RESIDUAL_PARAM_REGISTRY[residual_model])
-        )
-        if unknown:
-            raise ValueError(
-                f"search_space.residual.{residual_model} contains unknown parameter(s): {', '.join(unknown)}"
-            )
-        residual_validated_mode: ResidualMode = "residual_auto"
+            if unknown:
+                raise ValueError(
+                    f"search_space.residual.{residual_model} contains unknown parameter(s): {', '.join(unknown)}"
+                )
+            residual_validated_mode = "residual_auto"
     else:
         residual_validated_mode = residual_requested_mode
 
     jobs = tuple(
-        _normalize_job(job, search_space=search_space) for job in payload.get("jobs", [])
+        _normalize_job(
+            job,
+            search_space=search_space,
+            allow_missing_search_space=allow_missing_search_space,
+        )
+        for job in payload.get("jobs", [])
     )
     if not jobs:
         raise ValueError("Config must define at least one job")
@@ -538,7 +568,26 @@ def load_app_config(
         if search_space_contract is not None
         else None
     )
-    config = _normalize_payload(payload, source_path.parent, search_space=search_space)
+    dataset_path = Path(payload.get("dataset", {}).get("path", "df.csv"))
+    if dataset_path.is_absolute():
+        dataset_base_dir = source_path.parent
+    else:
+        repo_candidate = (repo_root / dataset_path).resolve()
+        local_candidate = (source_path.parent / dataset_path).resolve()
+        dataset_base_dir = (
+            repo_root if repo_candidate.exists() or not local_candidate.exists() else source_path.parent
+        )
+    base_config = _normalize_payload(
+        payload,
+        dataset_base_dir,
+        search_space=None,
+        allow_missing_search_space=True,
+    )
+    config = (
+        _normalize_payload(payload, dataset_base_dir, search_space=search_space)
+        if search_space is not None
+        else base_config
+    )
     normalized_payload = config.to_dict()
     normalized_payload["search_space_path"] = (
         str(search_space_contract.path) if search_space_contract else None

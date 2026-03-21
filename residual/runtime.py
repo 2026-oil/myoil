@@ -231,6 +231,7 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
         }
     payload["residual"] = {
         "model": loaded.config.residual.model,
+        "target": loaded.config.residual.target,
         "requested_mode": loaded.config.residual.requested_mode,
         "validated_mode": loaded.config.residual.validated_mode,
         "supports_auto": loaded.config.residual.model in SUPPORTED_RESIDUAL_MODELS,
@@ -529,13 +530,77 @@ def _score_residual_params(
         predicted = plugin.predict(payload["eval_panel"].copy())
         corrected = payload["eval_panel"].reset_index(drop=True).copy()
         corrected["residual_hat"] = predicted["residual_hat"].astype(float).values
-        corrected["y_hat_corrected"] = (
-            corrected["y_hat_base"] + corrected["residual_hat"]
+        corrected["y_hat_corrected"] = reconstruct_corrected_forecast(
+            corrected,
+            loaded.config.residual.target,
         )
         mse_scores.append(
             _compute_metrics(corrected["y"], corrected["y_hat_corrected"])["MSE"]
         )
     return float(sum(mse_scores) / len(mse_scores))
+
+
+def _residual_trajectory_group_keys() -> list[str]:
+    return ["fold_idx", "cutoff"]
+
+
+def _prepare_ordered_trajectory_frame(panel_df: pd.DataFrame) -> pd.DataFrame:
+    ordered = panel_df.copy()
+    ordered["__orig_order"] = np.arange(len(ordered))
+    return ordered.sort_values(
+        _residual_trajectory_group_keys() + ["horizon_step", "__orig_order"],
+        kind="stable",
+    ).reset_index(drop=True)
+
+
+def build_residual_target(panel_df: pd.DataFrame, mode: str) -> pd.Series:
+    if panel_df.empty:
+        return pd.Series(dtype=float, index=panel_df.index)
+    if mode == "level":
+        return (
+            panel_df["y"].astype(float) - panel_df["y_hat_base"].astype(float)
+        ).rename("residual_target")
+
+    ordered = _prepare_ordered_trajectory_frame(panel_df)
+    group_keys = _residual_trajectory_group_keys()
+    group_index = [ordered[key] for key in group_keys]
+    step_index = ordered.groupby(group_keys, sort=False).cumcount()
+    y = ordered["y"].astype(float)
+    y_hat_base = ordered["y_hat_base"].astype(float)
+    residual_target = (y.groupby(group_index).diff() - y_hat_base.groupby(group_index).diff()).where(
+        step_index > 0,
+        y - y_hat_base,
+    )
+    ordered["residual_target"] = residual_target.astype(float)
+    restored = ordered.sort_values("__orig_order", kind="stable")
+    return pd.Series(
+        restored["residual_target"].to_numpy(),
+        index=panel_df.index,
+        name="residual_target",
+    )
+
+
+def reconstruct_corrected_forecast(panel_df: pd.DataFrame, mode: str) -> pd.Series:
+    if panel_df.empty:
+        return pd.Series(dtype=float, index=panel_df.index)
+    if mode == "level":
+        return (
+            panel_df["y_hat_base"].astype(float)
+            + panel_df["residual_hat"].astype(float)
+        ).rename("y_hat_corrected")
+
+    ordered = _prepare_ordered_trajectory_frame(panel_df)
+    group_keys = _residual_trajectory_group_keys()
+    ordered["y_hat_corrected"] = (
+        ordered["y_hat_base"].astype(float)
+        + ordered.groupby(group_keys, sort=False)["residual_hat"].cumsum().astype(float)
+    )
+    restored = ordered.sort_values("__orig_order", kind="stable")
+    return pd.Series(
+        restored["y_hat_corrected"].to_numpy(),
+        index=panel_df.index,
+        name="y_hat_corrected",
+    )
 
 
 def _prediction_column(predictions: pd.DataFrame, model_name: str) -> str:
@@ -666,6 +731,7 @@ def _fold_artifact_dir(residual_root: Path, fold_idx: int) -> Path:
 
 
 def _build_fold_eval_panel(
+    loaded: LoadedConfig,
     job: JobConfig,
     fold_idx: int,
     train_end_ds: object,
@@ -689,10 +755,15 @@ def _build_fold_eval_panel(
                 "horizon_step": row_idx + 1,
                 "y": y,
                 "y_hat_base": y_hat_base,
-                "residual_target": y - y_hat_base,
+                "residual_target": 0.0,
             }
         )
-    return pd.DataFrame(rows, columns=_canonical_panel_columns()).reset_index(drop=True)
+    panel = pd.DataFrame(rows, columns=_canonical_panel_columns()).reset_index(drop=True)
+    panel["residual_target"] = build_residual_target(
+        panel,
+        loaded.config.residual.target,
+    )
+    return panel
 
 
 def _build_fold_backcast_panel(
@@ -745,10 +816,15 @@ def _build_fold_backcast_panel(
                     "horizon_step": row_idx + 1,
                     "y": y,
                     "y_hat_base": y_hat_base,
-                    "residual_target": y - y_hat_base,
+                    "residual_target": 0.0,
                 }
             )
-    return pd.DataFrame(rows, columns=_canonical_panel_columns()).reset_index(drop=True)
+    panel = pd.DataFrame(rows, columns=_canonical_panel_columns()).reset_index(drop=True)
+    panel["residual_target"] = build_residual_target(
+        panel,
+        loaded.config.residual.target,
+    )
+    return panel
 
 
 def _apply_residual_plugin(
@@ -846,8 +922,9 @@ def _apply_residual_plugin(
         predicted = plugin.predict(eval_panel.copy())
         corrected = eval_panel.reset_index(drop=True).copy()
         corrected["residual_hat"] = predicted["residual_hat"].astype(float).values
-        corrected["y_hat_corrected"] = (
-            corrected["y_hat_base"] + corrected["residual_hat"]
+        corrected["y_hat_corrected"] = reconstruct_corrected_forecast(
+            corrected,
+            loaded.config.residual.target,
         )
         corrected_groups.append(corrected)
         corrected.to_csv(fold_root / "corrected_eval.csv", index=False)
@@ -880,6 +957,7 @@ def _apply_residual_plugin(
     diagnostics = {
         "model": job.model,
         "residual_model": loaded.config.residual.model,
+        "residual.target": loaded.config.residual.target,
         "fold_count": int(len(fold_payloads)),
         "backcast_rows_total": int(total_backcast_rows),
         "corrected_eval_rows": int(len(corrected_folds)),
@@ -1324,6 +1402,7 @@ def _run_single_job(
                     fold_idx,
                 )
                 eval_panel = _build_fold_eval_panel(
+                    loaded,
                     effective_job,
                     fold_idx,
                     train_end_ds,
