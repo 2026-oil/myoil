@@ -6,6 +6,7 @@ import json
 from types import SimpleNamespace
 from typing import Any, TypedDict, cast
 
+import optuna
 import pandas as pd
 import pytest
 import yaml
@@ -1915,6 +1916,319 @@ def test_runtime_auto_mode_prefers_yaml_opt_n_trial_over_env(
     assert study_summary["trial_count"] == 2
 
 
+def test_runtime_auto_mode_prunes_trials_with_intermediate_reports(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    payload = _payload()
+    payload["runtime"]["opt_n_trial"] = 2
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"]},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    from residual import runtime
+
+    real_create_study = runtime.optuna.create_study
+
+    def _create_study_with_pruner(*args, **kwargs):
+        kwargs.setdefault("pruner", optuna.pruners.ThresholdPruner(upper=0.5))
+        return real_create_study(*args, **kwargs)
+
+    def _fake_fit_and_predict_fold(
+        loaded,
+        job,
+        *,
+        source_df,
+        freq,
+        train_idx,
+        test_idx,
+        params_override=None,
+        training_override=None,
+    ):
+        hidden_size = (params_override or {}).get("hidden_size", 32)
+        predicted = 1.0 if hidden_size == 32 else 2.0
+        predictions = pd.DataFrame(
+            {
+                "unique_id": [loaded.config.dataset.target_col],
+                "ds": pd.Series(["2020-01-22"]),
+                job.model: [predicted],
+            }
+        )
+        actuals = pd.Series([1.0])
+        return (
+            predictions,
+            actuals,
+            pd.Timestamp("2020-01-15"),
+            source_df.iloc[train_idx],
+            object(),
+        )
+
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    monkeypatch.setenv("NEURALFORECAST_OPTUNA_SEED", "7")
+    monkeypatch.setattr(runtime.optuna, "create_study", _create_study_with_pruner)
+    monkeypatch.setattr(runtime, "_fit_and_predict_fold", _fake_fit_and_predict_fold)
+    monkeypatch.setattr(
+        runtime,
+        "suggest_model_params",
+        lambda *_args, **_kwargs: {"hidden_size": 32 + _args[-1].number},
+    )
+    monkeypatch.setattr(
+        runtime,
+        "suggest_training_params",
+        lambda *_args, **_kwargs: {},
+    )
+    monkeypatch.setattr(
+        runtime,
+        "load_app_config",
+        lambda _repo_root, **kwargs: load_app_config(tmp_path, **kwargs),
+    )
+
+    output_root = tmp_path / "run_auto_prune"
+    code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "TFT",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    summary = json.loads(
+        (output_root / "models" / "TFT" / "optuna_study_summary.json").read_text()
+    )
+    assert code == 0
+    assert summary["trial_count"] == 2
+    assert summary["state_counts"]["complete"] == 1
+    assert summary["state_counts"]["pruned"] == 1
+
+
+def test_runtime_auto_mode_catches_recoverable_trial_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    payload = _payload()
+    payload["runtime"]["opt_n_trial"] = 2
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"]},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    from residual import runtime
+
+    def _fake_fit_and_predict_fold(
+        loaded,
+        job,
+        *,
+        source_df,
+        freq,
+        train_idx,
+        test_idx,
+        params_override=None,
+        training_override=None,
+    ):
+        hidden_size = (params_override or job.params).get("hidden_size", 32)
+        if hidden_size == 32:
+            raise ValueError("boom")
+        predictions = pd.DataFrame(
+            {
+                "unique_id": [loaded.config.dataset.target_col],
+                "ds": pd.Series(["2020-01-22"]),
+                job.model: [1.0],
+            }
+        )
+        actuals = pd.Series([1.0])
+        return (
+            predictions,
+            actuals,
+            pd.Timestamp("2020-01-15"),
+            source_df.iloc[train_idx],
+            object(),
+        )
+
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    monkeypatch.setenv("NEURALFORECAST_OPTUNA_SEED", "7")
+    monkeypatch.setattr(runtime, "_fit_and_predict_fold", _fake_fit_and_predict_fold)
+    monkeypatch.setattr(
+        runtime,
+        "suggest_model_params",
+        lambda *_args, **_kwargs: {"hidden_size": 32 + _args[-1].number},
+    )
+    monkeypatch.setattr(
+        runtime,
+        "suggest_training_params",
+        lambda *_args, **_kwargs: {},
+    )
+    monkeypatch.setattr(
+        runtime,
+        "load_app_config",
+        lambda _repo_root, **kwargs: load_app_config(tmp_path, **kwargs),
+    )
+
+    output_root = tmp_path / "run_auto_failure_tolerant"
+    code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "TFT",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    summary = json.loads(
+        (output_root / "models" / "TFT" / "optuna_study_summary.json").read_text()
+    )
+    assert code == 0
+    assert summary["trial_count"] == 2
+    assert summary["state_counts"]["complete"] == 1
+    assert summary["state_counts"]["fail"] == 1
+
+
+def test_runtime_auto_mode_resumes_persistent_study_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    payload = _payload()
+    payload["runtime"]["opt_n_trial"] = 2
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"]},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    from residual import runtime
+
+    def _fake_fit_and_predict_fold(
+        loaded,
+        job,
+        *,
+        source_df,
+        freq,
+        train_idx,
+        test_idx,
+        params_override=None,
+        training_override=None,
+    ):
+        hidden_size = (params_override or {}).get("hidden_size", 32)
+        predicted = 1.0 if hidden_size == 32 else 1.5
+        predictions = pd.DataFrame(
+            {
+                "unique_id": [loaded.config.dataset.target_col],
+                "ds": pd.Series(["2020-01-22"]),
+                job.model: [predicted],
+            }
+        )
+        actuals = pd.Series([1.0])
+        return (
+            predictions,
+            actuals,
+            pd.Timestamp("2020-01-15"),
+            source_df.iloc[train_idx],
+            object(),
+        )
+
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    monkeypatch.setenv("NEURALFORECAST_OPTUNA_SEED", "7")
+    monkeypatch.setattr(runtime, "_fit_and_predict_fold", _fake_fit_and_predict_fold)
+    monkeypatch.setattr(
+        runtime,
+        "suggest_model_params",
+        lambda *_args, **_kwargs: {"hidden_size": 32 + _args[-1].number},
+    )
+    monkeypatch.setattr(
+        runtime,
+        "suggest_training_params",
+        lambda *_args, **_kwargs: {},
+    )
+    monkeypatch.setattr(
+        runtime,
+        "load_app_config",
+        lambda _repo_root, **kwargs: load_app_config(tmp_path, **kwargs),
+    )
+
+    output_root = tmp_path / "run_auto_resume"
+    first_code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "TFT",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+    first_summary = json.loads(
+        (output_root / "models" / "TFT" / "optuna_study_summary.json").read_text()
+    )
+
+    second_code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "TFT",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+    second_summary = json.loads(
+        (output_root / "models" / "TFT" / "optuna_study_summary.json").read_text()
+    )
+
+    assert first_code == 0
+    assert second_code == 0
+    assert first_summary["requested_trial_count"] == 2
+    assert first_summary["existing_finished_trial_count_before_optimize"] == 0
+    assert first_summary["remaining_trial_count"] == 2
+    assert second_summary["trial_count"] == 2
+    assert second_summary["existing_finished_trial_count_before_optimize"] == 2
+    assert second_summary["remaining_trial_count"] == 0
+    assert second_summary["storage_backend"] == "journal"
+    assert Path(second_summary["storage_path"]).exists()
+
+
 def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -2572,6 +2886,9 @@ EXPECTED_HPT_CASE12_MODELS = [
 SEARCH_SPACE_MODELS = yaml.safe_load(
     (REPO_ROOT / 'search_space.yaml').read_text(encoding='utf-8')
 )['models']
+SEARCH_SPACE_RESIDUAL = yaml.safe_load(
+    (REPO_ROOT / 'search_space.yaml').read_text(encoding='utf-8')
+)['residual']
 
 EXPECTED_REPO_AUTO_SELECTORS = {
     'LSTM': [
@@ -2835,6 +3152,12 @@ def test_feature_set_hpt_case12_normalizes_to_auto_training_and_learned_jobs(pat
     assert (
         list(loaded.config.training_search.selected_search_params)
         == list(TRAINING_PARAM_REGISTRY)
+    )
+    assert loaded.config.residual.requested_mode == 'residual_auto_requested'
+    assert loaded.config.residual.validated_mode == 'residual_auto'
+    assert (
+        list(loaded.config.residual.selected_search_params)
+        == list(SEARCH_SPACE_RESIDUAL['xgboost'])
     )
 
     for job in loaded.config.jobs:
@@ -3174,6 +3497,22 @@ def test_apply_residual_plugin_prefers_yaml_opt_n_trial_over_env(
         manifest_path=manifest_path,
     )
 
+    first_summary = json.loads(
+        (
+            run_root
+            / "residual"
+            / job.model
+            / "optuna_study_summary.json"
+        ).read_text()
+    )
+    runtime._apply_residual_plugin(
+        loaded,
+        job,
+        run_root,
+        fold_payloads,
+        manifest_path=manifest_path,
+    )
+
     summary = json.loads(
         (
             run_root
@@ -3182,4 +3521,10 @@ def test_apply_residual_plugin_prefers_yaml_opt_n_trial_over_env(
             / "optuna_study_summary.json"
         ).read_text()
     )
+    assert first_summary["trial_count"] == 2
+    assert first_summary["remaining_trial_count"] == 2
     assert summary["trial_count"] == 2
+    assert summary["existing_finished_trial_count_before_optimize"] == 2
+    assert summary["remaining_trial_count"] == 0
+    assert summary["storage_backend"] == "journal"
+    assert Path(summary["storage_path"]).exists()

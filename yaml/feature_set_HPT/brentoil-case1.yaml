@@ -45,7 +45,7 @@ scheduler:
   max_concurrent_jobs: 2
   worker_devices: 1
 residual:
-  enabled: false
+  enabled: true
   model: xgboost
   params: {}
 jobs:
