@@ -27,10 +27,12 @@ class RandomForestResidualPlugin(ResidualPlugin):
     def __init__(
         self,
         *,
-        n_estimators: int = 200,
-        max_depth: int = 6,
-        min_samples_leaf: int = 2,
-        max_features: str = "sqrt",
+        n_estimators: int = int(RESIDUAL_DEFAULTS["randomforest"]["n_estimators"]),
+        max_depth: int = int(RESIDUAL_DEFAULTS["randomforest"]["max_depth"]),
+        min_samples_leaf: int = int(
+            RESIDUAL_DEFAULTS["randomforest"]["min_samples_leaf"]
+        ),
+        max_features: str = str(RESIDUAL_DEFAULTS["randomforest"]["max_features"]),
         feature_config: Any = None,
     ):
         self.config = _RandomForestConfig(

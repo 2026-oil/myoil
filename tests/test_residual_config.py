@@ -1515,6 +1515,11 @@ def test_residual_registry_builds_all_supported_plugins(model_name: str):
     assert plugin.metadata()["plugin"] == model_name
 
 
+def test_residual_registry_rejects_unsupported_model():
+    with pytest.raises(ValueError, match="Unsupported residual model: nope"):
+        _import_build_residual_plugin()({"model": "nope", "params": {}})
+
+
 def test_runtime_generates_per_fold_residual_artifacts_with_dummy_model(tmp_path: Path):
     payload = _payload()
     payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 4, "gap": 0})

@@ -16,6 +16,8 @@ def build_residual_plugin(config: Any) -> ResidualPlugin:
     if is_dataclass(config) and not isinstance(config, type):
         config = asdict(config)
     name = str(config.get("model", "xgboost")).lower()
+    if name not in DEFAULT_RESIDUAL_PARAMS_BY_MODEL:
+        raise ValueError(f"Unsupported residual model: {name}")
     params = {**DEFAULT_RESIDUAL_PARAMS_BY_MODEL[name], **dict(config.get("params", {}))}
     if name == "xgboost":
         return XGBoostResidualPlugin(
