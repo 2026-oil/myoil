@@ -64,12 +64,6 @@ models:
     - hidden_size
     - dropout
     - n_layers
-  DeepEDM:
-    - n_edm_blocks
-    - mlp_layers
-    - delay
-    - projection_dim
-    - dropout
   KAN:
     - grid_size
     - spline_order
@@ -131,13 +125,6 @@ models:
     - conv_hidden_size
     - top_k
     - encoder_layers
-  NonstationaryTransformer:
-    - hidden_size
-    - dropout
-    - n_head
-    - conv_hidden_size
-    - encoder_layers
-    - decoder_layers
   StemGNN:
     - n_stacks
     - multi_layer

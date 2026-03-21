@@ -39,8 +39,6 @@ jobs:
   params: {}
 - model: TimeMixer
   params: {}
-- model: NonstationaryTransformer
-  params: {}
 - model: SMamba
   params: {}
 - model: Naive

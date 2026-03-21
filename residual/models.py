@@ -11,7 +11,6 @@ from neuralforecast.models import (
     BiTCN,
     DLinear,
     DeepAR,
-    DeepEDM,
     DeepNPTS,
     DeformTime,
     DilatedRNN,
@@ -49,7 +48,6 @@ from neuralforecast.models import (
 )
 from neuralforecast.models.cmamba import CMamba
 from neuralforecast.models.mamba import Mamba
-from neuralforecast.models.nonstationary_transformer import NonstationaryTransformer
 from neuralforecast.models.smamba import SMamba
 from neuralforecast.models.xlstm_mixer import xLSTMMixer
 
@@ -88,7 +86,6 @@ MODEL_CLASSES = {
     'NLinear': NLinear,
     'TiDE': TiDE,
     'DeepNPTS': DeepNPTS,
-    'DeepEDM': DeepEDM,
     'DeformTime': DeformTime,
     'KAN': KAN,
     'TFT': TFT,
@@ -104,7 +101,6 @@ MODEL_CLASSES = {
     'TimeXer': TimeXer,
     'ModernTCN': ModernTCN,
     'TimesNet': TimesNet,
-    'NonstationaryTransformer': NonstationaryTransformer,
     'StemGNN': StemGNN,
     'TSMixer': TSMixer,
     'TSMixerx': TSMixerx,

@@ -34,11 +34,6 @@ from residual.scheduler import build_launch_plan, run_parallel_jobs, worker_env
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 NEWLY_SUPPORTED_MODEL_ALIASES = {
-    "DeepEDM": ("deepedm", "autodeepedm"),
-    "NonstationaryTransformer": (
-        "nonstationarytransformer",
-        "autononstationarytransformer",
-    ),
     "Mamba": ("mamba", "automamba"),
     "SMamba": ("smamba", "autosmamba"),
     "CMamba": ("cmamba", "autocmamba"),
@@ -338,20 +333,11 @@ def test_model_builder_disables_logger_and_keeps_timemixer_without_future_featur
     assert timemixer.use_future_temporal_feature == 0
 
 
-def test_build_model_supports_deepedm_and_duet(tmp_path: Path):
+def test_build_model_supports_duet(tmp_path: Path):
     payload = _payload()
     payload["dataset"]["hist_exog_cols"] = []
     payload["dataset"]["futr_exog_cols"] = []
     payload["jobs"] = [
-        {
-            "model": "DeepEDM",
-            "params": {
-                "n_edm_blocks": 2,
-                "mlp_layers": 2,
-                "delay": 4,
-                "projection_dim": 32,
-            },
-        },
         {
             "model": "DUET",
             "params": {
@@ -370,11 +356,8 @@ def test_build_model_supports_deepedm_and_duet(tmp_path: Path):
         tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
     )
 
-    deepedm = build_model(loaded.config, loaded.config.jobs[0])
-    duet = build_model(loaded.config, loaded.config.jobs[1], n_series=1)
+    duet = build_model(loaded.config, loaded.config.jobs[0], n_series=1)
 
-    assert deepedm.hparams.n_edm_blocks == 2
-    assert deepedm.hparams.projection_dim == 32
     assert getattr(duet.hparams, "n_series", 1) == 1
     assert duet.hparams.hidden_size == 32
 
@@ -2004,13 +1987,11 @@ def test_supported_auto_model_matrix_includes_v3_expansion():
         "NLinear",
         "TiDE",
         "DeepNPTS",
-        "DeepEDM",
         "DeformTime",
         "KAN",
         "TimeLLM",
         "TimeXer",
         "TimesNet",
-        "NonstationaryTransformer",
         "StemGNN",
         "TSMixer",
         "TSMixerx",
@@ -2033,18 +2014,40 @@ def test_supported_auto_model_matrix_includes_v3_expansion():
 def test_package_exports_and_intentional_omissions_are_explicit():
     for model_name in NEWLY_SUPPORTED_MODEL_ALIASES:
         assert hasattr(nf_models, model_name)
+    for auto_name in (
+        "AutoMamba",
+        "AutoSMamba",
+        "AutoCMamba",
+        "AutoxLSTMMixer",
+        "AutoDUET",
+    ):
+        assert hasattr(nf_auto, auto_name)
     assert hasattr(nf_models, "HINT")
     assert "HINT" not in SUPPORTED_AUTO_MODEL_NAMES
     assert not hasattr(nf_auto, "AutoDeformTime")
     assert not hasattr(nf_auto, "AutoModernTCN")
+    assert not hasattr(nf_auto, "AutoDeepEDM")
+    assert not hasattr(nf_auto, "AutoNonstationaryTransformer")
     assert hasattr(nf_models, "DeformTime")
+    assert not hasattr(nf_models, "DeepEDM")
+    assert not hasattr(nf_models, "NonstationaryTransformer")
     assert not hasattr(nf_models, "DeformableTST")
     assert "DeformTime" in SUPPORTED_AUTO_MODEL_NAMES
     assert "DeformTime" in MODEL_CLASSES
+    assert "DeepEDM" not in SUPPORTED_AUTO_MODEL_NAMES
+    assert "DeepEDM" not in MODEL_CLASSES
+    assert "NonstationaryTransformer" not in SUPPORTED_AUTO_MODEL_NAMES
+    assert "NonstationaryTransformer" not in MODEL_CLASSES
+    assert "deepedm" not in MODEL_FILENAME_DICT
+    assert "autodeepedm" not in MODEL_FILENAME_DICT
+    assert "nonstationarytransformer" not in MODEL_FILENAME_DICT
+    assert "autononstationarytransformer" not in MODEL_FILENAME_DICT
     assert "DeformableTST" not in SUPPORTED_AUTO_MODEL_NAMES
     assert "DeformableTST" not in MODEL_CLASSES
     search_space = yaml.safe_load((REPO_ROOT / "search_space.yaml").read_text())
     assert "DeformTime" in search_space["models"]
+    assert "DeepEDM" not in search_space["models"]
+    assert "NonstationaryTransformer" not in search_space["models"]
     assert "DeformableTST" not in search_space["models"]
 
 
@@ -2065,7 +2068,6 @@ def test_supports_auto_mode_expands_to_newly_added_models():
     for model_name in (
         "RNN",
         "DeepAR",
-        "DeepEDM",
         "DeformTime",
         "TimeMixer",
         "ModernTCN",
@@ -2073,13 +2075,14 @@ def test_supports_auto_mode_expands_to_newly_added_models():
         "XLinear",
         "StemGNN",
         "TimeLLM",
-        "NonstationaryTransformer",
         "Mamba",
         "SMamba",
         "CMamba",
         "xLSTMMixer",
     ):
         assert supports_auto_mode(model_name) is True
+    assert supports_auto_mode("DeepEDM") is False
+    assert supports_auto_mode("NonstationaryTransformer") is False
     assert supports_auto_mode("Naive") is False
 
 

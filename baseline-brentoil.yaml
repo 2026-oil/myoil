@@ -139,8 +139,6 @@ jobs:
   params: {}
 - model: TimesNet
   params: {}
-- model: NonstationaryTransformer
-  params: {}
 - model: SMamba
   params: {}
 - model: Naive
