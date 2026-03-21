@@ -55,13 +55,9 @@ jobs:
   params: {}
 - model: Autoformer
   params: {}
-- model: FEDformer
-  params: {}
 - model: PatchTST
   params: {}
 - model: iTransformer
-  params: {}
-- model: TimesNet
   params: {}
 - model: Naive
   params: {}

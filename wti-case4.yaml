@@ -86,12 +86,6 @@ jobs:
     dropout: 0.1
     factor: 3
     n_head: 4
-- model: FEDformer
-  params:
-    hidden_size: 64
-    modes: 32
-    dropout: 0.1
-    n_head: 8
 - model: PatchTST
   params:
     hidden_size: 64
@@ -106,11 +100,5 @@ jobs:
     e_layers: 2
     d_ff: 256
     dropout: 0.1
-- model: TimesNet
-  params:
-    hidden_size: 64
-    conv_hidden_size: 64
-    top_k: 5
-    encoder_layers: 2
 - model: Naive
   params: {}

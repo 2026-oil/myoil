@@ -68,12 +68,6 @@ jobs:
       factor: 3
       dropout: 0.05
       scaler_type: identity
-  - model: FEDformer
-    params:
-      hidden_size: 128
-      modes: 64
-      dropout: 0.05
-      scaler_type: identity
   - model: PatchTST
     params:
       hidden_size: 128

@@ -72,6 +72,10 @@ fi
 passed=()
 failed=()
 missing=()
+pty_enabled="0"
+if _should_use_pty; then
+  pty_enabled="1"
+fi
 script_start="$(date -u +%FT%TZ)"
 printf 'config\tstatus\texit_code\tlog_path\tstarted_at\tfinished_at\n' >"$results_tsv"
 
@@ -79,6 +83,7 @@ echo "[batch] repo_root=$repo_root"
 echo "[batch] timestamp=$timestamp"
 echo "[batch] log_dir=$log_dir"
 echo "[batch] runner=$python_bin main.py"
+echo "[batch] use_pty=$pty_enabled (NF_CASE_USE_PTY=$use_pty_mode)"
 echo "[batch] extra_args=${*:-<none>}"
 echo
 
@@ -98,7 +103,21 @@ for cfg in "${configs[@]}"; do
 
   cfg_name="$(basename -- "$cfg")"
   log_path="${log_dir}/${cfg_name%.yaml}.log"
-  if "$python_bin" main.py --config "$cfg" "$@" 2>&1 | tee "$log_path"; then
+  if _should_use_pty; then
+    cmd="$(_join_argv_for_script "$python_bin" "main.py" "--config" "$cfg" "$@")"
+    if script -q -e -c "$cmd" /dev/null 2>&1 | tee "$log_path"; then
+      echo "[batch] ok: $cfg (log: $log_path)"
+      passed+=("$cfg")
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$cfg" "passed" "0" "$log_path" "$cfg_start" "$(date -u +%FT%TZ)" >>"$results_tsv"
+    else
+      status=$?
+      echo "[batch] fail: $cfg (exit=$status, log: $log_path)"
+      failed+=("$cfg (exit=$status)")
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$cfg" "failed" "$status" "$log_path" "$cfg_start" "$(date -u +%FT%TZ)" >>"$results_tsv"
+    fi
+  elif "$python_bin" main.py --config "$cfg" "$@" 2>&1 | tee "$log_path"; then
     echo "[batch] ok: $cfg (log: $log_path)"
     passed+=("$cfg")
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
