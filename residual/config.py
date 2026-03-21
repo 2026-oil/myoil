@@ -51,6 +51,22 @@ LEGACY_SHARED_JOB_TRAINING_KEYS = {
     "early_stop_patience_steps",
     "num_lr_decays",
 }
+RESIDUAL_FEATURE_KEYS = {
+    "include_base_prediction",
+    "include_horizon_step",
+    "include_date_features",
+    "lag_features",
+    "exog_sources",
+}
+RESIDUAL_LAG_FEATURE_KEYS = {"enabled", "sources", "steps", "transforms"}
+RESIDUAL_EXOG_SOURCE_KEYS = {"hist", "futr", "static"}
+SUPPORTED_RESIDUAL_LAG_TRANSFORMS = {"raw"}
+FORBIDDEN_RESIDUAL_LAG_SOURCES = {
+    "y",
+    "residual_target",
+    "cutoff_day",
+    "ds_day",
+}
 ResidualTargetMode = Literal["level", "delta"]
 
 
@@ -126,11 +142,40 @@ class SchedulerConfig:
 
 
 @dataclass(frozen=True)
+class ResidualLagFeatureConfig:
+    enabled: bool = False
+    sources: tuple[str, ...] = field(default_factory=tuple)
+    steps: tuple[int, ...] = field(default_factory=tuple)
+    transforms: tuple[str, ...] = ("raw",)
+
+
+@dataclass(frozen=True)
+class ResidualExogSourceConfig:
+    hist: tuple[str, ...] = field(default_factory=tuple)
+    futr: tuple[str, ...] = field(default_factory=tuple)
+    static: tuple[str, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class ResidualFeatureConfig:
+    include_base_prediction: bool = True
+    include_horizon_step: bool = True
+    include_date_features: bool = False
+    lag_features: ResidualLagFeatureConfig = field(
+        default_factory=ResidualLagFeatureConfig
+    )
+    exog_sources: ResidualExogSourceConfig = field(
+        default_factory=ResidualExogSourceConfig
+    )
+
+
+@dataclass(frozen=True)
 class ResidualConfig:
     enabled: bool = True
     model: str = "xgboost"
     target: ResidualTargetMode = "level"
     params: dict[str, Any] = field(default_factory=dict)
+    features: ResidualFeatureConfig = field(default_factory=ResidualFeatureConfig)
     requested_mode: ResidualMode = "residual_fixed"
     validated_mode: ResidualMode = "residual_fixed"
     selected_search_params: tuple[str, ...] = field(default_factory=tuple)
@@ -175,6 +220,15 @@ class AppConfig:
         payload["residual"]["selected_search_params"] = list(
             payload["residual"]["selected_search_params"]
         )
+        feature_payload = payload["residual"].get("features")
+        if feature_payload is not None:
+            lag_payload = feature_payload["lag_features"]
+            lag_payload["sources"] = list(lag_payload["sources"])
+            lag_payload["steps"] = list(lag_payload["steps"])
+            lag_payload["transforms"] = list(lag_payload["transforms"])
+            exog_payload = feature_payload["exog_sources"]
+            for key in ("hist", "futr", "static"):
+                exog_payload[key] = list(exog_payload[key])
         return payload
 
 
@@ -200,6 +254,209 @@ def _as_tuple(value: Any) -> tuple[str, ...]:
     if isinstance(value, str):
         return tuple(part.strip() for part in value.split(",") if part.strip())
     return tuple(str(item) for item in value)
+
+
+def _unknown_keys(
+    payload: dict[str, Any], *, allowed: set[str], section: str
+) -> None:
+    unknown = sorted(set(payload).difference(allowed))
+    if unknown:
+        raise ValueError(
+            f"{section} contains unsupported key(s): {', '.join(unknown)}"
+        )
+
+
+def _coerce_bool(value: Any, *, field_name: str, default: bool) -> bool:
+    if value is None:
+        return default
+    if not isinstance(value, bool):
+        raise ValueError(f"{field_name} must be a boolean")
+    return value
+
+
+def _coerce_name_tuple(value: Any, *, field_name: str) -> tuple[str, ...]:
+    names = _as_tuple(value)
+    if any(not name.strip() for name in names):
+        raise ValueError(f"{field_name} contains an empty value")
+    duplicated = sorted({name for name in names if names.count(name) > 1})
+    if duplicated:
+        raise ValueError(
+            f"{field_name} contains duplicate value(s): {', '.join(duplicated)}"
+        )
+    return names
+
+
+def _coerce_positive_int_tuple(value: Any, *, field_name: str) -> tuple[int, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, (list, tuple)):
+        raise ValueError(f"{field_name} must be a list of positive integers")
+    out: list[int] = []
+    for item in value:
+        if isinstance(item, bool) or not isinstance(item, int):
+            raise ValueError(f"{field_name} must contain only positive integers")
+        if item <= 0:
+            raise ValueError(f"{field_name} must contain only positive integers")
+        out.append(item)
+    duplicated = sorted({item for item in out if out.count(item) > 1})
+    if duplicated:
+        raise ValueError(
+            f"{field_name} contains duplicate step(s): {', '.join(str(item) for item in duplicated)}"
+        )
+    return tuple(out)
+
+
+def _normalize_residual_feature_config(
+    value: Any,
+    *,
+    hist_exog_cols: tuple[str, ...],
+    futr_exog_cols: tuple[str, ...],
+    static_exog_cols: tuple[str, ...],
+) -> ResidualFeatureConfig:
+    if value is None:
+        value = {}
+    if not isinstance(value, dict):
+        raise ValueError("residual.features must be a mapping")
+    features_payload = dict(value)
+    _unknown_keys(
+        features_payload, allowed=RESIDUAL_FEATURE_KEYS, section="residual.features"
+    )
+
+    raw_lag_payload = features_payload.get("lag_features")
+    raw_exog_payload = features_payload.get("exog_sources")
+    if not isinstance(raw_lag_payload, (dict, type(None))):
+        raise ValueError("residual.features.lag_features must be a mapping")
+    if not isinstance(raw_exog_payload, (dict, type(None))):
+        raise ValueError("residual.features.exog_sources must be a mapping")
+    lag_payload = dict(raw_lag_payload or {})
+    exog_payload = dict(raw_exog_payload or {})
+    _unknown_keys(
+        lag_payload,
+        allowed=RESIDUAL_LAG_FEATURE_KEYS,
+        section="residual.features.lag_features",
+    )
+    _unknown_keys(
+        exog_payload,
+        allowed=RESIDUAL_EXOG_SOURCE_KEYS,
+        section="residual.features.exog_sources",
+    )
+
+    hist_selected = _coerce_name_tuple(
+        exog_payload.get("hist"), field_name="residual.features.exog_sources.hist"
+    )
+    futr_selected = _coerce_name_tuple(
+        exog_payload.get("futr"), field_name="residual.features.exog_sources.futr"
+    )
+    static_selected = _coerce_name_tuple(
+        exog_payload.get("static"), field_name="residual.features.exog_sources.static"
+    )
+    for field_name, selected, available in (
+        (
+            "residual.features.exog_sources.hist",
+            hist_selected,
+            hist_exog_cols,
+        ),
+        (
+            "residual.features.exog_sources.futr",
+            futr_selected,
+            futr_exog_cols,
+        ),
+        (
+            "residual.features.exog_sources.static",
+            static_selected,
+            static_exog_cols,
+        ),
+    ):
+        unknown = sorted(set(selected).difference(available))
+        if unknown:
+            dataset_field = field_name.rsplit(".", 1)[-1]
+            raise ValueError(
+                f"{field_name} must be selected from dataset.{dataset_field}_exog_cols; "
+                f"unknown value(s): {', '.join(unknown)}"
+            )
+
+    lag_enabled = _coerce_bool(
+        lag_payload.get("enabled"),
+        field_name="residual.features.lag_features.enabled",
+        default=False,
+    )
+    lag_sources = _coerce_name_tuple(
+        lag_payload.get("sources"), field_name="residual.features.lag_features.sources"
+    )
+    lag_steps = _coerce_positive_int_tuple(
+        lag_payload.get("steps"), field_name="residual.features.lag_features.steps"
+    )
+    lag_transforms = tuple(
+        item.lower()
+        for item in _coerce_name_tuple(
+            lag_payload.get("transforms", ("raw",)),
+            field_name="residual.features.lag_features.transforms",
+        )
+    )
+    unsupported_transforms = sorted(
+        set(lag_transforms).difference(SUPPORTED_RESIDUAL_LAG_TRANSFORMS)
+    )
+    if unsupported_transforms:
+        raise ValueError(
+            "residual.features.lag_features.transforms contains unsupported transform(s): "
+            + ", ".join(unsupported_transforms)
+        )
+    forbidden_sources = sorted(set(lag_sources).intersection(FORBIDDEN_RESIDUAL_LAG_SOURCES))
+    if forbidden_sources:
+        raise ValueError(
+            "residual.features.lag_features.sources contains forbidden source(s): "
+            + ", ".join(forbidden_sources)
+        )
+    allowed_lag_sources = {"y_hat_base", *hist_selected, *futr_selected}
+    unknown_lag_sources = sorted(set(lag_sources).difference(allowed_lag_sources))
+    if unknown_lag_sources:
+        raise ValueError(
+            "residual.features.lag_features.sources must be y_hat_base or selected "
+            "hist/futr exog columns; unknown value(s): "
+            + ", ".join(unknown_lag_sources)
+        )
+    if lag_enabled:
+        if not lag_sources:
+            raise ValueError(
+                "residual.features.lag_features.sources must be non-empty when lag_features.enabled is true"
+            )
+        if not lag_steps:
+            raise ValueError(
+                "residual.features.lag_features.steps must be non-empty when lag_features.enabled is true"
+            )
+    elif lag_sources or lag_steps or lag_transforms != ("raw",):
+        raise ValueError(
+            "residual.features.lag_features.enabled must be true when sources, steps, or non-default transforms are provided"
+        )
+
+    return ResidualFeatureConfig(
+        include_base_prediction=_coerce_bool(
+            features_payload.get("include_base_prediction"),
+            field_name="residual.features.include_base_prediction",
+            default=True,
+        ),
+        include_horizon_step=_coerce_bool(
+            features_payload.get("include_horizon_step"),
+            field_name="residual.features.include_horizon_step",
+            default=True,
+        ),
+        include_date_features=_coerce_bool(
+            features_payload.get("include_date_features"),
+            field_name="residual.features.include_date_features",
+            default=False,
+        ),
+        lag_features=ResidualLagFeatureConfig(
+            enabled=lag_enabled,
+            sources=lag_sources,
+            steps=lag_steps,
+            transforms=lag_transforms,
+        ),
+        exog_sources=ResidualExogSourceConfig(
+            hist=hist_selected,
+            futr=futr_selected,
+            static=static_selected,
+        ),
+    )
 
 
 def resolve_config_path(
@@ -430,6 +687,9 @@ def _normalize_payload(
     target_col = str(dataset.get("target_col", "")).strip()
     if not target_col:
         raise ValueError("dataset.target_col is required")
+    hist_exog_cols = _as_tuple(dataset.get("hist_exog_cols"))
+    futr_exog_cols = _as_tuple(dataset.get("futr_exog_cols"))
+    static_exog_cols = _as_tuple(dataset.get("static_exog_cols"))
 
     dataset_path = Path(dataset.get("path", "df.csv"))
     if not dataset_path.is_absolute():
@@ -471,6 +731,12 @@ def _normalize_payload(
     residual["model"] = residual_model
     residual["target"] = residual_target
     residual["params"] = dict(residual.get("params", {}))
+    residual["features"] = _normalize_residual_feature_config(
+        residual.get("features"),
+        hist_exog_cols=hist_exog_cols,
+        futr_exog_cols=futr_exog_cols,
+        static_exog_cols=static_exog_cols,
+    )
     residual_requested_mode = _requested_residual_mode(
         bool(residual["enabled"]), residual["params"]
     )
@@ -573,9 +839,9 @@ def _normalize_payload(
             target_col=target_col,
             dt_col=str(dataset.get("dt_col", "dt")),
             freq=dataset.get("freq"),
-            hist_exog_cols=_as_tuple(dataset.get("hist_exog_cols")),
-            futr_exog_cols=_as_tuple(dataset.get("futr_exog_cols")),
-            static_exog_cols=_as_tuple(dataset.get("static_exog_cols")),
+            hist_exog_cols=hist_exog_cols,
+            futr_exog_cols=futr_exog_cols,
+            static_exog_cols=static_exog_cols,
         ),
         runtime=RuntimeConfig(**runtime),
         training=TrainingConfig(**training),

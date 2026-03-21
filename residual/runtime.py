@@ -16,7 +16,13 @@ from optuna.trial import TrialState
 
 from .adapters import build_multivariate_inputs, build_univariate_inputs
 from .config import JobConfig, LoadedConfig, load_app_config
-from .manifest import build_manifest, write_manifest
+from .features import build_residual_feature_frame
+from .manifest import (
+    build_manifest,
+    residual_active_feature_columns,
+    residual_feature_policy_payload,
+    write_manifest,
+)
 from .models import BASELINE_MODEL_NAMES, build_model, validate_job
 from .optuna_spaces import (
     DEFAULT_OPTUNA_STUDY_DIRECTION,
@@ -260,6 +266,12 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
         "selected_search_params": list(loaded.config.residual.selected_search_params),
         "unknown_search_params": [],
         "validation_error": None,
+        "feature_policy": residual_feature_policy_payload(
+            loaded.config.residual.features
+        ),
+        "active_feature_columns": residual_active_feature_columns(
+            loaded.config.residual.features
+        ),
     }
     payload["training_search"] = {
         "requested_mode": loaded.config.training_search.requested_mode,
@@ -287,6 +299,8 @@ def _update_manifest_artifacts(
     training_study_summary_path: Path | None = None,
     residual_best_params_path: Path | None = None,
     residual_study_summary_path: Path | None = None,
+    residual_feature_policy: dict[str, Any] | None = None,
+    residual_active_feature_columns: Sequence[str] | None = None,
 ) -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     for job in manifest.get("jobs", []):
@@ -323,6 +337,12 @@ def _update_manifest_artifacts(
     if residual_study_summary_path is not None:
         manifest.setdefault("residual", {})["optuna_study_summary_path"] = str(
             residual_study_summary_path
+        )
+    if residual_feature_policy is not None:
+        manifest.setdefault("residual", {})["feature_policy"] = residual_feature_policy
+    if residual_active_feature_columns is not None:
+        manifest.setdefault("residual", {})["active_feature_columns"] = list(
+            residual_active_feature_columns
         )
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
@@ -907,7 +927,39 @@ def _predict_with_fitted_model(nf: NeuralForecast, adapter_inputs) -> pd.DataFra
     return nf.predict(**predict_kwargs)
 
 
-def _canonical_panel_columns(include_target: bool = True) -> list[str]:
+def _selected_residual_exog_columns(loaded: LoadedConfig) -> list[str]:
+    columns: list[str] = []
+    for column in (
+        *loaded.config.residual.features.exog_sources.hist,
+        *loaded.config.residual.features.exog_sources.futr,
+        *loaded.config.residual.features.exog_sources.static,
+    ):
+        if column not in columns:
+            columns.append(column)
+    return columns
+
+
+def _residual_panel_feature_values(
+    loaded: LoadedConfig,
+    row_source: pd.Series,
+    *,
+    static_source_df: pd.DataFrame,
+) -> dict[str, object]:
+    values: dict[str, object] = {}
+    for column in loaded.config.residual.features.exog_sources.hist:
+        values[column] = row_source[column]
+    for column in loaded.config.residual.features.exog_sources.futr:
+        values[column] = row_source[column]
+    for column in loaded.config.residual.features.exog_sources.static:
+        values[column] = static_source_df[column].iloc[-1]
+    return values
+
+
+def _canonical_panel_columns(
+    include_target: bool = True,
+    *,
+    feature_source_columns: Sequence[str] = (),
+) -> list[str]:
     columns = [
         "model_name",
         "fold_idx",
@@ -921,6 +973,9 @@ def _canonical_panel_columns(include_target: bool = True) -> list[str]:
     ]
     if include_target:
         columns.extend(["y", "residual_target"])
+    for column in feature_source_columns:
+        if column not in columns:
+            columns.append(column)
     return columns
 
 
@@ -935,12 +990,16 @@ def _build_fold_eval_panel(
     train_end_ds: object,
     target_predictions: pd.DataFrame,
     actuals: pd.Series,
+    future_df: pd.DataFrame,
+    train_df: pd.DataFrame,
 ) -> pd.DataFrame:
     cutoff = pd.to_datetime(train_end_ds)
+    feature_source_columns = _selected_residual_exog_columns(loaded)
     rows: list[dict[str, object]] = []
     for row_idx, ds in enumerate(target_predictions["ds"]):
         y_hat_base = float(target_predictions[job.model].iloc[row_idx])
         y = float(actuals.iloc[row_idx])
+        row_source = future_df.iloc[row_idx]
         rows.append(
             {
                 "model_name": job.model,
@@ -954,9 +1013,19 @@ def _build_fold_eval_panel(
                 "y": y,
                 "y_hat_base": y_hat_base,
                 "residual_target": 0.0,
+                **_residual_panel_feature_values(
+                    loaded,
+                    row_source,
+                    static_source_df=train_df,
+                ),
             }
         )
-    panel = pd.DataFrame(rows, columns=_canonical_panel_columns()).reset_index(drop=True)
+    panel = pd.DataFrame(
+        rows,
+        columns=_canonical_panel_columns(
+            feature_source_columns=feature_source_columns,
+        ),
+    ).reset_index(drop=True)
     panel["residual_target"] = build_residual_target(
         panel,
         loaded.config.residual.target,
@@ -979,6 +1048,7 @@ def _build_fold_backcast_panel(
         horizon=loaded.config.cv.horizon,
         step_size=loaded.config.cv.step_size,
     )
+    feature_source_columns = _selected_residual_exog_columns(loaded)
     rows: list[dict[str, object]] = []
     for cutoff_idx in cutoff_indices:
         history_df = train_df.iloc[: cutoff_idx + 1].reset_index(drop=True)
@@ -1002,6 +1072,7 @@ def _build_fold_backcast_panel(
         for row_idx, ds in enumerate(target_predictions["ds"]):
             y_hat_base = float(target_predictions[pred_col].iloc[row_idx])
             y = float(actuals.iloc[row_idx])
+            row_source = future_df.iloc[row_idx]
             rows.append(
                 {
                     "model_name": job.model,
@@ -1015,14 +1086,40 @@ def _build_fold_backcast_panel(
                     "y": y,
                     "y_hat_base": y_hat_base,
                     "residual_target": 0.0,
+                    **_residual_panel_feature_values(
+                        loaded,
+                        row_source,
+                        static_source_df=history_df,
+                    ),
                 }
             )
-    panel = pd.DataFrame(rows, columns=_canonical_panel_columns()).reset_index(drop=True)
+    panel = pd.DataFrame(
+        rows,
+        columns=_canonical_panel_columns(
+            feature_source_columns=feature_source_columns,
+        ),
+    ).reset_index(drop=True)
     panel["residual_target"] = build_residual_target(
         panel,
         loaded.config.residual.target,
     )
     return panel
+
+
+def _resolve_runtime_active_feature_columns(
+    loaded: LoadedConfig,
+    fold_payloads: Sequence[dict[str, Any]],
+) -> list[str]:
+    for payload in fold_payloads:
+        for panel_name in ("backcast_panel", "eval_panel"):
+            panel = payload.get(panel_name)
+            if isinstance(panel, pd.DataFrame):
+                feature_frame = build_residual_feature_frame(
+                    panel,
+                    feature_config=loaded.config.residual.features,
+                )
+                return list(feature_frame.columns)
+    return residual_active_feature_columns(loaded.config.residual.features)
 
 
 def _apply_residual_plugin(
@@ -1040,6 +1137,10 @@ def _apply_residual_plugin(
 
     residual_root = run_root / "residual" / job.model
     residual_root.mkdir(parents=True, exist_ok=True)
+    feature_policy = residual_feature_policy_payload(loaded.config.residual.features)
+    active_feature_columns = _resolve_runtime_active_feature_columns(
+        loaded, fold_payloads
+    )
     corrected_groups: list[pd.DataFrame] = []
     checkpoint_metadata: dict[str, dict[str, object]] = {}
     total_backcast_rows = 0
@@ -1167,7 +1268,11 @@ def _apply_residual_plugin(
             ),
             encoding="utf-8",
         )
-        checkpoint_metadata[str(fold_idx)] = plugin.metadata()
+        checkpoint_metadata[str(fold_idx)] = {
+            **plugin.metadata(),
+            "feature_policy": feature_policy,
+            "active_feature_columns": active_feature_columns,
+        }
         total_backcast_rows += len(backcast_panel)
 
     corrected_folds = pd.concat(corrected_groups, ignore_index=True)
@@ -1179,6 +1284,8 @@ def _apply_residual_plugin(
         "model": job.model,
         "residual_model": loaded.config.residual.model,
         "residual.target": loaded.config.residual.target,
+        "residual.feature_policy": feature_policy,
+        "active_feature_columns": active_feature_columns,
         "fold_count": int(len(fold_payloads)),
         "backcast_rows_total": int(total_backcast_rows),
         "corrected_eval_rows": int(len(corrected_folds)),
@@ -1194,6 +1301,12 @@ def _apply_residual_plugin(
     }
     (residual_root / "diagnostics.json").write_text(
         json.dumps(diagnostics, indent=2), encoding="utf-8"
+    )
+    _update_manifest_artifacts(
+        manifest_path,
+        job_name=job.model,
+        residual_feature_policy=feature_policy,
+        residual_active_feature_columns=active_feature_columns,
     )
 
 
@@ -1861,6 +1974,8 @@ def _run_single_job(
                     train_end_ds,
                     target_predictions,
                     target_actuals,
+                    future_df,
+                    train_df,
                 )
                 fold_payloads.append(
                     {

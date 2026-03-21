@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 from xgboost import Booster, DMatrix, train as xgb_train
 
+from residual.features import ResidualFeatureConfig, build_residual_feature_frame
 from residual.optuna_spaces import RESIDUAL_DEFAULTS
 from residual.plugins_base import ResidualContext, ResidualPlugin
 
@@ -31,6 +32,7 @@ class XGBoostResidualPlugin(ResidualPlugin):
         learning_rate: float = RESIDUAL_DEFAULTS["xgboost"]["learning_rate"],
         subsample: float = RESIDUAL_DEFAULTS["xgboost"]["subsample"],
         colsample_bytree: float = RESIDUAL_DEFAULTS["xgboost"]["colsample_bytree"],
+        feature_config: Any = None,
     ):
         self.config = _XGBoostConfig(
             n_estimators=n_estimators,
@@ -43,29 +45,21 @@ class XGBoostResidualPlugin(ResidualPlugin):
         self._trained = False
         self._fallback_value = 0.0
         self._checkpoint_path: Path | None = None
+        self._feature_config_override = feature_config
+        self._resolved_feature_config: ResidualFeatureConfig | None = None
+        self._feature_columns: tuple[str, ...] | None = None
 
-    @staticmethod
-    def _prepare_panel(panel_df: pd.DataFrame) -> pd.DataFrame:
-        panel = panel_df.copy()
-        for column in ("cutoff", "ds"):
-            panel[column] = pd.to_datetime(panel[column])
-        panel["horizon_step"] = panel["horizon_step"].astype(int)
-        panel["y_hat_base"] = panel["y_hat_base"].astype(float)
-        panel["cutoff_day"] = panel["cutoff"].astype("int64") // 86_400_000_000_000
-        panel["ds_day"] = panel["ds"].astype("int64") // 86_400_000_000_000
-        return panel
-
-    @classmethod
-    def _feature_frame(cls, panel_df: pd.DataFrame) -> pd.DataFrame:
-        prepared = cls._prepare_panel(panel_df)
-        return prepared[
-            [
-                "horizon_step",
-                "y_hat_base",
-                "cutoff_day",
-                "ds_day",
-            ]
-        ].astype(float)
+    def _feature_frame(self, panel_df: pd.DataFrame) -> pd.DataFrame:
+        feature_frame = build_residual_feature_frame(
+            panel_df,
+            feature_config=(
+                self._resolved_feature_config
+                if self._resolved_feature_config is not None
+                else self._feature_config_override
+            ),
+            required_columns=self._feature_columns,
+        )
+        return feature_frame.frame
 
     def fit(self, panel_df: pd.DataFrame, context: ResidualContext) -> None:
         self._checkpoint_path = context.output_dir / "model.ubj"
@@ -81,7 +75,17 @@ class XGBoostResidualPlugin(ResidualPlugin):
             return
         target = train_panel["residual_target"].astype(float)
         self._fallback_value = float(target.mean())
-        features = self._feature_frame(train_panel)
+        feature_frame = build_residual_feature_frame(
+            train_panel,
+            feature_config=(
+                self._feature_config_override
+                if self._feature_config_override is not None
+                else context.config
+            ),
+        )
+        self._resolved_feature_config = feature_frame.resolved_config
+        self._feature_columns = feature_frame.columns
+        features = feature_frame.frame
         dtrain = DMatrix(features, label=target)
         self.model = xgb_train(
             params={

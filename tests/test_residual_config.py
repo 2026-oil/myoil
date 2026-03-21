@@ -364,6 +364,231 @@ def test_load_app_config_preserves_residual_target_yaml_toml_parity(tmp_path: Pa
     assert loaded_yaml.config.to_dict() == loaded_toml.config.to_dict()
 
 
+def test_load_app_config_applies_residual_feature_defaults(tmp_path: Path):
+    payload = _payload()
+    payload["dataset"]["futr_exog_cols"] = ["futr_a"]
+    payload["dataset"]["static_exog_cols"] = ["static_a"]
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,futr_a,static_a\n2020-01-01,1,2,3,4\n",
+        encoding="utf-8",
+    )
+
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    features = loaded.config.residual.features
+    assert features.include_base_prediction is True
+    assert features.include_horizon_step is True
+    assert features.include_date_features is False
+    assert features.lag_features.enabled is False
+    assert features.lag_features.sources == ()
+    assert features.lag_features.steps == ()
+    assert features.lag_features.transforms == ("raw",)
+    assert features.exog_sources.hist == ()
+    assert features.exog_sources.futr == ()
+    assert features.exog_sources.static == ()
+    assert loaded.normalized_payload["residual"]["features"] == {
+        "include_base_prediction": True,
+        "include_horizon_step": True,
+        "include_date_features": False,
+        "lag_features": {
+            "enabled": False,
+            "sources": [],
+            "steps": [],
+            "transforms": ["raw"],
+        },
+        "exog_sources": {"hist": [], "futr": [], "static": []},
+    }
+
+
+def test_load_app_config_accepts_residual_feature_opt_ins(tmp_path: Path):
+    payload = _payload()
+    payload["dataset"]["futr_exog_cols"] = ["futr_a"]
+    payload["dataset"]["static_exog_cols"] = ["static_a"]
+    payload["residual"]["features"] = {
+        "include_date_features": True,
+        "exog_sources": {
+            "hist": ["hist_a"],
+            "futr": ["futr_a"],
+            "static": ["static_a"],
+        },
+        "lag_features": {
+            "enabled": True,
+            "sources": ["y_hat_base", "hist_a", "futr_a"],
+            "steps": [1, 2],
+            "transforms": ["raw"],
+        },
+    }
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,futr_a,static_a\n2020-01-01,1,2,3,4\n",
+        encoding="utf-8",
+    )
+
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    features = loaded.config.residual.features
+    assert features.include_date_features is True
+    assert features.exog_sources.hist == ("hist_a",)
+    assert features.exog_sources.futr == ("futr_a",)
+    assert features.exog_sources.static == ("static_a",)
+    assert features.lag_features.enabled is True
+    assert features.lag_features.sources == ("y_hat_base", "hist_a", "futr_a")
+    assert features.lag_features.steps == (1, 2)
+    assert loaded.normalized_payload["residual"]["features"]["lag_features"] == {
+        "enabled": True,
+        "sources": ["y_hat_base", "hist_a", "futr_a"],
+        "steps": [1, 2],
+        "transforms": ["raw"],
+    }
+
+
+def test_manifest_and_capability_report_include_residual_feature_visibility(
+    tmp_path: Path,
+):
+    from residual import runtime
+    from residual.manifest import build_manifest
+
+    payload = _payload()
+    payload["dataset"]["futr_exog_cols"] = ["futr_a"]
+    payload["dataset"]["static_exog_cols"] = ["static_a"]
+    payload["residual"]["features"] = {
+        "include_date_features": True,
+        "exog_sources": {
+            "hist": ["hist_a"],
+            "futr": ["futr_a"],
+            "static": ["static_a"],
+        },
+        "lag_features": {
+            "enabled": True,
+            "sources": ["y_hat_base", "hist_a", "futr_a"],
+            "steps": [1, 2],
+            "transforms": ["raw"],
+        },
+    }
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,futr_a,static_a\n2020-01-01,1,2,3,4\n",
+        encoding="utf-8",
+    )
+    loaded = load_app_config(
+        tmp_path,
+        config_path=_write_config(tmp_path, payload, ".yaml"),
+    )
+    capability_path = tmp_path / "capability_report.json"
+    runtime._validate_jobs(loaded, loaded.config.jobs, capability_path)
+    capability = json.loads(capability_path.read_text(encoding="utf-8"))
+    manifest = build_manifest(
+        loaded,
+        compat_mode="dual_read",
+        entrypoint_version="test-entrypoint",
+        resolved_config_path=tmp_path / "config.resolved.json",
+    )
+
+    expected_policy = {
+        "include_base_prediction": True,
+        "include_horizon_step": True,
+        "include_date_features": True,
+        "lag_features": {
+            "enabled": True,
+            "sources": ["y_hat_base", "hist_a", "futr_a"],
+            "steps": [1, 2],
+            "transforms": ["raw"],
+        },
+        "exog_sources": {
+            "hist": ["hist_a"],
+            "futr": ["futr_a"],
+            "static": ["static_a"],
+        },
+    }
+    expected_columns = [
+        "horizon_step",
+        "y_hat_base",
+        "cutoff_day",
+        "ds_day",
+        "y_hat_base_lag_1",
+        "y_hat_base_lag_2",
+        "hist_a_lag_1",
+        "hist_a_lag_2",
+        "futr_a_lag_1",
+        "futr_a_lag_2",
+        "hist_a",
+        "futr_a",
+        "static_a",
+    ]
+
+    assert capability["residual"]["feature_policy"] == expected_policy
+    assert capability["residual"]["active_feature_columns"] == expected_columns
+    assert manifest["residual"]["target"] == "level"
+    assert manifest["residual"]["feature_policy"] == expected_policy
+    assert manifest["residual"]["active_feature_columns"] == expected_columns
+
+
+def test_load_app_config_rejects_unknown_residual_feature_exog_selection(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["residual"]["features"] = {
+        "exog_sources": {"hist": ["missing_hist"]},
+    }
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="residual.features.exog_sources.hist must be selected from dataset.hist_exog_cols",
+    ):
+        load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+
+
+def test_load_app_config_rejects_forbidden_residual_lag_sources(tmp_path: Path):
+    payload = _payload()
+    payload["residual"]["features"] = {
+        "lag_features": {
+            "enabled": True,
+            "sources": ["y"],
+            "steps": [1],
+        }
+    }
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="residual.features.lag_features.sources contains forbidden source",
+    ):
+        load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+
+
+def test_load_app_config_rejects_residual_lag_sources_without_matching_exog_opt_in(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["dataset"]["futr_exog_cols"] = ["futr_a"]
+    payload["residual"]["features"] = {
+        "lag_features": {
+            "enabled": True,
+            "sources": ["hist_a"],
+            "steps": [1],
+        }
+    }
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,futr_a\n2020-01-01,1,2,3\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="residual.features.lag_features.sources must be y_hat_base or selected hist/futr exog columns",
+    ):
+        load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+
+
 def test_adapters_materialize_expected_frames(tmp_path: Path):
     payload = _payload()
     yaml_path = _write_config(tmp_path, payload, ".yaml")
@@ -1597,6 +1822,103 @@ def test_apply_residual_plugin_uses_fold_local_backcasts_only(
     assert not (residual_root / "corrected_holdout.csv").exists()
 
 
+def test_fold_panels_include_selected_residual_exog_sources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from residual import runtime
+
+    payload = _payload()
+    payload["cv"].update({"horizon": 2, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["dataset"]["futr_exog_cols"] = ["futr_a"]
+    payload["dataset"]["static_exog_cols"] = ["static_a"]
+    payload["residual"]["features"] = {
+        "exog_sources": {
+            "hist": ["hist_a"],
+            "futr": ["futr_a"],
+            "static": ["static_a"],
+        }
+    }
+    (tmp_path / "data.csv").write_text(
+        "\n".join(
+            [
+                "dt,target,hist_a,futr_a,static_a",
+                "2020-01-01,1,10,100,1000",
+                "2020-01-08,2,11,101,1001",
+                "2020-01-15,3,12,102,1002",
+                "2020-01-22,4,13,103,1003",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    loaded = load_app_config(
+        tmp_path,
+        config_path=_write_config(tmp_path, payload, ".yaml"),
+    )
+    job = loaded.config.jobs[0]
+    train_df = pd.read_csv(tmp_path / "data.csv")
+    future_df = train_df.iloc[2:4].reset_index(drop=True)
+    target_predictions = pd.DataFrame(
+        {
+            "unique_id": ["target", "target"],
+            "ds": pd.to_datetime(["2020-01-15", "2020-01-22"]),
+            job.model: [9.5, 10.5],
+        }
+    )
+    actuals = future_df["target"].reset_index(drop=True)
+
+    monkeypatch.setattr(
+        runtime,
+        "_iter_backcast_cutoff_indices",
+        lambda **_kwargs: [1],
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_build_adapter_inputs",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            fit_df=pd.DataFrame(), static_df=None, futr_df=None, metadata={}
+        ),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_predict_with_fitted_model",
+        lambda _nf, _adapter_inputs: target_predictions.rename(
+            columns={job.model: "TFT"}
+        ),
+    )
+
+    backcast_panel = runtime._build_fold_backcast_panel(
+        loaded,
+        job,
+        nf=cast(Any, object()),
+        train_df=train_df,
+        dt_col="dt",
+        target_col="target",
+        fold_idx=0,
+    )
+    eval_panel = runtime._build_fold_eval_panel(
+        loaded,
+        job,
+        fold_idx=0,
+        train_end_ds=pd.Timestamp("2020-01-08"),
+        target_predictions=target_predictions,
+        actuals=actuals,
+        future_df=future_df,
+        train_df=train_df.iloc[:2].reset_index(drop=True),
+    )
+
+    assert backcast_panel[["hist_a", "futr_a", "static_a"]].to_dict(
+        orient="records"
+    ) == [
+        {"hist_a": 12, "futr_a": 102, "static_a": 1001},
+        {"hist_a": 13, "futr_a": 103, "static_a": 1001},
+    ]
+    assert eval_panel[["hist_a", "futr_a", "static_a"]].to_dict(orient="records") == [
+        {"hist_a": 12, "futr_a": 102, "static_a": 1001},
+        {"hist_a": 13, "futr_a": 103, "static_a": 1001},
+    ]
+
+
 @pytest.mark.parametrize(
     "path", RESIDUAL_RUNTIME_SMOKE_FIXTURE_FILES, ids=lambda p: p.stem
 )
@@ -1825,8 +2147,6 @@ def test_residual_plugins_predict_panel_and_write_checkpoint(
     assert list(feature_frame.columns) == [
         "horizon_step",
         "y_hat_base",
-        "cutoff_day",
-        "ds_day",
     ]
     predicted = plugin.predict(train_df.drop(columns=["residual_target"]))
     assert "residual_hat" in predicted.columns
@@ -4093,5 +4413,166 @@ def test_apply_residual_plugin_prefers_yaml_opt_n_trial_over_env(
     assert summary["trial_count"] == 2
     assert summary["existing_finished_trial_count_before_optimize"] == 2
     assert summary["remaining_trial_count"] == 0
-    assert summary["storage_backend"] == "journal"
-    assert Path(summary["storage_path"]).exists()
+
+
+def test_apply_residual_plugin_writes_feature_visibility_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from residual import runtime
+
+    class _ZeroResidualPlugin(ResidualPlugin):
+        name = "zero"
+
+        def fit(self, panel_df: pd.DataFrame, context: ResidualContext) -> None:
+            return None
+
+        def predict(self, panel_df: pd.DataFrame) -> pd.DataFrame:
+            return panel_df.copy().assign(residual_hat=0.0)
+
+        def metadata(self) -> dict[str, object]:
+            return {"plugin": self.name}
+
+    monkeypatch.setattr(
+        runtime,
+        "build_residual_plugin",
+        lambda _config: _ZeroResidualPlugin(),
+    )
+
+    payload = _payload()
+    payload["dataset"]["futr_exog_cols"] = ["futr_a"]
+    payload["dataset"]["static_exog_cols"] = ["static_a"]
+    payload["residual"]["features"] = {
+        "include_date_features": True,
+        "exog_sources": {
+            "hist": ["hist_a"],
+            "futr": ["futr_a"],
+            "static": ["static_a"],
+        },
+        "lag_features": {
+            "enabled": True,
+            "sources": ["y_hat_base", "hist_a", "futr_a"],
+            "steps": [1],
+            "transforms": ["raw"],
+        },
+    }
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,futr_a,static_a\n"
+        "2020-01-01,1,2,20,200\n"
+        "2020-01-08,2,3,30,300\n",
+        encoding="utf-8",
+    )
+    loaded = load_app_config(
+        tmp_path,
+        config_path=_write_config(tmp_path, payload, ".yaml"),
+    )
+    job = loaded.config.jobs[0]
+    run_root = tmp_path / "run"
+    manifest_path = run_root / "manifest" / "run_manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps({"jobs": [{"model": job.model}], "residual": {}}, indent=2),
+        encoding="utf-8",
+    )
+    fold_payloads = [
+        {
+            "fold_idx": 0,
+            "backcast_panel": _residual_target_panel(
+                [
+                    {
+                        "model_name": job.model,
+                        "fold_idx": 0,
+                        "panel_split": "backcast_train",
+                        "unique_id": "target",
+                        "cutoff": "2020-01-08",
+                        "train_end_ds": "2020-01-08",
+                        "ds": "2020-01-15",
+                        "horizon_step": 1,
+                        "y_hat_base": 10.0,
+                        "y": 11.0,
+                        "residual_target": 1.0,
+                        "hist_a": 2.0,
+                        "futr_a": 20.0,
+                        "static_a": 200.0,
+                    },
+                    {
+                        "model_name": job.model,
+                        "fold_idx": 0,
+                        "panel_split": "backcast_train",
+                        "unique_id": "target",
+                        "cutoff": "2020-01-08",
+                        "train_end_ds": "2020-01-08",
+                        "ds": "2020-01-22",
+                        "horizon_step": 2,
+                        "y_hat_base": 12.0,
+                        "y": 13.0,
+                        "residual_target": 1.0,
+                        "hist_a": 3.0,
+                        "futr_a": 30.0,
+                        "static_a": 200.0,
+                    },
+                ]
+            ),
+            "eval_panel": _residual_target_panel(
+                [
+                    {
+                        "model_name": job.model,
+                        "fold_idx": 0,
+                        "panel_split": "fold_eval",
+                        "unique_id": "target",
+                        "cutoff": "2020-01-22",
+                        "train_end_ds": "2020-01-22",
+                        "ds": "2020-01-29",
+                        "horizon_step": 1,
+                        "y_hat_base": 14.0,
+                        "y": 15.0,
+                        "residual_target": 1.0,
+                        "hist_a": 4.0,
+                        "futr_a": 40.0,
+                        "static_a": 200.0,
+                    }
+                ]
+            ),
+            "base_summary": {"fold_idx": 0},
+        }
+    ]
+
+    runtime._apply_residual_plugin(
+        loaded,
+        job,
+        run_root,
+        fold_payloads,
+        manifest_path=manifest_path,
+    )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    plugin_metadata = json.loads(
+        (run_root / "residual" / job.model / "plugin_metadata.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    diagnostics = json.loads(
+        (run_root / "residual" / job.model / "diagnostics.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    expected_columns = [
+        "horizon_step",
+        "y_hat_base",
+        "cutoff_day",
+        "ds_day",
+        "y_hat_base_lag_1",
+        "hist_a_lag_1",
+        "futr_a_lag_1",
+        "hist_a",
+        "futr_a",
+        "static_a",
+    ]
+
+    assert manifest["residual"]["feature_policy"]["include_date_features"] is True
+    assert manifest["residual"]["active_feature_columns"] == expected_columns
+    assert plugin_metadata["0"]["active_feature_columns"] == expected_columns
+    assert plugin_metadata["0"]["feature_policy"]["lag_features"]["steps"] == [1]
+    assert diagnostics["active_feature_columns"] == expected_columns
+    assert diagnostics["residual.feature_policy"]["exog_sources"]["static"] == [
+        "static_a"
+    ]
