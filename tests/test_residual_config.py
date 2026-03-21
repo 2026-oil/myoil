@@ -2378,6 +2378,13 @@ CASE_YAML_FILES = [
     REPO_ROOT / 'yaml' / 'feature_set' / 'wti-case4.yaml',
 ]
 
+HPT_CASE12_YAML_FILES = [
+    REPO_ROOT / 'yaml' / 'feature_set_HPT' / 'brentoil-case1.yaml',
+    REPO_ROOT / 'yaml' / 'feature_set_HPT' / 'brentoil-case2.yaml',
+    REPO_ROOT / 'yaml' / 'feature_set_HPT' / 'wti-case1.yaml',
+    REPO_ROOT / 'yaml' / 'feature_set_HPT' / 'wti-case2.yaml',
+]
+
 EXPECTED_CASE_TRAINING = {
     'input_size': 64,
     'season_length': 52,
@@ -2429,6 +2436,26 @@ EXPECTED_CASE_MODEL_PARAMS = {
     },
     'Naive': {},
 }
+
+EXPECTED_HPT_CASE12_TRAINING = {
+    'train_protocol': 'expanding_window_tscv',
+    'val_size': 8,
+    'early_stop_patience_steps': 5,
+    'loss': 'mse',
+}
+
+EXPECTED_HPT_CASE12_MODELS = [
+    'PatchTST',
+    'DLinear',
+    'Naive',
+    'iTransformer',
+    'LSTM',
+    'NHITS',
+]
+
+SEARCH_SPACE_MODELS = yaml.safe_load(
+    (REPO_ROOT / 'search_space.yaml').read_text(encoding='utf-8')
+)['models']
 
 EXPECTED_CASE_METADATA = {
     'brentoil-case1.yaml': {
@@ -2596,6 +2623,59 @@ def test_case_yaml_build_model_preserves_expected_fixed_params():
             if actual_value is None and hasattr(model, 'hparams'):
                 actual_value = getattr(model.hparams, key, None)
             assert actual_value == expected_value
+
+
+@pytest.mark.parametrize('path', HPT_CASE12_YAML_FILES, ids=lambda p: p.name)
+def test_feature_set_hpt_case12_training_keeps_only_fixed_controls(path: Path):
+    payload = _load_case_yaml(path)
+    assert payload['training'] == EXPECTED_HPT_CASE12_TRAINING
+
+
+def test_feature_set_hpt_directory_only_contains_case12_files():
+    actual = sorted(path.name for path in (REPO_ROOT / 'yaml' / 'feature_set_HPT').glob('*.yaml'))
+    assert actual == sorted(path.name for path in HPT_CASE12_YAML_FILES)
+
+
+@pytest.mark.parametrize('path', HPT_CASE12_YAML_FILES, ids=lambda p: p.name)
+def test_feature_set_hpt_case12_cv_and_jobs_follow_optuna_scope(path: Path):
+    payload = _load_case_yaml(path)
+
+    assert payload['cv']['n_windows'] == 5
+    assert [job['model'] for job in payload['jobs']] == EXPECTED_HPT_CASE12_MODELS
+    assert all(job['params'] == {} for job in payload['jobs'])
+
+
+@pytest.mark.parametrize('path', HPT_CASE12_YAML_FILES, ids=lambda p: p.name)
+def test_feature_set_hpt_case12_preserves_metadata(path: Path):
+    payload = _load_case_yaml(path)
+    expected = EXPECTED_CASE_METADATA[path.name]
+
+    assert payload['task']['name'] == expected['task_name']
+    assert payload['dataset']['target_col'] == expected['target_col']
+    assert payload['dataset']['hist_exog_cols'] == expected['hist_exog_cols']
+
+
+@pytest.mark.parametrize('path', HPT_CASE12_YAML_FILES, ids=lambda p: p.name)
+def test_feature_set_hpt_case12_normalizes_to_auto_training_and_learned_jobs(path: Path):
+    loaded = load_app_config(REPO_ROOT, config_path=path)
+
+    assert loaded.config.training_search.requested_mode == 'training_auto_requested'
+    assert loaded.config.training_search.validated_mode == 'training_auto'
+    assert (
+        list(loaded.config.training_search.selected_search_params)
+        == list(TRAINING_PARAM_REGISTRY)
+    )
+
+    for job in loaded.config.jobs:
+        if job.model == 'Naive':
+            assert job.requested_mode == 'baseline_fixed'
+            assert job.validated_mode == 'baseline_fixed'
+            assert job.selected_search_params == ()
+        else:
+            assert job.params == {}
+            assert job.requested_mode == 'learned_auto_requested'
+            assert job.validated_mode == 'learned_auto'
+            assert list(job.selected_search_params) == list(SEARCH_SPACE_MODELS[job.model])
 
 
 def _residual_target_panel(rows: list[dict[str, object]]) -> pd.DataFrame:

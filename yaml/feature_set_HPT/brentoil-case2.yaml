@@ -1,38 +1,36 @@
 task:
-  name: wti_case2_HPT
+  name: brentoil_case2
 dataset:
   path: data/df.csv
-  target_col: Com_CrudeOil
+  target_col: Com_BrentCrudeOil
   dt_col: dt
   hist_exog_cols:
   - Com_Gasoline
   - Com_BloombergCommodity_BCOM
   - Com_LME_Ni_Cash
   - Com_Coal
-  - Com_Canola
   - Com_Cotton
   - Com_LME_Al_Cash
-  - Com_LMEX
   - Bonds_KOR_10Y
-  - Com_PalmOil
   - Com_Barley
-  - Com_Corn
-  - Com_Oat
-  - Com_Wheat
-  - Com_Soybeans
+  - Com_Canola
+  - Com_LMEX
   - Com_LME_Ni_Inv
+  - Com_Corn
+  - Com_Wheat
   futr_exog_cols: []
   static_exog_cols: []
 runtime:
   random_seed: 1
 training:
   train_protocol: expanding_window_tscv
+  val_size: 8
   early_stop_patience_steps: 5
   loss: mse
 cv:
   horizon: 8
   step_size: 8
-  n_windows: 12
+  n_windows: 5
   gap: 0
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean
@@ -47,17 +45,15 @@ residual:
   model: xgboost
   params: {}
 jobs:
-- model: LSTM
-  params: {}
-- model: NHITS
+- model: PatchTST
   params: {}
 - model: DLinear
   params: {}
-- model: Autoformer
-  params: {}
-- model: PatchTST
+- model: Naive
   params: {}
 - model: iTransformer
   params: {}
-- model: Naive
+- model: LSTM
+  params: {}
+- model: NHITS
   params: {}

@@ -1,5 +1,5 @@
 task:
-  name: wti_case4_HPT
+  name: wti_case2
 dataset:
   path: data/df.csv
   target_col: Com_CrudeOil
@@ -21,21 +21,19 @@ dataset:
   - Com_Wheat
   - Com_Soybeans
   - Com_LME_Ni_Inv
-  - Com_NaturalGas
-  - Idx_OVX
-  - Com_Gold
   futr_exog_cols: []
   static_exog_cols: []
 runtime:
   random_seed: 1
 training:
   train_protocol: expanding_window_tscv
+  val_size: 8
   early_stop_patience_steps: 5
   loss: mse
 cv:
   horizon: 8
   step_size: 8
-  n_windows: 12
+  n_windows: 5
   gap: 0
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean
@@ -50,17 +48,15 @@ residual:
   model: xgboost
   params: {}
 jobs:
-- model: LSTM
-  params: {}
-- model: NHITS
+- model: PatchTST
   params: {}
 - model: DLinear
   params: {}
-- model: Autoformer
-  params: {}
-- model: PatchTST
+- model: Naive
   params: {}
 - model: iTransformer
   params: {}
-- model: Naive
+- model: LSTM
+  params: {}
+- model: NHITS
   params: {}

@@ -109,14 +109,10 @@ def test_run_brent_wti_cases_script_default_config_list_includes_all_feature_set
         "yaml/feature_set/wti-case4.yaml",
     ]
     expected_hpt = [
-        "yaml/feature_set/brentoil-case1_HPT.yaml",
-        "yaml/feature_set/brentoil-case2_HPT.yaml",
-        "yaml/feature_set/brentoil-case3_HPT.yaml",
-        "yaml/feature_set/brentoil-case4_HPT.yaml",
-        "yaml/feature_set/wti-case1_HPT.yaml",
-        "yaml/feature_set/wti-case2_HPT.yaml",
-        "yaml/feature_set/wti-case3_HPT.yaml",
-        "yaml/feature_set/wti-case4_HPT.yaml",
+        "yaml/feature_set_HPT/brentoil-case1.yaml",
+        "yaml/feature_set_HPT/brentoil-case2.yaml",
+        "yaml/feature_set_HPT/wti-case1.yaml",
+        "yaml/feature_set_HPT/wti-case2.yaml",
     ]
 
     for config_path in [*expected_feature_set, *expected_hpt]:
