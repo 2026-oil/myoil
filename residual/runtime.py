@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import replace
+from decimal import Decimal, ROUND_HALF_UP
 import json
 import os
 from pathlib import Path
@@ -39,6 +40,20 @@ from .registry import build_residual_plugin
 from .scheduler import build_launch_plan, run_parallel_jobs
 
 ENTRYPOINT_VERSION = "neuralforecast-residual-v1"
+SUMMARY_REPORT_FILENAME = "sample.md"
+TARGET_DISPLAY_NAMES = {
+    "Com_BrentCrudeOil": "BrentCrude",
+    "Com_CrudeOil": "WTI",
+}
+DEFAULT_SAMPLE_STRUCTURE = {
+    "section_setup": "# 02. 데이터 및 모델 세팅",
+    "setup_intro": "- 아래는 case별 hist_exog_cols만 남기고, 공통 training/jobs 상세는 Appendix 첨부 하였음.",
+    "section_design": "# 03. 실험 설계 및 적용",
+    "section_results": "# 04. 실험(모델링) 결과",
+    "section_results_detail": "### 04-01. 세부 결과",
+    "results_intro": "- 각 run의 leaderboard.csv 기준 결과를 아래에 정리했다.",
+    "section_model_tables": "### 각 모형별 Table",
+}
 
 
 class _OptunaTrialFailure(RuntimeError):
@@ -375,9 +390,23 @@ def _compute_metrics(actual: pd.Series, predicted: pd.Series) -> dict[str, float
     mae = float(err.abs().mean())
     mse = float((err**2).mean())
     rmse = mse**0.5
+    # Use per-fold actual range normalization so nRMSE remains scale-aware and
+    # naturally yields blank report cells for constant-target folds.
+    actual_range = float(actual.max() - actual.min()) if not actual.empty else float("nan")
+    nrmse = float("nan") if np.isclose(actual_range, 0.0) else rmse / actual_range
     with np.errstate(divide="ignore", invalid="ignore"):
         mape = float((err.abs() / actual.abs()).mean())
-    return {"MAE": mae, "MSE": mse, "RMSE": rmse, "MAPE": mape}
+    ss_tot = float(((actual - actual.mean()) ** 2).sum())
+    ss_res = float((err**2).sum())
+    r2 = float("nan") if np.isclose(ss_tot, 0.0) else 1.0 - (ss_res / ss_tot)
+    return {
+        "MAE": mae,
+        "MSE": mse,
+        "RMSE": rmse,
+        "MAPE": mape,
+        "NRMSE": nrmse,
+        "R2": r2,
+    }
 
 
 def _fit_and_predict_fold(
@@ -1253,12 +1282,19 @@ def _build_leaderboard(metrics_frame: pd.DataFrame) -> pd.DataFrame:
     }
     if "MAPE" in metrics_frame.columns:
         agg_fields["mean_fold_mape"] = ("MAPE", _safe_mean)
+    if "NRMSE" in metrics_frame.columns:
+        agg_fields["mean_fold_nrmse"] = ("NRMSE", _safe_mean)
+    if "R2" in metrics_frame.columns:
+        agg_fields["mean_fold_r2"] = ("R2", _safe_mean)
+    sort_fields = ["mean_fold_nrmse", "mean_fold_mse", "mean_fold_mae", "model"]
+    active_sort_fields = [field for field in sort_fields if field in agg_fields or field == "model"]
+    ascending = [True] * (len(active_sort_fields) - 1) + [True]
     leaderboard = (
         metrics_frame.groupby("model", as_index=False)
         .agg(**agg_fields)
         .sort_values(
-            by=["mean_fold_mse", "mean_fold_mae", "model"],
-            ascending=[True, True, True],
+            by=active_sort_fields,
+            ascending=ascending,
             kind="stable",
         )
         .reset_index(drop=True)
@@ -1270,6 +1306,226 @@ def _build_leaderboard(metrics_frame: pd.DataFrame) -> pd.DataFrame:
 def _write_leaderboard_workbook(leaderboard: pd.DataFrame, workbook_path: Path) -> None:
     workbook_path.parent.mkdir(parents=True, exist_ok=True)
     leaderboard.to_csv(workbook_path, index=False)
+
+
+def _load_summary_config(run_root: Path) -> dict[str, Any]:
+    config_path = run_root / "config" / "config.resolved.json"
+    if not config_path.exists():
+        return {}
+    return json.loads(config_path.read_text(encoding="utf-8"))
+
+
+def _load_sample_structure() -> dict[str, str]:
+    sample_path = Path(__file__).resolve().parents[1] / "sample.md"
+    if not sample_path.exists():
+        return dict(DEFAULT_SAMPLE_STRUCTURE)
+
+    lines = sample_path.read_text(encoding="utf-8").splitlines()
+
+    def _find_line(prefix: str, default: str) -> str:
+        for line in lines:
+            if line.strip().startswith(prefix):
+                return line.rstrip()
+        return default
+
+    def _find_contains(snippet: str, default: str) -> str:
+        for line in lines:
+            if snippet in line:
+                return line.rstrip()
+        return default
+
+    return {
+        "section_setup": _find_line("# 02.", DEFAULT_SAMPLE_STRUCTURE["section_setup"]),
+        "setup_intro": _find_contains(
+            "hist_exog_cols만 남기고", DEFAULT_SAMPLE_STRUCTURE["setup_intro"]
+        ),
+        "section_design": _find_line("# 03.", DEFAULT_SAMPLE_STRUCTURE["section_design"]),
+        "section_results": _find_line("# 04.", DEFAULT_SAMPLE_STRUCTURE["section_results"]),
+        "section_results_detail": _find_line(
+            "### 04-01.", DEFAULT_SAMPLE_STRUCTURE["section_results_detail"]
+        ),
+        "results_intro": _find_contains(
+            "leaderboard", DEFAULT_SAMPLE_STRUCTURE["results_intro"]
+        ),
+        "section_model_tables": _find_line(
+            "### 각 모형별 Table", DEFAULT_SAMPLE_STRUCTURE["section_model_tables"]
+        ),
+    }
+
+
+def _display_target_name(target_col: str | None) -> str:
+    if not target_col:
+        return ""
+    if target_col in TARGET_DISPLAY_NAMES:
+        return TARGET_DISPLAY_NAMES[target_col]
+    target = target_col.removeprefix("Com_").replace("_", " ").strip()
+    return target
+
+
+def _case_title(task_name: str | None, target_col: str | None, run_root: Path) -> str:
+    raw_name = (task_name or run_root.name).strip()
+    lowered = raw_name.lower()
+    variant = ""
+    if lowered.endswith("_hpt"):
+        raw_name = raw_name[:-4]
+        variant = " HPT"
+    parts = [part for part in raw_name.split("_") if part]
+    case_number = ""
+    for part in parts:
+        if part.lower().startswith("case") and part[4:].isdigit():
+            case_number = part[4:]
+            break
+    target_name = _display_target_name(target_col) or raw_name
+    if case_number:
+        return f"Case {case_number}{variant} | {target_name}"
+    return f"{raw_name}{variant} | {target_name}".strip(" |")
+
+
+def _yaml_hist_exog_block(hist_exog_cols: Sequence[str] | None) -> str:
+    lines = ["...", "hist_exog_cols:"]
+    for col in hist_exog_cols or ():
+        lines.append(f"  - {col}")
+    lines.append("...")
+    return "\n".join(lines)
+
+
+def _round_half_up(value: float | int | None) -> str:
+    if value is None:
+        return ""
+    numeric = float(value)
+    if not np.isfinite(numeric):
+        return ""
+    quantized = Decimal(str(numeric)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return format(quantized, "f")
+
+
+def _format_report_metric(value: float | int | None, *, percentage: bool = False) -> str:
+    if value is None:
+        return ""
+    numeric = float(value)
+    if not np.isfinite(numeric):
+        return ""
+    if percentage:
+        return f"{_round_half_up(numeric * 100)}%"
+    return _round_half_up(numeric)
+
+
+def _build_summary_markdown(run_root: Path, leaderboard: pd.DataFrame) -> Path:
+    summary_dir = run_root / "summary"
+    summary_dir.mkdir(parents=True, exist_ok=True)
+    report_path = summary_dir / SUMMARY_REPORT_FILENAME
+
+    resolved = _load_summary_config(run_root)
+    dataset = resolved.get("dataset", {})
+    cv = resolved.get("cv", {})
+    task = resolved.get("task", {})
+    sample_structure = _load_sample_structure()
+
+    case_title = _case_title(task.get("name"), dataset.get("target_col"), run_root)
+    hist_exog_yaml = _yaml_hist_exog_block(dataset.get("hist_exog_cols"))
+    target_name = _display_target_name(dataset.get("target_col"))
+    horizon = cv.get("horizon")
+    step_size = cv.get("step_size")
+    n_windows = cv.get("n_windows")
+    gap = cv.get("gap")
+    overlap_eval_policy = cv.get("overlap_eval_policy")
+
+    leaderboard_lines = [
+        "| Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    if leaderboard.empty:
+        leaderboard_lines.append("|  |  |  |  |  |  |")
+    else:
+        for row in leaderboard.to_dict(orient="records"):
+            leaderboard_lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        str(row.get("rank", "")) if row.get("rank") is not None else "",
+                        str(row.get("model", "") or ""),
+                        _format_report_metric(row.get("mean_fold_mape"), percentage=True),
+                        _format_report_metric(row.get("mean_fold_nrmse")),
+                        _format_report_metric(row.get("mean_fold_mae")),
+                        _format_report_metric(row.get("mean_fold_r2")),
+                    ]
+                )
+                + " |"
+            )
+
+    model_sections: list[str] = []
+    if leaderboard.empty:
+        model_sections.append("- \n\n    | Case | MAPE | nRMSE | MAE | R2 |\n    | --- | --- | --- | --- | --- |\n    |  |  |  |  |  |")
+    else:
+        for row in leaderboard.to_dict(orient="records"):
+            model_sections.append(
+                "\n".join(
+                    [
+                        f"- {row.get('model', '')}",
+                        "",
+                        "    | Case | MAPE | nRMSE | MAE | R2 |",
+                        "    | --- | --- | --- | --- | --- |",
+                        "    | "
+                        + " | ".join(
+                            [
+                                case_title,
+                                _format_report_metric(row.get("mean_fold_mape"), percentage=True),
+                                _format_report_metric(row.get("mean_fold_nrmse")),
+                                _format_report_metric(row.get("mean_fold_mae")),
+                                _format_report_metric(row.get("mean_fold_r2")),
+                            ]
+                        )
+                        + " |",
+                    ]
+                )
+            )
+
+    report = "\n".join(
+        [
+            sample_structure["section_setup"],
+            "",
+            "---",
+            "",
+            f"## **{case_title}**",
+            "",
+            sample_structure["setup_intro"],
+            "",
+            "```yaml",
+            hist_exog_yaml,
+            "```",
+            "",
+            sample_structure["section_design"],
+            "",
+            "---",
+            "",
+            f"- 타깃: {target_name}",
+            "- 각 타깃을 독립적인 forecasting 문제로 학습/평가",
+            (
+                f"- 평가는 {n_windows if n_windows is not None else ''}개 rolling TSCV"
+                f"(h={horizon if horizon is not None else ''}, step={step_size if step_size is not None else ''}, gap={gap if gap is not None else ''}) 구조로 설계했다."
+            ),
+            f"- overlap_eval_policy: {overlap_eval_policy or ''}",
+            "",
+            sample_structure["section_results"],
+            "",
+            sample_structure["section_results_detail"],
+            "",
+            "---",
+            "",
+            sample_structure["results_intro"],
+            "",
+            f"## **{case_title}**",
+            "",
+            *leaderboard_lines,
+            "",
+            sample_structure["section_model_tables"],
+            "",
+            *model_sections,
+            "",
+        ]
+    )
+    report_path.write_text(report, encoding="utf-8")
+    return report_path
 
 
 def _load_last_fold_forecasts(run_root: Path) -> pd.DataFrame:
@@ -1411,9 +1667,13 @@ def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
     leaderboard = _build_leaderboard(metrics)
     workbook_path = summary_dir / "leaderboard.csv"
     _write_leaderboard_workbook(leaderboard, workbook_path)
+    markdown_path = _build_summary_markdown(run_root, leaderboard)
 
     forecasts = _load_last_fold_forecasts(run_root)
-    plot_paths: dict[str, str] = {"leaderboard": str(workbook_path)}
+    plot_paths: dict[str, str] = {
+        "leaderboard": str(workbook_path),
+        "markdown": str(markdown_path),
+    }
     if forecasts.empty:
         return plot_paths
     last_fold = int(forecasts["fold_idx"].max())

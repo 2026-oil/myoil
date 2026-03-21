@@ -655,6 +655,27 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
     run_root = tmp_path / "summary_run"
     cv_dir = run_root / "cv"
     cv_dir.mkdir(parents=True)
+    config_dir = run_root / "config"
+    config_dir.mkdir(parents=True)
+    (config_dir / "config.resolved.json").write_text(
+        json.dumps(
+            {
+                "task": {"name": "brentoil_case1"},
+                "dataset": {
+                    "target_col": "Com_BrentCrudeOil",
+                    "hist_exog_cols": ["Com_Gasoline", "Idx_OVX"],
+                },
+                "cv": {
+                    "horizon": 8,
+                    "step_size": 8,
+                    "n_windows": 12,
+                    "gap": 0,
+                    "overlap_eval_policy": "by_cutoff_mean",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     pd.DataFrame(
         [
             {
@@ -664,6 +685,8 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
                 "MSE": 1.0,
                 "RMSE": 1.0,
                 "MAPE": 0.1,
+                "NRMSE": 0.25,
+                "R2": 0.8,
             },
             {
                 "fold_idx": 1,
@@ -672,6 +695,8 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
                 "MSE": 0.25,
                 "RMSE": 0.5,
                 "MAPE": 0.05,
+                "NRMSE": 0.10,
+                "R2": 0.9,
             },
         ]
     ).to_csv(cv_dir / "ModelA_metrics_by_cutoff.csv", index=False)
@@ -684,6 +709,8 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
                 "MSE": 4.0,
                 "RMSE": 2.0,
                 "MAPE": 0.2,
+                "NRMSE": 0.50,
+                "R2": 0.4,
             },
             {
                 "fold_idx": 1,
@@ -692,6 +719,8 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
                 "MSE": 2.25,
                 "RMSE": 1.5,
                 "MAPE": 0.15,
+                "NRMSE": 0.40,
+                "R2": 0.6,
             },
         ]
     ).to_csv(cv_dir / "ModelB_metrics_by_cutoff.csv", index=False)
@@ -729,15 +758,86 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
     artifacts = runtime._build_summary_artifacts(run_root)
 
     leaderboard_path = run_root / "summary" / "leaderboard.csv"
+    markdown_path = run_root / "summary" / "sample.md"
     assert artifacts["leaderboard"] == str(leaderboard_path)
+    assert artifacts["markdown"] == str(markdown_path)
     assert leaderboard_path.exists()
+    assert markdown_path.exists()
     leaderboard = pd.read_csv(leaderboard_path)
     assert leaderboard.loc[0, "rank"] == 1
     assert leaderboard.loc[0, "model"] == "ModelA"
     assert "mean_fold_mape" in leaderboard.columns
+    assert "mean_fold_nrmse" in leaderboard.columns
+    assert "mean_fold_r2" in leaderboard.columns
+    report = markdown_path.read_text(encoding="utf-8")
+    assert "# 02. 데이터 및 모델 세팅" in report
+    assert "## **Case 1 | BrentCrude**" in report
+    assert "| Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |" in report
+    assert "| 1 | ModelA | 7.50% | 0.18 | 0.75 | 0.85 |" in report
+    assert "hist_exog_cols:" in report
     assert (run_root / "summary" / "last_fold_all_models.png").exists()
     assert (run_root / "summary" / "last_fold_top3.png").exists()
     assert (run_root / "summary" / "last_fold_top5.png").exists()
+
+
+def test_summary_builder_leaves_missing_report_values_blank(tmp_path: Path):
+    from residual import runtime
+
+    run_root = tmp_path / "blank_summary"
+    cv_dir = run_root / "cv"
+    cv_dir.mkdir(parents=True)
+    (run_root / "config").mkdir(parents=True)
+    (run_root / "config" / "config.resolved.json").write_text(
+        json.dumps(
+            {
+                "task": {"name": "wti_case9"},
+                "dataset": {
+                    "target_col": "Com_CrudeOil",
+                    "hist_exog_cols": [],
+                },
+                "cv": {
+                    "horizon": 4,
+                    "step_size": 2,
+                    "n_windows": 3,
+                    "gap": 0,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    pd.DataFrame(
+        [
+            {
+                "fold_idx": 0,
+                "cutoff": "2020-01-15",
+                "MAE": 1.0,
+                "MSE": 1.0,
+                "RMSE": 1.0,
+                "MAPE": 0.1,
+                "NRMSE": float("nan"),
+                "R2": float("nan"),
+            }
+        ]
+    ).to_csv(cv_dir / "ModelA_metrics_by_cutoff.csv", index=False)
+
+    artifacts = runtime._build_summary_artifacts(run_root)
+
+    report = Path(artifacts["markdown"]).read_text(encoding="utf-8")
+    assert "## **Case 9 | WTI**" in report
+    assert "| 1 | ModelA | 10.00% |  | 1.00 |  |" in report
+
+
+def test_compute_metrics_includes_range_normalized_nrmse_and_r2():
+    from residual import runtime
+
+    metrics = runtime._compute_metrics(
+        pd.Series([1.0, 2.0, 3.0]),
+        pd.Series([1.0, 2.0, 5.0]),
+    )
+
+    assert metrics["RMSE"] == pytest.approx((4.0 / 3.0) ** 0.5)
+    assert metrics["NRMSE"] == pytest.approx(((4.0 / 3.0) ** 0.5) / 2.0)
+    assert metrics["R2"] == pytest.approx(-1.0)
 
 
 def test_runtime_skip_summary_env_suppresses_summary_artifacts(
@@ -808,13 +908,18 @@ def test_runtime_smoke_writes_summary_artifacts_for_dummy_model(tmp_path: Path):
     )
 
     leaderboard_path = output_root / "summary" / "leaderboard.csv"
+    markdown_path = output_root / "summary" / "sample.md"
     assert code == 0
     assert leaderboard_path.exists()
+    assert markdown_path.exists()
     assert (output_root / "summary" / "last_fold_all_models.png").exists()
     assert (output_root / "summary" / "last_fold_top3.png").exists()
     assert (output_root / "summary" / "last_fold_top5.png").exists()
     leaderboard = pd.read_csv(leaderboard_path)
     assert "rank" in leaderboard.columns
+    assert "| Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |" in markdown_path.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_trajectory_frame_contains_train_and_val_series():
