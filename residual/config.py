@@ -162,6 +162,10 @@ class AppConfig:
         if self.task.name is None:
             payload.pop("task", None)
         payload["dataset"]["path"] = str(self.dataset.path)
+        if "model_step_size" in payload["training"]:
+            payload["training"]["step_size"] = payload["training"].pop(
+                "model_step_size"
+            )
         payload["training_search"]["selected_search_params"] = list(
             payload["training_search"]["selected_search_params"]
         )

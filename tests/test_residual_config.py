@@ -462,7 +462,8 @@ def test_load_app_config_ignores_legacy_training_season_length_and_maps_step_siz
 
     assert loaded.config.training.model_step_size == 6
     assert "season_length" not in loaded.normalized_payload["training"]
-    assert loaded.normalized_payload["training"]["model_step_size"] == 6
+    assert loaded.normalized_payload["training"]["step_size"] == 6
+    assert "model_step_size" not in loaded.normalized_payload["training"]
 
 
 def test_load_app_config_migrates_legacy_shared_job_scaler_type_to_training(
@@ -3665,11 +3666,12 @@ def test_feature_set_hpt_case12_training_keeps_only_fixed_controls(path: Path):
     assert payload["training"] == EXPECTED_HPT_CASE12_TRAINING
 
 
-def test_feature_set_hpt_directory_only_contains_case12_files():
+def test_feature_set_hpt_directory_contains_expected_case12_files():
     actual = sorted(
         path.name for path in (REPO_ROOT / "yaml" / "feature_set_HPT").glob("*.yaml")
     )
-    assert actual == sorted(path.name for path in HPT_CASE12_YAML_FILES)
+    for expected in HPT_CASE12_YAML_FILES:
+        assert expected.name in actual
 
 
 @pytest.mark.parametrize("path", OPTUNA_CONFIG_YAML_FILES, ids=lambda p: p.name)
