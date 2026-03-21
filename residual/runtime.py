@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from typing import Any, Sequence
 
+import numpy as np
 import optuna
 import pandas as pd
 from neuralforecast import NeuralForecast
@@ -362,11 +363,15 @@ def _resolve_freq(loaded: LoadedConfig, source_df: pd.DataFrame) -> str:
 
 
 def _compute_metrics(actual: pd.Series, predicted: pd.Series) -> dict[str, float]:
-    err = actual.reset_index(drop=True) - predicted.reset_index(drop=True)
+    actual = actual.reset_index(drop=True)
+    predicted = predicted.reset_index(drop=True)
+    err = actual - predicted
     mae = float(err.abs().mean())
     mse = float((err**2).mean())
     rmse = mse**0.5
-    return {"MAE": mae, "MSE": mse, "RMSE": rmse}
+    with np.errstate(divide="ignore", invalid="ignore"):
+        mape = float((err.abs() / actual.abs()).mean())
+    return {"MAE": mae, "MSE": mse, "RMSE": rmse, "MAPE": mape}
 
 
 def _fit_and_predict_fold(
@@ -971,14 +976,21 @@ def _load_metrics_for_summary(run_root: Path) -> pd.DataFrame:
 
 
 def _build_leaderboard(metrics_frame: pd.DataFrame) -> pd.DataFrame:
+    def _safe_mean(series: pd.Series) -> float:
+        values = pd.to_numeric(series, errors="coerce").replace([np.inf, -np.inf], np.nan)
+        return float(values.mean())
+
+    agg_fields: dict[str, tuple[str, object]] = {
+        "mean_fold_mae": ("MAE", "mean"),
+        "mean_fold_mse": ("MSE", "mean"),
+        "mean_fold_rmse": ("RMSE", "mean"),
+        "fold_count": ("fold_idx", "nunique"),
+    }
+    if "MAPE" in metrics_frame.columns:
+        agg_fields["mean_fold_mape"] = ("MAPE", _safe_mean)
     leaderboard = (
         metrics_frame.groupby("model", as_index=False)
-        .agg(
-            mean_fold_mae=("MAE", "mean"),
-            mean_fold_mse=("MSE", "mean"),
-            mean_fold_rmse=("RMSE", "mean"),
-            fold_count=("fold_idx", "nunique"),
-        )
+        .agg(**agg_fields)
         .sort_values(
             by=["mean_fold_mse", "mean_fold_mae", "model"],
             ascending=[True, True, True],
@@ -991,21 +1003,8 @@ def _build_leaderboard(metrics_frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def _write_leaderboard_workbook(leaderboard: pd.DataFrame, workbook_path: Path) -> None:
-    from openpyxl import Workbook
-
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "leaderboard"
-    rows = [leaderboard.columns.tolist(), *leaderboard.values.tolist()]
-    for row in rows:
-        sheet.append(list(row))
-    sheet.auto_filter.ref = sheet.dimensions
-    for column_cells in sheet.columns:
-        values = ["" if cell.value is None else str(cell.value) for cell in column_cells]
-        width = min(max(len(value) for value in values) + 2, 48)
-        sheet.column_dimensions[column_cells[0].column_letter].width = max(width, 10)
     workbook_path.parent.mkdir(parents=True, exist_ok=True)
-    workbook.save(workbook_path)
+    leaderboard.to_csv(workbook_path, index=False)
 
 
 def _load_last_fold_forecasts(run_root: Path) -> pd.DataFrame:
@@ -1145,7 +1144,7 @@ def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
     if metrics.empty:
         return {}
     leaderboard = _build_leaderboard(metrics)
-    workbook_path = summary_dir / "leaderboard.xlsx"
+    workbook_path = summary_dir / "leaderboard.csv"
     _write_leaderboard_workbook(leaderboard, workbook_path)
 
     forecasts = _load_last_fold_forecasts(run_root)

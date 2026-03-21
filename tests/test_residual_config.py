@@ -546,7 +546,6 @@ def test_runtime_logs_fold_errors_to_stdout(
 
 
 def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
-    from openpyxl import load_workbook
     from residual import runtime
 
     run_root = tmp_path / "summary_run"
@@ -554,14 +553,42 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
     cv_dir.mkdir(parents=True)
     pd.DataFrame(
         [
-            {"fold_idx": 0, "cutoff": "2020-01-15", "MAE": 1.0, "MSE": 1.0, "RMSE": 1.0},
-            {"fold_idx": 1, "cutoff": "2020-01-22", "MAE": 0.5, "MSE": 0.25, "RMSE": 0.5},
+            {
+                "fold_idx": 0,
+                "cutoff": "2020-01-15",
+                "MAE": 1.0,
+                "MSE": 1.0,
+                "RMSE": 1.0,
+                "MAPE": 0.1,
+            },
+            {
+                "fold_idx": 1,
+                "cutoff": "2020-01-22",
+                "MAE": 0.5,
+                "MSE": 0.25,
+                "RMSE": 0.5,
+                "MAPE": 0.05,
+            },
         ]
     ).to_csv(cv_dir / "ModelA_metrics_by_cutoff.csv", index=False)
     pd.DataFrame(
         [
-            {"fold_idx": 0, "cutoff": "2020-01-15", "MAE": 2.0, "MSE": 4.0, "RMSE": 2.0},
-            {"fold_idx": 1, "cutoff": "2020-01-22", "MAE": 1.5, "MSE": 2.25, "RMSE": 1.5},
+            {
+                "fold_idx": 0,
+                "cutoff": "2020-01-15",
+                "MAE": 2.0,
+                "MSE": 4.0,
+                "RMSE": 2.0,
+                "MAPE": 0.2,
+            },
+            {
+                "fold_idx": 1,
+                "cutoff": "2020-01-22",
+                "MAE": 1.5,
+                "MSE": 2.25,
+                "RMSE": 1.5,
+                "MAPE": 0.15,
+            },
         ]
     ).to_csv(cv_dir / "ModelB_metrics_by_cutoff.csv", index=False)
     for model_name, values in {
@@ -597,16 +624,13 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
 
     artifacts = runtime._build_summary_artifacts(run_root)
 
-    workbook_path = run_root / "summary" / "leaderboard.xlsx"
-    assert artifacts["leaderboard"] == str(workbook_path)
-    assert workbook_path.exists()
-    workbook = load_workbook(workbook_path)
-    sheet = workbook["leaderboard"]
-    assert sheet.auto_filter.ref == sheet.dimensions
-    assert sheet["A2"].value == 1
-    assert sheet["B2"].value == "ModelA"
-    assert sheet.column_dimensions["A"].width is not None
-    assert sheet.column_dimensions["A"].width >= 10
+    leaderboard_path = run_root / "summary" / "leaderboard.csv"
+    assert artifacts["leaderboard"] == str(leaderboard_path)
+    assert leaderboard_path.exists()
+    leaderboard = pd.read_csv(leaderboard_path)
+    assert leaderboard.loc[0, "rank"] == 1
+    assert leaderboard.loc[0, "model"] == "ModelA"
+    assert "mean_fold_mape" in leaderboard.columns
     assert (run_root / "summary" / "last_fold_all_models.png").exists()
     assert (run_root / "summary" / "last_fold_top3.png").exists()
     assert (run_root / "summary" / "last_fold_top5.png").exists()
@@ -651,7 +675,6 @@ def test_runtime_skip_summary_env_suppresses_summary_artifacts(
 
 
 def test_runtime_smoke_writes_summary_artifacts_for_dummy_model(tmp_path: Path):
-    from openpyxl import load_workbook
     from residual.runtime import main as runtime_main
 
     payload = _payload()
@@ -680,14 +703,14 @@ def test_runtime_smoke_writes_summary_artifacts_for_dummy_model(tmp_path: Path):
         ]
     )
 
-    leaderboard_path = output_root / "summary" / "leaderboard.xlsx"
+    leaderboard_path = output_root / "summary" / "leaderboard.csv"
     assert code == 0
     assert leaderboard_path.exists()
     assert (output_root / "summary" / "last_fold_all_models.png").exists()
     assert (output_root / "summary" / "last_fold_top3.png").exists()
     assert (output_root / "summary" / "last_fold_top5.png").exists()
-    workbook = load_workbook(leaderboard_path)
-    assert workbook["leaderboard"].auto_filter.ref
+    leaderboard = pd.read_csv(leaderboard_path)
+    assert "rank" in leaderboard.columns
 
 
 def test_trajectory_frame_contains_train_and_val_series():
