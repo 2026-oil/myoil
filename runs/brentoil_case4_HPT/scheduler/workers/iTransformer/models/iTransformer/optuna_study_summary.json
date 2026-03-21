@@ -1,0 +1,78 @@
+{
+  "direction": "minimize",
+  "trial_count": 20,
+  "finished_trial_count": 20,
+  "state_counts": {
+    "complete": 9,
+    "fail": 2,
+    "pruned": 9
+  },
+  "best_value": 55.93719157975979,
+  "best_trial_number": 19,
+  "objective_metric": "mean_fold_mse",
+  "study_name": "neuralforecast::brentoil_case4_HPT::iTransformer::main-search::f0ae6c824f2d",
+  "storage_backend": "journal",
+  "storage_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/iTransformer/models/iTransformer/.optuna/main-search.journal",
+  "requested_trial_count": 20,
+  "existing_trial_count_before_optimize": 0,
+  "existing_finished_trial_count_before_optimize": 0,
+  "remaining_trial_count": 20,
+  "requested_mode": "learned_auto_requested",
+  "validated_mode": "learned_auto",
+  "selected_search_params": [
+    "hidden_size",
+    "n_heads",
+    "e_layers",
+    "d_ff",
+    "d_layers",
+    "factor",
+    "dropout",
+    "use_norm"
+  ],
+  "selected_training_search_params": [
+    "input_size",
+    "batch_size",
+    "valid_batch_size",
+    "windows_batch_size",
+    "inference_windows_batch_size",
+    "learning_rate",
+    "scaler_type",
+    "step_size",
+    "max_steps",
+    "val_check_steps",
+    "early_stop_patience_steps",
+    "num_lr_decays"
+  ],
+  "best_params": {
+    "hidden_size": 128,
+    "n_heads": 4,
+    "e_layers": 2,
+    "d_ff": 512,
+    "d_layers": 1,
+    "factor": 5,
+    "dropout": 0.3,
+    "use_norm": true
+  },
+  "best_training_params": {
+    "input_size": 48,
+    "batch_size": 64,
+    "valid_batch_size": 32,
+    "windows_batch_size": 512,
+    "inference_windows_batch_size": 256,
+    "learning_rate": 0.0018634676430756797,
+    "scaler_type": "standard",
+    "step_size": 8,
+    "max_steps": 800,
+    "val_check_steps": 50,
+    "early_stop_patience_steps": 20,
+    "num_lr_decays": 1
+  },
+  "fold_mse": [
+    25.139897312200684,
+    3.6590764253477754,
+    42.184179572199426,
+    8.494103384826357,
+    200.2087012042247
+  ],
+  "objective_stage": "tuning_pre_replay_direct_predictions"
+}

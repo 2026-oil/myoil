@@ -1,0 +1,36 @@
+{
+  "direction": "minimize",
+  "trial_count": 20,
+  "finished_trial_count": 20,
+  "state_counts": {
+    "complete": 16,
+    "pruned": 4
+  },
+  "best_value": 32.424777388630844,
+  "best_trial_number": 16,
+  "objective_metric": "mean_fold_mse",
+  "study_name": "neuralforecast::brentoil_case4_HPT::NHITS::residual-search::f0ae6c824f2d",
+  "storage_backend": "journal",
+  "storage_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/NHITS/residual/NHITS/.optuna/residual-search.journal",
+  "requested_trial_count": 20,
+  "existing_trial_count_before_optimize": 0,
+  "existing_finished_trial_count_before_optimize": 0,
+  "remaining_trial_count": 20,
+  "requested_mode": "residual_auto_requested",
+  "validated_mode": "residual_auto",
+  "selected_search_params": [
+    "n_estimators",
+    "max_depth",
+    "learning_rate",
+    "subsample",
+    "colsample_bytree"
+  ],
+  "best_params": {
+    "n_estimators": 16,
+    "max_depth": 4,
+    "learning_rate": 0.027033810978246458,
+    "subsample": 0.9899406004183687,
+    "colsample_bytree": 0.9179154048193409
+  },
+  "objective_stage": "tuning_pre_replay_residual_corrected_predictions"
+}

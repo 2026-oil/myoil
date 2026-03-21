@@ -35,7 +35,13 @@
       "validated_mode": "learned_auto",
       "selected_search_params": [
         "moving_avg_window"
-      ]
+      ],
+      "model_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/DLinear/models/DLinear/best_params.json",
+      "model_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/DLinear/models/DLinear/optuna_study_summary.json",
+      "training_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/DLinear/models/DLinear/training_best_params.json",
+      "training_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/DLinear/models/DLinear/training_optuna_study_summary.json",
+      "residual_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/DLinear/residual/DLinear/best_params.json",
+      "residual_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/DLinear/residual/DLinear/optuna_study_summary.json"
     },
     {
       "model": "Naive",
@@ -101,7 +107,9 @@
       "val_check_steps",
       "early_stop_patience_steps",
       "num_lr_decays"
-    ]
+    ],
+    "best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/DLinear/models/DLinear/training_best_params.json",
+    "optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/DLinear/models/DLinear/training_optuna_study_summary.json"
   },
   "residual": {
     "model": "xgboost",
@@ -113,7 +121,9 @@
       "learning_rate",
       "subsample",
       "colsample_bytree"
-    ]
+    ],
+    "best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/DLinear/residual/DLinear/best_params.json",
+    "optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/DLinear/residual/DLinear/optuna_study_summary.json"
   },
   "training": {
     "loss": "mse"

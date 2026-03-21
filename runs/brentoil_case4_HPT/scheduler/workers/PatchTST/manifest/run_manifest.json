@@ -27,7 +27,13 @@
         "fc_dropout",
         "attn_dropout",
         "revin"
-      ]
+      ],
+      "model_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/PatchTST/models/PatchTST/best_params.json",
+      "model_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/PatchTST/models/PatchTST/optuna_study_summary.json",
+      "training_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/PatchTST/models/PatchTST/training_best_params.json",
+      "training_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/PatchTST/models/PatchTST/training_optuna_study_summary.json",
+      "residual_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/PatchTST/residual/PatchTST/best_params.json",
+      "residual_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/PatchTST/residual/PatchTST/optuna_study_summary.json"
     },
     {
       "model": "DLinear",
@@ -101,7 +107,9 @@
       "val_check_steps",
       "early_stop_patience_steps",
       "num_lr_decays"
-    ]
+    ],
+    "best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/PatchTST/models/PatchTST/training_best_params.json",
+    "optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/PatchTST/models/PatchTST/training_optuna_study_summary.json"
   },
   "residual": {
     "model": "xgboost",
@@ -113,7 +121,9 @@
       "learning_rate",
       "subsample",
       "colsample_bytree"
-    ]
+    ],
+    "best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/PatchTST/residual/PatchTST/best_params.json",
+    "optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_HPT/scheduler/workers/PatchTST/residual/PatchTST/optuna_study_summary.json"
   },
   "training": {
     "loss": "mse"

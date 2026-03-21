@@ -1,0 +1,47 @@
+{
+  "0": {
+    "plugin": "xgboost",
+    "n_estimators": 128,
+    "max_depth": 4,
+    "learning_rate": 0.06788196229841237,
+    "subsample": 0.687487654489708,
+    "colsample_bytree": 0.9720833380650836,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/DLinear/residual/DLinear/folds/fold_000/residual_checkpoint/model.ubj"
+  },
+  "1": {
+    "plugin": "xgboost",
+    "n_estimators": 128,
+    "max_depth": 4,
+    "learning_rate": 0.06788196229841237,
+    "subsample": 0.687487654489708,
+    "colsample_bytree": 0.9720833380650836,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/DLinear/residual/DLinear/folds/fold_001/residual_checkpoint/model.ubj"
+  },
+  "2": {
+    "plugin": "xgboost",
+    "n_estimators": 128,
+    "max_depth": 4,
+    "learning_rate": 0.06788196229841237,
+    "subsample": 0.687487654489708,
+    "colsample_bytree": 0.9720833380650836,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/DLinear/residual/DLinear/folds/fold_002/residual_checkpoint/model.ubj"
+  },
+  "3": {
+    "plugin": "xgboost",
+    "n_estimators": 128,
+    "max_depth": 4,
+    "learning_rate": 0.06788196229841237,
+    "subsample": 0.687487654489708,
+    "colsample_bytree": 0.9720833380650836,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/DLinear/residual/DLinear/folds/fold_003/residual_checkpoint/model.ubj"
+  },
+  "4": {
+    "plugin": "xgboost",
+    "n_estimators": 128,
+    "max_depth": 4,
+    "learning_rate": 0.06788196229841237,
+    "subsample": 0.687487654489708,
+    "colsample_bytree": 0.9720833380650836,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT/scheduler/workers/DLinear/residual/DLinear/folds/fold_004/residual_checkpoint/model.ubj"
+  }
+}

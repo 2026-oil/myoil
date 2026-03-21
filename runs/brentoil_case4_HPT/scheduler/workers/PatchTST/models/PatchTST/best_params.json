@@ -1,0 +1,12 @@
+{
+  "hidden_size": 128,
+  "n_heads": 8,
+  "encoder_layers": 3,
+  "linear_hidden_size": 256,
+  "patch_len": 8,
+  "stride": 8,
+  "dropout": 0.3,
+  "fc_dropout": 0.2,
+  "attn_dropout": 0.1,
+  "revin": true
+}

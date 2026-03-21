@@ -1,0 +1,36 @@
+{
+  "model": "PatchTST",
+  "requested_mode": "learned_auto_requested",
+  "validated_mode": "learned_auto",
+  "selected_search_params": [
+    "hidden_size",
+    "n_heads",
+    "encoder_layers",
+    "linear_hidden_size",
+    "patch_len",
+    "stride",
+    "dropout",
+    "fc_dropout",
+    "attn_dropout",
+    "revin"
+  ],
+  "selected_training_search_params": [
+    "input_size",
+    "batch_size",
+    "valid_batch_size",
+    "windows_batch_size",
+    "inference_windows_batch_size",
+    "learning_rate",
+    "scaler_type",
+    "step_size",
+    "max_steps",
+    "val_check_steps",
+    "early_stop_patience_steps",
+    "num_lr_decays"
+  ],
+  "devices": 1,
+  "loss": "mse",
+  "evaluation_policy": "tscv_only",
+  "tuning_objective_metric": "mean_fold_mse_on_direct_predictions",
+  "fold_count": 5
+}

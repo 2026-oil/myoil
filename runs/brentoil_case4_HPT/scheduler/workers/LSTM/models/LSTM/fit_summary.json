@@ -1,0 +1,32 @@
+{
+  "model": "LSTM",
+  "requested_mode": "learned_auto_requested",
+  "validated_mode": "learned_auto",
+  "selected_search_params": [
+    "encoder_hidden_size",
+    "encoder_n_layers",
+    "inference_input_size",
+    "encoder_dropout",
+    "decoder_hidden_size",
+    "decoder_layers"
+  ],
+  "selected_training_search_params": [
+    "input_size",
+    "batch_size",
+    "valid_batch_size",
+    "windows_batch_size",
+    "inference_windows_batch_size",
+    "learning_rate",
+    "scaler_type",
+    "step_size",
+    "max_steps",
+    "val_check_steps",
+    "early_stop_patience_steps",
+    "num_lr_decays"
+  ],
+  "devices": 1,
+  "loss": "mse",
+  "evaluation_policy": "tscv_only",
+  "tuning_objective_metric": "mean_fold_mse_on_direct_predictions",
+  "fold_count": 5
+}
