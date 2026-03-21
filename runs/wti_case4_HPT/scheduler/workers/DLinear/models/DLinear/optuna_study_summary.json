@@ -1,0 +1,63 @@
+{
+  "direction": "minimize",
+  "trial_count": 20,
+  "finished_trial_count": 20,
+  "state_counts": {
+    "complete": 19,
+    "pruned": 1
+  },
+  "best_value": 39.30585110876682,
+  "best_trial_number": 15,
+  "objective_metric": "mean_fold_mse",
+  "study_name": "neuralforecast::wti_case4_HPT::DLinear::main-search::f82f389db484",
+  "storage_backend": "journal",
+  "storage_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case4_HPT/scheduler/workers/DLinear/models/DLinear/.optuna/main-search.journal",
+  "requested_trial_count": 20,
+  "existing_trial_count_before_optimize": 0,
+  "existing_finished_trial_count_before_optimize": 0,
+  "remaining_trial_count": 20,
+  "requested_mode": "learned_auto_requested",
+  "validated_mode": "learned_auto",
+  "selected_search_params": [
+    "moving_avg_window"
+  ],
+  "selected_training_search_params": [
+    "input_size",
+    "batch_size",
+    "valid_batch_size",
+    "windows_batch_size",
+    "inference_windows_batch_size",
+    "learning_rate",
+    "scaler_type",
+    "step_size",
+    "max_steps",
+    "val_check_steps",
+    "early_stop_patience_steps",
+    "num_lr_decays"
+  ],
+  "best_params": {
+    "moving_avg_window": 13
+  },
+  "best_training_params": {
+    "input_size": 24,
+    "batch_size": 32,
+    "valid_batch_size": 16,
+    "windows_batch_size": 256,
+    "inference_windows_batch_size": 1024,
+    "learning_rate": 0.003640552129684826,
+    "scaler_type": "robust",
+    "step_size": 4,
+    "max_steps": 1200,
+    "val_check_steps": 50,
+    "early_stop_patience_steps": -1,
+    "num_lr_decays": 3
+  },
+  "fold_mse": [
+    24.69860741113487,
+    11.190942487959054,
+    12.492615871570795,
+    1.132763150960249,
+    147.0143266222091
+  ],
+  "objective_stage": "tuning_pre_replay_direct_predictions"
+}

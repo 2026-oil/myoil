@@ -1678,4 +1678,94 @@
 [2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
 [2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
 [2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-13/20 fold=3/5 [#######-----------] 42/105  40%
+[2K[model:DLinear] idx=2/6 status=running phase=tune-trial-20/20 fold=5/5 [################--] 96/105  91% mse=168.0998
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-13/20 fold=3/5 [#######-----------] 42/105  40%
+[2K[model:DLinear] idx=2/6 status=running phase=replay fold=1/5 [################--] 96/105  91%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-13/20 fold=3/5 [#######-----------] 43/105  41% mse=19.4606
+[2K[model:DLinear] idx=2/6 status=running phase=replay fold=1/5 [################--] 96/105  91%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-13/20 fold=4/5 [#######-----------] 43/105  41%
+[2K[model:DLinear] idx=2/6 status=running phase=replay fold=1/5 [################--] 96/105  91%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-13/20 fold=4/5 [#######-----------] 43/105  41%
+[2K[model:DLinear] idx=2/6 status=running phase=replay fold=1/5 [#################-] 97/105  92% mse=24.6986
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-13/20 fold=4/5 [#######-----------] 43/105  41%
+[2K[model:DLinear] idx=2/6 status=running phase=replay fold=2/5 [#################-] 97/105  92%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-13/20 fold=4/5 [#######-----------] 43/105  41%
+[2K[model:DLinear] idx=2/6 status=running phase=replay fold=2/5 [#################-] 98/105  93% mse=11.1909
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-13/20 fold=4/5 [########----------] 44/105  42% mse=3.3982
+[2K[model:DLinear] idx=2/6 status=running phase=replay fold=2/5 [#################-] 98/105  93% mse=11.1909
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-13/20 fold=5/5 [########----------] 44/105  42%
+[2K[model:DLinear] idx=2/6 status=running phase=replay fold=2/5 [#################-] 98/105  93% mse=11.1909
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-13/20 fold=5/5 [########----------] 44/105  42%
+[2K[model:DLinear] idx=2/6 status=running phase=replay fold=3/5 [#################-] 98/105  93%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-13/20 fold=5/5 [########----------] 44/105  42%
+[2K[model:DLinear] idx=2/6 status=running phase=replay fold=3/5 [#################-] 99/105  94% mse=12.4926
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-13/20 fold=5/5 [########----------] 44/105  42%
+[2K[model:DLinear] idx=2/6 status=running phase=replay fold=4/5 [#################-] 99/105  94%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-13/20 fold=5/5 [########----------] 45/105  43% mse=238.6891
+[2K[model:DLinear] idx=2/6 status=running phase=replay fold=4/5 [#################-] 99/105  94%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-14/20 fold=1/5 [########----------] 45/105  43%
+[2K[model:DLinear] idx=2/6 status=running phase=replay fold=4/5 [#################-] 99/105  94%
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
+[2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%[7F[2K[summary] completed=0/6 failed=0 queued=4 current=PatchTST(1/6),DLinear(2/6)
+[2K[model:PatchTST] idx=1/6 status=running phase=tune-trial-14/20 fold=1/5 [########----------] 45/105  43%
+[2K[model:DLinear] idx=2/6 status=running phase=replay fold=4/5 [#################-] 100/105  95% mse=1.1328
+[2K[model:Naive] idx=3/6 status=queued [------------------] 0/1   0%
+[2K[model:iTransformer] idx=4/6 status=queued [------------------] 0/1   0%
+[2K[model:LSTM] idx=5/6 status=queued [------------------] 0/1   0%
 [2K[model:NHITS] idx=6/6 status=queued [------------------] 0/1   0%

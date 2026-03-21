@@ -9,6 +9,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = REPO_ROOT / "run_brent_wti_cases.sh"
+CONFIG_SOURCE_PATH = REPO_ROOT / "run.sh"
 
 
 def _write_executable(path: Path, content: str) -> None:
@@ -96,7 +97,7 @@ fi
 
 
 def test_run_brent_wti_cases_script_default_config_list_includes_all_residual_feature_set_cases():
-    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    script = CONFIG_SOURCE_PATH.read_text(encoding="utf-8")
 
     expected_groups = [
         "yaml/feature_set_res_level_lag_exg_xgb",
