@@ -1,0 +1,36 @@
+{
+  "manifest_version": "1",
+  "artifact_schema_version": "1",
+  "evaluation_protocol_version": "2",
+  "config_source_type": "yaml",
+  "config_source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/.tmp_ralph_model_smokes/deformtime.yaml",
+  "config_resolved_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/ralph-new-model-smoke/deformtime/config/config.resolved.json",
+  "config_input_sha256": "3c14e944ed5ed0645e7a26feb910ee208acc76e53c369f8af8505b675bbe2c8c",
+  "config_resolved_sha256": "e51959c62f3445c70a2243887ea5df5f8dc471e60c64dcf09a75ef5fb11fb424",
+  "search_space_path": null,
+  "search_space_sha256": null,
+  "entrypoint_version": "neuralforecast-residual-v1",
+  "compat_mode": "dual_read",
+  "jobs": [
+    {
+      "model": "DeformTime",
+      "requested_mode": "learned_fixed",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": []
+    }
+  ],
+  "training_search": {
+    "requested_mode": "training_fixed",
+    "validated_mode": "training_fixed",
+    "selected_search_params": []
+  },
+  "residual": {
+    "model": "xgboost",
+    "requested_mode": "residual_disabled",
+    "validated_mode": "residual_disabled",
+    "selected_search_params": []
+  },
+  "training": {
+    "loss": "mse"
+  }
+}

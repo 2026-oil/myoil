@@ -1,3 +1,4 @@
+import torch
 import pandas as pd
 
 from neuralforecast import NeuralForecast
@@ -39,3 +40,33 @@ def test_moderntcn_model(suppress_warnings):
 
     cv = nf.cross_validation(df=full_df, n_windows=1, step_size=7)
     assert not cv.empty
+
+
+def test_moderntcn_forward_shape():
+    model = ModernTCN(
+        h=7,
+        input_size=28,
+        n_series=5,
+        max_steps=1,
+        val_check_steps=1,
+        enable_progress_bar=False,
+        enable_model_summary=False,
+        accelerator="cpu",
+        devices=1,
+        patch_size=8,
+        patch_stride=4,
+        num_blocks=(1, 1, 1, 1),
+        large_size=(5, 5, 3, 3),
+        small_size=(3, 3, 3, 3),
+        dims=(8, 8, 8, 8),
+        batch_size=8,
+        valid_batch_size=8,
+        windows_batch_size=8,
+        inference_windows_batch_size=8,
+        decomposition=True,
+        individual=True,
+        kernel_size=3,
+    )
+    windows_batch = {"insample_y": torch.randn(2, 28, 5)}
+    preds = model(windows_batch)
+    assert preds.shape == (2, 7, 5)

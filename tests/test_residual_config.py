@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 import yaml
 
+import neuralforecast.auto as nf_auto
 import neuralforecast.models as nf_models
 from neuralforecast.core import MODEL_FILENAME_DICT
 from residual.adapters import build_multivariate_inputs, build_univariate_inputs
@@ -43,6 +44,8 @@ NEWLY_SUPPORTED_MODEL_ALIASES = {
     "CMamba": ("cmamba", "autocmamba"),
     "xLSTMMixer": ("xlstmmixer", "autoxlstmmixer"),
     "DUET": ("duet", "autoduet"),
+    "DeformTime": ("deformtime",),
+    "ModernTCN": ("moderntcn",),
 }
 
 
@@ -2002,6 +2005,7 @@ def test_supported_auto_model_matrix_includes_v3_expansion():
         "TiDE",
         "DeepNPTS",
         "DeepEDM",
+        "DeformTime",
         "KAN",
         "TimeLLM",
         "TimeXer",
@@ -2013,6 +2017,7 @@ def test_supported_auto_model_matrix_includes_v3_expansion():
         "MLPMultivariate",
         "SOFTS",
         "TimeMixer",
+        "ModernTCN",
         "DUET",
         "Mamba",
         "SMamba",
@@ -2030,6 +2035,17 @@ def test_package_exports_and_intentional_omissions_are_explicit():
         assert hasattr(nf_models, model_name)
     assert hasattr(nf_models, "HINT")
     assert "HINT" not in SUPPORTED_AUTO_MODEL_NAMES
+    assert not hasattr(nf_auto, "AutoDeformTime")
+    assert not hasattr(nf_auto, "AutoModernTCN")
+    assert hasattr(nf_models, "DeformTime")
+    assert not hasattr(nf_models, "DeformableTST")
+    assert "DeformTime" in SUPPORTED_AUTO_MODEL_NAMES
+    assert "DeformTime" in MODEL_CLASSES
+    assert "DeformableTST" not in SUPPORTED_AUTO_MODEL_NAMES
+    assert "DeformableTST" not in MODEL_CLASSES
+    search_space = yaml.safe_load((REPO_ROOT / "search_space.yaml").read_text())
+    assert "DeformTime" in search_space["models"]
+    assert "DeformableTST" not in search_space["models"]
 
 
 @pytest.mark.parametrize(
@@ -2038,7 +2054,7 @@ def test_package_exports_and_intentional_omissions_are_explicit():
     ids=NEWLY_SUPPORTED_MODEL_ALIASES.keys(),
 )
 def test_model_filename_dict_includes_newly_supported_aliases(
-    model_name: str, aliases: tuple[str, str]
+    model_name: str, aliases: tuple[str, ...]
 ):
     expected_cls = getattr(nf_models, model_name)
     for alias in aliases:
@@ -2050,7 +2066,9 @@ def test_supports_auto_mode_expands_to_newly_added_models():
         "RNN",
         "DeepAR",
         "DeepEDM",
+        "DeformTime",
         "TimeMixer",
+        "ModernTCN",
         "DUET",
         "XLinear",
         "StemGNN",
@@ -2063,6 +2081,35 @@ def test_supports_auto_mode_expands_to_newly_added_models():
     ):
         assert supports_auto_mode(model_name) is True
     assert supports_auto_mode("Naive") is False
+
+
+def test_build_model_supports_new_official_model_ports(tmp_path: Path):
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [
+        {
+            "model": "DeformTime",
+            "params": {"d_model": 16, "patch_len": 4},
+        },
+        {
+            "model": "ModernTCN",
+            "params": {
+                "patch_size": 8,
+                "patch_stride": 4,
+                "num_blocks": [1, 1, 1, 1],
+                "large_size": [5, 5, 3, 3],
+                "small_size": [3, 3, 3, 3],
+                "dims": [8, 8, 8, 8],
+            },
+        },
+    ]
+    loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+
+    deform = build_model(loaded.config, loaded.config.jobs[0], n_series=1)
+    modern = build_model(loaded.config, loaded.config.jobs[1], n_series=1)
+
+    assert deform.__class__.__name__ == "DeformTime"
+    assert modern.__class__.__name__ == "ModernTCN"
 
 
 def test_should_use_multivariate_for_no_exog_multivariate_model(tmp_path: Path):

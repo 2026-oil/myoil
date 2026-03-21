@@ -355,11 +355,32 @@ class Stage(nn.Module):
         return x
 
 
-class ForecastHead(nn.Module):
+def _ceil_div(numerator: int, denominator: int) -> int:
+    return -(-numerator // denominator)
+
+
+def _infer_feature_length(
+    input_size: int,
+    patch_size: int,
+    patch_stride: int,
+    downsample_ratio: int,
+    num_stages: int,
+) -> int:
+    """Infer the last temporal length produced by the backbone."""
+    length = max(input_size, patch_size)
+    if patch_size != patch_stride:
+        length += patch_size - patch_stride
+    length = (length - patch_size) // patch_stride + 1
+    for _ in range(max(num_stages - 1, 0)):
+        length = _ceil_div(length, downsample_ratio)
+    return length
+
+
+class FlattenHead(nn.Module):
     def __init__(
         self,
         n_vars: int,
-        d_model: int,
+        head_nf: int,
         target_window: int,
         *,
         head_dropout: float = 0.0,
@@ -368,21 +389,25 @@ class ForecastHead(nn.Module):
         super().__init__()
         self.n_vars = n_vars
         self.individual = individual
+        self.flatten = nn.Flatten(start_dim=-2)
         self.dropout = nn.Dropout(head_dropout)
         if individual:
             self.linear = nn.ModuleList(
-                [nn.Linear(d_model, target_window) for _ in range(n_vars)]
+                [nn.Linear(head_nf, target_window) for _ in range(n_vars)]
             )
         else:
-            self.linear = nn.Linear(d_model, target_window)
+            self.linear = nn.Linear(head_nf, target_window)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: [B, M, D, N] -> pool time dimension and predict per series.
-        x = x.mean(dim=-1)
+        # x: [B, M, D, N] -> flatten the feature map and predict per series.
         if self.individual:
-            outputs = [layer(x[:, idx, :]) for idx, layer in enumerate(self.linear)]
+            outputs = [
+                layer(self.flatten(x[:, idx, :, :]))
+                for idx, layer in enumerate(self.linear)
+            ]
             x = torch.stack(outputs, dim=1)
         else:
+            x = self.flatten(x)
             x = self.linear(x)
         return self.dropout(x)
 
@@ -392,7 +417,7 @@ class ModernTCNBackbone(nn.Module):
 
     The original paper/repo includes a larger multi-scale head and optional time
     feature patching. This local port keeps the core stem -> stage residual block
-    hierarchy and uses a lightweight pooled forecast head so the model remains
+    hierarchy and uses a lightweight flattening forecast head so the model remains
     CPU-safe and self-contained in this checkout.
     """
 
@@ -415,6 +440,7 @@ class ModernTCNBackbone(nn.Module):
         affine: bool = True,
         subtract_last: bool = False,
         individual: bool = False,
+        head_nf: int = 1,
         target_window: int = 96,
     ) -> None:
         super().__init__()
@@ -473,9 +499,9 @@ class ModernTCNBackbone(nn.Module):
             ]
         )
 
-        self.head = ForecastHead(
+        self.head = FlattenHead(
             n_vars=nvars,
-            d_model=self.dims[-1],
+            head_nf=head_nf,
             target_window=target_window,
             head_dropout=head_dropout,
             individual=individual,
@@ -662,6 +688,13 @@ class ModernTCN(BaseModel):
         self.dw_dims = (
             _as_tuple(dw_dims, n_stage) if dw_dims is not None else self.dims
         )
+        self.head_nf = self.dims[-1] * _infer_feature_length(
+            input_size=self.input_size,
+            patch_size=self.patch_size,
+            patch_stride=self.patch_stride,
+            downsample_ratio=self.downsample_ratio,
+            num_stages=n_stage,
+        )
 
         if self.decomposition and self.kernel_size % 2 == 0:
             raise ValueError("kernel_size should be odd when decomposition is enabled")
@@ -683,6 +716,7 @@ class ModernTCN(BaseModel):
             affine=self.affine,
             subtract_last=self.subtract_last,
             individual=self.individual,
+            head_nf=self.head_nf,
             target_window=self.target_window,
         )
 
@@ -705,6 +739,7 @@ class ModernTCN(BaseModel):
                 affine=self.affine,
                 subtract_last=self.subtract_last,
                 individual=self.individual,
+                head_nf=self.head_nf,
                 target_window=self.target_window,
             )
             self.model_trend = ModernTCNBackbone(
@@ -724,6 +759,7 @@ class ModernTCN(BaseModel):
                 affine=self.affine,
                 subtract_last=self.subtract_last,
                 individual=self.individual,
+                head_nf=self.head_nf,
                 target_window=self.target_window,
             )
 

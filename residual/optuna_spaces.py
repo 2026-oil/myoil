@@ -30,6 +30,7 @@ SUPPORTED_AUTO_MODEL_NAMES = {
     "TiDE",
     "DeepNPTS",
     "DeepEDM",
+    "DeformTime",
     "KAN",
     "TFT",
     "VanillaTransformer",
@@ -48,6 +49,7 @@ SUPPORTED_AUTO_MODEL_NAMES = {
     "MLPMultivariate",
     "SOFTS",
     "TimeMixer",
+    "ModernTCN",
     "DUET",
     "Mamba",
     "SMamba",
@@ -296,6 +298,13 @@ MODEL_PARAM_REGISTRY = {
         "spline_order": _categorical([2, 3, 4]),
         "hidden_size": _categorical([16, 32, 64, 128]),
     },
+    "DeformTime": {
+        "d_model": _categorical([16, 32, 64]),
+        "n_heads": _categorical([2, 4, 8]),
+        "e_layers": _int(1, 3),
+        "patch_len": _categorical([4, 8, 16]),
+        "dropout": _float(0.0, 0.3),
+    },
     "iTransformer": {
         "hidden_size": _categorical([32, 64, 128, 256]),
         "n_heads": _categorical([4, 8]),
@@ -362,6 +371,13 @@ MODEL_PARAM_REGISTRY = {
         "d_ff": _categorical([32, 64, 128, 256]),
         "down_sampling_layers": _categorical([1, 2, 3]),
         "top_k": _categorical([3, 5, 7]),
+    },
+    "ModernTCN": {
+        "patch_size": _categorical([8, 16, 24]),
+        "patch_stride": _categorical([4, 8, 12]),
+        "ffn_ratio": _categorical([1, 2, 4]),
+        "large_size": _categorical([(5, 5, 3, 3), (7, 7, 5, 5)]),
+        "dims": _categorical([(8, 8, 8, 8), (16, 16, 16, 16)]),
     },
     "DUET": {
         "n_block": _categorical([1, 2, 3]),
