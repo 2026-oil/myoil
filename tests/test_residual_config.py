@@ -24,11 +24,13 @@ from residual.models import (
 from residual.optuna_spaces import (
     DEFAULT_OPTUNA_NUM_TRIALS,
     EXCLUDED_AUTO_MODEL_NAMES,
+    FIXED_TRAINING_KEYS,
     MODEL_PARAM_REGISTRY,
     RESIDUAL_PARAM_REGISTRY,
     SUPPORTED_AUTO_MODEL_NAMES,
     SUPPORTED_RESIDUAL_MODELS,
     TRAINING_PARAM_REGISTRY,
+    suggest_training_params,
     optuna_num_trials,
 )
 from residual.plugins_base import ResidualContext, ResidualPlugin
@@ -672,7 +674,7 @@ def test_model_builder_propagates_centralized_training_controls(tmp_path: Path):
         assert model.hparams.early_stop_patience_steps == 11
 
 
-def test_load_app_config_ignores_legacy_training_season_length_and_maps_step_size(
+def test_load_app_config_preserves_training_season_length_and_maps_step_size(
     tmp_path: Path,
 ):
     payload = _payload()
@@ -685,8 +687,9 @@ def test_load_app_config_ignores_legacy_training_season_length_and_maps_step_siz
         tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
     )
 
+    assert loaded.config.training.season_length == 52
     assert loaded.config.training.model_step_size == 6
-    assert "season_length" not in loaded.normalized_payload["training"]
+    assert loaded.normalized_payload["training"]["season_length"] == 52
     assert loaded.normalized_payload["training"]["step_size"] == 6
     assert "model_step_size" not in loaded.normalized_payload["training"]
 
@@ -2330,7 +2333,7 @@ def test_load_app_config_accepts_training_search_space_section(tmp_path: Path):
         tmp_path,
         {
             "models": {"TFT": ["hidden_size", "dropout", "n_head"]},
-            "training": ["input_size", "max_steps"],
+            "training": ["input_size", "step_size"],
             "residual": {"xgboost": ["n_estimators"]},
         },
     )
@@ -2341,11 +2344,11 @@ def test_load_app_config_accepts_training_search_space_section(tmp_path: Path):
     assert loaded.config.training_search.validated_mode == "training_auto"
     assert list(loaded.config.training_search.selected_search_params) == [
         "input_size",
-        "max_steps",
+        "step_size",
     ]
 
 
-def test_load_app_config_accepts_training_search_space_max_steps(tmp_path: Path):
+def test_load_app_config_accepts_training_search_space_learning_rate(tmp_path: Path):
     payload = _payload()
     payload["jobs"] = [{"model": "TFT", "params": {}}]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
@@ -2358,14 +2361,16 @@ def test_load_app_config_accepts_training_search_space_max_steps(tmp_path: Path)
         tmp_path,
         {
             "models": {"TFT": ["hidden_size"]},
-            "training": ["max_steps"],
+            "training": ["learning_rate"],
             "residual": {"xgboost": ["n_estimators"]},
         },
     )
 
     loaded = load_app_config(tmp_path, config_path=config_path)
 
-    assert list(loaded.config.training_search.selected_search_params) == ["max_steps"]
+    assert list(loaded.config.training_search.selected_search_params) == [
+        "learning_rate"
+    ]
 
 
 def test_load_app_config_rejects_unknown_training_search_space_param(tmp_path: Path):
@@ -2388,6 +2393,35 @@ def test_load_app_config_rejects_unknown_training_search_space_param(tmp_path: P
 
     with pytest.raises(ValueError, match="search_space.training contains unknown"):
         load_app_config(tmp_path, config_path=config_path)
+
+
+def test_load_app_config_rejects_fixed_training_search_space_param(tmp_path: Path):
+    payload = _payload()
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"]},
+            "training": ["batch_size"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    with pytest.raises(
+        ValueError, match="search_space.training contains fixed, non-tunable"
+    ):
+        load_app_config(tmp_path, config_path=config_path)
+
+
+def test_suggest_training_params_rejects_fixed_training_keys():
+    with pytest.raises(ValueError, match="fixed and non-tunable"):
+        suggest_training_params(("batch_size",), object())
 
 
 def test_load_app_config_rejects_training_model_learning_rate_overlap(tmp_path: Path):
@@ -2642,18 +2676,18 @@ def test_runtime_auto_mode_prefers_yaml_opt_n_trial_over_env(
     assert study_summary["trial_count"] == 2
 
 
-def test_runtime_auto_mode_prunes_trials_with_intermediate_reports(
+def test_runtime_auto_mode_prunes_trials_only_after_fold_three(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     payload = _payload()
     payload["runtime"]["opt_n_trial"] = 2
-    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 4, "gap": 0})
     payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
     payload["dataset"]["hist_exog_cols"] = []
     payload["jobs"] = [{"model": "TFT", "params": {}}]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     (tmp_path / "data.csv").write_text(
-        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n",
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n2020-01-29,5\n2020-02-05,6\n2020-02-12,7\n2020-02-19,8\n",
         encoding="utf-8",
     )
     config_path = _write_config(tmp_path, payload, ".yaml")
@@ -2673,6 +2707,9 @@ def test_runtime_auto_mode_prunes_trials_with_intermediate_reports(
     def _create_study_with_pruner(*args, **kwargs):
         kwargs.setdefault("pruner", optuna.pruners.ThresholdPruner(upper=0.5))
         return real_create_study(*args, **kwargs)
+
+    real_should_prune = optuna.trial.Trial.should_prune
+    should_prune_steps: list[int] = []
 
     def _fake_fit_and_predict_fold(
         loaded,
@@ -2703,9 +2740,14 @@ def test_runtime_auto_mode_prunes_trials_with_intermediate_reports(
             object(),
         )
 
+    def _should_prune_with_trace(self):
+        should_prune_steps.append(len(self.user_attrs.get("fold_mse", [])))
+        return real_should_prune(self)
+
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
     monkeypatch.setenv("NEURALFORECAST_OPTUNA_SEED", "7")
     monkeypatch.setattr(runtime.optuna, "create_study", _create_study_with_pruner)
+    monkeypatch.setattr(runtime.optuna.trial.Trial, "should_prune", _should_prune_with_trace)
     monkeypatch.setattr(runtime, "_fit_and_predict_fold", _fake_fit_and_predict_fold)
     monkeypatch.setattr(
         runtime,
@@ -2742,6 +2784,96 @@ def test_runtime_auto_mode_prunes_trials_with_intermediate_reports(
     assert summary["trial_count"] == 2
     assert summary["state_counts"]["complete"] == 1
     assert summary["state_counts"]["pruned"] == 1
+    assert len(should_prune_steps) == 2
+    assert all(step == 4 for step in should_prune_steps)
+
+
+def test_residual_auto_mode_prunes_trials_only_after_fold_three(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from residual import runtime
+
+    payload = _payload()
+    payload["residual"] = {"enabled": True, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n2020-01-15,3,4\n2020-01-22,4,5\n",
+        encoding="utf-8",
+    )
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"]},
+            "training": ["learning_rate"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+    job = loaded.config.jobs[0]
+
+    class _DummyResidualPlugin:
+        def fit(self, *_args, **_kwargs):
+            return None
+
+        def predict(self, panel: pd.DataFrame) -> pd.DataFrame:
+            return pd.DataFrame({"residual_hat": [0.0] * len(panel)})
+
+    class _FakeTrial:
+        def __init__(self):
+            self.user_attrs: dict[str, Any] = {}
+            self.reported_steps: list[int] = []
+            self.prune_checks: list[int] = []
+
+        def set_user_attr(self, key: str, value: Any) -> None:
+            self.user_attrs[key] = value
+
+        def report(self, value: float, step: int) -> None:
+            self.reported_steps.append(step)
+
+        def should_prune(self) -> bool:
+            self.prune_checks.append(len(self.user_attrs.get("fold_mse", [])))
+            return True
+
+    monkeypatch.setattr(
+        runtime, "build_residual_plugin", lambda *_args, **_kwargs: _DummyResidualPlugin()
+    )
+
+    fold_payloads = []
+    for fold_idx in range(4):
+        panel = pd.DataFrame(
+            {
+                "y": [1.0],
+                "y_hat_base": [1.0],
+                "cutoff": [pd.Timestamp("2020-01-01")],
+                "unique_id": ["target"],
+                "panel_split": ["eval"],
+                "fold_idx": [fold_idx],
+                "residual_target": [0.0],
+            }
+        )
+        fold_payloads.append(
+            {
+                "fold_idx": fold_idx,
+                "backcast_panel": panel.copy(),
+                "eval_panel": panel.copy(),
+                "trial_dir": tmp_path / f"trial_{fold_idx}",
+            }
+        )
+
+    trial = _FakeTrial()
+
+    with pytest.raises(optuna.TrialPruned):
+        runtime._score_residual_params(
+            loaded,
+            job,
+            {},
+            fold_payloads,
+            trial=trial,
+        )
+
+    assert trial.reported_steps == [0, 1, 2, 3]
+    assert trial.prune_checks == [4]
 
 
 def test_runtime_auto_mode_catches_recoverable_trial_failures(
@@ -3569,6 +3701,24 @@ def test_source_baseline_yaml_files_unchanged():
     assert any(job["model"] == "LSTM" for job in brent["jobs"])
 
 
+TOP_LEVEL_FIXED_TRAINING_YAML_FILES = [
+    REPO_ROOT / "config.yaml",
+    REPO_ROOT / "baseline-brentoil.yaml",
+    REPO_ROOT / "baseline-brentoil_uni.yaml",
+    REPO_ROOT / "baseline-wti.yaml",
+    REPO_ROOT / "baseline-wti_uni.yaml",
+]
+
+
+@pytest.mark.parametrize("path", TOP_LEVEL_FIXED_TRAINING_YAML_FILES, ids=lambda p: p.name)
+def test_top_level_yaml_files_pin_fixed_training_controls(path: Path):
+    payload = _load_case_yaml(path)
+    training = payload["training"]
+
+    for key, value in EXPECTED_FIXED_TRAINING_VALUES.items():
+        assert training[key] == value
+
+
 CASE_YAML_FILES = [
     REPO_ROOT / "yaml" / "feature_set" / "brentoil-case1.yaml",
     REPO_ROOT / "yaml" / "feature_set" / "brentoil-case2.yaml",
@@ -3654,7 +3804,14 @@ EXPECTED_CASE_MODEL_PARAMS = {
 
 EXPECTED_HPT_CASE12_TRAINING = {
     "train_protocol": "expanding_window_tscv",
+    "season_length": 52,
+    "batch_size": 32,
+    "valid_batch_size": 32,
+    "windows_batch_size": 1024,
+    "inference_windows_batch_size": 1024,
+    "max_steps": 1000,
     "val_size": 8,
+    "val_check_steps": 100,
     "early_stop_patience_steps": 5,
     "loss": "mse",
 }
@@ -3731,18 +3888,22 @@ EXPECTED_REPO_AUTO_SELECTORS = {
 }
 EXPECTED_REPO_TRAINING_SELECTORS = [
     "input_size",
-    "batch_size",
-    "valid_batch_size",
-    "windows_batch_size",
-    "inference_windows_batch_size",
     "learning_rate",
     "scaler_type",
     "step_size",
-    "max_steps",
-    "val_check_steps",
     "early_stop_patience_steps",
-    "num_lr_decays",
 ]
+
+EXPECTED_FIXED_TRAINING_VALUES = {
+    "season_length": 52,
+    "batch_size": 32,
+    "valid_batch_size": 32,
+    "windows_batch_size": 1024,
+    "inference_windows_batch_size": 1024,
+    "max_steps": 1000,
+    "val_size": 8,
+    "val_check_steps": 100,
+}
 
 EXPECTED_CASE_METADATA = {
     "brentoil-case1.yaml": {
@@ -4076,7 +4237,7 @@ def test_repo_search_space_updates_requested_auto_selectors_only():
         assert SEARCH_SPACE_MODELS[model_name] == expected
 
     assert SEARCH_SPACE_TRAINING == EXPECTED_REPO_TRAINING_SELECTORS
-    assert "season_length" not in SEARCH_SPACE_TRAINING
+    assert set(FIXED_TRAINING_KEYS).isdisjoint(SEARCH_SPACE_TRAINING)
     assert "context_size" not in SEARCH_SPACE_MODELS["LSTM"]
     assert SEARCH_SPACE_MODELS["GRU"] == [
         "encoder_hidden_size",

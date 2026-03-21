@@ -12,6 +12,7 @@ import yaml
 from .optuna_spaces import (
     BASELINE_MODEL_NAMES,
     DEFAULT_TRAINING_PARAMS,
+    FIXED_TRAINING_KEYS,
     SUPPORTED_AUTO_MODEL_NAMES,
     SUPPORTED_RESIDUAL_MODELS,
     MODEL_PARAM_REGISTRY,
@@ -44,7 +45,7 @@ CENTRALIZED_TRAINING_KEYS = {
     "early_stop_patience_steps",
     "num_lr_decays",
     "loss",
-}
+} | set(FIXED_TRAINING_KEYS)
 LEGACY_SHARED_JOB_TRAINING_KEYS = {
     "scaler_type",
     "step_size",
@@ -96,6 +97,7 @@ class TaskConfig:
 class TrainingConfig:
     train_protocol: str = "expanding_window_tscv"
     input_size: int = DEFAULT_TRAINING_PARAMS["input_size"]
+    season_length: int = DEFAULT_TRAINING_PARAMS["season_length"]
     batch_size: int = DEFAULT_TRAINING_PARAMS["batch_size"]
     valid_batch_size: int = DEFAULT_TRAINING_PARAMS["valid_batch_size"]
     windows_batch_size: int = DEFAULT_TRAINING_PARAMS["windows_batch_size"]
@@ -563,6 +565,14 @@ def _validate_search_space_payload(
             raise ValueError(
                 f"search_space.models.{model_name} contains unknown parameter(s): {', '.join(unknown)}"
             )
+    fixed_training = sorted(
+        set(normalized["training"]).intersection(FIXED_TRAINING_KEYS)
+    )
+    if fixed_training:
+        raise ValueError(
+            "search_space.training contains fixed, non-tunable parameter(s): "
+            + ", ".join(fixed_training)
+        )
     unknown_training = sorted(set(normalized["training"]).difference(TRAINING_PARAM_REGISTRY))
     if unknown_training:
         raise ValueError(
@@ -667,7 +677,6 @@ def _normalize_payload(
     dataset = dict(payload.get("dataset", {}))
     runtime = dict(payload.get("runtime", {}))
     training = dict(payload.get("training", {}))
-    training.pop("season_length", None)
     for selector, field_name in TRAINING_SELECTOR_TO_CONFIG_FIELD.items():
         if selector in training:
             if field_name in training:

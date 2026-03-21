@@ -61,10 +61,15 @@ DEFAULT_SAMPLE_STRUCTURE = {
     "results_intro": "- 각 run의 leaderboard.csv 기준 결과를 아래에 정리했다.",
     "section_model_tables": "### 각 모형별 Table",
 }
+MIN_PRUNE_FOLD_IDX = 3
 
 
 class _OptunaTrialFailure(RuntimeError):
     """Recoverable per-trial failure that should not abort the whole study."""
+
+
+def _can_prune_at_fold(fold_idx: int) -> bool:
+    return fold_idx >= MIN_PRUNE_FOLD_IDX
 
 
 class _ProgressLogger:
@@ -628,7 +633,7 @@ def _tune_main_job(
                 interim_metric = float(sum(fold_mse) / len(fold_mse))
                 trial.set_user_attr("fold_mse", fold_mse.copy())
                 trial.report(interim_metric, step=fold_idx)
-                if trial.should_prune():
+                if _can_prune_at_fold(fold_idx) and trial.should_prune():
                     trial.set_user_attr("pruned_after_fold", fold_idx)
                     if progress is not None:
                         progress.fold_completed(
@@ -740,7 +745,7 @@ def _score_residual_params(
             interim_metric = float(sum(mse_scores) / len(mse_scores))
             trial.set_user_attr("fold_mse", mse_scores.copy())
             trial.report(interim_metric, step=step_idx)
-            if trial.should_prune():
+            if _can_prune_at_fold(fold_idx) and trial.should_prune():
                 trial.set_user_attr("pruned_after_fold", fold_idx)
                 raise optuna.TrialPruned(
                     f"Pruned residual trial after fold {fold_idx} with mean_mse={interim_metric:.4f}"

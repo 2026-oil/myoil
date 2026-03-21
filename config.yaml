@@ -23,6 +23,14 @@ runtime:
 training:
   # Learned models are trained separately for each expanding-window TS-CV fold.
   train_protocol: expanding_window_tscv
+  season_length: 52
+  batch_size: 32
+  valid_batch_size: 32
+  windows_batch_size: 1024
+  inference_windows_batch_size: 1024
+  max_steps: 1000
+  val_size: 8
+  val_check_steps: 100
   early_stop_patience_steps: 5
   loss: mse
 cv:
