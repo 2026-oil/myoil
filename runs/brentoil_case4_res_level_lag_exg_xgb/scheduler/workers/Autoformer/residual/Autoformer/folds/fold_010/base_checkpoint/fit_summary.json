@@ -1,0 +1,9 @@
+{
+  "model": "Autoformer",
+  "fold_idx": 10,
+  "train_rows": 568,
+  "eval_rows": 8,
+  "train_end_ds": "2025-11-17 00:00:00",
+  "loss": "mse",
+  "loss_curve_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_res_level_lag_exg_xgb/scheduler/workers/Autoformer/models/Autoformer/folds/fold_010/loss_curve.png"
+}

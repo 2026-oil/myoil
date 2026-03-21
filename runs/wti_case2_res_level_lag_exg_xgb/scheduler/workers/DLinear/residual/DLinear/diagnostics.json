@@ -1,0 +1,89 @@
+{
+  "model": "DLinear",
+  "residual_model": "xgboost",
+  "residual.target": "level",
+  "residual.feature_policy": {
+    "include_base_prediction": true,
+    "include_horizon_step": true,
+    "include_date_features": false,
+    "lag_features": {
+      "enabled": true,
+      "sources": [
+        "y_hat_base"
+      ],
+      "steps": [
+        1,
+        2,
+        3,
+        4,
+        6,
+        12,
+        24
+      ],
+      "transforms": [
+        "raw"
+      ]
+    },
+    "exog_sources": {
+      "hist": [
+        "Com_Gasoline",
+        "Com_BloombergCommodity_BCOM",
+        "Com_LME_Ni_Cash",
+        "Com_Coal",
+        "Com_Canola",
+        "Com_Cotton",
+        "Com_LME_Al_Cash",
+        "Com_LMEX",
+        "Bonds_KOR_10Y",
+        "Com_PalmOil",
+        "Com_Barley",
+        "Com_Corn",
+        "Com_Oat",
+        "Com_Wheat",
+        "Com_Soybeans",
+        "Com_LME_Ni_Inv"
+      ],
+      "futr": [],
+      "static": []
+    }
+  },
+  "active_feature_columns": [
+    "horizon_step",
+    "y_hat_base",
+    "y_hat_base_lag_1",
+    "y_hat_base_lag_2",
+    "y_hat_base_lag_3",
+    "y_hat_base_lag_4",
+    "y_hat_base_lag_6",
+    "y_hat_base_lag_12",
+    "y_hat_base_lag_24",
+    "Com_Gasoline",
+    "Com_BloombergCommodity_BCOM",
+    "Com_LME_Ni_Cash",
+    "Com_Coal",
+    "Com_Canola",
+    "Com_Cotton",
+    "Com_LME_Al_Cash",
+    "Com_LMEX",
+    "Bonds_KOR_10Y",
+    "Com_PalmOil",
+    "Com_Barley",
+    "Com_Corn",
+    "Com_Oat",
+    "Com_Wheat",
+    "Com_Soybeans",
+    "Com_LME_Ni_Inv"
+  ],
+  "fold_count": 12,
+  "backcast_rows_total": 5616,
+  "corrected_eval_rows": 96,
+  "corrected_eval_mode": "per_fold_backcast_runtime",
+  "tscv_policy": {
+    "n_windows": 12,
+    "horizon": 8,
+    "step_size": 8,
+    "gap": 0,
+    "max_train_size": null
+  },
+  "artifact_layout": "residual/<model>/folds/fold_{i:03d}/(backcast_panel.csv, corrected_eval.csv, base_checkpoint/, residual_checkpoint/model.ubj)"
+}

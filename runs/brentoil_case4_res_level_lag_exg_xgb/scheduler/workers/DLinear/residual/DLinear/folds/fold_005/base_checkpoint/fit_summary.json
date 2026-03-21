@@ -1,0 +1,9 @@
+{
+  "model": "DLinear",
+  "fold_idx": 5,
+  "train_rows": 528,
+  "eval_rows": 8,
+  "train_end_ds": "2025-02-10 00:00:00",
+  "loss": "mse",
+  "loss_curve_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case4_res_level_lag_exg_xgb/scheduler/workers/DLinear/models/DLinear/folds/fold_005/loss_curve.png"
+}

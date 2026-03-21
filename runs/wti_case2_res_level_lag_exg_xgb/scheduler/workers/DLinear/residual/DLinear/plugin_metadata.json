@@ -1,0 +1,974 @@
+{
+  "0": {
+    "plugin": "xgboost",
+    "n_estimators": 64,
+    "max_depth": 6,
+    "learning_rate": 0.001,
+    "subsample": 1.0,
+    "colsample_bytree": 1.0,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_res_level_lag_exg_xgb/scheduler/workers/DLinear/residual/DLinear/folds/fold_000/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": true,
+        "sources": [
+          "y_hat_base"
+        ],
+        "steps": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          12,
+          24
+        ],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "Com_Gasoline",
+          "Com_BloombergCommodity_BCOM",
+          "Com_LME_Ni_Cash",
+          "Com_Coal",
+          "Com_Canola",
+          "Com_Cotton",
+          "Com_LME_Al_Cash",
+          "Com_LMEX",
+          "Bonds_KOR_10Y",
+          "Com_PalmOil",
+          "Com_Barley",
+          "Com_Corn",
+          "Com_Oat",
+          "Com_Wheat",
+          "Com_Soybeans",
+          "Com_LME_Ni_Inv"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base",
+      "y_hat_base_lag_1",
+      "y_hat_base_lag_2",
+      "y_hat_base_lag_3",
+      "y_hat_base_lag_4",
+      "y_hat_base_lag_6",
+      "y_hat_base_lag_12",
+      "y_hat_base_lag_24",
+      "Com_Gasoline",
+      "Com_BloombergCommodity_BCOM",
+      "Com_LME_Ni_Cash",
+      "Com_Coal",
+      "Com_Canola",
+      "Com_Cotton",
+      "Com_LME_Al_Cash",
+      "Com_LMEX",
+      "Bonds_KOR_10Y",
+      "Com_PalmOil",
+      "Com_Barley",
+      "Com_Corn",
+      "Com_Oat",
+      "Com_Wheat",
+      "Com_Soybeans",
+      "Com_LME_Ni_Inv"
+    ]
+  },
+  "1": {
+    "plugin": "xgboost",
+    "n_estimators": 64,
+    "max_depth": 6,
+    "learning_rate": 0.001,
+    "subsample": 1.0,
+    "colsample_bytree": 1.0,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_res_level_lag_exg_xgb/scheduler/workers/DLinear/residual/DLinear/folds/fold_001/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": true,
+        "sources": [
+          "y_hat_base"
+        ],
+        "steps": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          12,
+          24
+        ],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "Com_Gasoline",
+          "Com_BloombergCommodity_BCOM",
+          "Com_LME_Ni_Cash",
+          "Com_Coal",
+          "Com_Canola",
+          "Com_Cotton",
+          "Com_LME_Al_Cash",
+          "Com_LMEX",
+          "Bonds_KOR_10Y",
+          "Com_PalmOil",
+          "Com_Barley",
+          "Com_Corn",
+          "Com_Oat",
+          "Com_Wheat",
+          "Com_Soybeans",
+          "Com_LME_Ni_Inv"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base",
+      "y_hat_base_lag_1",
+      "y_hat_base_lag_2",
+      "y_hat_base_lag_3",
+      "y_hat_base_lag_4",
+      "y_hat_base_lag_6",
+      "y_hat_base_lag_12",
+      "y_hat_base_lag_24",
+      "Com_Gasoline",
+      "Com_BloombergCommodity_BCOM",
+      "Com_LME_Ni_Cash",
+      "Com_Coal",
+      "Com_Canola",
+      "Com_Cotton",
+      "Com_LME_Al_Cash",
+      "Com_LMEX",
+      "Bonds_KOR_10Y",
+      "Com_PalmOil",
+      "Com_Barley",
+      "Com_Corn",
+      "Com_Oat",
+      "Com_Wheat",
+      "Com_Soybeans",
+      "Com_LME_Ni_Inv"
+    ]
+  },
+  "2": {
+    "plugin": "xgboost",
+    "n_estimators": 64,
+    "max_depth": 6,
+    "learning_rate": 0.001,
+    "subsample": 1.0,
+    "colsample_bytree": 1.0,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_res_level_lag_exg_xgb/scheduler/workers/DLinear/residual/DLinear/folds/fold_002/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": true,
+        "sources": [
+          "y_hat_base"
+        ],
+        "steps": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          12,
+          24
+        ],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "Com_Gasoline",
+          "Com_BloombergCommodity_BCOM",
+          "Com_LME_Ni_Cash",
+          "Com_Coal",
+          "Com_Canola",
+          "Com_Cotton",
+          "Com_LME_Al_Cash",
+          "Com_LMEX",
+          "Bonds_KOR_10Y",
+          "Com_PalmOil",
+          "Com_Barley",
+          "Com_Corn",
+          "Com_Oat",
+          "Com_Wheat",
+          "Com_Soybeans",
+          "Com_LME_Ni_Inv"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base",
+      "y_hat_base_lag_1",
+      "y_hat_base_lag_2",
+      "y_hat_base_lag_3",
+      "y_hat_base_lag_4",
+      "y_hat_base_lag_6",
+      "y_hat_base_lag_12",
+      "y_hat_base_lag_24",
+      "Com_Gasoline",
+      "Com_BloombergCommodity_BCOM",
+      "Com_LME_Ni_Cash",
+      "Com_Coal",
+      "Com_Canola",
+      "Com_Cotton",
+      "Com_LME_Al_Cash",
+      "Com_LMEX",
+      "Bonds_KOR_10Y",
+      "Com_PalmOil",
+      "Com_Barley",
+      "Com_Corn",
+      "Com_Oat",
+      "Com_Wheat",
+      "Com_Soybeans",
+      "Com_LME_Ni_Inv"
+    ]
+  },
+  "3": {
+    "plugin": "xgboost",
+    "n_estimators": 64,
+    "max_depth": 6,
+    "learning_rate": 0.001,
+    "subsample": 1.0,
+    "colsample_bytree": 1.0,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_res_level_lag_exg_xgb/scheduler/workers/DLinear/residual/DLinear/folds/fold_003/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": true,
+        "sources": [
+          "y_hat_base"
+        ],
+        "steps": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          12,
+          24
+        ],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "Com_Gasoline",
+          "Com_BloombergCommodity_BCOM",
+          "Com_LME_Ni_Cash",
+          "Com_Coal",
+          "Com_Canola",
+          "Com_Cotton",
+          "Com_LME_Al_Cash",
+          "Com_LMEX",
+          "Bonds_KOR_10Y",
+          "Com_PalmOil",
+          "Com_Barley",
+          "Com_Corn",
+          "Com_Oat",
+          "Com_Wheat",
+          "Com_Soybeans",
+          "Com_LME_Ni_Inv"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base",
+      "y_hat_base_lag_1",
+      "y_hat_base_lag_2",
+      "y_hat_base_lag_3",
+      "y_hat_base_lag_4",
+      "y_hat_base_lag_6",
+      "y_hat_base_lag_12",
+      "y_hat_base_lag_24",
+      "Com_Gasoline",
+      "Com_BloombergCommodity_BCOM",
+      "Com_LME_Ni_Cash",
+      "Com_Coal",
+      "Com_Canola",
+      "Com_Cotton",
+      "Com_LME_Al_Cash",
+      "Com_LMEX",
+      "Bonds_KOR_10Y",
+      "Com_PalmOil",
+      "Com_Barley",
+      "Com_Corn",
+      "Com_Oat",
+      "Com_Wheat",
+      "Com_Soybeans",
+      "Com_LME_Ni_Inv"
+    ]
+  },
+  "4": {
+    "plugin": "xgboost",
+    "n_estimators": 64,
+    "max_depth": 6,
+    "learning_rate": 0.001,
+    "subsample": 1.0,
+    "colsample_bytree": 1.0,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_res_level_lag_exg_xgb/scheduler/workers/DLinear/residual/DLinear/folds/fold_004/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": true,
+        "sources": [
+          "y_hat_base"
+        ],
+        "steps": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          12,
+          24
+        ],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "Com_Gasoline",
+          "Com_BloombergCommodity_BCOM",
+          "Com_LME_Ni_Cash",
+          "Com_Coal",
+          "Com_Canola",
+          "Com_Cotton",
+          "Com_LME_Al_Cash",
+          "Com_LMEX",
+          "Bonds_KOR_10Y",
+          "Com_PalmOil",
+          "Com_Barley",
+          "Com_Corn",
+          "Com_Oat",
+          "Com_Wheat",
+          "Com_Soybeans",
+          "Com_LME_Ni_Inv"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base",
+      "y_hat_base_lag_1",
+      "y_hat_base_lag_2",
+      "y_hat_base_lag_3",
+      "y_hat_base_lag_4",
+      "y_hat_base_lag_6",
+      "y_hat_base_lag_12",
+      "y_hat_base_lag_24",
+      "Com_Gasoline",
+      "Com_BloombergCommodity_BCOM",
+      "Com_LME_Ni_Cash",
+      "Com_Coal",
+      "Com_Canola",
+      "Com_Cotton",
+      "Com_LME_Al_Cash",
+      "Com_LMEX",
+      "Bonds_KOR_10Y",
+      "Com_PalmOil",
+      "Com_Barley",
+      "Com_Corn",
+      "Com_Oat",
+      "Com_Wheat",
+      "Com_Soybeans",
+      "Com_LME_Ni_Inv"
+    ]
+  },
+  "5": {
+    "plugin": "xgboost",
+    "n_estimators": 64,
+    "max_depth": 6,
+    "learning_rate": 0.001,
+    "subsample": 1.0,
+    "colsample_bytree": 1.0,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_res_level_lag_exg_xgb/scheduler/workers/DLinear/residual/DLinear/folds/fold_005/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": true,
+        "sources": [
+          "y_hat_base"
+        ],
+        "steps": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          12,
+          24
+        ],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "Com_Gasoline",
+          "Com_BloombergCommodity_BCOM",
+          "Com_LME_Ni_Cash",
+          "Com_Coal",
+          "Com_Canola",
+          "Com_Cotton",
+          "Com_LME_Al_Cash",
+          "Com_LMEX",
+          "Bonds_KOR_10Y",
+          "Com_PalmOil",
+          "Com_Barley",
+          "Com_Corn",
+          "Com_Oat",
+          "Com_Wheat",
+          "Com_Soybeans",
+          "Com_LME_Ni_Inv"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base",
+      "y_hat_base_lag_1",
+      "y_hat_base_lag_2",
+      "y_hat_base_lag_3",
+      "y_hat_base_lag_4",
+      "y_hat_base_lag_6",
+      "y_hat_base_lag_12",
+      "y_hat_base_lag_24",
+      "Com_Gasoline",
+      "Com_BloombergCommodity_BCOM",
+      "Com_LME_Ni_Cash",
+      "Com_Coal",
+      "Com_Canola",
+      "Com_Cotton",
+      "Com_LME_Al_Cash",
+      "Com_LMEX",
+      "Bonds_KOR_10Y",
+      "Com_PalmOil",
+      "Com_Barley",
+      "Com_Corn",
+      "Com_Oat",
+      "Com_Wheat",
+      "Com_Soybeans",
+      "Com_LME_Ni_Inv"
+    ]
+  },
+  "6": {
+    "plugin": "xgboost",
+    "n_estimators": 64,
+    "max_depth": 6,
+    "learning_rate": 0.001,
+    "subsample": 1.0,
+    "colsample_bytree": 1.0,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_res_level_lag_exg_xgb/scheduler/workers/DLinear/residual/DLinear/folds/fold_006/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": true,
+        "sources": [
+          "y_hat_base"
+        ],
+        "steps": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          12,
+          24
+        ],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "Com_Gasoline",
+          "Com_BloombergCommodity_BCOM",
+          "Com_LME_Ni_Cash",
+          "Com_Coal",
+          "Com_Canola",
+          "Com_Cotton",
+          "Com_LME_Al_Cash",
+          "Com_LMEX",
+          "Bonds_KOR_10Y",
+          "Com_PalmOil",
+          "Com_Barley",
+          "Com_Corn",
+          "Com_Oat",
+          "Com_Wheat",
+          "Com_Soybeans",
+          "Com_LME_Ni_Inv"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base",
+      "y_hat_base_lag_1",
+      "y_hat_base_lag_2",
+      "y_hat_base_lag_3",
+      "y_hat_base_lag_4",
+      "y_hat_base_lag_6",
+      "y_hat_base_lag_12",
+      "y_hat_base_lag_24",
+      "Com_Gasoline",
+      "Com_BloombergCommodity_BCOM",
+      "Com_LME_Ni_Cash",
+      "Com_Coal",
+      "Com_Canola",
+      "Com_Cotton",
+      "Com_LME_Al_Cash",
+      "Com_LMEX",
+      "Bonds_KOR_10Y",
+      "Com_PalmOil",
+      "Com_Barley",
+      "Com_Corn",
+      "Com_Oat",
+      "Com_Wheat",
+      "Com_Soybeans",
+      "Com_LME_Ni_Inv"
+    ]
+  },
+  "7": {
+    "plugin": "xgboost",
+    "n_estimators": 64,
+    "max_depth": 6,
+    "learning_rate": 0.001,
+    "subsample": 1.0,
+    "colsample_bytree": 1.0,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_res_level_lag_exg_xgb/scheduler/workers/DLinear/residual/DLinear/folds/fold_007/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": true,
+        "sources": [
+          "y_hat_base"
+        ],
+        "steps": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          12,
+          24
+        ],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "Com_Gasoline",
+          "Com_BloombergCommodity_BCOM",
+          "Com_LME_Ni_Cash",
+          "Com_Coal",
+          "Com_Canola",
+          "Com_Cotton",
+          "Com_LME_Al_Cash",
+          "Com_LMEX",
+          "Bonds_KOR_10Y",
+          "Com_PalmOil",
+          "Com_Barley",
+          "Com_Corn",
+          "Com_Oat",
+          "Com_Wheat",
+          "Com_Soybeans",
+          "Com_LME_Ni_Inv"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base",
+      "y_hat_base_lag_1",
+      "y_hat_base_lag_2",
+      "y_hat_base_lag_3",
+      "y_hat_base_lag_4",
+      "y_hat_base_lag_6",
+      "y_hat_base_lag_12",
+      "y_hat_base_lag_24",
+      "Com_Gasoline",
+      "Com_BloombergCommodity_BCOM",
+      "Com_LME_Ni_Cash",
+      "Com_Coal",
+      "Com_Canola",
+      "Com_Cotton",
+      "Com_LME_Al_Cash",
+      "Com_LMEX",
+      "Bonds_KOR_10Y",
+      "Com_PalmOil",
+      "Com_Barley",
+      "Com_Corn",
+      "Com_Oat",
+      "Com_Wheat",
+      "Com_Soybeans",
+      "Com_LME_Ni_Inv"
+    ]
+  },
+  "8": {
+    "plugin": "xgboost",
+    "n_estimators": 64,
+    "max_depth": 6,
+    "learning_rate": 0.001,
+    "subsample": 1.0,
+    "colsample_bytree": 1.0,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_res_level_lag_exg_xgb/scheduler/workers/DLinear/residual/DLinear/folds/fold_008/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": true,
+        "sources": [
+          "y_hat_base"
+        ],
+        "steps": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          12,
+          24
+        ],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "Com_Gasoline",
+          "Com_BloombergCommodity_BCOM",
+          "Com_LME_Ni_Cash",
+          "Com_Coal",
+          "Com_Canola",
+          "Com_Cotton",
+          "Com_LME_Al_Cash",
+          "Com_LMEX",
+          "Bonds_KOR_10Y",
+          "Com_PalmOil",
+          "Com_Barley",
+          "Com_Corn",
+          "Com_Oat",
+          "Com_Wheat",
+          "Com_Soybeans",
+          "Com_LME_Ni_Inv"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base",
+      "y_hat_base_lag_1",
+      "y_hat_base_lag_2",
+      "y_hat_base_lag_3",
+      "y_hat_base_lag_4",
+      "y_hat_base_lag_6",
+      "y_hat_base_lag_12",
+      "y_hat_base_lag_24",
+      "Com_Gasoline",
+      "Com_BloombergCommodity_BCOM",
+      "Com_LME_Ni_Cash",
+      "Com_Coal",
+      "Com_Canola",
+      "Com_Cotton",
+      "Com_LME_Al_Cash",
+      "Com_LMEX",
+      "Bonds_KOR_10Y",
+      "Com_PalmOil",
+      "Com_Barley",
+      "Com_Corn",
+      "Com_Oat",
+      "Com_Wheat",
+      "Com_Soybeans",
+      "Com_LME_Ni_Inv"
+    ]
+  },
+  "9": {
+    "plugin": "xgboost",
+    "n_estimators": 64,
+    "max_depth": 6,
+    "learning_rate": 0.001,
+    "subsample": 1.0,
+    "colsample_bytree": 1.0,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_res_level_lag_exg_xgb/scheduler/workers/DLinear/residual/DLinear/folds/fold_009/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": true,
+        "sources": [
+          "y_hat_base"
+        ],
+        "steps": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          12,
+          24
+        ],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "Com_Gasoline",
+          "Com_BloombergCommodity_BCOM",
+          "Com_LME_Ni_Cash",
+          "Com_Coal",
+          "Com_Canola",
+          "Com_Cotton",
+          "Com_LME_Al_Cash",
+          "Com_LMEX",
+          "Bonds_KOR_10Y",
+          "Com_PalmOil",
+          "Com_Barley",
+          "Com_Corn",
+          "Com_Oat",
+          "Com_Wheat",
+          "Com_Soybeans",
+          "Com_LME_Ni_Inv"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base",
+      "y_hat_base_lag_1",
+      "y_hat_base_lag_2",
+      "y_hat_base_lag_3",
+      "y_hat_base_lag_4",
+      "y_hat_base_lag_6",
+      "y_hat_base_lag_12",
+      "y_hat_base_lag_24",
+      "Com_Gasoline",
+      "Com_BloombergCommodity_BCOM",
+      "Com_LME_Ni_Cash",
+      "Com_Coal",
+      "Com_Canola",
+      "Com_Cotton",
+      "Com_LME_Al_Cash",
+      "Com_LMEX",
+      "Bonds_KOR_10Y",
+      "Com_PalmOil",
+      "Com_Barley",
+      "Com_Corn",
+      "Com_Oat",
+      "Com_Wheat",
+      "Com_Soybeans",
+      "Com_LME_Ni_Inv"
+    ]
+  },
+  "10": {
+    "plugin": "xgboost",
+    "n_estimators": 64,
+    "max_depth": 6,
+    "learning_rate": 0.001,
+    "subsample": 1.0,
+    "colsample_bytree": 1.0,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_res_level_lag_exg_xgb/scheduler/workers/DLinear/residual/DLinear/folds/fold_010/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": true,
+        "sources": [
+          "y_hat_base"
+        ],
+        "steps": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          12,
+          24
+        ],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "Com_Gasoline",
+          "Com_BloombergCommodity_BCOM",
+          "Com_LME_Ni_Cash",
+          "Com_Coal",
+          "Com_Canola",
+          "Com_Cotton",
+          "Com_LME_Al_Cash",
+          "Com_LMEX",
+          "Bonds_KOR_10Y",
+          "Com_PalmOil",
+          "Com_Barley",
+          "Com_Corn",
+          "Com_Oat",
+          "Com_Wheat",
+          "Com_Soybeans",
+          "Com_LME_Ni_Inv"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base",
+      "y_hat_base_lag_1",
+      "y_hat_base_lag_2",
+      "y_hat_base_lag_3",
+      "y_hat_base_lag_4",
+      "y_hat_base_lag_6",
+      "y_hat_base_lag_12",
+      "y_hat_base_lag_24",
+      "Com_Gasoline",
+      "Com_BloombergCommodity_BCOM",
+      "Com_LME_Ni_Cash",
+      "Com_Coal",
+      "Com_Canola",
+      "Com_Cotton",
+      "Com_LME_Al_Cash",
+      "Com_LMEX",
+      "Bonds_KOR_10Y",
+      "Com_PalmOil",
+      "Com_Barley",
+      "Com_Corn",
+      "Com_Oat",
+      "Com_Wheat",
+      "Com_Soybeans",
+      "Com_LME_Ni_Inv"
+    ]
+  },
+  "11": {
+    "plugin": "xgboost",
+    "n_estimators": 64,
+    "max_depth": 6,
+    "learning_rate": 0.001,
+    "subsample": 1.0,
+    "colsample_bytree": 1.0,
+    "checkpoint_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_res_level_lag_exg_xgb/scheduler/workers/DLinear/residual/DLinear/folds/fold_011/residual_checkpoint/model.ubj",
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": true,
+        "sources": [
+          "y_hat_base"
+        ],
+        "steps": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          12,
+          24
+        ],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "Com_Gasoline",
+          "Com_BloombergCommodity_BCOM",
+          "Com_LME_Ni_Cash",
+          "Com_Coal",
+          "Com_Canola",
+          "Com_Cotton",
+          "Com_LME_Al_Cash",
+          "Com_LMEX",
+          "Bonds_KOR_10Y",
+          "Com_PalmOil",
+          "Com_Barley",
+          "Com_Corn",
+          "Com_Oat",
+          "Com_Wheat",
+          "Com_Soybeans",
+          "Com_LME_Ni_Inv"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base",
+      "y_hat_base_lag_1",
+      "y_hat_base_lag_2",
+      "y_hat_base_lag_3",
+      "y_hat_base_lag_4",
+      "y_hat_base_lag_6",
+      "y_hat_base_lag_12",
+      "y_hat_base_lag_24",
+      "Com_Gasoline",
+      "Com_BloombergCommodity_BCOM",
+      "Com_LME_Ni_Cash",
+      "Com_Coal",
+      "Com_Canola",
+      "Com_Cotton",
+      "Com_LME_Al_Cash",
+      "Com_LMEX",
+      "Bonds_KOR_10Y",
+      "Com_PalmOil",
+      "Com_Barley",
+      "Com_Corn",
+      "Com_Oat",
+      "Com_Wheat",
+      "Com_Soybeans",
+      "Com_LME_Ni_Inv"
+    ]
+  }
+}

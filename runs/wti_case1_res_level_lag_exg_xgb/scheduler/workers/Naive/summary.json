@@ -1,0 +1,10 @@
+{
+  "job_name": "Naive",
+  "gpu_id": 0,
+  "devices": 1,
+  "cuda_visible_devices": "0",
+  "returncode": 0,
+  "stdout_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case1_res_level_lag_exg_xgb/scheduler/workers/Naive/stdout.log",
+  "stderr_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case1_res_level_lag_exg_xgb/scheduler/workers/Naive/stderr.log",
+  "completed_at": "2026-03-21T13:52:16.334557+00:00"
+}

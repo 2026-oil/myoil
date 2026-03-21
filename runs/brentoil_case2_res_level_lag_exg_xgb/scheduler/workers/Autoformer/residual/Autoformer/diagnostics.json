@@ -1,0 +1,63 @@
+{
+  "model": "Autoformer",
+  "residual_model": "xgboost",
+  "residual.target": "level",
+  "residual.feature_policy": {
+    "include_base_prediction": true,
+    "include_horizon_step": true,
+    "include_date_features": false,
+    "lag_features": {
+      "enabled": true,
+      "sources": [
+        "y_hat_base"
+      ],
+      "steps": [
+        1,
+        2,
+        3,
+        4,
+        6,
+        12,
+        24
+      ],
+      "transforms": [
+        "raw"
+      ]
+    },
+    "exog_sources": {
+      "hist": [
+        "Com_Gasoline",
+        "Com_BloombergCommodity_BCOM",
+        "Com_LME_Ni_Cash",
+        "Com_Coal",
+        "Com_Cotton",
+        "Com_LME_Al_Cash",
+        "Bonds_KOR_10Y",
+        "Com_Barley",
+        "Com_Canola",
+        "Com_LMEX",
+        "Com_LME_Ni_Inv",
+        "Com_Corn",
+        "Com_Wheat"
+      ],
+      "futr": [],
+      "static": []
+    }
+  },
+  "active_feature_columns": [
+    "horizon_step",
+    "y_hat_base"
+  ],
+  "fold_count": 12,
+  "backcast_rows_total": 5616,
+  "corrected_eval_rows": 96,
+  "corrected_eval_mode": "per_fold_backcast_runtime",
+  "tscv_policy": {
+    "n_windows": 12,
+    "horizon": 8,
+    "step_size": 8,
+    "gap": 0,
+    "max_train_size": null
+  },
+  "artifact_layout": "residual/<model>/folds/fold_{i:03d}/(backcast_panel.csv, corrected_eval.csv, base_checkpoint/, residual_checkpoint/model.ubj)"
+}

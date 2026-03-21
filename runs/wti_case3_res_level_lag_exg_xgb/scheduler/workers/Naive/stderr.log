@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/home/sonet/.openclaw/workspace/research/neuralforecast/main.py", line 51, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/home/sonet/.openclaw/workspace/research/neuralforecast/main.py", line 45, in main
+    from residual.runtime import main as residual_main
+  File "/home/sonet/.openclaw/workspace/research/neuralforecast/residual/runtime.py", line 27, in <module>
+    from .optuna_spaces import (
+ImportError: cannot import name 'TRAINING_SELECTOR_TO_CONFIG_FIELD' from 'residual.optuna_spaces' (/home/sonet/.openclaw/workspace/research/neuralforecast/residual/optuna_spaces.py)

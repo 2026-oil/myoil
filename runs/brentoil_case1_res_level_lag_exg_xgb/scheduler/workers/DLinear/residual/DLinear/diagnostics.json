@@ -1,0 +1,66 @@
+{
+  "model": "DLinear",
+  "residual_model": "xgboost",
+  "residual.target": "level",
+  "residual.feature_policy": {
+    "include_base_prediction": true,
+    "include_horizon_step": true,
+    "include_date_features": false,
+    "lag_features": {
+      "enabled": true,
+      "sources": [
+        "y_hat_base"
+      ],
+      "steps": [
+        1,
+        2,
+        3,
+        4,
+        6,
+        12,
+        24
+      ],
+      "transforms": [
+        "raw"
+      ]
+    },
+    "exog_sources": {
+      "hist": [
+        "Com_Gasoline",
+        "Com_Steel",
+        "Bonds_US_Spread_10Y_1Y",
+        "Bonds_CHN_Spread_30Y_5Y",
+        "EX_USD_BRL",
+        "Com_Cheese",
+        "Bonds_BRZ_Spread_10Y_1Y",
+        "Com_Cu_Gold_Ratio",
+        "Idx_OVX",
+        "Com_Oil_Spread",
+        "Com_LME_Zn_Spread",
+        "Idx_CSI300",
+        "Bonds_CHN_Spread_5Y_1Y",
+        "Com_LME_Cu_Spread",
+        "Com_LME_Pb_Spread",
+        "Com_LME_Al_Spread"
+      ],
+      "futr": [],
+      "static": []
+    }
+  },
+  "active_feature_columns": [
+    "horizon_step",
+    "y_hat_base"
+  ],
+  "fold_count": 12,
+  "backcast_rows_total": 5616,
+  "corrected_eval_rows": 96,
+  "corrected_eval_mode": "per_fold_backcast_runtime",
+  "tscv_policy": {
+    "n_windows": 12,
+    "horizon": 8,
+    "step_size": 8,
+    "gap": 0,
+    "max_train_size": null
+  },
+  "artifact_layout": "residual/<model>/folds/fold_{i:03d}/(backcast_panel.csv, corrected_eval.csv, base_checkpoint/, residual_checkpoint/model.ubj)"
+}

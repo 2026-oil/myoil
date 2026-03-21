@@ -1,0 +1,9 @@
+{
+  "model": "LSTM",
+  "fold_idx": 3,
+  "train_rows": 512,
+  "eval_rows": 8,
+  "train_end_ds": "2024-10-21 00:00:00",
+  "loss": "mse",
+  "loss_curve_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case2_res_level_lag_exg_xgb/scheduler/workers/LSTM/models/LSTM/folds/fold_003/loss_curve.png"
+}

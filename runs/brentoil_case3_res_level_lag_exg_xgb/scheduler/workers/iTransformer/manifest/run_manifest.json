@@ -1,0 +1,114 @@
+{
+  "manifest_version": "1",
+  "artifact_schema_version": "1",
+  "evaluation_protocol_version": "2",
+  "config_source_type": "yaml",
+  "config_source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/yaml/feature_set_res_level_lag_exg_xgb/brentoil-case3.yaml",
+  "config_resolved_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3_res_level_lag_exg_xgb/scheduler/workers/iTransformer/config/config.resolved.json",
+  "config_input_sha256": "36d9cb6886d1198c3da98599c38da67047160762478acbc1e20be089d6874f7f",
+  "config_resolved_sha256": "50d13b1285ff661fe3226e6949f96468a48cd2e2c922b35d45df08b671e04135",
+  "search_space_path": null,
+  "search_space_sha256": null,
+  "entrypoint_version": "neuralforecast-residual-v1",
+  "compat_mode": "dual_read",
+  "jobs": [
+    {
+      "model": "LSTM",
+      "requested_mode": "learned_fixed",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": []
+    },
+    {
+      "model": "NHITS",
+      "requested_mode": "learned_fixed",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": []
+    },
+    {
+      "model": "DLinear",
+      "requested_mode": "learned_fixed",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": []
+    },
+    {
+      "model": "Autoformer",
+      "requested_mode": "learned_fixed",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": []
+    },
+    {
+      "model": "PatchTST",
+      "requested_mode": "learned_fixed",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": []
+    },
+    {
+      "model": "iTransformer",
+      "requested_mode": "learned_fixed",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": []
+    },
+    {
+      "model": "Naive",
+      "requested_mode": "baseline_fixed",
+      "validated_mode": "baseline_fixed",
+      "selected_search_params": []
+    }
+  ],
+  "training_search": {
+    "requested_mode": "training_fixed",
+    "validated_mode": "training_fixed",
+    "selected_search_params": []
+  },
+  "residual": {
+    "model": "xgboost",
+    "target": "level",
+    "requested_mode": "residual_fixed",
+    "validated_mode": "residual_fixed",
+    "selected_search_params": [],
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": true,
+        "sources": [
+          "y_hat_base"
+        ],
+        "steps": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          12,
+          24
+        ],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "Com_Gasoline",
+          "Com_BloombergCommodity_BCOM",
+          "Com_LME_Ni_Cash",
+          "Com_Coal",
+          "Com_LME_Al_Cash",
+          "Bonds_KOR_10Y",
+          "Com_LMEX",
+          "Com_LME_Ni_Inv"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base"
+    ]
+  },
+  "training": {
+    "loss": "mse"
+  }
+}
