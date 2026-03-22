@@ -43,7 +43,9 @@ nbs/_extensions
 
 *.png
 
-.omx/
+# ignore OMX runtime/state directories everywhere in the repo
+/.omx/
+**/.omx/
 .venv/
 
 CLAUDE.md
