@@ -100,20 +100,18 @@ def test_run_case3_bomb_script_default_config_list_has_declared_order() -> None:
     script = CONFIG_SOURCE_PATH.read_text(encoding="utf-8")
 
     expected = [
-        "yaml/bomb/brentoil-case3-family-h8-mse.yaml",
-        "yaml/bomb/brentoil-case3-family-h8-mse-diff.yaml",
-        "yaml/bomb/brentoil-case3-family-h8-exloss.yaml",
-        "yaml/bomb/brentoil-case3-family-h8-mse-res-level.yaml",
-        "yaml/bomb/brentoil-case3-family-h8-mse-res-delta.yaml",
-        "yaml/bomb/brentoil-case3-family-h6-mse.yaml",
-        "yaml/bomb/brentoil-case3-family-h4-mse.yaml",
-        "yaml/bomb/wti-case3-family-h8-mse.yaml",
-        "yaml/bomb/wti-case3-family-h8-mse-diff.yaml",
-        "yaml/bomb/wti-case3-family-h8-exloss.yaml",
-        "yaml/bomb/wti-case3-family-h8-mse-res-level.yaml",
-        "yaml/bomb/wti-case3-family-h8-mse-res-delta.yaml",
-        "yaml/bomb/wti-case3-family-h6-mse.yaml",
-        "yaml/bomb/wti-case3-family-h4-mse.yaml",
+        "yaml/bomb/brentoil-case3-family-h8-diff-exloss-i48.yaml",
+        "yaml/bomb/brentoil-case3-family-h8-diff-exloss-i48-res-level.yaml",
+        "yaml/bomb/brentoil-case3-family-h8-diff-exloss-i48-res-delta.yaml",
+        "yaml/bomb/brentoil-case3-family-h8-diff-exloss-i128.yaml",
+        "yaml/bomb/brentoil-case3-family-h8-diff-exloss-i128-res-level.yaml",
+        "yaml/bomb/brentoil-case3-family-h8-diff-exloss-i128-res-delta.yaml",
+        "yaml/bomb/wti-case3-family-h8-diff-exloss-i48.yaml",
+        "yaml/bomb/wti-case3-family-h8-diff-exloss-i48-res-level.yaml",
+        "yaml/bomb/wti-case3-family-h8-diff-exloss-i48-res-delta.yaml",
+        "yaml/bomb/wti-case3-family-h8-diff-exloss-i128.yaml",
+        "yaml/bomb/wti-case3-family-h8-diff-exloss-i128-res-level.yaml",
+        "yaml/bomb/wti-case3-family-h8-diff-exloss-i128-res-delta.yaml",
     ]
 
     positions = []

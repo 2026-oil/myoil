@@ -1,5 +1,5 @@
 task:
-  name: wti_case3_bomb_family_h8_mse_res_level
+  name: wti_case3_bomb_family_h8_diff_exloss_i48_res_level
 dataset:
   path: data/df.csv
   target_col: Com_CrudeOil
@@ -17,6 +17,8 @@ dataset:
   static_exog_cols: []
 runtime:
   random_seed: 1
+  transformations_target: diff
+  transformations_exog: diff
 training:
   train_protocol: expanding_window_tscv
   input_size: 48
@@ -25,15 +27,21 @@ training:
   valid_batch_size: 32
   windows_batch_size: 128
   inference_windows_batch_size: 1024
-  learning_rate: 0.0071377767178455506
-  max_steps: 500
+  learning_rate: 0.003
+  max_steps: 800
   val_size: 8
   val_check_steps: 200
   early_stop_patience_steps: 5
   num_lr_decays: -1
   model_step_size: 4
   scaler_type: identity
-  loss: mse
+  loss: exloss
+  loss_params:
+    up_th: 0.9
+    down_th: 0.1
+    lamda_underestimate: 1.2
+    lamda_overestimate: 1.0
+    lamda: 1.0
 cv:
   horizon: 8
   step_size: 8
@@ -56,7 +64,7 @@ residual:
     max_depth: 2
     learning_rate: 0.003
     subsample: 0.5
-    colsample_bytree: 0.90
+    colsample_bytree: 0.9
   features:
     include_base_prediction: true
     include_horizon_step: true
@@ -68,7 +76,15 @@ residual:
       transforms:
       - raw
     exog_sources:
-      hist: []
+      hist:
+      - Com_Gasoline
+      - Com_BloombergCommodity_BCOM
+      - Com_LME_Ni_Cash
+      - Com_Coal
+      - Com_LME_Al_Cash
+      - Com_LMEX
+      - Bonds_KOR_10Y
+      - Com_LME_Ni_Inv
       futr: []
       static: []
 jobs:
@@ -134,9 +150,3 @@ jobs:
     d_ff: 128
     down_sampling_layers: 1
     top_k: 5
-- model: xLSTM
-  params:
-    encoder_hidden_size: 64
-    encoder_n_blocks: 2
-    decoder_hidden_size: 128
-    encoder_dropout: 0.1

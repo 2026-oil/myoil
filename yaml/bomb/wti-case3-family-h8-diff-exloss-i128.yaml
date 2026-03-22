@@ -1,5 +1,5 @@
 task:
-  name: wti_case3_bomb_family_h8_mse
+  name: wti_case3_bomb_family_h8_diff_exloss_i128
 dataset:
   path: data/df.csv
   target_col: Com_CrudeOil
@@ -17,23 +17,31 @@ dataset:
   static_exog_cols: []
 runtime:
   random_seed: 1
+  transformations_target: diff
+  transformations_exog: diff
 training:
   train_protocol: expanding_window_tscv
-  input_size: 48
+  input_size: 128
   season_length: 52
   batch_size: 32
   valid_batch_size: 32
   windows_batch_size: 128
   inference_windows_batch_size: 1024
-  learning_rate: 0.0071377767178455506
-  max_steps: 500
+  learning_rate: 0.003
+  max_steps: 800
   val_size: 8
   val_check_steps: 200
   early_stop_patience_steps: 5
   num_lr_decays: -1
   model_step_size: 4
   scaler_type: identity
-  loss: mse
+  loss: exloss
+  loss_params:
+    up_th: 0.9
+    down_th: 0.1
+    lamda_underestimate: 1.2
+    lamda_overestimate: 1.0
+    lamda: 1.0
 cv:
   horizon: 8
   step_size: 8
@@ -54,7 +62,7 @@ jobs:
   params:
     encoder_hidden_size: 32
     encoder_n_layers: 3
-    inference_input_size: 48
+    inference_input_size: 128
     encoder_dropout: 0.0
     decoder_hidden_size: 256
     decoder_layers: 3
@@ -112,9 +120,3 @@ jobs:
     d_ff: 128
     down_sampling_layers: 1
     top_k: 5
-- model: xLSTM
-  params:
-    encoder_hidden_size: 64
-    encoder_n_blocks: 2
-    decoder_hidden_size: 128
-    encoder_dropout: 0.1

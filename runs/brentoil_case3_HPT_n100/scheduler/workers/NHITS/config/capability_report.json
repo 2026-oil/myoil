@@ -1,0 +1,93 @@
+{
+  "NHITS": {
+    "name": "NHITS",
+    "multivariate": false,
+    "supports_hist_exog": true,
+    "supports_futr_exog": true,
+    "supports_stat_exog": true,
+    "requires_n_series": false,
+    "single_device_only": true,
+    "requested_mode": "learned_auto_requested",
+    "validated_mode": "learned_auto",
+    "supports_auto": true,
+    "search_space_entry_found": true,
+    "selected_search_params": [
+      "n_pool_kernel_size",
+      "n_freq_downsample",
+      "n_blocks",
+      "mlp_units",
+      "dropout_prob_theta",
+      "activation"
+    ],
+    "unknown_search_params": [],
+    "validation_error": null
+  },
+  "residual": {
+    "model": "xgboost",
+    "target": "level",
+    "requested_mode": "residual_disabled",
+    "validated_mode": "residual_disabled",
+    "supports_auto": true,
+    "search_space_entry_found": false,
+    "selected_search_params": [],
+    "unknown_search_params": [],
+    "validation_error": null,
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": false,
+        "sources": [],
+        "steps": [],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "Com_Gasoline",
+          "Com_BloombergCommodity_BCOM",
+          "Com_LME_Ni_Cash",
+          "Com_Coal",
+          "Com_LME_Al_Cash",
+          "Bonds_KOR_10Y",
+          "Com_LMEX",
+          "Com_LME_Ni_Inv"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base",
+      "Com_Gasoline",
+      "Com_BloombergCommodity_BCOM",
+      "Com_LME_Ni_Cash",
+      "Com_Coal",
+      "Com_LME_Al_Cash",
+      "Bonds_KOR_10Y",
+      "Com_LMEX",
+      "Com_LME_Ni_Inv"
+    ]
+  },
+  "training_search": {
+    "requested_mode": "training_auto_requested",
+    "validated_mode": "training_auto",
+    "supports_auto": true,
+    "search_space_entry_found": true,
+    "selected_search_params": [
+      "input_size",
+      "batch_size",
+      "valid_batch_size",
+      "windows_batch_size",
+      "inference_windows_batch_size",
+      "learning_rate",
+      "scaler_type",
+      "model_step_size"
+    ],
+    "unknown_search_params": [],
+    "validation_error": null
+  }
+}
