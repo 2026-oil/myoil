@@ -115,10 +115,6 @@ DEFAULT_TRAINING_PARAMS = {
 LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD = {"step_size": "model_step_size"}
 FIXED_TRAINING_VALUES = {
     "season_length": 52,
-    "batch_size": 32,
-    "valid_batch_size": 32,
-    "windows_batch_size": 1024,
-    "inference_windows_batch_size": 1024,
     "max_steps": 1000,
     "val_size": 8,
     "val_check_steps": 100,
@@ -522,6 +518,10 @@ RESIDUAL_PARAM_REGISTRY = {
 
 TRAINING_PARAM_REGISTRY = {
     "input_size": _categorical([24, 36, 48, 64, 72, 96]),
+    "batch_size": _categorical([16, 32, 64, 128]),
+    "valid_batch_size": _categorical([16, 32, 64, 128]),
+    "windows_batch_size": _categorical([256, 512, 1024, 2048]),
+    "inference_windows_batch_size": _categorical([256, 512, 1024, 2048]),
     "learning_rate": _float(3e-4, 1e-2, log=True),
     "scaler_type": _categorical([None, "robust", "standard", "identity"]),
     "model_step_size": _categorical([1, 4, 8, 12]),

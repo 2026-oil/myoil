@@ -19,6 +19,7 @@ class _XGBoostConfig:
     learning_rate: float = RESIDUAL_DEFAULTS["xgboost"]["learning_rate"]
     subsample: float = RESIDUAL_DEFAULTS["xgboost"]["subsample"]
     colsample_bytree: float = RESIDUAL_DEFAULTS["xgboost"]["colsample_bytree"]
+    cpu_threads: int | None = None
 
 
 class XGBoostResidualPlugin(ResidualPlugin):
@@ -32,6 +33,7 @@ class XGBoostResidualPlugin(ResidualPlugin):
         learning_rate: float = RESIDUAL_DEFAULTS["xgboost"]["learning_rate"],
         subsample: float = RESIDUAL_DEFAULTS["xgboost"]["subsample"],
         colsample_bytree: float = RESIDUAL_DEFAULTS["xgboost"]["colsample_bytree"],
+        cpu_threads: int | None = None,
         feature_config: Any = None,
     ):
         self.config = _XGBoostConfig(
@@ -40,6 +42,7 @@ class XGBoostResidualPlugin(ResidualPlugin):
             learning_rate=learning_rate,
             subsample=subsample,
             colsample_bytree=colsample_bytree,
+            cpu_threads=cpu_threads,
         )
         self.model: Booster | None = None
         self._trained = False
@@ -95,8 +98,12 @@ class XGBoostResidualPlugin(ResidualPlugin):
                 "subsample": self.config.subsample,
                 "colsample_bytree": self.config.colsample_bytree,
                 "verbosity": 0,
-                "nthread": 1,
                 "seed": 0,
+                **(
+                    {"nthread": int(self.config.cpu_threads)}
+                    if self.config.cpu_threads is not None
+                    else {}
+                ),
             },
             dtrain=dtrain,
             num_boost_round=self.config.n_estimators,
@@ -126,6 +133,7 @@ class XGBoostResidualPlugin(ResidualPlugin):
             "learning_rate": self.config.learning_rate,
             "subsample": self.config.subsample,
             "colsample_bytree": self.config.colsample_bytree,
+            "cpu_threads": self.config.cpu_threads,
             "checkpoint_path": str(self._checkpoint_path)
             if self._checkpoint_path
             else None,

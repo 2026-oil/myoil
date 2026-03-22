@@ -19,6 +19,7 @@ class _RandomForestConfig:
     max_depth: int = int(RESIDUAL_DEFAULTS["randomforest"]["max_depth"])
     min_samples_leaf: int = int(RESIDUAL_DEFAULTS["randomforest"]["min_samples_leaf"])
     max_features: str = str(RESIDUAL_DEFAULTS["randomforest"]["max_features"])
+    cpu_threads: int | None = None
 
 
 class RandomForestResidualPlugin(ResidualPlugin):
@@ -33,6 +34,7 @@ class RandomForestResidualPlugin(ResidualPlugin):
             RESIDUAL_DEFAULTS["randomforest"]["min_samples_leaf"]
         ),
         max_features: str = str(RESIDUAL_DEFAULTS["randomforest"]["max_features"]),
+        cpu_threads: int | None = None,
         feature_config: Any = None,
     ):
         self.config = _RandomForestConfig(
@@ -40,6 +42,7 @@ class RandomForestResidualPlugin(ResidualPlugin):
             max_depth=max_depth,
             min_samples_leaf=min_samples_leaf,
             max_features=max_features,
+            cpu_threads=cpu_threads,
         )
         self.model: RandomForestRegressor | None = None
         self._trained = False
@@ -92,7 +95,7 @@ class RandomForestResidualPlugin(ResidualPlugin):
             min_samples_leaf=self.config.min_samples_leaf,
             max_features=self.config.max_features,
             random_state=0,
-            n_jobs=1,
+            n_jobs=self.config.cpu_threads,
         )
         self.model.fit(features, target)
         with self._checkpoint_path.open("wb") as handle:
@@ -118,5 +121,6 @@ class RandomForestResidualPlugin(ResidualPlugin):
             "max_depth": self.config.max_depth,
             "min_samples_leaf": self.config.min_samples_leaf,
             "max_features": self.config.max_features,
+            "cpu_threads": self.config.cpu_threads,
             "checkpoint_path": str(self._checkpoint_path) if self._checkpoint_path else None,
         }

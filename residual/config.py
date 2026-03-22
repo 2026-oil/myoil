@@ -47,6 +47,11 @@ CENTRALIZED_TRAINING_KEYS = {
     "num_lr_decays",
     "loss",
     "loss_params",
+    "accelerator",
+    "devices",
+    "strategy",
+    "precision",
+    "dataloader_kwargs",
 } | set(FIXED_TRAINING_KEYS)
 LEGACY_SHARED_JOB_TRAINING_KEYS = {
     "scaler_type",
@@ -64,6 +69,13 @@ RESIDUAL_FEATURE_KEYS = {
 RESIDUAL_LAG_FEATURE_KEYS = {"enabled", "sources", "steps", "transforms"}
 RESIDUAL_EXOG_SOURCE_KEYS = {"hist", "futr", "static"}
 SUPPORTED_RESIDUAL_LAG_TRANSFORMS = {"raw"}
+SUPPORTED_TRAINER_ACCELERATORS = {"auto", "cpu", "gpu"}
+SUPPORTED_DATALOADER_KWARGS = {
+    "num_workers",
+    "pin_memory",
+    "persistent_workers",
+    "prefetch_factor",
+}
 FORBIDDEN_RESIDUAL_LAG_SOURCES = {
     "y",
     "residual_target",
@@ -130,6 +142,11 @@ class TrainingConfig:
     num_lr_decays: int = DEFAULT_TRAINING_PARAMS["num_lr_decays"]
     loss: str = "mse"
     loss_params: TrainingLossParams | None = None
+    accelerator: str | None = None
+    devices: int | None = None
+    strategy: str | None = None
+    precision: str | int | None = None
+    dataloader_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -156,6 +173,7 @@ class SchedulerConfig:
     gpu_ids: tuple[int, ...] = (0, 1)
     max_concurrent_jobs: int = 2
     worker_devices: int = 1
+    parallelize_single_job_tuning: bool = True
 
 
 @dataclass(frozen=True)
@@ -191,6 +209,7 @@ class ResidualConfig:
     enabled: bool = True
     model: str = "xgboost"
     target: ResidualTargetMode = "level"
+    cpu_threads: int | None = None
     params: dict[str, Any] = field(default_factory=dict)
     features: ResidualFeatureConfig = field(default_factory=ResidualFeatureConfig)
     requested_mode: ResidualMode = "residual_fixed"
@@ -369,6 +388,68 @@ def _coerce_positive_int_tuple(value: Any, *, field_name: str) -> tuple[int, ...
             f"{field_name} contains duplicate step(s): {', '.join(str(item) for item in duplicated)}"
         )
     return tuple(out)
+
+
+def _coerce_nonnegative_int(value: Any, *, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{field_name} must be an integer")
+    if value < 0:
+        raise ValueError(f"{field_name} must be >= 0")
+    return int(value)
+
+
+def _coerce_positive_int(value: Any, *, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{field_name} must be an integer")
+    if value <= 0:
+        raise ValueError(f"{field_name} must be > 0")
+    return int(value)
+
+
+def _normalize_dataloader_kwargs(value: Any) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError("training.dataloader_kwargs must be a mapping")
+    payload = dict(value)
+    _unknown_keys(
+        payload,
+        allowed=SUPPORTED_DATALOADER_KWARGS,
+        section="training.dataloader_kwargs",
+    )
+    normalized: dict[str, Any] = {}
+    if "num_workers" in payload:
+        normalized["num_workers"] = _coerce_nonnegative_int(
+            payload["num_workers"],
+            field_name="training.dataloader_kwargs.num_workers",
+        )
+    if "pin_memory" in payload:
+        normalized["pin_memory"] = _coerce_bool(
+            payload["pin_memory"],
+            field_name="training.dataloader_kwargs.pin_memory",
+            default=False,
+        )
+    if "persistent_workers" in payload:
+        normalized["persistent_workers"] = _coerce_bool(
+            payload["persistent_workers"],
+            field_name="training.dataloader_kwargs.persistent_workers",
+            default=False,
+        )
+    if "prefetch_factor" in payload:
+        normalized["prefetch_factor"] = _coerce_positive_int(
+            payload["prefetch_factor"],
+            field_name="training.dataloader_kwargs.prefetch_factor",
+        )
+    num_workers = int(normalized.get("num_workers", 0))
+    if num_workers == 0 and normalized.get("persistent_workers"):
+        raise ValueError(
+            "training.dataloader_kwargs.persistent_workers requires num_workers > 0"
+        )
+    if num_workers == 0 and "prefetch_factor" in normalized:
+        raise ValueError(
+            "training.dataloader_kwargs.prefetch_factor requires num_workers > 0"
+        )
+    return normalized
 
 
 def _normalize_residual_feature_config(
@@ -798,15 +879,81 @@ def _normalize_payload(
         raise ValueError(
             "training.loss_params is only supported when training.loss == exloss"
         )
+    if "accelerator" in training:
+        value = training.get("accelerator")
+        if value is None:
+            training["accelerator"] = None
+        elif not isinstance(value, str):
+            raise ValueError("training.accelerator must be a string")
+        else:
+            normalized_accelerator = value.strip().lower()
+            if normalized_accelerator not in SUPPORTED_TRAINER_ACCELERATORS:
+                raise ValueError(
+                    "training.accelerator must be one of: auto, cpu, gpu"
+                )
+            training["accelerator"] = normalized_accelerator
+    if "devices" in training:
+        value = training.get("devices")
+        if value is None:
+            training["devices"] = None
+        else:
+            training["devices"] = _coerce_positive_int(
+                value,
+                field_name="training.devices",
+            )
+    if "strategy" in training:
+        value = training.get("strategy")
+        if value is None:
+            training["strategy"] = None
+        elif not isinstance(value, str):
+            raise ValueError("training.strategy must be a string")
+        else:
+            training["strategy"] = value.strip() or None
+    if "precision" in training:
+        value = training.get("precision")
+        if value is None:
+            training["precision"] = None
+        elif isinstance(value, (int, str)) and not isinstance(value, bool):
+            training["precision"] = value
+        else:
+            raise ValueError("training.precision must be an int or string")
+    training["dataloader_kwargs"] = _normalize_dataloader_kwargs(
+        training.get("dataloader_kwargs")
+    )
 
     scheduler.setdefault("worker_devices", 1)
-    scheduler["gpu_ids"] = tuple(int(item) for item in scheduler.get("gpu_ids", (0, 1)))
-    if int(scheduler["worker_devices"]) != 1:
-        raise ValueError("worker_devices must remain 1 for scheduler-launched jobs")
+    scheduler.setdefault("parallelize_single_job_tuning", True)
+    scheduler["gpu_ids"] = tuple(
+        int(item) for item in scheduler.get("gpu_ids", (0, 1))
+    )
+    scheduler["worker_devices"] = _coerce_positive_int(
+        int(scheduler["worker_devices"]),
+        field_name="scheduler.worker_devices",
+    )
+    if not scheduler["gpu_ids"]:
+        raise ValueError("scheduler.gpu_ids must contain at least one GPU id")
+    if scheduler["worker_devices"] > len(scheduler["gpu_ids"]):
+        raise ValueError(
+            "scheduler.worker_devices cannot exceed the number of configured gpu_ids"
+        )
+    if len(scheduler["gpu_ids"]) % scheduler["worker_devices"] != 0:
+        raise ValueError(
+            "scheduler.gpu_ids must be evenly divisible by scheduler.worker_devices"
+        )
+    scheduler["parallelize_single_job_tuning"] = _coerce_bool(
+        scheduler["parallelize_single_job_tuning"],
+        field_name="scheduler.parallelize_single_job_tuning",
+        default=True,
+    )
 
     residual.setdefault("enabled", True)
     residual.setdefault("model", "xgboost")
     residual.setdefault("target", "level")
+    if "cpu_threads" in residual and residual["cpu_threads"] is not None:
+        residual["cpu_threads"] = _coerce_positive_int(
+            residual["cpu_threads"],
+            field_name="residual.cpu_threads",
+        )
     residual.setdefault("params", {})
     if "train_source" in residual:
         raise ValueError(

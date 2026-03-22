@@ -19,6 +19,7 @@ def build_residual_plugin(config: Any) -> ResidualPlugin:
     if name not in DEFAULT_RESIDUAL_PARAMS_BY_MODEL:
         raise ValueError(f"Unsupported residual model: {name}")
     params = {**DEFAULT_RESIDUAL_PARAMS_BY_MODEL[name], **dict(config.get("params", {}))}
+    cpu_threads = config.get("cpu_threads")
     if name == "xgboost":
         return XGBoostResidualPlugin(
             n_estimators=int(params["n_estimators"]),
@@ -26,6 +27,7 @@ def build_residual_plugin(config: Any) -> ResidualPlugin:
             learning_rate=float(params["learning_rate"]),
             subsample=float(params["subsample"]),
             colsample_bytree=float(params["colsample_bytree"]),
+            cpu_threads=(None if cpu_threads is None else int(cpu_threads)),
         )
     if name == "randomforest":
         return RandomForestResidualPlugin(
@@ -33,6 +35,7 @@ def build_residual_plugin(config: Any) -> ResidualPlugin:
             max_depth=(None if params["max_depth"] is None else int(params["max_depth"])),
             min_samples_leaf=int(params["min_samples_leaf"]),
             max_features=params["max_features"],
+            cpu_threads=(None if cpu_threads is None else int(cpu_threads)),
         )
     if name == "lightgbm":
         return LightGBMResidualPlugin(
@@ -42,5 +45,6 @@ def build_residual_plugin(config: Any) -> ResidualPlugin:
             num_leaves=int(params["num_leaves"]),
             min_child_samples=int(params["min_child_samples"]),
             feature_fraction=float(params["feature_fraction"]),
+            cpu_threads=(None if cpu_threads is None else int(cpu_threads)),
         )
     raise ValueError(f"Unsupported residual model: {name}")

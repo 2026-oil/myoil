@@ -21,6 +21,7 @@ class _LightGBMConfig:
     num_leaves: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["num_leaves"]
     min_child_samples: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["min_child_samples"]
     feature_fraction: float = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["feature_fraction"]
+    cpu_threads: int | None = None
 
 
 class LightGBMResidualPlugin(ResidualPlugin):
@@ -35,6 +36,7 @@ class LightGBMResidualPlugin(ResidualPlugin):
         num_leaves: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["num_leaves"],
         min_child_samples: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["min_child_samples"],
         feature_fraction: float = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["feature_fraction"],
+        cpu_threads: int | None = None,
         feature_config: Any = None,
     ):
         self.config = _LightGBMConfig(
@@ -44,6 +46,7 @@ class LightGBMResidualPlugin(ResidualPlugin):
             num_leaves=num_leaves,
             min_child_samples=min_child_samples,
             feature_fraction=feature_fraction,
+            cpu_threads=cpu_threads,
         )
         self.model: LGBMRegressor | None = None
         self._trained = False
@@ -98,7 +101,7 @@ class LightGBMResidualPlugin(ResidualPlugin):
             min_child_samples=self.config.min_child_samples,
             feature_fraction=self.config.feature_fraction,
             random_state=0,
-            n_jobs=1,
+            n_jobs=self.config.cpu_threads,
             verbosity=-1,
         )
         self.model.fit(features, target)
@@ -126,5 +129,6 @@ class LightGBMResidualPlugin(ResidualPlugin):
             "num_leaves": self.config.num_leaves,
             "min_child_samples": self.config.min_child_samples,
             "feature_fraction": self.config.feature_fraction,
+            "cpu_threads": self.config.cpu_threads,
             "checkpoint_path": str(self._checkpoint_path) if self._checkpoint_path else None,
         }

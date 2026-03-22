@@ -228,6 +228,10 @@ models:
     - temporal_dropout
 training:
   - input_size
+  - batch_size
+  - valid_batch_size
+  - windows_batch_size
+  - inference_windows_batch_size
   - learning_rate
   - scaler_type
   - model_step_size

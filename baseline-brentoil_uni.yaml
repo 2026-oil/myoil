@@ -22,6 +22,11 @@ training:
   val_check_steps: 100
   early_stop_patience_steps: -1
   loss: mse
+  dataloader_kwargs:
+    num_workers: 2
+    pin_memory: true
+    persistent_workers: true
+    prefetch_factor: 2
 cv:
   horizon: 8
   step_size: 4
@@ -35,6 +40,7 @@ scheduler:
   - 1
   max_concurrent_jobs: 2
   worker_devices: 1
+  parallelize_single_job_tuning: true
 residual:
   enabled: false
   model: xgboost

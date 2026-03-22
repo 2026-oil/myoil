@@ -3,10 +3,12 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass, replace
 from decimal import Decimal, ROUND_HALF_UP
+import fcntl
 import json
 import os
 from pathlib import Path
 from typing import Any, Sequence
+from datetime import datetime, timezone
 
 import numpy as np
 import optuna
@@ -44,7 +46,12 @@ from .progress import (
     emit_progress_event,
 )
 from .registry import build_residual_plugin
-from .scheduler import build_launch_plan, run_parallel_jobs
+from .scheduler import (
+    build_device_groups,
+    build_launch_plan,
+    build_tuning_launch_plan,
+    run_parallel_jobs,
+)
 
 ENTRYPOINT_VERSION = "neuralforecast-residual-v1"
 SUMMARY_REPORT_FILENAME = "sample.md"
@@ -70,6 +77,10 @@ class _OptunaTrialFailure(RuntimeError):
 
 def _can_prune_at_fold(fold_idx: int) -> bool:
     return fold_idx >= MIN_PRUNE_FOLD_IDX
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 class _ProgressLogger:
@@ -199,6 +210,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--validate-only", action="store_true")
     parser.add_argument("--jobs", nargs="+", default=None)
     parser.add_argument("--output-root", default=None)
+    parser.add_argument(
+        "--internal-stage",
+        choices=("full", "tune-main-only", "replay-only"),
+        default="full",
+        help=argparse.SUPPRESS,
+    )
     return parser
 
 
@@ -653,6 +670,46 @@ def _finished_trial_count(study: optuna.Study) -> int:
     return sum(1 for trial in study.trials if trial.state.is_finished())
 
 
+def _shared_budget_state_path(study_metadata: dict[str, Any]) -> Path:
+    storage_path = Path(str(study_metadata["storage_path"]))
+    return storage_path.with_suffix(f"{storage_path.suffix}.budget.json")
+
+
+def _reserve_shared_optuna_trial_slot(
+    study: optuna.Study,
+    *,
+    target_trial_count: int,
+    study_metadata: dict[str, Any],
+) -> int | None:
+    budget_path = _shared_budget_state_path(study_metadata)
+    budget_path.parent.mkdir(parents=True, exist_ok=True)
+    with budget_path.open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        handle.seek(0)
+        raw = handle.read().strip()
+        state = json.loads(raw) if raw else {}
+        finished_trial_count = _finished_trial_count(study)
+        reserved_count = max(int(state.get("reserved_trial_count", 0)), finished_trial_count)
+        if reserved_count >= target_trial_count:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            return None
+        slot_index = reserved_count
+        state.update(
+            {
+                "reserved_trial_count": reserved_count + 1,
+                "target_trial_count": target_trial_count,
+                "updated_at": _now_iso(),
+            }
+        )
+        handle.seek(0)
+        handle.truncate()
+        handle.write(json.dumps(state, indent=2))
+        handle.flush()
+        os.fsync(handle.fileno())
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        return slot_index
+
+
 def _optimize_study_with_resume(
     study: optuna.Study,
     *,
@@ -679,6 +736,42 @@ def _optimize_study_with_resume(
     }
 
 
+def _parallel_optimize_study_with_shared_budget(
+    study: optuna.Study,
+    *,
+    objective,
+    target_trial_count: int,
+    study_metadata: dict[str, Any],
+) -> dict[str, int]:
+    existing_trial_count = len(study.trials)
+    existing_finished_trial_count = _finished_trial_count(study)
+    reserved_slots = 0
+    while True:
+        slot_index = _reserve_shared_optuna_trial_slot(
+            study,
+            target_trial_count=target_trial_count,
+            study_metadata=study_metadata,
+        )
+        if slot_index is None:
+            break
+        reserved_slots += 1
+        study.optimize(
+            objective,
+            n_trials=1,
+            show_progress_bar=False,
+            catch=(_OptunaTrialFailure,),
+        )
+    return {
+        "requested_trial_count": target_trial_count,
+        "existing_trial_count_before_optimize": existing_trial_count,
+        "existing_finished_trial_count_before_optimize": (
+            existing_finished_trial_count
+        ),
+        "remaining_trial_count": max(target_trial_count - existing_finished_trial_count, 0),
+        "reserved_trial_slots": reserved_slots,
+    }
+
+
 def _require_complete_best_trial(study: optuna.Study, *, label: str) -> optuna.FrozenTrial:
     if not any(trial.state == TrialState.COMPLETE for trial in study.trials):
         raise RuntimeError(
@@ -687,17 +780,15 @@ def _require_complete_best_trial(study: optuna.Study, *, label: str) -> optuna.F
     return study.best_trial
 
 
-def _tune_main_job(
+def _main_job_objective(
     loaded: LoadedConfig,
     job: JobConfig,
-    models_dir: Path,
     *,
     source_df: pd.DataFrame,
     freq: str,
     splits: list[tuple[list[int], list[int]]],
     progress: _ProgressLogger | None = None,
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    sampler = build_optuna_sampler(optuna_seed(loaded.config.runtime.random_seed))
+) -> Any:
     trial_count = optuna_num_trials(loaded.config.runtime.opt_n_trial)
 
     def objective(trial: optuna.Trial) -> float:
@@ -774,18 +865,17 @@ def _tune_main_job(
         trial.set_user_attr("fold_mse", fold_mse)
         return metric
 
-    study, study_metadata = _open_persistent_study(
-        models_dir,
-        loaded=loaded,
-        stage="main-search",
-        job_name=job.model,
-        sampler=sampler,
-    )
-    optimize_metadata = _optimize_study_with_resume(
-        study,
-        objective=objective,
-        target_trial_count=trial_count,
-    )
+    return objective
+
+
+def _collect_main_tuning_result(
+    study: optuna.Study,
+    *,
+    loaded: LoadedConfig,
+    job: JobConfig,
+    study_metadata: dict[str, Any],
+    optimize_metadata: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     best_trial = _require_complete_best_trial(
         study, label=f"{job.model} main Optuna study"
     )
@@ -807,6 +897,116 @@ def _tune_main_job(
         "objective_stage": "tuning_pre_replay_direct_predictions",
     }
     return best_params, best_training_params, summary
+
+
+def _tune_main_job(
+    loaded: LoadedConfig,
+    job: JobConfig,
+    models_dir: Path,
+    *,
+    source_df: pd.DataFrame,
+    freq: str,
+    splits: list[tuple[list[int], list[int]]],
+    progress: _ProgressLogger | None = None,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    sampler = build_optuna_sampler(optuna_seed(loaded.config.runtime.random_seed))
+    objective = _main_job_objective(
+        loaded,
+        job,
+        source_df=source_df,
+        freq=freq,
+        splits=splits,
+        progress=progress,
+    )
+
+    study, study_metadata = _open_persistent_study(
+        models_dir,
+        loaded=loaded,
+        stage="main-search",
+        job_name=job.model,
+        sampler=sampler,
+    )
+    optimize_metadata = _optimize_study_with_resume(
+        study,
+        objective=objective,
+        target_trial_count=optuna_num_trials(loaded.config.runtime.opt_n_trial),
+    )
+    return _collect_main_tuning_result(
+        study,
+        loaded=loaded,
+        job=job,
+        study_metadata=study_metadata,
+        optimize_metadata=optimize_metadata,
+    )
+
+
+def _parallel_tune_main_job_worker(
+    loaded: LoadedConfig,
+    job: JobConfig,
+    models_dir: Path,
+    *,
+    source_df: pd.DataFrame,
+    freq: str,
+    splits: list[tuple[list[int], list[int]]],
+    progress: _ProgressLogger | None = None,
+) -> dict[str, Any]:
+    worker_index = int(os.environ.get("NEURALFORECAST_OPTUNA_WORKER_INDEX", "0"))
+    sampler = build_optuna_sampler(
+        optuna_seed(loaded.config.runtime.random_seed) + worker_index
+    )
+    objective = _main_job_objective(
+        loaded,
+        job,
+        source_df=source_df,
+        freq=freq,
+        splits=splits,
+        progress=progress,
+    )
+    study, study_metadata = _open_persistent_study(
+        models_dir,
+        loaded=loaded,
+        stage="main-search",
+        job_name=job.model,
+        sampler=sampler,
+    )
+    return _parallel_optimize_study_with_shared_budget(
+        study,
+        objective=objective,
+        target_trial_count=optuna_num_trials(loaded.config.runtime.opt_n_trial),
+        study_metadata=study_metadata,
+    )
+
+
+def _load_main_tuning_result(
+    loaded: LoadedConfig,
+    job: JobConfig,
+    models_dir: Path,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    sampler = build_optuna_sampler(optuna_seed(loaded.config.runtime.random_seed))
+    study, study_metadata = _open_persistent_study(
+        models_dir,
+        loaded=loaded,
+        stage="main-search",
+        job_name=job.model,
+        sampler=sampler,
+    )
+    optimize_metadata = {
+        "requested_trial_count": optuna_num_trials(loaded.config.runtime.opt_n_trial),
+        "existing_trial_count_before_optimize": len(study.trials),
+        "existing_finished_trial_count_before_optimize": _finished_trial_count(study),
+        "remaining_trial_count": max(
+            optuna_num_trials(loaded.config.runtime.opt_n_trial)
+            - _finished_trial_count(study),
+            0,
+        ),
+    }
+    return _collect_main_tuning_result(
+        study,
+        loaded=loaded,
+        job=job,
+        study_metadata=study_metadata,
+        optimize_metadata=optimize_metadata,
+    )
 
 
 def _score_residual_params(
@@ -1948,7 +2148,12 @@ def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
 
 
 def _run_single_job(
-    loaded: LoadedConfig, job: JobConfig, run_root: Path, *, manifest_path: Path
+    loaded: LoadedConfig,
+    job: JobConfig,
+    run_root: Path,
+    *,
+    manifest_path: Path,
+    main_stage: str = "full",
 ) -> None:
     source_df = pd.read_csv(loaded.config.dataset.path)
     source_df = source_df.sort_values(loaded.config.dataset.dt_col).reset_index(
@@ -1968,23 +2173,45 @@ def _run_single_job(
     models_dir.mkdir(parents=True, exist_ok=True)
     total_steps = len(splits)
     if job.validated_mode == "learned_auto":
-        total_steps *= optuna_num_trials(loaded.config.runtime.opt_n_trial) + 1
+        if main_stage == "tune-main-only":
+            total_steps *= optuna_num_trials(loaded.config.runtime.opt_n_trial)
+        else:
+            total_steps *= optuna_num_trials(loaded.config.runtime.opt_n_trial) + 1
     progress = _ProgressLogger(job.model, total_steps)
     progress.model_started(
         total_folds=len(splits),
-        detail=f"mode={job.validated_mode} output_root={run_root}",
+        detail=f"mode={job.validated_mode} stage={main_stage} output_root={run_root}",
     )
 
     if job.validated_mode == "learned_auto":
-        best_params, best_training_params, study_summary = _tune_main_job(
-            loaded,
-            job,
-            models_dir,
-            source_df=source_df,
-            freq=freq,
-            splits=splits,
-            progress=progress,
-        )
+        if main_stage == "tune-main-only":
+            _parallel_tune_main_job_worker(
+                loaded,
+                job,
+                models_dir,
+                source_df=source_df,
+                freq=freq,
+                splits=splits,
+                progress=progress,
+            )
+            progress.model_finished(detail="main-tuning-complete")
+            return
+        if main_stage == "replay-only":
+            best_params, best_training_params, study_summary = _load_main_tuning_result(
+                loaded,
+                job,
+                models_dir,
+            )
+        else:
+            best_params, best_training_params, study_summary = _tune_main_job(
+                loaded,
+                job,
+                models_dir,
+                source_df=source_df,
+                freq=freq,
+                splits=splits,
+                progress=progress,
+            )
         (models_dir / "best_params.json").write_text(
             json.dumps(best_params, indent=2), encoding="utf-8"
         )
@@ -2138,6 +2365,20 @@ def _run_single_job(
     pd.DataFrame(metrics_rows).to_csv(
         cv_dir / f"{effective_job.model}_metrics_by_cutoff.csv", index=False
     )
+    worker_devices = int(
+        os.environ.get(
+            "NEURALFORECAST_WORKER_DEVICES",
+            loaded.config.scheduler.worker_devices,
+        )
+    )
+    resolved_devices = (
+        min(loaded.config.training.devices, worker_devices)
+        if loaded.config.training.devices is not None
+        else worker_devices
+    )
+    resolved_strategy = loaded.config.training.strategy
+    if resolved_strategy is None and resolved_devices > 1:
+        resolved_strategy = "ddp-gloo-auto"
     (models_dir / "fit_summary.json").write_text(
         json.dumps(
             {
@@ -2148,7 +2389,10 @@ def _run_single_job(
                 "selected_training_search_params": list(
                     loaded.config.training_search.selected_search_params
                 ),
-                "devices": 1,
+                "devices": resolved_devices,
+                "precision": loaded.config.training.precision,
+                "strategy": resolved_strategy,
+                "dataloader_kwargs": loaded.config.training.dataloader_kwargs,
                 "loss": loaded.config.training.loss,
                 "evaluation_policy": "tscv_only",
                 "tuning_objective_metric": "mean_fold_mse_on_direct_predictions"
@@ -2171,6 +2415,59 @@ def _run_single_job(
     progress.model_finished(detail="run-complete")
 
 
+def _should_parallelize_single_job_tuning(loaded: LoadedConfig, job: JobConfig) -> bool:
+    if job.validated_mode != "learned_auto":
+        return False
+    if os.environ.get("NEURALFORECAST_WORKER_DEVICES"):
+        return False
+    if not loaded.config.scheduler.parallelize_single_job_tuning:
+        return False
+    return len(build_device_groups(loaded.config)) > 1
+
+
+def _run_single_job_with_parallel_tuning(
+    repo_root: Path,
+    loaded: LoadedConfig,
+    job: JobConfig,
+    run_root: Path,
+    *,
+    manifest_path: Path,
+) -> list[dict[str, object]]:
+    scheduler_dir = run_root / "scheduler"
+    scheduler_dir.mkdir(parents=True, exist_ok=True)
+    tune_launches = build_tuning_launch_plan(
+        loaded.config,
+        job_name=job.model,
+        worker_count=min(
+            len(build_device_groups(loaded.config)),
+            loaded.config.scheduler.max_concurrent_jobs,
+        ),
+    )
+    (scheduler_dir / "launch_plan.json").write_text(
+        json.dumps([launch.__dict__ for launch in tune_launches], indent=2),
+        encoding="utf-8",
+    )
+    results = run_parallel_jobs(repo_root, loaded, tune_launches, scheduler_dir)
+    if any(int(result["returncode"]) != 0 for result in results):
+        raise SystemExit(
+            json.dumps(
+                {
+                    "ok": False,
+                    "worker_results": results,
+                    "summary_artifacts": {},
+                }
+            )
+        )
+    _run_single_job(
+        loaded,
+        job,
+        run_root,
+        manifest_path=manifest_path,
+        main_stage="replay-only",
+    )
+    return results
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -2190,15 +2487,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps({"ok": True, "jobs": [job.model for job in selected_jobs]}))
         return 0
     if len(selected_jobs) == 1:
-        _run_single_job(
-            loaded,
-            selected_jobs[0],
-            paths["run_root"],
-            manifest_path=paths["manifest_path"],
-        )
+        if (
+            args.internal_stage == "full"
+            and _should_parallelize_single_job_tuning(loaded, selected_jobs[0])
+        ):
+            worker_results = _run_single_job_with_parallel_tuning(
+                repo_root,
+                loaded,
+                selected_jobs[0],
+                paths["run_root"],
+                manifest_path=paths["manifest_path"],
+            )
+        else:
+            _run_single_job(
+                loaded,
+                selected_jobs[0],
+                paths["run_root"],
+                manifest_path=paths["manifest_path"],
+                main_stage=args.internal_stage,
+            )
+            worker_results = []
         summary_artifacts = (
             _build_summary_artifacts(paths["run_root"])
-            if _should_build_summary_artifacts()
+            if args.internal_stage != "tune-main-only"
+            and _should_build_summary_artifacts()
             else {}
         )
         print(
@@ -2206,6 +2518,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 {
                     "ok": True,
                     "executed_jobs": [selected_jobs[0].model],
+                    "worker_results": worker_results,
                     "summary_artifacts": summary_artifacts,
                 }
             )

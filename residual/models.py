@@ -153,6 +153,34 @@ def validate_job(job: JobConfig) -> ModelCapabilities:
     return capabilities_for(job.model)
 
 
+def _resolved_devices(config: AppConfig) -> int | None:
+    worker_devices = os.environ.get("NEURALFORECAST_WORKER_DEVICES")
+    if config.training.devices is not None:
+        if worker_devices:
+            return min(int(config.training.devices), int(worker_devices))
+        return int(config.training.devices)
+    if worker_devices:
+        return int(worker_devices)
+    return int(config.scheduler.worker_devices)
+
+
+def _resolved_strategy(config: AppConfig, devices: int | None) -> Any:
+    if config.training.strategy is not None:
+        return config.training.strategy
+    if devices is None or devices <= 1:
+        return None
+    try:
+        from pytorch_lightning.strategies import DDPStrategy
+
+        return DDPStrategy(process_group_backend="gloo")
+    except Exception:
+        return "ddp"
+
+
+def _resolved_dataloader_kwargs(config: AppConfig) -> dict[str, Any]:
+    return dict(config.training.dataloader_kwargs)
+
+
 def build_model(
     config: AppConfig,
     job: JobConfig,
@@ -187,13 +215,12 @@ def build_model(
         'inference_windows_batch_size': config.training.inference_windows_batch_size,
         'random_seed': config.runtime.random_seed,
         'alias': job.model,
-        'accelerator': 'gpu' if os.environ.get('CUDA_VISIBLE_DEVICES') else 'cpu',
-        'devices': 1,
         'enable_checkpointing': False,
         'enable_progress_bar': False,
         'logger': False,
         'loss': resolve_loss(config.training.loss, loss_params=config.training.loss_params),
         'valid_loss': resolve_loss(config.training.loss, loss_params=config.training.loss_params),
+        'dataloader_kwargs': _resolved_dataloader_kwargs(config),
         'hist_exog_list': _configured_exog_list(
             caps.supports_hist_exog, config.dataset.hist_exog_cols
         ),
@@ -204,6 +231,16 @@ def build_model(
             caps.supports_stat_exog, config.dataset.static_exog_cols
         ),
     }
+    resolved_devices = _resolved_devices(config)
+    resolved_strategy = _resolved_strategy(config, resolved_devices)
+    if config.training.accelerator is not None:
+        shared_kwargs['accelerator'] = config.training.accelerator
+    if resolved_devices is not None:
+        shared_kwargs['devices'] = resolved_devices
+    if resolved_strategy is not None:
+        shared_kwargs['strategy'] = resolved_strategy
+    if config.training.precision is not None:
+        shared_kwargs['precision'] = config.training.precision
     if caps.requires_n_series:
         shared_kwargs['n_series'] = 1 if n_series is None else n_series
     signature = inspect.signature(model_cls.__init__)

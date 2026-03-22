@@ -36,7 +36,13 @@ from residual.optuna_spaces import (
 )
 from residual.plugins_base import ResidualContext, ResidualPlugin
 from residual.progress import PROGRESS_EVENT_PREFIX
-from residual.scheduler import build_launch_plan, run_parallel_jobs, worker_env
+from residual.scheduler import (
+    build_device_groups,
+    build_launch_plan,
+    build_tuning_launch_plan,
+    run_parallel_jobs,
+    worker_env,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -158,6 +164,7 @@ overlap_eval_policy = 'by_cutoff_mean'
 gpu_ids = [0, 1]
 max_concurrent_jobs = 2
 worker_devices = 1
+parallelize_single_job_tuning = false
 
 [residual]
 enabled = true
@@ -214,7 +221,12 @@ def _payload() -> dict:
             "gap": 0,
             "overlap_eval_policy": "by_cutoff_mean",
         },
-        "scheduler": {"gpu_ids": [0, 1], "max_concurrent_jobs": 2, "worker_devices": 1},
+        "scheduler": {
+            "gpu_ids": [0, 1],
+            "max_concurrent_jobs": 2,
+            "worker_devices": 1,
+            "parallelize_single_job_tuning": False,
+        },
         "residual": {
             "enabled": True,
             "model": "xgboost",
@@ -1001,21 +1013,42 @@ def test_build_model_supports_duet(tmp_path: Path):
     assert duet.hparams.hidden_size == 32
 
 
-def test_scheduler_plan_and_worker_env_use_single_device(tmp_path: Path):
+def test_scheduler_plan_and_worker_env_support_device_groups(tmp_path: Path):
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n", encoding="utf-8"
     )
+    payload = _payload()
+    payload["scheduler"]["worker_devices"] = 2
     loaded = load_app_config(
-        tmp_path, config_path=_write_config(tmp_path, _payload(), ".yaml")
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
     )
     launches = build_launch_plan(loaded.config, loaded.config.jobs)
-    assert [launch.gpu_id for launch in launches] == [0, 1]
-    assert all(launch.devices == 1 for launch in launches)
-    env = worker_env(1)
-    assert env["CUDA_VISIBLE_DEVICES"] == "1"
-    assert env["NEURALFORECAST_WORKER_DEVICES"] == "1"
+    assert all(launch.devices == 2 for launch in launches)
+    assert build_device_groups(loaded.config) == [(0, 1)]
+    tuning_launches = build_tuning_launch_plan(loaded.config, job_name="TFT")
+    assert len(tuning_launches) == 1
+    env = worker_env((0, 1))
+    assert env["CUDA_VISIBLE_DEVICES"] == "0,1"
+    assert env["NEURALFORECAST_WORKER_DEVICES"] == "2"
     assert env["NEURALFORECAST_PROGRESS_MODE"] == "structured"
     assert env["NEURALFORECAST_SKIP_SUMMARY_ARTIFACTS"] == "1"
+
+
+def test_load_app_config_rejects_non_divisible_scheduler_groups(tmp_path: Path):
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n",
+        encoding="utf-8",
+    )
+    payload = _payload()
+    payload["scheduler"]["gpu_ids"] = [0, 1, 2]
+    payload["scheduler"]["worker_devices"] = 2
+    path = _write_config(tmp_path, payload, ".yaml")
+
+    with pytest.raises(
+        ValueError,
+        match="scheduler.gpu_ids must be evenly divisible by scheduler.worker_devices",
+    ):
+        load_app_config(tmp_path, config_path=path)
 
 
 def test_scheduler_respects_max_concurrent_jobs(
@@ -1065,6 +1098,61 @@ def test_scheduler_respects_max_concurrent_jobs(
 
     assert len(results) == 3
     assert state["max_active"] == 2
+
+
+def test_build_model_surfaces_trainer_and_dataloader_settings(tmp_path: Path):
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n2020-01-08,2,3,4\n",
+        encoding="utf-8",
+    )
+    payload = _payload()
+    payload["training"].update(
+        {
+            "devices": 2,
+            "strategy": "ddp",
+            "precision": "16-mixed",
+            "dataloader_kwargs": {
+                "num_workers": 2,
+                "pin_memory": True,
+                "persistent_workers": True,
+                "prefetch_factor": 2,
+            },
+        }
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    model = build_model(loaded.config, loaded.config.jobs[0], n_series=1)
+
+    assert model.trainer_kwargs["devices"] == 2
+    assert model.trainer_kwargs["strategy"] == "ddp"
+    assert model.trainer_kwargs["precision"] == "16-mixed"
+    assert model.dataloader_kwargs == {
+        "num_workers": 2,
+        "pin_memory": True,
+        "persistent_workers": True,
+        "prefetch_factor": 2,
+    }
+
+
+def test_build_model_clamps_devices_to_visible_worker_assignment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n2020-01-08,2,3,4\n",
+        encoding="utf-8",
+    )
+    payload = _payload()
+    payload["training"]["devices"] = 2
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+    monkeypatch.setenv("NEURALFORECAST_WORKER_DEVICES", "1")
+
+    model = build_model(loaded.config, loaded.config.jobs[0], n_series=1)
+
+    assert model.trainer_kwargs["devices"] == 1
 
 
 def test_scheduler_streams_worker_stdout_to_terminal(
@@ -1728,6 +1816,18 @@ def test_residual_registry_builds_xgboost_plugin_with_custom_params():
     )
     assert plugin.metadata()["plugin"] == "xgboost"
     assert plugin.metadata()["n_estimators"] == 8
+
+
+def test_residual_registry_surfaces_cpu_thread_overrides():
+    plugin = _import_build_residual_plugin()(
+        {
+            "model": "xgboost",
+            "cpu_threads": 4,
+            "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+        }
+    )
+
+    assert plugin.metadata()["cpu_threads"] == 4
 
 
 @pytest.mark.parametrize(
@@ -2762,7 +2862,7 @@ def test_load_app_config_rejects_removed_early_stop_search_space_param(
         load_app_config(tmp_path, config_path=config_path)
 
 
-def test_load_app_config_rejects_fixed_training_search_space_param(tmp_path: Path):
+def test_load_app_config_accepts_batch_training_search_space_param(tmp_path: Path):
     payload = _payload()
     payload["jobs"] = [{"model": "TFT", "params": {}}]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
@@ -2780,15 +2880,20 @@ def test_load_app_config_rejects_fixed_training_search_space_param(tmp_path: Pat
         },
     )
 
-    with pytest.raises(
-        ValueError, match="search_space.training contains fixed, non-tunable"
-    ):
-        load_app_config(tmp_path, config_path=config_path)
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    assert loaded.config.training_search.validated_mode == "training_auto"
+    assert "batch_size" in loaded.config.training_search.selected_search_params
 
 
-def test_suggest_training_params_rejects_fixed_training_keys():
-    with pytest.raises(ValueError, match="fixed and non-tunable"):
-        suggest_training_params(("batch_size",), object())
+def test_suggest_training_params_supports_batch_size_selector():
+    class _Trial:
+        def suggest_categorical(self, _name, options):
+            return options[0]
+
+    suggested = suggest_training_params(("batch_size",), _Trial())
+
+    assert suggested["batch_size"] == 16
 
 
 def test_load_app_config_rejects_training_model_learning_rate_overlap(tmp_path: Path):
@@ -3041,6 +3146,109 @@ def test_runtime_auto_mode_prefers_yaml_opt_n_trial_over_env(
         (output_root / "models" / "TFT" / "optuna_study_summary.json").read_text()
     )
     assert study_summary["trial_count"] == 2
+
+
+def test_runtime_main_parallelizes_single_auto_job_tuning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    payload = _payload()
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["scheduler"]["parallelize_single_job_tuning"] = True
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(tmp_path, {"models": {"TFT": ["hidden_size"]}, "training": [], "residual": {}})
+
+    from residual import runtime
+
+    called: dict[str, Any] = {}
+
+    def _fake_parallel(repo_root, loaded, job, run_root, *, manifest_path):
+        called["repo_root"] = repo_root
+        called["job_name"] = job.model
+        called["run_root"] = run_root
+        called["manifest_path"] = manifest_path
+        return [{"job_name": job.model, "returncode": 0}]
+
+    monkeypatch.setattr(
+        runtime,
+        "load_app_config",
+        lambda _repo_root, **kwargs: load_app_config(tmp_path, **kwargs),
+    )
+    monkeypatch.setattr(runtime, "_run_single_job_with_parallel_tuning", _fake_parallel)
+    monkeypatch.setattr(runtime, "_should_build_summary_artifacts", lambda: False)
+
+    code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "TFT",
+            "--output-root",
+            str(tmp_path / "run_parallel_auto"),
+        ]
+    )
+
+    assert code == 0
+    assert called["job_name"] == "TFT"
+
+
+def test_runtime_main_does_not_recurse_parallel_tuning_inside_worker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    payload = _payload()
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["scheduler"]["parallelize_single_job_tuning"] = True
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {"models": {"TFT": ["hidden_size"]}, "training": [], "residual": {}},
+    )
+
+    from residual import runtime
+
+    called = {"count": 0}
+
+    def _fake_parallel(*_args, **_kwargs):
+        called["count"] += 1
+        return []
+
+    monkeypatch.setattr(
+        runtime,
+        "load_app_config",
+        lambda _repo_root, **kwargs: load_app_config(tmp_path, **kwargs),
+    )
+    monkeypatch.setattr(runtime, "_run_single_job_with_parallel_tuning", _fake_parallel)
+    monkeypatch.setattr(runtime, "_run_single_job", lambda *_args, **_kwargs: None)
+    monkeypatch.setenv("NEURALFORECAST_WORKER_DEVICES", "1")
+
+    code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "TFT",
+            "--output-root",
+            str(tmp_path / "run_worker_no_recurse"),
+        ]
+    )
+
+    assert code == 0
+    assert called["count"] == 0
 
 
 def test_runtime_auto_mode_prunes_trials_only_after_fold_ten(
@@ -4255,6 +4463,10 @@ EXPECTED_REPO_AUTO_SELECTORS = {
 }
 EXPECTED_REPO_TRAINING_SELECTORS = [
     "input_size",
+    "batch_size",
+    "valid_batch_size",
+    "windows_batch_size",
+    "inference_windows_batch_size",
     "learning_rate",
     "scaler_type",
     "model_step_size",
