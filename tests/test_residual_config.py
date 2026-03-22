@@ -118,9 +118,16 @@ def _write_config(tmp_path: Path, payload: dict, suffix: str) -> Path:
         task_block = ""
         task_name = payload.get("task", {}).get("name")
         residual_target = payload.get("residual", {}).get("target", "level")
+        runtime_transformations = payload.get("runtime", {}).get("transformations")
         if task_name:
-            task_block = f"\n[task]\nname = {task_name!r}\n"
-        text = """
+            task_block = "\n[task]\nname = " + repr(task_name) + "\n"
+        runtime_block = "\n[runtime]\nrandom_seed = 1\n"
+        if runtime_transformations is not None:
+            runtime_block += "transformations = " + repr(runtime_transformations) + "\n"
+        text = (
+            task_block
+            + runtime_block
+            + """
 [dataset]
 path = 'data.csv'
 target_col = 'target'
@@ -128,9 +135,6 @@ dt_col = 'dt'
 hist_exog_cols = ['hist_a']
 futr_exog_cols = []
 static_exog_cols = []
-
-[runtime]
-random_seed = 1
 
 [training]
 input_size = 64
@@ -173,7 +177,8 @@ params = { hidden_size = 32 }
 model = 'iTransformer'
 params = { hidden_size = 32, n_heads = 4, e_layers = 2, d_ff = 64 }
 """
-        text = f"{task_block}{text}".replace("__RESIDUAL_TARGET__", residual_target)
+        )
+        text = text.replace("__RESIDUAL_TARGET__", residual_target)
         path.write_text(text, encoding="utf-8")
     else:
         path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
@@ -365,6 +370,73 @@ def test_load_app_config_preserves_residual_target_yaml_toml_parity(tmp_path: Pa
 
     assert loaded_yaml.config.residual.target == "delta"
     assert loaded_yaml.config.to_dict() == loaded_toml.config.to_dict()
+
+
+def test_runtime_transformations_omitted_when_unset_preserves_resolved_hash(
+    tmp_path: Path,
+):
+    payload_default = _payload()
+    payload_null = _payload()
+    payload_null["runtime"]["transformations"] = None
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n",
+        encoding="utf-8",
+    )
+
+    loaded_default = load_app_config(
+        tmp_path,
+        config_path=_write_config(tmp_path, payload_default, ".yaml"),
+    )
+    loaded_null = load_app_config(
+        tmp_path,
+        config_path=_write_config(tmp_path, payload_null, ".yaml"),
+    )
+
+    assert "transformations" not in loaded_default.normalized_payload["runtime"]
+    assert "transformations" not in loaded_null.normalized_payload["runtime"]
+    assert loaded_default.resolved_hash == loaded_null.resolved_hash
+
+
+def test_runtime_transformations_yaml_toml_validation_parity(tmp_path: Path):
+    payload = _payload()
+    payload["runtime"]["transformations"] = "diff"
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n2020-01-08,2,3,4\n",
+        encoding="utf-8",
+    )
+    yaml_path = _write_config(tmp_path, payload, ".yaml")
+    toml_path = _write_config(tmp_path, payload, ".toml")
+
+    loaded_yaml = load_app_config(tmp_path, config_path=yaml_path)
+    loaded_toml = load_app_config(tmp_path, config_toml_path=toml_path)
+
+    assert loaded_yaml.config.runtime.transformations == "diff"
+    assert loaded_yaml.config.to_dict() == loaded_toml.config.to_dict()
+    assert loaded_yaml.normalized_payload["runtime"]["transformations"] == "diff"
+
+
+@pytest.mark.parametrize("suffix", [".yaml", ".toml"])
+def test_load_app_config_rejects_invalid_runtime_transformations(
+    tmp_path: Path, suffix: str
+):
+    payload = _payload()
+    payload["runtime"]["transformations"] = "log"
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n2020-01-08,2,3,4\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError, match="runtime.transformations must be the string 'diff'"
+    ):
+        if suffix == ".toml":
+            load_app_config(
+                tmp_path, config_toml_path=_write_config(tmp_path, payload, suffix)
+            )
+        else:
+            load_app_config(
+                tmp_path, config_path=_write_config(tmp_path, payload, suffix)
+            )
 
 
 def test_load_app_config_accepts_exloss_params(tmp_path: Path):
@@ -1727,6 +1799,102 @@ def test_runtime_generates_per_fold_residual_artifacts_with_dummy_model(tmp_path
     assert diagnostics["fold_count"] == 4
     assert diagnostics["residual.target"] == "level"
     assert diagnostics["tscv_policy"]["gap"] == 0
+
+
+def test_runtime_diff_preserves_raw_scale_for_baseline_learned_artifacts(
+    tmp_path: Path,
+):
+    from residual.runtime import main as runtime_main
+
+    data = (
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n"
+        "2020-01-22,4\n2020-01-29,5\n2020-02-05,6\n2020-02-12,7\n"
+    )
+    cases = [
+        ("Naive", {}, tmp_path / "run_diff_baseline"),
+        (
+            "DummyUnivariate",
+            {"start_padding_enabled": True},
+            tmp_path / "run_diff_learned",
+        ),
+    ]
+    for model_name, params, output_root in cases:
+        payload = _payload()
+        payload["runtime"]["transformations"] = "diff"
+        payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
+        payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 0})
+        payload["dataset"]["hist_exog_cols"] = []
+        payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+        payload["jobs"] = [{"model": model_name, "params": params}]
+        (tmp_path / "data.csv").write_text(data, encoding="utf-8")
+        config_path = _write_config(tmp_path, payload, ".yaml")
+
+        code = runtime_main(
+            [
+                "--config",
+                str(config_path),
+                "--jobs",
+                model_name,
+                "--output-root",
+                str(output_root),
+            ]
+        )
+
+        forecasts = pd.read_csv(output_root / "cv" / f"{model_name}_forecasts.csv")
+        assert code == 0
+        assert forecasts["y"].tolist() == [6.0, 7.0]
+        assert forecasts["y_hat"].tolist() == [6.0, 7.0]
+        assert forecasts["y_hat"].tolist() != [1.0, 1.0]
+
+
+def test_runtime_diff_residual_enabled_skips_short_backcast_history_without_crash(
+    tmp_path: Path,
+):
+    from residual.runtime import main as runtime_main
+
+    payload = _payload()
+    payload["runtime"]["transformations"] = "diff"
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 0})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["residual"] = {
+        "enabled": True,
+        "model": "xgboost",
+        "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+    }
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    (tmp_path / "data.csv").write_text(
+        (
+            "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n"
+            "2020-01-22,4\n2020-01-29,5\n"
+        ),
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    output_root = tmp_path / "run_diff_residual"
+
+    code = runtime_main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "DummyUnivariate",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    assert code == 0
+    assert (
+        output_root
+        / "residual"
+        / "DummyUnivariate"
+        / "folds"
+        / "fold_000"
+        / "backcast_panel.csv"
+    ).exists()
 
 
 def test_runtime_writes_loss_curve_images_for_residual_disabled_learned_folds(
@@ -4561,6 +4729,63 @@ def test_build_residual_target_delta_does_not_leak_across_fold_and_cutoff_groups
     residual_target = build_residual_target(panel, "delta")
 
     assert residual_target.tolist() == [1.0, 1.0, 2.0, 3.0, 2.0, 1.0]
+
+
+def test_runtime_diff_inverse_reconstruction_uses_anchor_and_cumsum():
+    from residual.runtime import _FoldDiffContext, _restore_prediction_series
+
+    restored = _restore_prediction_series(
+        pd.Series([1.0, 2.0, 3.0]),
+        _FoldDiffContext(target_col="target", anchor=10.0),
+    )
+
+    assert restored.tolist() == [11.0, 13.0, 16.0]
+
+
+def test_runtime_diff_only_transforms_target_channel_in_multivariate_inputs(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["runtime"]["transformations"] = "diff"
+    payload["dataset"]["hist_exog_cols"] = ["hist_a"]
+    payload["dataset"]["futr_exog_cols"] = ["futr_a"]
+    payload["jobs"] = [
+        {"model": "DummyMultivariate", "params": {"start_padding_enabled": True}}
+    ]
+    data = (
+        "dt,target,hist_a,futr_a\n"
+        "2020-01-01,1,10,100\n"
+        "2020-01-08,2,11,101\n"
+        "2020-01-15,3,12,102\n"
+        "2020-01-22,4,13,103\n"
+    )
+    (tmp_path / "data.csv").write_text(data, encoding="utf-8")
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    import residual.runtime as runtime
+
+    train_df = pd.read_csv(tmp_path / "data.csv").iloc[:3].reset_index(drop=True)
+    diff_context = runtime._build_fold_diff_context(loaded, train_df)
+    transformed_train_df = runtime._transform_training_frame(train_df, diff_context)
+    adapter_inputs = build_multivariate_inputs(
+        transformed_train_df,
+        loaded.config.jobs[0],
+        dataset=loaded.config.dataset,
+        dt_col=loaded.config.dataset.dt_col,
+    )
+
+    fit_frame = adapter_inputs.fit_df.sort_values(["ds", "unique_id"]).reset_index(
+        drop=True
+    )
+    assert fit_frame["ds"].dt.strftime("%Y-%m-%d").unique().tolist() == [
+        "2020-01-08",
+        "2020-01-15",
+    ]
+    assert fit_frame.loc[fit_frame["unique_id"] == "target", "y"].tolist() == [1.0, 1.0]
+    assert fit_frame.loc[fit_frame["unique_id"] == "hist_a", "y"].tolist() == [11, 12]
+    assert fit_frame.loc[fit_frame["unique_id"] == "futr_a", "y"].tolist() == [101, 102]
 
 
 def test_apply_residual_plugin_writes_residual_target_to_diagnostics(

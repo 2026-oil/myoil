@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from decimal import Decimal, ROUND_HALF_UP
 import json
 import os
@@ -413,6 +413,88 @@ def _resolve_freq(loaded: LoadedConfig, source_df: pd.DataFrame) -> str:
     return inferred
 
 
+@dataclass(frozen=True)
+class _FoldDiffContext:
+    target_col: str
+    anchor: float
+
+
+def _build_fold_diff_context(
+    loaded: LoadedConfig,
+    train_df: pd.DataFrame,
+    *,
+    target_col: str | None = None,
+) -> _FoldDiffContext | None:
+    if loaded.config.runtime.transformations != "diff":
+        return None
+    active_target_col = target_col or loaded.config.dataset.target_col
+    if len(train_df) < 2:
+        raise ValueError(
+            "runtime.transformations=diff requires at least 2 training rows per fold"
+        )
+    return _FoldDiffContext(
+        target_col=active_target_col,
+        anchor=float(train_df[active_target_col].iloc[-1]),
+    )
+
+
+def _transform_training_frame(
+    train_df: pd.DataFrame,
+    diff_context: _FoldDiffContext | None,
+) -> pd.DataFrame:
+    normalized = train_df.reset_index(drop=True).copy()
+    if diff_context is None:
+        return normalized
+    normalized[diff_context.target_col] = (
+        normalized[diff_context.target_col].astype(float).diff()
+    )
+    transformed = normalized.iloc[1:].reset_index(drop=True)
+    if transformed.empty:
+        raise ValueError(
+            "runtime.transformations=diff removed all training rows; need at least 2 rows"
+        )
+    return transformed
+
+
+def _transform_training_series(
+    history: pd.Series,
+    diff_context: _FoldDiffContext | None,
+) -> pd.Series:
+    normalized = history.reset_index(drop=True).astype(float)
+    if diff_context is None:
+        return normalized
+    transformed = normalized.diff().iloc[1:].reset_index(drop=True)
+    if transformed.empty:
+        raise ValueError(
+            "runtime.transformations=diff removed all training rows; need at least 2 rows"
+        )
+    return transformed
+
+
+def _restore_prediction_series(
+    predictions: pd.Series,
+    diff_context: _FoldDiffContext | None,
+) -> pd.Series:
+    restored = predictions.reset_index(drop=True).astype(float)
+    if diff_context is None:
+        return restored
+    return (restored.cumsum() + diff_context.anchor).astype(float)
+
+
+def _restore_target_predictions(
+    target_predictions: pd.DataFrame,
+    *,
+    prediction_col: str,
+    diff_context: _FoldDiffContext | None,
+) -> pd.DataFrame:
+    restored = target_predictions.reset_index(drop=True).copy()
+    restored[prediction_col] = _restore_prediction_series(
+        restored[prediction_col],
+        diff_context,
+    ).to_numpy()
+    return restored
+
+
 def _compute_metrics(actual: pd.Series, predicted: pd.Series) -> dict[str, float]:
     actual = actual.reset_index(drop=True)
     predicted = predicted.reset_index(drop=True)
@@ -455,7 +537,15 @@ def _fit_and_predict_fold(
     target_col = loaded.config.dataset.target_col
     train_df = source_df.iloc[train_idx].reset_index(drop=True)
     future_df = source_df.iloc[test_idx].reset_index(drop=True)
-    adapter_inputs = _build_adapter_inputs(loaded, train_df, future_df, job, dt_col)
+    diff_context = _build_fold_diff_context(loaded, train_df)
+    transformed_train_df = _transform_training_frame(train_df, diff_context)
+    adapter_inputs = _build_adapter_inputs(
+        loaded,
+        transformed_train_df,
+        future_df,
+        job,
+        dt_col,
+    )
     model = build_model(
         effective_config,
         job,
@@ -469,10 +559,15 @@ def _fit_and_predict_fold(
         val_size=effective_config.training.val_size,
     )
     predictions = _predict_with_fitted_model(nf, adapter_inputs)
-    _prediction_column(predictions, job.model)
+    pred_col = _prediction_column(predictions, job.model)
     target_predictions = predictions[
         predictions["unique_id"] == target_col
     ].reset_index(drop=True)
+    target_predictions = _restore_target_predictions(
+        target_predictions,
+        prediction_col=pred_col,
+        diff_context=diff_context,
+    )
     target_actuals = future_df[target_col].reset_index(drop=True)
     train_end_ds = pd.to_datetime(train_df[dt_col].iloc[-1])
     return target_predictions, target_actuals, train_end_ds, train_df, nf
@@ -1066,9 +1161,20 @@ def _build_fold_backcast_panel(
         future_df = train_df.iloc[
             cutoff_idx + 1 : cutoff_idx + 1 + loaded.config.cv.horizon
         ].reset_index(drop=True)
-        adapter_inputs = _build_adapter_inputs(
+        if (
+            loaded.config.runtime.transformations == "diff"
+            and len(history_df) < 2
+        ):
+            continue
+        diff_context = _build_fold_diff_context(
             loaded,
             history_df,
+            target_col=target_col,
+        )
+        transformed_history_df = _transform_training_frame(history_df, diff_context)
+        adapter_inputs = _build_adapter_inputs(
+            loaded,
+            transformed_history_df,
             future_df,
             job,
             dt_col,
@@ -1078,6 +1184,11 @@ def _build_fold_backcast_panel(
         target_predictions = predictions[
             predictions["unique_id"] == target_col
         ].reset_index(drop=True)
+        target_predictions = _restore_target_predictions(
+            target_predictions,
+            prediction_col=pred_col,
+            diff_context=diff_context,
+        )
         actuals = future_df[target_col].reset_index(drop=True)
         cutoff = pd.to_datetime(train_df[dt_col].iloc[cutoff_idx])
         for row_idx, ds in enumerate(target_predictions["ds"]):
@@ -1322,6 +1433,7 @@ def _apply_residual_plugin(
 
 
 def _baseline_cross_validation(
+    loaded: LoadedConfig,
     train_df: pd.DataFrame,
     splits: list[tuple[list[int], list[int]]],
     model_name: str,
@@ -1335,18 +1447,29 @@ def _baseline_cross_validation(
         future_actual = values.iloc[test_idx].reset_index(drop=True)
         future_dates = dates.iloc[test_idx].reset_index(drop=True)
         train_end_ds = dates.iloc[train_idx[-1]]
+        diff_context = _build_fold_diff_context(
+            loaded,
+            train_df.iloc[train_idx].reset_index(drop=True),
+            target_col="y",
+        )
+        working_history = _transform_training_series(history, diff_context)
         if model_name == "Naive":
-            pred_values = pd.Series([float(history.iloc[-1])] * len(future_actual))
+            pred_values = pd.Series(
+                [float(working_history.iloc[-1])] * len(future_actual)
+            )
         elif model_name == "SeasonalNaive":
-            season = min(len(history), len(future_actual))
-            tail = history.iloc[-season:].reset_index(drop=True)
+            season = min(len(working_history), len(future_actual))
+            tail = working_history.iloc[-season:].reset_index(drop=True)
             pred_values = pd.Series(
                 (list(tail) * ((len(future_actual) // len(tail)) + 1))[
                     : len(future_actual)
                 ]
             )
         else:
-            pred_values = pd.Series([float(history.mean())] * len(future_actual))
+            pred_values = pd.Series(
+                [float(working_history.mean())] * len(future_actual)
+            )
+        pred_values = _restore_prediction_series(pred_values, diff_context)
         metrics = _compute_metrics(future_actual, pred_values)
         metrics_rows.append(
             {"fold_idx": fold_idx, "cutoff": str(train_end_ds), **metrics}
@@ -1892,6 +2015,7 @@ def _run_single_job(
         train_series["ds"] = pd.to_datetime(train_series["ds"])
         train_series.insert(0, "unique_id", target_col)
         baseline_metrics, baseline_forecasts = _baseline_cross_validation(
+            loaded,
             train_series,
             splits,
             effective_job.model,

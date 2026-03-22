@@ -71,6 +71,7 @@ FORBIDDEN_RESIDUAL_LAG_SOURCES = {
     "ds_day",
 }
 ResidualTargetMode = Literal["level", "delta"]
+RuntimeTransformationMode = Literal["diff"]
 
 
 @dataclass(frozen=True)
@@ -88,6 +89,7 @@ class DatasetConfig:
 class RuntimeConfig:
     random_seed: int = 1
     opt_n_trial: int | None = None
+    transformations: RuntimeTransformationMode | None = None
 
 
 @dataclass(frozen=True)
@@ -222,6 +224,8 @@ class AppConfig:
         if self.task.name is None:
             payload.pop("task", None)
         payload["dataset"]["path"] = str(self.dataset.path)
+        if payload["runtime"].get("transformations") is None:
+            payload["runtime"].pop("transformations", None)
         payload["training_search"]["selected_search_params"] = list(
             payload["training_search"]["selected_search_params"]
         )
@@ -767,6 +771,19 @@ def _normalize_payload(
         runtime["opt_n_trial"] = int(runtime["opt_n_trial"])
         if runtime["opt_n_trial"] <= 0:
             raise ValueError("runtime.opt_n_trial must be a positive integer")
+    if "transformations" in runtime:
+        value = runtime.get("transformations")
+        if value is None:
+            runtime.pop("transformations", None)
+        elif not isinstance(value, str):
+            raise ValueError("runtime.transformations must be the string 'diff'")
+        else:
+            normalized_transformation = value.strip().lower()
+            if normalized_transformation != "diff":
+                raise ValueError(
+                    "runtime.transformations must be the string 'diff'"
+                )
+            runtime["transformations"] = normalized_transformation
 
     training.setdefault("loss", "mse")
     loss = str(training["loss"]).lower()
