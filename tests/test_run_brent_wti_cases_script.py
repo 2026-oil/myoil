@@ -96,27 +96,10 @@ fi
     assert "[batch] passed=1 failed=1 missing=1" in summary_txt
 
 
-def test_run_brent_wti_cases_script_default_config_list_includes_all_residual_feature_set_cases():
+def test_run_brent_wti_cases_script_default_config_list_targets_case3_hpt_configs():
     script = CONFIG_SOURCE_PATH.read_text(encoding="utf-8")
 
-    expected_groups = [
-        "yaml/feature_set_res_level_lag_exg_xgb",
-        "yaml/feature_set_res_level_lag_exg_lgbm",
-        "yaml/feature_set_res_delta_lag_exg_xgb",
-        "yaml/feature_set_res_delta_lag_exg_lgbm",
-    ]
-    expected_cases = [
-        "brentoil-case1.yaml",
-        "brentoil-case2.yaml",
-        "brentoil-case3.yaml",
-        "brentoil-case4.yaml",
-        "wti-case1.yaml",
-        "wti-case2.yaml",
-        "wti-case3.yaml",
-        "wti-case4.yaml",
-    ]
-
-    for group in expected_groups:
-        for case in expected_cases:
-            config_path = f"{group}/{case}"
-            assert f'"{config_path}"' in script
+    assert 'yaml/feature_set_HPT_c3/brentoil-case3.yaml' in script
+    assert 'yaml/feature_set_HPT_c3/wti-case3.yaml' in script
+    assert 'yaml/feature_set_HPT_c3/brentoil-case4.yaml' not in script
+    assert 'yaml/feature_set_HPT_c3/wti-case4.yaml' not in script

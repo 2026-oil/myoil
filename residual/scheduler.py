@@ -187,6 +187,7 @@ def run_parallel_jobs(
             "completed_at": _now_iso(),
         }
         worker_root = workers_root / _progress_key(launch)
+        worker_root.mkdir(parents=True, exist_ok=True)
         (worker_root / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
         with events_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps({"event": "worker_completed", **summary}) + "\n")

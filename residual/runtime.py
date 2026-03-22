@@ -672,19 +672,27 @@ def _open_persistent_study(
     sampler: optuna.samplers.BaseSampler,
 ) -> tuple[optuna.Study, dict[str, Any]]:
     storage_dir = study_root / ".optuna"
-    storage_dir.mkdir(parents=True, exist_ok=True)
     storage_path = storage_dir / f"{stage}.journal"
-    storage = optuna.storages.JournalStorage(
-        optuna.storages.journal.JournalFileBackend(str(storage_path))
-    )
     study_name = _build_study_name(loaded, stage=stage, job_name=job_name)
-    study = optuna.create_study(
-        storage=storage,
-        study_name=study_name,
-        load_if_exists=True,
-        sampler=sampler,
-        direction=DEFAULT_OPTUNA_STUDY_DIRECTION,
-    )
+    for attempt in range(2):
+        storage_dir.mkdir(parents=True, exist_ok=True)
+        storage = optuna.storages.JournalStorage(
+            optuna.storages.journal.JournalFileBackend(str(storage_path))
+        )
+        try:
+            study = optuna.create_study(
+                storage=storage,
+                study_name=study_name,
+                load_if_exists=True,
+                sampler=sampler,
+                direction=DEFAULT_OPTUNA_STUDY_DIRECTION,
+            )
+            break
+        except FileNotFoundError:
+            if attempt == 1:
+                raise
+    else:
+        raise RuntimeError("persistent Optuna study creation failed unexpectedly")
     metadata = {
         "study_name": study_name,
         "storage_backend": "journal",
