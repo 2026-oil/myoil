@@ -62,13 +62,13 @@ scheduler:
 residual:
   enabled: true
   model: xgboost
-  target: level
+  target: delta
   params:
-    n_estimators: 128
-    max_depth: 6
+    n_estimators: 96
+    max_depth: 4
     learning_rate: 0.03
-    subsample: 0.9
-    colsample_bytree: 0.9
+    subsample: 0.8
+    colsample_bytree: 0.8
   features:
     include_base_prediction: true
     include_horizon_step: true
@@ -83,7 +83,6 @@ residual:
       - 3
       - 4
       - 6
-      - 12
       transforms:
       - raw
     exog_sources:
