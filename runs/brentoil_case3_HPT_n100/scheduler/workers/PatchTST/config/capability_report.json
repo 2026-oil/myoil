@@ -66,6 +66,10 @@
     "search_space_entry_found": true,
     "selected_search_params": [
       "input_size",
+      "batch_size",
+      "valid_batch_size",
+      "windows_batch_size",
+      "inference_windows_batch_size",
       "learning_rate",
       "scaler_type",
       "model_step_size"

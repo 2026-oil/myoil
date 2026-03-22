@@ -1,0 +1,104 @@
+task:
+  name: wti_case3_bomb_family_h8_exloss
+dataset:
+  path: data/df.csv
+  target_col: Com_CrudeOil
+  dt_col: dt
+  hist_exog_cols:
+  - Com_Gasoline
+  - Com_BloombergCommodity_BCOM
+  - Com_LME_Ni_Cash
+  - Com_Coal
+  - Com_LME_Al_Cash
+  - Com_LMEX
+  - Bonds_KOR_10Y
+  - Com_LME_Ni_Inv
+  futr_exog_cols: []
+  static_exog_cols: []
+runtime:
+  random_seed: 1
+training:
+  train_protocol: expanding_window_tscv
+  input_size: 48
+  season_length: 52
+  batch_size: 32
+  valid_batch_size: 32
+  windows_batch_size: 128
+  inference_windows_batch_size: 1024
+  learning_rate: 0.0071377767178455506
+  max_steps: 500
+  val_size: 8
+  val_check_steps: 200
+  early_stop_patience_steps: 5
+  num_lr_decays: -1
+  model_step_size: 4
+  scaler_type: identity
+  loss: exloss
+  loss_params:
+    up_th: 0.9
+    down_th: 0.1
+    lamda_underestimate: 1.2
+    lamda_overestimate: 1.0
+    lamda: 1.0
+cv:
+  horizon: 8
+  step_size: 8
+  n_windows: 1
+  gap: 0
+  max_train_size: null
+  overlap_eval_policy: by_cutoff_mean
+scheduler:
+  gpu_ids:
+  - 0
+  - 1
+  max_concurrent_jobs: 2
+  worker_devices: 1
+residual:
+  enabled: false
+jobs:
+- model: LSTM
+  params:
+    encoder_hidden_size: 32
+    encoder_n_layers: 3
+    inference_input_size: 48
+    encoder_dropout: 0.0
+    decoder_hidden_size: 256
+    decoder_layers: 3
+- model: DLinear
+  params:
+    moving_avg_window: 13
+- model: NHITS
+  params:
+    n_pool_kernel_size:
+    - 8
+    - 4
+    - 1
+    n_freq_downsample:
+    - 4
+    - 2
+    - 1
+    n_blocks:
+    - 2
+    - 2
+    - 2
+    mlp_units:
+    - - 512
+      - 512
+    - - 512
+      - 512
+    - - 512
+      - 512
+    dropout_prob_theta: 0.2
+    activation: LeakyReLU
+- model: TimeMixer
+  params:
+    d_model: 64
+    d_ff: 128
+    down_sampling_layers: 1
+    top_k: 5
+- model: xLSTM
+  params:
+    encoder_hidden_size: 64
+    encoder_n_blocks: 2
+    decoder_hidden_size: 128
+    encoder_dropout: 0.1

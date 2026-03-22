@@ -40,13 +40,27 @@
     "val_check_steps": 100,
     "early_stop_patience_steps": 10,
     "num_lr_decays": -1,
-    "loss": "mse"
+    "loss": "mse",
+    "accelerator": null,
+    "devices": null,
+    "strategy": null,
+    "precision": null,
+    "dataloader_kwargs": {
+      "num_workers": 2,
+      "pin_memory": true,
+      "persistent_workers": true,
+      "prefetch_factor": 2
+    }
   },
   "training_search": {
     "requested_mode": "training_auto_requested",
     "validated_mode": "training_auto",
     "selected_search_params": [
       "input_size",
+      "batch_size",
+      "valid_batch_size",
+      "windows_batch_size",
+      "inference_windows_batch_size",
       "learning_rate",
       "scaler_type",
       "model_step_size"
@@ -66,12 +80,14 @@
       1
     ],
     "max_concurrent_jobs": 2,
-    "worker_devices": 1
+    "worker_devices": 1,
+    "parallelize_single_job_tuning": true
   },
   "residual": {
     "enabled": false,
     "model": "xgboost",
     "target": "level",
+    "cpu_threads": null,
     "params": {},
     "features": {
       "include_base_prediction": true,
@@ -176,5 +192,5 @@
     }
   ],
   "search_space_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/search_space.yaml",
-  "search_space_sha256": "f226f846f18eaaa8c0506fd56b97de1f5fb6e409b1f1de60c77cc3dce7946ef8"
+  "search_space_sha256": "c9c2a9c68ee3fe61b10fd52c410511fa18a8a5bbdfe2f6f372befb5e9631957d"
 }
