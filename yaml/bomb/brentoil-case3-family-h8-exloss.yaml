@@ -92,6 +92,18 @@ jobs:
 - model: DLinear
   params:
     moving_avg_window: 13
+- model: PatchTST
+  params:
+    hidden_size: 128
+    n_heads: 8
+    encoder_layers: 3
+    linear_hidden_size: 256
+    patch_len: 8
+    stride: 8
+    dropout: 0.3
+    fc_dropout: 0.2
+    attn_dropout: 0.1
+    revin: true
 - model: TimeMixer
   params:
     d_model: 64

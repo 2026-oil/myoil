@@ -90,6 +90,28 @@ jobs:
       - 512
     dropout_prob_theta: 0.2
     activation: LeakyReLU
+- model: PatchTST
+  params:
+    hidden_size: 128
+    n_heads: 4
+    encoder_layers: 4
+    linear_hidden_size: 256
+    patch_len: 4
+    stride: 8
+    dropout: 0.3
+    fc_dropout: 0.2
+    attn_dropout: 0.0
+    revin: true
+- model: iTransformer
+  params:
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 1
+    d_ff: 512
+    d_layers: 1
+    factor: 5
+    dropout: 0.3
+    use_norm: false
 - model: TimeMixer
   params:
     d_model: 64
