@@ -1,0 +1,112 @@
+task:
+  name: 2wti_case3_HPT_res_delta_xgb_spike_n100
+
+dataset:
+  path: data/df.csv
+  target_col: Com_CrudeOil
+  dt_col: dt
+  hist_exog_cols:
+  - Com_Gasoline
+  - Com_BloombergCommodity_BCOM
+  - Com_LME_Ni_Cash
+  - Com_Coal
+  - Com_LME_Al_Cash
+  - Com_LMEX
+  - Bonds_KOR_10Y
+  - Com_LME_Ni_Inv
+  - Com_NaturalGas
+  - Idx_OVX
+  - Com_Gold
+  - BS_Core_Index_Integrated
+  futr_exog_cols: []
+  static_exog_cols: []
+
+runtime:
+  random_seed: 1
+  opt_n_trial: 100
+
+training:
+  train_protocol: expanding_window_tscv
+  season_length: 52
+  batch_size: 32
+  valid_batch_size: 32
+  windows_batch_size: 1024
+  inference_windows_batch_size: 1024
+  max_steps: 1000
+  val_check_steps: 100
+  val_size: 8
+  early_stop_patience_steps: 10
+  loss: mse
+  dataloader_kwargs:
+    num_workers: 2
+    pin_memory: true
+    persistent_workers: true
+    prefetch_factor: 2
+
+cv:
+  horizon: 8
+  step_size: 8
+  n_windows: 5
+  gap: 0
+  max_train_size: null
+  overlap_eval_policy: by_cutoff_mean
+
+scheduler:
+  gpu_ids:
+  - 0
+  - 1
+  max_concurrent_jobs: 2
+  worker_devices: 1
+  parallelize_single_job_tuning: true
+
+residual:
+  enabled: true
+  model: xgboost
+  target: delta
+  params:
+    n_estimators: 64
+    max_depth: 6
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+  features:
+    include_base_prediction: true
+    include_horizon_step: true
+    include_date_features: false
+    lag_features:
+      enabled: true
+      sources:
+      - y_hat_base
+      - Idx_OVX
+      - BS_Core_Index_Integrated
+      steps:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 6
+      - 12
+      transforms:
+      - raw
+    exog_sources:
+      hist:
+      - Com_NaturalGas
+      - Idx_OVX
+      - Com_Gold
+      - BS_Core_Index_Integrated
+      futr: []
+      static: []
+
+jobs:
+- model: PatchTST
+  params: {}
+- model: DLinear
+  params: {}
+- model: Naive
+  params: {}
+- model: iTransformer
+  params: {}
+- model: LSTM
+  params: {}
+- model: NHITS
+  params: {}
