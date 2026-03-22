@@ -125,11 +125,29 @@ def _write_config(tmp_path: Path, payload: dict, suffix: str) -> Path:
         task_name = payload.get("task", {}).get("name")
         residual_target = payload.get("residual", {}).get("target", "level")
         runtime_transformations = payload.get("runtime", {}).get("transformations")
+        runtime_transformations_target = payload.get("runtime", {}).get(
+            "transformations_target"
+        )
+        runtime_transformations_exog = payload.get("runtime", {}).get(
+            "transformations_exog"
+        )
         if task_name:
             task_block = "\n[task]\nname = " + repr(task_name) + "\n"
         runtime_block = "\n[runtime]\nrandom_seed = 1\n"
         if runtime_transformations is not None:
             runtime_block += "transformations = " + repr(runtime_transformations) + "\n"
+        if runtime_transformations_target is not None:
+            runtime_block += (
+                "transformations_target = "
+                + repr(runtime_transformations_target)
+                + "\n"
+            )
+        if runtime_transformations_exog is not None:
+            runtime_block += (
+                "transformations_exog = "
+                + repr(runtime_transformations_exog)
+                + "\n"
+            )
         text = (
             task_block
             + runtime_block
@@ -389,7 +407,8 @@ def test_runtime_transformations_omitted_when_unset_preserves_resolved_hash(
 ):
     payload_default = _payload()
     payload_null = _payload()
-    payload_null["runtime"]["transformations"] = None
+    payload_null["runtime"]["transformations_target"] = None
+    payload_null["runtime"]["transformations_exog"] = None
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n",
         encoding="utf-8",
@@ -404,14 +423,17 @@ def test_runtime_transformations_omitted_when_unset_preserves_resolved_hash(
         config_path=_write_config(tmp_path, payload_null, ".yaml"),
     )
 
-    assert "transformations" not in loaded_default.normalized_payload["runtime"]
-    assert "transformations" not in loaded_null.normalized_payload["runtime"]
+    assert "transformations_target" not in loaded_default.normalized_payload["runtime"]
+    assert "transformations_exog" not in loaded_default.normalized_payload["runtime"]
+    assert "transformations_target" not in loaded_null.normalized_payload["runtime"]
+    assert "transformations_exog" not in loaded_null.normalized_payload["runtime"]
     assert loaded_default.resolved_hash == loaded_null.resolved_hash
 
 
 def test_runtime_transformations_yaml_toml_validation_parity(tmp_path: Path):
     payload = _payload()
-    payload["runtime"]["transformations"] = "diff"
+    payload["runtime"]["transformations_target"] = "diff"
+    payload["runtime"]["transformations_exog"] = "diff"
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n2020-01-08,2,3,4\n",
         encoding="utf-8",
@@ -422,9 +444,11 @@ def test_runtime_transformations_yaml_toml_validation_parity(tmp_path: Path):
     loaded_yaml = load_app_config(tmp_path, config_path=yaml_path)
     loaded_toml = load_app_config(tmp_path, config_toml_path=toml_path)
 
-    assert loaded_yaml.config.runtime.transformations == "diff"
+    assert loaded_yaml.config.runtime.transformations_target == "diff"
+    assert loaded_yaml.config.runtime.transformations_exog == "diff"
     assert loaded_yaml.config.to_dict() == loaded_toml.config.to_dict()
-    assert loaded_yaml.normalized_payload["runtime"]["transformations"] == "diff"
+    assert loaded_yaml.normalized_payload["runtime"]["transformations_target"] == "diff"
+    assert loaded_yaml.normalized_payload["runtime"]["transformations_exog"] == "diff"
 
 
 @pytest.mark.parametrize("suffix", [".yaml", ".toml"])
@@ -432,14 +456,39 @@ def test_load_app_config_rejects_invalid_runtime_transformations(
     tmp_path: Path, suffix: str
 ):
     payload = _payload()
-    payload["runtime"]["transformations"] = "log"
+    payload["runtime"]["transformations_target"] = "log"
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n2020-01-08,2,3,4\n",
         encoding="utf-8",
     )
 
     with pytest.raises(
-        ValueError, match="runtime.transformations must be the string 'diff'"
+        ValueError, match="runtime.transformations_target must be the string 'diff'"
+    ):
+        if suffix == ".toml":
+            load_app_config(
+                tmp_path, config_toml_path=_write_config(tmp_path, payload, suffix)
+            )
+        else:
+            load_app_config(
+                tmp_path, config_path=_write_config(tmp_path, payload, suffix)
+            )
+
+
+@pytest.mark.parametrize("suffix", [".yaml", ".toml"])
+def test_load_app_config_rejects_legacy_runtime_transformations(
+    tmp_path: Path, suffix: str
+):
+    payload = _payload()
+    payload["runtime"]["transformations"] = "diff"
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n2020-01-08,2,3,4\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="runtime.transformations is no longer supported",
     ):
         if suffix == ".toml":
             load_app_config(
@@ -1920,7 +1969,7 @@ def test_runtime_diff_preserves_raw_scale_for_baseline_learned_artifacts(
     ]
     for model_name, params, output_root in cases:
         payload = _payload()
-        payload["runtime"]["transformations"] = "diff"
+        payload["runtime"]["transformations_target"] = "diff"
         payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
         payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 0})
         payload["dataset"]["hist_exog_cols"] = []
@@ -1953,7 +2002,7 @@ def test_runtime_diff_residual_enabled_skips_short_backcast_history_without_cras
     from residual.runtime import main as runtime_main
 
     payload = _payload()
-    payload["runtime"]["transformations"] = "diff"
+    payload["runtime"]["transformations_target"] = "diff"
     payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
     payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 0})
     payload["dataset"]["hist_exog_cols"] = []
@@ -4954,11 +5003,11 @@ def test_runtime_diff_inverse_reconstruction_uses_anchor_and_cumsum():
     assert restored.tolist() == [11.0, 13.0, 16.0]
 
 
-def test_runtime_diff_only_transforms_target_channel_in_multivariate_inputs(
+def test_runtime_target_diff_only_transforms_target_channel_in_multivariate_inputs(
     tmp_path: Path,
 ):
     payload = _payload()
-    payload["runtime"]["transformations"] = "diff"
+    payload["runtime"]["transformations_target"] = "diff"
     payload["dataset"]["hist_exog_cols"] = ["hist_a"]
     payload["dataset"]["futr_exog_cols"] = ["futr_a"]
     payload["jobs"] = [
@@ -4997,6 +5046,95 @@ def test_runtime_diff_only_transforms_target_channel_in_multivariate_inputs(
     ]
     assert fit_frame.loc[fit_frame["unique_id"] == "target", "y"].tolist() == [1.0, 1.0]
     assert fit_frame.loc[fit_frame["unique_id"] == "hist_a", "y"].tolist() == [11, 12]
+    assert fit_frame.loc[fit_frame["unique_id"] == "futr_a", "y"].tolist() == [101, 102]
+
+
+def test_runtime_exog_diff_only_transforms_hist_exog_channel_in_multivariate_inputs(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["runtime"]["transformations_exog"] = "diff"
+    payload["dataset"]["hist_exog_cols"] = ["hist_a"]
+    payload["dataset"]["futr_exog_cols"] = ["futr_a"]
+    payload["jobs"] = [
+        {"model": "DummyMultivariate", "params": {"start_padding_enabled": True}}
+    ]
+    data = (
+        "dt,target,hist_a,futr_a\n"
+        "2020-01-01,1,10,100\n"
+        "2020-01-08,2,11,101\n"
+        "2020-01-15,3,12,102\n"
+        "2020-01-22,4,13,103\n"
+    )
+    (tmp_path / "data.csv").write_text(data, encoding="utf-8")
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    import residual.runtime as runtime
+
+    train_df = pd.read_csv(tmp_path / "data.csv").iloc[:3].reset_index(drop=True)
+    diff_context = runtime._build_fold_diff_context(loaded, train_df)
+    transformed_train_df = runtime._transform_training_frame(train_df, diff_context)
+    adapter_inputs = build_multivariate_inputs(
+        transformed_train_df,
+        loaded.config.jobs[0],
+        dataset=loaded.config.dataset,
+        dt_col=loaded.config.dataset.dt_col,
+    )
+
+    fit_frame = adapter_inputs.fit_df.sort_values(["ds", "unique_id"]).reset_index(
+        drop=True
+    )
+    assert fit_frame["ds"].dt.strftime("%Y-%m-%d").unique().tolist() == [
+        "2020-01-08",
+        "2020-01-15",
+    ]
+    assert fit_frame.loc[fit_frame["unique_id"] == "target", "y"].tolist() == [2, 3]
+    assert fit_frame.loc[fit_frame["unique_id"] == "hist_a", "y"].tolist() == [1.0, 1.0]
+    assert fit_frame.loc[fit_frame["unique_id"] == "futr_a", "y"].tolist() == [101, 102]
+
+
+def test_runtime_target_and_exog_diff_transform_both_channels_in_multivariate_inputs(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["runtime"]["transformations_target"] = "diff"
+    payload["runtime"]["transformations_exog"] = "diff"
+    payload["dataset"]["hist_exog_cols"] = ["hist_a"]
+    payload["dataset"]["futr_exog_cols"] = ["futr_a"]
+    payload["jobs"] = [
+        {"model": "DummyMultivariate", "params": {"start_padding_enabled": True}}
+    ]
+    data = (
+        "dt,target,hist_a,futr_a\n"
+        "2020-01-01,1,10,100\n"
+        "2020-01-08,2,11,101\n"
+        "2020-01-15,3,12,102\n"
+        "2020-01-22,4,13,103\n"
+    )
+    (tmp_path / "data.csv").write_text(data, encoding="utf-8")
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    import residual.runtime as runtime
+
+    train_df = pd.read_csv(tmp_path / "data.csv").iloc[:3].reset_index(drop=True)
+    diff_context = runtime._build_fold_diff_context(loaded, train_df)
+    transformed_train_df = runtime._transform_training_frame(train_df, diff_context)
+    adapter_inputs = build_multivariate_inputs(
+        transformed_train_df,
+        loaded.config.jobs[0],
+        dataset=loaded.config.dataset,
+        dt_col=loaded.config.dataset.dt_col,
+    )
+
+    fit_frame = adapter_inputs.fit_df.sort_values(["ds", "unique_id"]).reset_index(
+        drop=True
+    )
+    assert fit_frame.loc[fit_frame["unique_id"] == "target", "y"].tolist() == [1.0, 1.0]
+    assert fit_frame.loc[fit_frame["unique_id"] == "hist_a", "y"].tolist() == [1.0, 1.0]
     assert fit_frame.loc[fit_frame["unique_id"] == "futr_a", "y"].tolist() == [101, 102]
 
 

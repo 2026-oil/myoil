@@ -433,7 +433,24 @@ def _resolve_freq(loaded: LoadedConfig, source_df: pd.DataFrame) -> str:
 @dataclass(frozen=True)
 class _FoldDiffContext:
     target_col: str
-    anchor: float
+    anchor: float | None = None
+    transform_target: bool = True
+    hist_exog_cols: tuple[str, ...] = ()
+
+
+def _has_target_diff(loaded: LoadedConfig) -> bool:
+    return loaded.config.runtime.transformations_target == "diff"
+
+
+def _has_hist_exog_diff(loaded: LoadedConfig) -> bool:
+    return bool(
+        loaded.config.runtime.transformations_exog == "diff"
+        and loaded.config.dataset.hist_exog_cols
+    )
+
+
+def _has_any_runtime_diff(loaded: LoadedConfig) -> bool:
+    return _has_target_diff(loaded) or _has_hist_exog_diff(loaded)
 
 
 def _build_fold_diff_context(
@@ -442,16 +459,20 @@ def _build_fold_diff_context(
     *,
     target_col: str | None = None,
 ) -> _FoldDiffContext | None:
-    if loaded.config.runtime.transformations != "diff":
+    target_diff = _has_target_diff(loaded)
+    exog_diff = _has_hist_exog_diff(loaded)
+    if not target_diff and not exog_diff:
         return None
     active_target_col = target_col or loaded.config.dataset.target_col
     if len(train_df) < 2:
         raise ValueError(
-            "runtime.transformations=diff requires at least 2 training rows per fold"
+            "runtime.transformations_target/exog=diff requires at least 2 training rows per fold"
         )
     return _FoldDiffContext(
         target_col=active_target_col,
-        anchor=float(train_df[active_target_col].iloc[-1]),
+        anchor=float(train_df[active_target_col].iloc[-1]) if target_diff else None,
+        transform_target=target_diff,
+        hist_exog_cols=loaded.config.dataset.hist_exog_cols if exog_diff else (),
     )
 
 
@@ -462,13 +483,17 @@ def _transform_training_frame(
     normalized = train_df.reset_index(drop=True).copy()
     if diff_context is None:
         return normalized
-    normalized[diff_context.target_col] = (
-        normalized[diff_context.target_col].astype(float).diff()
-    )
+    if diff_context.transform_target:
+        normalized[diff_context.target_col] = (
+            normalized[diff_context.target_col].astype(float).diff()
+        )
+    for column in diff_context.hist_exog_cols:
+        if column in normalized.columns:
+            normalized[column] = normalized[column].astype(float).diff()
     transformed = normalized.iloc[1:].reset_index(drop=True)
     if transformed.empty:
         raise ValueError(
-            "runtime.transformations=diff removed all training rows; need at least 2 rows"
+            "runtime.transformations_target/exog=diff removed all training rows; need at least 2 rows"
         )
     return transformed
 
@@ -478,12 +503,12 @@ def _transform_training_series(
     diff_context: _FoldDiffContext | None,
 ) -> pd.Series:
     normalized = history.reset_index(drop=True).astype(float)
-    if diff_context is None:
+    if diff_context is None or not diff_context.transform_target:
         return normalized
     transformed = normalized.diff().iloc[1:].reset_index(drop=True)
     if transformed.empty:
         raise ValueError(
-            "runtime.transformations=diff removed all training rows; need at least 2 rows"
+            "runtime.transformations_target/exog=diff removed all training rows; need at least 2 rows"
         )
     return transformed
 
@@ -493,8 +518,10 @@ def _restore_prediction_series(
     diff_context: _FoldDiffContext | None,
 ) -> pd.Series:
     restored = predictions.reset_index(drop=True).astype(float)
-    if diff_context is None:
+    if diff_context is None or not diff_context.transform_target:
         return restored
+    if diff_context.anchor is None:
+        raise ValueError("diff target restoration requires a target anchor")
     return (restored.cumsum() + diff_context.anchor).astype(float)
 
 
@@ -1361,10 +1388,7 @@ def _build_fold_backcast_panel(
         future_df = train_df.iloc[
             cutoff_idx + 1 : cutoff_idx + 1 + loaded.config.cv.horizon
         ].reset_index(drop=True)
-        if (
-            loaded.config.runtime.transformations == "diff"
-            and len(history_df) < 2
-        ):
+        if _has_any_runtime_diff(loaded) and len(history_df) < 2:
             continue
         diff_context = _build_fold_diff_context(
             loaded,

@@ -101,7 +101,8 @@ class DatasetConfig:
 class RuntimeConfig:
     random_seed: int = 1
     opt_n_trial: int | None = None
-    transformations: RuntimeTransformationMode | None = None
+    transformations_target: RuntimeTransformationMode | None = None
+    transformations_exog: RuntimeTransformationMode | None = None
 
 
 @dataclass(frozen=True)
@@ -243,8 +244,9 @@ class AppConfig:
         if self.task.name is None:
             payload.pop("task", None)
         payload["dataset"]["path"] = str(self.dataset.path)
-        if payload["runtime"].get("transformations") is None:
-            payload["runtime"].pop("transformations", None)
+        for key in ("transformations_target", "transformations_exog"):
+            if payload["runtime"].get(key) is None:
+                payload["runtime"].pop(key, None)
         payload["training_search"]["selected_search_params"] = list(
             payload["training_search"]["selected_search_params"]
         )
@@ -853,18 +855,24 @@ def _normalize_payload(
         if runtime["opt_n_trial"] <= 0:
             raise ValueError("runtime.opt_n_trial must be a positive integer")
     if "transformations" in runtime:
-        value = runtime.get("transformations")
+        raise ValueError(
+            "runtime.transformations is no longer supported; "
+            "use runtime.transformations_target and/or "
+            "runtime.transformations_exog"
+        )
+    for key in ("transformations_target", "transformations_exog"):
+        if key not in runtime:
+            continue
+        value = runtime.get(key)
         if value is None:
-            runtime.pop("transformations", None)
+            runtime.pop(key, None)
         elif not isinstance(value, str):
-            raise ValueError("runtime.transformations must be the string 'diff'")
+            raise ValueError(f"runtime.{key} must be the string 'diff'")
         else:
             normalized_transformation = value.strip().lower()
             if normalized_transformation != "diff":
-                raise ValueError(
-                    "runtime.transformations must be the string 'diff'"
-                )
-            runtime["transformations"] = normalized_transformation
+                raise ValueError(f"runtime.{key} must be the string 'diff'")
+            runtime[key] = normalized_transformation
 
     training.setdefault("loss", "mse")
     loss = str(training["loss"]).lower()
