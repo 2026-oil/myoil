@@ -43,7 +43,7 @@ training:
 cv:
   horizon: 8
   step_size: 8
-  n_windows: 12
+  n_windows: 6
   gap: 0
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean
