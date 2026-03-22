@@ -16,11 +16,13 @@ dataset:
   - Com_LME_Ni_Inv
   futr_exog_cols: []
   static_exog_cols: []
+  
 runtime:
   random_seed: 1
   opt_n_trial: 100
   transformations_target: diff
   transformations_exog: diff
+  
 training:
   train_protocol: expanding_window_tscv
   season_length: 52
@@ -33,6 +35,7 @@ training:
   val_size: 8
   early_stop_patience_steps: 10
   loss: mse
+  
 cv:
   horizon: 8
   step_size: 8
@@ -40,13 +43,16 @@ cv:
   gap: 0
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean
+  
 scheduler:
   gpu_ids:
   - 0
   max_concurrent_jobs: 1
   worker_devices: 1
+  
 residual:
   enabled: false
+  
 jobs:
 - model: LSTM
   params: {}
