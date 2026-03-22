@@ -15,12 +15,13 @@ import neuralforecast.auto as nf_auto
 import neuralforecast.models as nf_models
 from neuralforecast.core import MODEL_FILENAME_DICT
 from residual.adapters import build_multivariate_inputs, build_univariate_inputs
-from residual.config import load_app_config
+from residual.config import TrainingLossParams, load_app_config
 from residual.models import (
     MODEL_CLASSES,
     build_model,
     supports_auto_mode,
 )
+from neuralforecast.losses.pytorch import ExLoss
 from residual.optuna_spaces import (
     DEFAULT_OPTUNA_NUM_TRIALS,
     EXCLUDED_AUTO_MODEL_NAMES,
@@ -366,6 +367,120 @@ def test_load_app_config_preserves_residual_target_yaml_toml_parity(tmp_path: Pa
     assert loaded_yaml.config.to_dict() == loaded_toml.config.to_dict()
 
 
+def test_load_app_config_accepts_exloss_params(tmp_path: Path):
+    payload = _payload()
+    payload["training"].update(
+        {
+            "loss": "exloss",
+            "loss_params": {
+                "up_th": 0.9,
+                "down_th": 0.1,
+                "lamda_underestimate": 1.5,
+                "lamda_overestimate": 1.0,
+                "lamda": 0.7,
+            },
+        }
+    )
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n",
+        encoding="utf-8",
+    )
+
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    assert loaded.config.training.loss == "exloss"
+    assert loaded.config.training.loss_params == TrainingLossParams(
+        up_th=0.9,
+        down_th=0.1,
+        lamda_underestimate=1.5,
+        lamda_overestimate=1.0,
+        lamda=0.7,
+    )
+    assert loaded.normalized_payload["training"]["loss_params"] == {
+        "up_th": 0.9,
+        "down_th": 0.1,
+        "lamda_underestimate": 1.5,
+        "lamda_overestimate": 1.0,
+        "lamda": 0.7,
+    }
+
+
+@pytest.mark.parametrize(
+    ("loss_params", "message"),
+    [
+        ({"extra": 1}, "training.loss_params contains unsupported key"),
+        (
+            {"up_th": 0.1, "down_th": 0.9},
+            "thresholds must satisfy 0 < down_th < up_th < 1",
+        ),
+        ({"lamda_underestimate": -1}, "lamda_underestimate must be >= 0"),
+        ({"lamda_overestimate": -1}, "lamda_overestimate must be >= 0"),
+        ({"lamda": -1}, "training.loss_params.lamda must be >= 0"),
+        (
+            {"lamda_underestimate": "oops"},
+            "training.loss_params.lamda_underestimate must be numeric",
+        ),
+        ({"up_th": float("nan")}, "training.loss_params.up_th must be finite"),
+        ({"lamda": float("inf")}, "training.loss_params.lamda must be finite"),
+    ],
+)
+def test_load_app_config_rejects_invalid_exloss_params(
+    tmp_path: Path, loss_params: dict[str, Any], message: str
+):
+    payload = _payload()
+    payload["training"]["loss"] = "exloss"
+    payload["training"]["loss_params"] = loss_params
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=message):
+        load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+
+
+def test_load_app_config_rejects_loss_params_for_mse(tmp_path: Path):
+    payload = _payload()
+    payload["training"]["loss_params"] = {"lamda": 0.7}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="training.loss_params is only supported when training.loss == exloss",
+    ):
+        load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+
+
+def test_load_app_config_preserves_default_mse_loss_payload_and_resolved_hash(
+    tmp_path: Path,
+):
+    payload_default = _payload()
+    payload_default["training"].pop("loss", None)
+    payload_explicit = _payload()
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n",
+        encoding="utf-8",
+    )
+
+    loaded_default = load_app_config(
+        tmp_path,
+        config_path=_write_config(tmp_path, payload_default, ".yaml"),
+    )
+    loaded_explicit = load_app_config(
+        tmp_path,
+        config_path=_write_config(tmp_path, payload_explicit, ".yaml"),
+    )
+
+    assert "loss_params" not in loaded_default.normalized_payload["training"]
+    assert "loss_params" not in loaded_explicit.normalized_payload["training"]
+    assert loaded_default.resolved_hash == loaded_explicit.resolved_hash
+
+
 def test_load_app_config_applies_residual_feature_defaults(tmp_path: Path):
     payload = _payload()
     payload["dataset"]["futr_exog_cols"] = ["futr_a"]
@@ -623,7 +738,45 @@ def test_model_builder_applies_common_loss_and_multivariate_n_series(tmp_path: P
     univariate_model = build_model(loaded.config, loaded.config.jobs[0])
     multivariate_model = build_model(loaded.config, loaded.config.jobs[1], n_series=2)
     assert type(univariate_model.loss).__name__ == "MSE"
+    assert type(univariate_model.valid_loss).__name__ == "MSE"
     assert type(multivariate_model.loss).__name__ == "MSE"
+    assert type(multivariate_model.valid_loss).__name__ == "MSE"
+    assert getattr(multivariate_model, "n_series", 2) == 2
+
+
+def test_model_builder_applies_exloss_and_multivariate_n_series(tmp_path: Path):
+    payload = _payload()
+    payload["training"].update(
+        {
+            "loss": "exloss",
+            "loss_params": {
+                "up_th": 0.9,
+                "down_th": 0.1,
+                "lamda_underestimate": 1.5,
+                "lamda_overestimate": 1.0,
+                "lamda": 0.7,
+            },
+        }
+    )
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n", encoding="utf-8"
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+    univariate_model = build_model(loaded.config, loaded.config.jobs[0])
+    multivariate_model = build_model(loaded.config, loaded.config.jobs[1], n_series=2)
+    assert isinstance(univariate_model.loss, ExLoss)
+    assert isinstance(univariate_model.valid_loss, ExLoss)
+    assert isinstance(multivariate_model.loss, ExLoss)
+    assert isinstance(multivariate_model.valid_loss, ExLoss)
+    assert loaded.config.training.loss_params == TrainingLossParams(
+        up_th=0.9,
+        down_th=0.1,
+        lamda_underestimate=1.5,
+        lamda_overestimate=1.0,
+        lamda=0.7,
+    )
     assert getattr(multivariate_model, "n_series", 2) == 2
 
 

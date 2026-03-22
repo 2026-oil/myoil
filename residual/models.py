@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import inspect
 import os
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 
-from neuralforecast.losses.pytorch import MSE
+from neuralforecast.losses.pytorch import ExLoss, MSE
 from neuralforecast.models import (
     Autoformer,
     BiTCN,
@@ -57,7 +57,7 @@ try:
 except Exception:  # pragma: no cover
     DummyMultivariate = DummyUnivariate = None
 
-from .config import AppConfig, JobConfig
+from .config import AppConfig, JobConfig, TrainingLossParams
 from .optuna_spaces import BASELINE_MODEL_NAMES, SUPPORTED_AUTO_MODEL_NAMES
 
 
@@ -122,11 +122,15 @@ if DummyUnivariate is not None:
 if DummyMultivariate is not None:
     MODEL_CLASSES['DummyMultivariate'] = DummyMultivariate
 
-def resolve_loss(name: str) -> Any:
+def resolve_loss(
+    name: str, *, loss_params: TrainingLossParams | None = None
+) -> Any:
     normalized = name.lower()
-    if normalized != 'mse':
-        raise ValueError(f'Unsupported common loss: {name}')
-    return MSE()
+    if normalized == 'mse':
+        return MSE()
+    if normalized == 'exloss':
+        return ExLoss(**asdict(loss_params or TrainingLossParams()))
+    raise ValueError(f'Unsupported common loss: {name}')
 
 
 def capabilities_for(model_name: str) -> ModelCapabilities:
@@ -188,8 +192,8 @@ def build_model(
         'enable_checkpointing': False,
         'enable_progress_bar': False,
         'logger': False,
-        'loss': resolve_loss(config.training.loss),
-        'valid_loss': resolve_loss(config.training.loss),
+        'loss': resolve_loss(config.training.loss, loss_params=config.training.loss_params),
+        'valid_loss': resolve_loss(config.training.loss, loss_params=config.training.loss_params),
         'hist_exog_list': _configured_exog_list(
             caps.supports_hist_exog, config.dataset.hist_exog_cols
         ),

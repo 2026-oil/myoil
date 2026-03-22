@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Literal
 import hashlib
 import json
+import math
 import tomllib
 
 import yaml
@@ -28,7 +29,7 @@ CONFIG_FILENAMES = ("config.yaml", "config.yml", "config.toml")
 DEFAULT_MANIFEST_VERSION = "1"
 DEFAULT_ARTIFACT_SCHEMA_VERSION = "1"
 DEFAULT_EVALUATION_PROTOCOL_VERSION = "2"
-SUPPORTED_LOSSES = {"mse"}
+SUPPORTED_LOSSES = {"mse", "exloss"}
 CENTRALIZED_TRAINING_KEYS = {
     "train_protocol",
     "input_size",
@@ -45,6 +46,7 @@ CENTRALIZED_TRAINING_KEYS = {
     "early_stop_patience_steps",
     "num_lr_decays",
     "loss",
+    "loss_params",
 } | set(FIXED_TRAINING_KEYS)
 LEGACY_SHARED_JOB_TRAINING_KEYS = {
     "scaler_type",
@@ -93,6 +95,16 @@ class TaskConfig:
     name: str | None = None
 
 
+
+@dataclass(frozen=True)
+class TrainingLossParams:
+    up_th: float = 0.9
+    down_th: float = 0.1
+    lamda_underestimate: float = 1.2
+    lamda_overestimate: float = 1.0
+    lamda: float = 1.0
+
+
 @dataclass(frozen=True)
 class TrainingConfig:
     train_protocol: str = "expanding_window_tscv"
@@ -115,6 +127,7 @@ class TrainingConfig:
     ]
     num_lr_decays: int = DEFAULT_TRAINING_PARAMS["num_lr_decays"]
     loss: str = "mse"
+    loss_params: TrainingLossParams | None = None
 
 
 @dataclass(frozen=True)
@@ -212,6 +225,8 @@ class AppConfig:
         payload["training_search"]["selected_search_params"] = list(
             payload["training_search"]["selected_search_params"]
         )
+        if payload["training"].get("loss") != "exloss":
+            payload["training"].pop("loss_params", None)
         payload["jobs"] = list(payload["jobs"])
         for job in payload["jobs"]:
             job["selected_search_params"] = list(job["selected_search_params"])
@@ -283,6 +298,54 @@ def _coerce_name_tuple(value: Any, *, field_name: str) -> tuple[str, ...]:
         )
     return names
 
+
+
+
+def _coerce_float(value: Any, *, field_name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{field_name} must be numeric")
+    value = float(value)
+    if not math.isfinite(value):
+        raise ValueError(f"{field_name} must be finite")
+    return value
+
+
+def _normalize_training_loss_params(value: Any) -> TrainingLossParams:
+    if value is None:
+        return TrainingLossParams()
+    if not isinstance(value, dict):
+        raise ValueError("training.loss_params must be a mapping")
+    payload = dict(value)
+    allowed = {
+        "up_th",
+        "down_th",
+        "lamda_underestimate",
+        "lamda_overestimate",
+        "lamda",
+    }
+    _unknown_keys(payload, allowed=allowed, section="training.loss_params")
+    params = TrainingLossParams(
+        up_th=_coerce_float(payload.get("up_th", 0.9), field_name="training.loss_params.up_th"),
+        down_th=_coerce_float(payload.get("down_th", 0.1), field_name="training.loss_params.down_th"),
+        lamda_underestimate=_coerce_float(
+            payload.get("lamda_underestimate", 1.2),
+            field_name="training.loss_params.lamda_underestimate",
+        ),
+        lamda_overestimate=_coerce_float(
+            payload.get("lamda_overestimate", 1.0),
+            field_name="training.loss_params.lamda_overestimate",
+        ),
+        lamda=_coerce_float(payload.get("lamda", 1.0), field_name="training.loss_params.lamda"),
+    )
+    if not 0 < params.down_th < params.up_th < 1:
+        raise ValueError("training.loss_params thresholds must satisfy 0 < down_th < up_th < 1")
+    if params.lamda_underestimate < 0:
+        raise ValueError("training.loss_params.lamda_underestimate must be >= 0")
+    if params.lamda_overestimate < 0:
+        raise ValueError("training.loss_params.lamda_overestimate must be >= 0")
+    if params.lamda < 0:
+        raise ValueError("training.loss_params.lamda must be >= 0")
+    return params
 
 def _coerce_positive_int_tuple(value: Any, *, field_name: str) -> tuple[int, ...]:
     if value is None:
@@ -710,6 +773,14 @@ def _normalize_payload(
     if loss not in SUPPORTED_LOSSES:
         raise ValueError(f"Unsupported common loss: {loss}")
     training["loss"] = loss
+    if loss == "exloss":
+        training["loss_params"] = _normalize_training_loss_params(
+            training.get("loss_params")
+        )
+    elif "loss_params" in training:
+        raise ValueError(
+            "training.loss_params is only supported when training.loss == exloss"
+        )
 
     scheduler.setdefault("worker_devices", 1)
     scheduler["gpu_ids"] = tuple(int(item) for item in scheduler.get("gpu_ids", (0, 1)))

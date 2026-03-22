@@ -3,7 +3,9 @@ import warnings
 import torch
 
 from neuralforecast.losses.pytorch import (
+    ExLoss,
     MAE,
+    MSE,
     PMM,
     DistributionLoss,
     HuberIQLoss,
@@ -160,3 +162,39 @@ def test_duplicate_level_and_quantiles_dedup():
         check = MQLoss(level=[80, 90])
         assert len(w) == 0
     assert len(check.quantiles) == 5
+
+
+def test_exloss_returns_scalar_for_bhn_tensors():
+    loss = ExLoss()
+    y = torch.tensor([[[0.0], [1.0], [5.0], [1.0], [0.0]]])
+    y_hat = torch.tensor([[[0.0], [1.0], [4.0], [1.0], [0.0]]])
+
+    value = loss(y=y, y_hat=y_hat)
+
+    assert value.ndim == 0
+    assert torch.isfinite(value)
+
+
+def test_exloss_penalizes_harmful_direction_extreme_misses():
+    loss = ExLoss(
+        up_th=0.8,
+        down_th=0.2,
+        lamda_underestimate=2.0,
+        lamda_overestimate=1.0,
+        lamda=1.0,
+    )
+    mse = MSE()
+
+    y_high = torch.tensor([[[0.0], [0.0], [10.0], [0.0], [0.0]]])
+    pred_high_under = torch.tensor([[[0.0], [0.0], [0.0], [0.0], [0.0]]])
+    pred_high_over = torch.tensor([[[0.0], [0.0], [20.0], [0.0], [0.0]]])
+
+    assert torch.isclose(mse(y_high, pred_high_under), mse(y_high, pred_high_over))
+    assert loss(y_high, pred_high_under) > loss(y_high, pred_high_over)
+
+    y_low = torch.tensor([[[0.0], [0.0], [-10.0], [0.0], [0.0]]])
+    pred_low_over = torch.tensor([[[0.0], [0.0], [0.0], [0.0], [0.0]]])
+    pred_low_under = torch.tensor([[[0.0], [0.0], [-20.0], [0.0], [0.0]]])
+
+    assert torch.isclose(mse(y_low, pred_low_over), mse(y_low, pred_low_under))
+    assert loss(y_low, pred_low_over) > loss(y_low, pred_low_under)

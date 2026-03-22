@@ -1,4 +1,4 @@
-__all__ = ['BasePointLoss', 'MAE', 'MSE', 'RMSE', 'MAPE', 'SMAPE', 'MASE', 'relMSE', 'QuantileLoss', 'MQLoss', 'QuantileLayer',
+__all__ = ['BasePointLoss', 'MAE', 'MSE', 'ExLoss', 'RMSE', 'MAPE', 'SMAPE', 'MASE', 'relMSE', 'QuantileLoss', 'MQLoss', 'QuantileLayer',
            'IQLoss', 'DistributionLoss', 'PMM', 'GMM', 'NBMM', 'HuberLoss', 'TukeyLoss', 'HuberQLoss', 'HuberMQLoss',
            'HuberIQLoss', 'Accuracy', 'sCRPS']
 
@@ -189,6 +189,91 @@ class MSE(BasePointLoss):
         losses = (y - y_hat) ** 2
         weights = self._compute_weights(y=y, mask=mask)
         return _weighted_mean(losses=losses, weights=weights)
+
+
+class ExLoss(BasePointLoss):
+    r"""Extreme-aware MSE with asymmetric penalties.
+
+    Ports the ExtremeCast ExLoss idea to the NeuralForecast `[B, H, N]`
+    point-loss interface by computing per-series horizon quantiles and
+    adding extra penalty for harmful-direction misses on extreme highs/lows.
+    """
+
+    def __init__(
+        self,
+        up_th: float = 0.9,
+        down_th: float = 0.1,
+        lamda_underestimate: float = 1.2,
+        lamda_overestimate: float = 1.0,
+        lamda: float = 1.0,
+        horizon_weight=None,
+    ):
+        if not 0 < down_th < up_th < 1:
+            raise ValueError("ExLoss thresholds must satisfy 0 < down_th < up_th < 1")
+        if lamda_underestimate < 0 or lamda_overestimate < 0 or lamda < 0:
+            raise ValueError("ExLoss lambda parameters must be >= 0")
+        super().__init__(
+            horizon_weight=horizon_weight,
+            outputsize_multiplier=1,
+            output_names=[""],
+        )
+        self.up_th = up_th
+        self.down_th = down_th
+        self.lamda_underestimate = lamda_underestimate
+        self.lamda_overestimate = lamda_overestimate
+        self.lamda = lamda
+
+    def _threshold(
+        self, y: torch.Tensor, q: float, mask: Union[torch.Tensor, None]
+    ):
+        if mask is None:
+            return torch.quantile(y, q=q, dim=1, keepdim=True)
+        masked = y.masked_fill(mask <= 0, float("nan"))
+        if hasattr(torch, "nanquantile"):
+            threshold = torch.nanquantile(masked, q=q, dim=1, keepdim=True)
+            fallback = torch.quantile(y, q=q, dim=1, keepdim=True)
+            return torch.where(torch.isnan(threshold), fallback, threshold)
+        return torch.quantile(y, q=q, dim=1, keepdim=True)
+
+    def __call__(
+        self,
+        y: torch.Tensor,
+        y_hat: torch.Tensor,
+        y_insample: Union[torch.Tensor, None] = None,
+        mask: Union[torch.Tensor, None] = None,
+    ) -> torch.Tensor:
+        weights = self._compute_weights(y=y, mask=mask)
+        mse_loss = _weighted_mean(losses=(y - y_hat) ** 2, weights=weights)
+
+        tar_up = self._threshold(y, self.up_th, mask)
+        tar_down = self._threshold(y, self.down_th, mask)
+
+        target_up_area = F.relu(y - tar_up)
+        target_down_area = -F.relu(tar_down - y)
+        pred_up_area = F.relu(y_hat - tar_up)
+        pred_down_area = -F.relu(tar_down - y_hat)
+
+        loss_up = (
+            self.lamda_underestimate
+            * (target_up_area - pred_up_area)
+            * F.relu(target_up_area - pred_up_area)
+            + self.lamda_overestimate
+            * (pred_up_area - target_up_area)
+            * F.relu(pred_up_area - target_up_area)
+        )
+        loss_down = (
+            self.lamda_overestimate
+            * (target_down_area - pred_down_area)
+            * F.relu(target_down_area - pred_down_area)
+            + self.lamda_underestimate
+            * (pred_down_area - target_down_area)
+            * F.relu(pred_down_area - target_down_area)
+        )
+        ex_loss = (
+            _weighted_mean(losses=loss_up + loss_down, weights=weights)
+            / (1 - self.up_th + self.down_th)
+        )
+        return mse_loss + self.lamda * ex_loss
 
 
 class RMSE(BasePointLoss):
