@@ -48,6 +48,7 @@ def test_bomb_yaml_configs_follow_requested_constraints() -> None:
         assert training["max_steps"] == 800
         assert cv["horizon"] == 8
         assert all(job["model"] not in {"Naive", "xLSTM"} for job in jobs)
+        assert any(job["model"] == "LSTM" for job in jobs)
 
         if filename.endswith(("-res-level.yaml", "-res-delta.yaml")):
             assert residual["enabled"] is True

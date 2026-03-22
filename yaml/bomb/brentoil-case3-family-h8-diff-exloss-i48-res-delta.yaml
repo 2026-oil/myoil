@@ -88,6 +88,12 @@ residual:
       futr: []
       static: []
 jobs:
+- model: LSTM
+  params:
+    encoder_hidden_size: 64
+    decoder_hidden_size: 64
+    encoder_n_layers: 2
+    context_size: 10
 - model: NHITS
   params:
     n_pool_kernel_size:
