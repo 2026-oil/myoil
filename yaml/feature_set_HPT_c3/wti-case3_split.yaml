@@ -46,9 +46,9 @@ scheduler:
 residual:
   enabled: false
 jobs:
-- model: DLinear
-  params: {}
-- model: Naive
+- model: PatchTST
   params: {}
 - model: iTransformer
+  params: {}
+- model: NHITS
   params: {}
