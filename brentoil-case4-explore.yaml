@@ -1,0 +1,107 @@
+task:
+  name: brentoil_case4_explore
+dataset:
+  path: data/df.csv
+  target_col: Com_BrentCrudeOil
+  dt_col: dt
+  hist_exog_cols:
+  - Com_Gasoline
+  - Com_BloombergCommodity_BCOM
+  - Com_LME_Ni_Cash
+  - Com_Coal
+  - Com_Cotton
+  - Com_LME_Al_Cash
+  - Bonds_KOR_10Y
+  - Com_Barley
+  - Com_Canola
+  - Com_LMEX
+  - Com_LME_Ni_Inv
+  - Com_Corn
+  - Com_Wheat
+  - Com_NaturalGas
+  - Idx_OVX
+  - Com_Gold
+  futr_exog_cols: []
+  static_exog_cols: []
+runtime:
+  random_seed: 1
+training:
+  train_protocol: expanding_window_tscv
+  max_steps: 50
+  val_check_steps: 50
+  early_stop_patience_steps: -1
+  loss: mse
+cv:
+  horizon: 8
+  step_size: 4
+  n_windows: 1
+  gap: 0
+  max_train_size: null
+  overlap_eval_policy: by_cutoff_mean
+scheduler:
+  gpu_ids:
+  - 0
+  max_concurrent_jobs: 1
+  worker_devices: 1
+residual:
+  enabled: false
+  model: xgboost
+  params: {}
+jobs:
+- model: LSTM
+  params:
+    encoder_hidden_size: 128
+    decoder_hidden_size: 128
+    encoder_n_layers: 2
+- model: NHITS
+  params:
+    mlp_units:
+    - - 512
+      - 512
+    - - 512
+      - 512
+    - - 512
+      - 512
+    n_pool_kernel_size:
+    - 2
+    - 2
+    - 1
+    n_freq_downsample:
+    - 4
+    - 2
+    - 1
+    dropout_prob_theta: 0.0
+- model: DLinear
+  params:
+    moving_avg_window: 25
+- model: Autoformer
+  params:
+    hidden_size: 128
+    dropout: 0.05
+    factor: 3
+    n_head: 4
+- model: FEDformer
+  params:
+    hidden_size: 128
+    modes: 64
+    dropout: 0.05
+- model: PatchTST
+  params:
+    hidden_size: 128
+    n_heads: 16
+    encoder_layers: 3
+    patch_len: 16
+- model: iTransformer
+  params:
+    hidden_size: 512
+    n_heads: 8
+    e_layers: 2
+    d_ff: 2048
+- model: TimesNet
+  params:
+    hidden_size: 64
+    conv_hidden_size: 64
+    top_k: 5
+    encoder_layers: 2
+- model: Naive
+  params: {}

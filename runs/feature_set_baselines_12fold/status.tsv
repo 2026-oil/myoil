@@ -1,0 +1,9 @@
+timestamp	config	model	returncode	output_root
+2026-03-20T23:17:04+0900	brentoil-case1.yaml	LSTM	1	/Users/jaeholee/Desktop/myoil/runs/feature_set_baselines_12fold/brentoil-case1/LSTM
+2026-03-20T23:31:15+0900	brentoil-case1.yaml	LSTM	0	/Users/jaeholee/Desktop/myoil/runs/feature_set_baselines_12fold/brentoil-case1/LSTM
+2026-03-20T23:31:44+0900	brentoil-case1.yaml	NHITS	0	/Users/jaeholee/Desktop/myoil/runs/feature_set_baselines_12fold/brentoil-case1/NHITS
+2026-03-20T23:31:50+0900	brentoil-case1.yaml	DLinear	0	/Users/jaeholee/Desktop/myoil/runs/feature_set_baselines_12fold/brentoil-case1/DLinear
+2026-03-21T00:01:42+0900	brentoil-case1.yaml	Autoformer	0	/Users/jaeholee/Desktop/myoil/runs/feature_set_baselines_12fold/brentoil-case1/Autoformer
+2026-03-21T00:41:35+0900	brentoil-case1.yaml	FEDformer	0	/Users/jaeholee/Desktop/myoil/runs/feature_set_baselines_12fold/brentoil-case1/FEDformer
+2026-03-21T00:47:00+0900	brentoil-case1.yaml	PatchTST	0	/Users/jaeholee/Desktop/myoil/runs/feature_set_baselines_12fold/brentoil-case1/PatchTST
+2026-03-21T14:55:24+0900	brentoil-case1.yaml	iTransformer	0	/Users/jaeholee/Desktop/myoil/runs/feature_set_baselines_12fold/brentoil-case1/iTransformer
