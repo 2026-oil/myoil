@@ -1,5 +1,5 @@
 task:
-  name: wti_case3_HPT_add_mixer
+  name: wti_case3_HPT_n100_split2
 dataset:
   path: data/df.csv
   target_col: Com_CrudeOil
@@ -52,5 +52,7 @@ scheduler:
 residual:
   enabled: false
 jobs:
-- model: TSMixerx
+- model: LSTM
+  params: {}
+- model: Naive
   params: {}
