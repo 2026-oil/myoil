@@ -1,0 +1,160 @@
+task:
+  name: wti_case3_diff_res_level_screen_20m
+
+dataset:
+  path: data/df.csv
+  target_col: Com_CrudeOil
+  dt_col: dt
+  hist_exog_cols:
+  - Com_Gasoline
+  - Com_BloombergCommodity_BCOM
+  - Com_LME_Ni_Cash
+  - Com_Coal
+  - Com_LME_Al_Cash
+  - Com_LMEX
+  - Bonds_KOR_10Y
+  - Com_LME_Ni_Inv
+  futr_exog_cols: []
+  static_exog_cols: []
+
+runtime:
+  random_seed: 1
+  transformations: diff
+
+training:
+  train_protocol: expanding_window_tscv
+  input_size: 64
+  season_length: 52
+  batch_size: 32
+  valid_batch_size: 32
+  windows_batch_size: 1024
+  inference_windows_batch_size: 1024
+  learning_rate: 0.004
+  max_steps: 400
+  val_size: 8
+  val_check_steps: 100
+  early_stop_patience_steps: 5
+  num_lr_decays: 1
+  model_step_size: 1
+  scaler_type: robust
+  loss: mse
+  dataloader_kwargs:
+    num_workers: 2
+    pin_memory: true
+    persistent_workers: true
+    prefetch_factor: 2
+
+cv:
+  horizon: 8
+  step_size: 8
+  n_windows: 1
+  gap: 0
+  max_train_size: null
+  overlap_eval_policy: by_cutoff_mean
+
+scheduler:
+  gpu_ids:
+  - 0
+  - 1
+  max_concurrent_jobs: 2
+  worker_devices: 1
+
+residual:
+  enabled: true
+  model: xgboost
+  target: level
+  params:
+    n_estimators: 128
+    max_depth: 6
+    learning_rate: 0.03
+    subsample: 0.9
+    colsample_bytree: 0.9
+  features:
+    include_base_prediction: true
+    include_horizon_step: true
+    include_date_features: false
+    lag_features:
+      enabled: true
+      sources:
+      - y_hat_base
+      steps:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 6
+      - 12
+      transforms:
+      - raw
+    exog_sources:
+      hist:
+      - Com_Gasoline
+      - Com_BloombergCommodity_BCOM
+      - Com_LME_Ni_Cash
+      - Com_Coal
+      - Com_LME_Al_Cash
+      - Com_LMEX
+      - Bonds_KOR_10Y
+      - Com_LME_Ni_Inv
+      futr: []
+      static: []
+
+jobs:
+- model: PatchTST
+  params:
+    hidden_size: 128
+    n_heads: 4
+    encoder_layers: 4
+    linear_hidden_size: 256
+    patch_len: 4
+    stride: 8
+    dropout: 0.3
+    fc_dropout: 0.2
+    attn_dropout: 0.0
+    revin: true
+- model: iTransformer
+  params:
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 1
+    d_ff: 512
+    d_layers: 1
+    factor: 5
+    dropout: 0.3
+    use_norm: false
+- model: LSTM
+  params:
+    encoder_hidden_size: 32
+    encoder_n_layers: 3
+    inference_input_size: 48
+    encoder_dropout: 0.0
+    decoder_hidden_size: 256
+    decoder_layers: 3
+- model: Naive
+  params: {}
+- model: NHITS
+  params:
+    n_pool_kernel_size:
+    - 8
+    - 4
+    - 1
+    n_freq_downsample:
+    - 4
+    - 2
+    - 1
+    n_blocks:
+    - 2
+    - 2
+    - 2
+    mlp_units:
+    - - 512
+      - 512
+    - - 512
+      - 512
+    - - 512
+      - 512
+    dropout_prob_theta: 0.2
+    activation: LeakyReLU
+- model: DLinear
+  params:
+    moving_avg_window: 13
