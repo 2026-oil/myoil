@@ -1,5 +1,5 @@
 task:
-  name: wti_case3_LDN_diff_all_n100
+  name: wti_case3_ldn_diff_all_n100
   
 dataset:
   path: /content/drive/MyDrive/csv/df.csv
