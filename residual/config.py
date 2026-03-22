@@ -490,7 +490,8 @@ def _normalize_residual_feature_config(
     )
 
     hist_selected = _coerce_name_tuple(
-        exog_payload.get("hist"), field_name="residual.features.exog_sources.hist"
+        exog_payload.get("hist", hist_exog_cols),
+        field_name="residual.features.exog_sources.hist",
     )
     futr_selected = _coerce_name_tuple(
         exog_payload.get("futr"), field_name="residual.features.exog_sources.futr"

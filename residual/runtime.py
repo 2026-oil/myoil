@@ -1719,6 +1719,35 @@ def _artifact_model_name(path: Path, suffix: str) -> str:
     return path.name.removesuffix(suffix)
 
 
+def _residual_summary_model_name(model_name: str) -> str:
+    return f"{model_name}_res"
+
+
+def _load_residual_metrics_for_summary(root: Path) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    residual_dir = root / "residual"
+    if not residual_dir.exists():
+        return rows
+    for model_root in sorted(path for path in residual_dir.iterdir() if path.is_dir()):
+        folds_dir = model_root / "folds"
+        if not folds_dir.exists():
+            continue
+        for metrics_path in sorted(folds_dir.glob("fold_*/metrics.json")):
+            payload = json.loads(metrics_path.read_text(encoding="utf-8"))
+            corrected_metrics = payload.get("corrected_metrics")
+            if not corrected_metrics:
+                continue
+            rows.append(
+                {
+                    "model": _residual_summary_model_name(model_root.name),
+                    "fold_idx": payload.get("fold_idx"),
+                    "cutoff": payload.get("cutoff"),
+                    **corrected_metrics,
+                }
+            )
+    return rows
+
+
 def _summary_job_roots(run_root: Path) -> list[Path]:
     roots: list[Path] = []
     if (run_root / "cv").exists():
@@ -1742,6 +1771,7 @@ def _load_metrics_for_summary(run_root: Path) -> pd.DataFrame:
             if "model" not in frame.columns:
                 frame["model"] = model_name
             rows.extend(frame.to_dict(orient="records"))
+        rows.extend(_load_residual_metrics_for_summary(root))
     return pd.DataFrame(rows)
 
 
@@ -2016,12 +2046,53 @@ def _load_last_fold_forecasts(run_root: Path) -> pd.DataFrame:
                 frame["model"] = model_name
             frame["fold_idx"] = pd.to_numeric(frame["fold_idx"], errors="coerce")
             frames.append(frame)
+        residual_dir = root / "residual"
+        if not residual_dir.exists():
+            continue
+        for path in sorted(residual_dir.glob("*/corrected_folds.csv")):
+            frame = pd.read_csv(path)
+            if frame.empty or "y_hat_corrected" not in frame.columns:
+                continue
+            model_name = path.parent.name
+            frame = frame.copy()
+            frame["model"] = _residual_summary_model_name(model_name)
+            frame["y_hat"] = pd.to_numeric(
+                frame["y_hat_corrected"], errors="coerce"
+            )
+            frame["fold_idx"] = pd.to_numeric(frame["fold_idx"], errors="coerce")
+            frames.append(frame)
     if not frames:
         return pd.DataFrame()
     forecasts = pd.concat(frames, ignore_index=True)
     forecasts = forecasts.dropna(subset=["fold_idx"]).copy()
     forecasts["fold_idx"] = forecasts["fold_idx"].astype(int)
     return forecasts
+
+
+def _build_residual_comparison_plots(
+    run_root: Path, last_fold_forecasts: pd.DataFrame
+) -> dict[str, str]:
+    residual_dir = run_root / "summary" / "residual"
+    plot_paths: dict[str, str] = {}
+    available_models = set(last_fold_forecasts["model"])
+    residual_models = sorted(
+        model.removesuffix("_res")
+        for model in available_models
+        if model.endswith("_res") and model.removesuffix("_res") in available_models
+    )
+    if not residual_models:
+        return plot_paths
+    residual_dir.mkdir(parents=True, exist_ok=True)
+    for model_name in residual_models:
+        plot_path = residual_dir / f"{model_name}.png"
+        _plot_last_fold_overlay(
+            last_fold_forecasts,
+            [model_name, _residual_summary_model_name(model_name)],
+            plot_path,
+            title=f"Last fold predictions ({model_name}: base vs base+residual)",
+        )
+        plot_paths[f"residual_{model_name}"] = str(plot_path)
+    return plot_paths
 
 
 def _plot_last_fold_overlay(
@@ -2040,7 +2111,7 @@ def _plot_last_fold_overlay(
     selected = forecasts[forecasts["model"].isin(selected_models)].copy()
     if selected.empty:
         return
-    selected["ds"] = pd.to_datetime(selected["ds"])
+    selected["ds"] = pd.Index([pd.Timestamp(value) for value in selected["ds"]])
     actual = (
         selected[["ds", "y"]]
         .drop_duplicates(subset=["ds"])
@@ -2168,6 +2239,7 @@ def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
         plot_path = summary_dir / f"last_fold_{slug}.png"
         _plot_last_fold_overlay(last_fold_forecasts, models, plot_path, title=title)
         plot_paths[slug] = str(plot_path)
+    plot_paths.update(_build_residual_comparison_plots(run_root, last_fold_forecasts))
     return plot_paths
 
 

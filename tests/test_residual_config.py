@@ -635,7 +635,7 @@ def test_load_app_config_applies_residual_feature_defaults(tmp_path: Path):
     assert features.lag_features.sources == ()
     assert features.lag_features.steps == ()
     assert features.lag_features.transforms == ("raw",)
-    assert features.exog_sources.hist == ()
+    assert features.exog_sources.hist == ("hist_a",)
     assert features.exog_sources.futr == ()
     assert features.exog_sources.static == ()
     assert loaded.normalized_payload["residual"]["features"] == {
@@ -648,7 +648,7 @@ def test_load_app_config_applies_residual_feature_defaults(tmp_path: Path):
             "steps": [],
             "transforms": ["raw"],
         },
-        "exog_sources": {"hist": [], "futr": [], "static": []},
+        "exog_sources": {"hist": ["hist_a"], "futr": [], "static": []},
     }
 
 
@@ -692,6 +692,29 @@ def test_load_app_config_accepts_residual_feature_opt_ins(tmp_path: Path):
         "sources": ["y_hat_base", "hist_a", "futr_a"],
         "steps": [1, 2],
         "transforms": ["raw"],
+    }
+
+
+def test_load_app_config_allows_explicit_empty_residual_hist_exog_override(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["residual"]["features"] = {"exog_sources": {"hist": []}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n",
+        encoding="utf-8",
+    )
+
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    features = loaded.config.residual.features
+    assert features.exog_sources.hist == ()
+    assert loaded.normalized_payload["residual"]["features"]["exog_sources"] == {
+        "hist": [],
+        "futr": [],
+        "static": [],
     }
 
 
@@ -1387,6 +1410,9 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
     run_root = tmp_path / "summary_run"
     cv_dir = run_root / "cv"
     cv_dir.mkdir(parents=True)
+    residual_model_dir = run_root / "residual" / "ModelA"
+    (residual_model_dir / "folds" / "fold_000").mkdir(parents=True)
+    (residual_model_dir / "folds" / "fold_001").mkdir(parents=True)
     config_dir = run_root / "config"
     config_dir.mkdir(parents=True)
     (config_dir / "config.resolved.json").write_text(
@@ -1408,6 +1434,37 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
         ),
         encoding="utf-8",
     )
+    for fold_idx, corrected_metrics in {
+        0: {
+            "MAE": 0.4,
+            "MSE": 0.16,
+            "RMSE": 0.4,
+            "MAPE": 0.04,
+            "NRMSE": 0.08,
+            "R2": 0.95,
+        },
+        1: {
+            "MAE": 0.2,
+            "MSE": 0.04,
+            "RMSE": 0.2,
+            "MAPE": 0.02,
+            "NRMSE": 0.04,
+            "R2": 0.98,
+        },
+    }.items():
+        (
+            residual_model_dir / "folds" / f"fold_{fold_idx:03d}" / "metrics.json"
+        ).write_text(
+            json.dumps(
+                {
+                    "fold_idx": fold_idx,
+                    "cutoff": f"2020-01-{15 + (7 * fold_idx):02d}",
+                    "base_metrics": {},
+                    "corrected_metrics": corrected_metrics,
+                }
+            ),
+            encoding="utf-8",
+        )
     pd.DataFrame(
         [
             {
@@ -1486,6 +1543,30 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
                 },
             ]
         ).to_csv(cv_dir / f"{model_name}_forecasts.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                "fold_idx": 1,
+                "cutoff": "2020-01-22",
+                "train_end_ds": "2020-01-22",
+                "unique_id": "target",
+                "ds": "2020-01-29",
+                "horizon_step": 1,
+                "y": 10.0,
+                "y_hat_corrected": 10.1,
+            },
+            {
+                "fold_idx": 1,
+                "cutoff": "2020-01-22",
+                "train_end_ds": "2020-01-22",
+                "unique_id": "target",
+                "ds": "2020-02-05",
+                "horizon_step": 2,
+                "y": 11.0,
+                "y_hat_corrected": 10.9,
+            },
+        ]
+    ).to_csv(residual_model_dir / "corrected_folds.csv", index=False)
 
     artifacts = runtime._build_summary_artifacts(run_root)
 
@@ -1497,7 +1578,8 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
     assert markdown_path.exists()
     leaderboard = pd.read_csv(leaderboard_path)
     assert leaderboard.loc[0, "rank"] == 1
-    assert leaderboard.loc[0, "model"] == "ModelA"
+    assert leaderboard.loc[0, "model"] == "ModelA_res"
+    assert leaderboard["model"].tolist() == ["ModelA_res", "ModelA", "ModelB"]
     assert "mean_fold_mape" in leaderboard.columns
     assert "mean_fold_nrmse" in leaderboard.columns
     assert "mean_fold_r2" in leaderboard.columns
@@ -1505,11 +1587,14 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
     assert "# 02. 데이터 및 모델 세팅" in report
     assert "## **Case 1 | BrentCrude**" in report
     assert "| Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |" in report
-    assert "| 1 | ModelA | 7.50% | 0.18 | 0.75 | 0.85 |" in report
+    assert "| 1 | ModelA_res | 3.00% | 0.06 | 0.30 | 0.97 |" in report
+    assert "| 2 | ModelA | 7.50% | 0.18 | 0.75 | 0.85 |" in report
     assert "hist_exog_cols:" in report
     assert (run_root / "summary" / "last_fold_all_models.png").exists()
     assert (run_root / "summary" / "last_fold_top3.png").exists()
     assert (run_root / "summary" / "last_fold_top5.png").exists()
+    assert (run_root / "summary" / "residual" / "ModelA.png").exists()
+    assert not (run_root / "summary" / "residual" / "ModelB.png").exists()
 
 
 def test_summary_builder_leaves_missing_report_values_blank(tmp_path: Path):
@@ -1948,6 +2033,12 @@ def test_runtime_generates_per_fold_residual_artifacts_with_dummy_model(tmp_path
     assert diagnostics["fold_count"] == 4
     assert diagnostics["residual.target"] == "level"
     assert diagnostics["tscv_policy"]["gap"] == 0
+    leaderboard = pd.read_csv(output_root / "summary" / "leaderboard.csv")
+    assert "DummyUnivariate" in set(leaderboard["model"])
+    assert "DummyUnivariate_res" in set(leaderboard["model"])
+    report = (output_root / "summary" / "sample.md").read_text(encoding="utf-8")
+    assert "DummyUnivariate_res" in report
+    assert (output_root / "summary" / "residual" / "DummyUnivariate.png").exists()
 
 
 def test_runtime_diff_preserves_raw_scale_for_baseline_learned_artifacts(
