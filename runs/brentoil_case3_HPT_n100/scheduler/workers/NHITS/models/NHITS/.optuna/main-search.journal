@@ -2570,3 +2570,5 @@
 {"op_code":8,"worker_id":"6753521d-4fa6-48be-b71e-020c11e6a21e-133804208904000","trial_id":88,"user_attr":{"best_training_params":{"input_size":48,"batch_size":64,"valid_batch_size":128,"windows_batch_size":256,"inference_windows_batch_size":512,"learning_rate":0.0009977380625457958,"scaler_type":"robust","model_step_size":8}}}
 {"op_code":8,"worker_id":"6753521d-4fa6-48be-b71e-020c11e6a21e-133804208904000","trial_id":88,"user_attr":{"fold_mse":[19.489189928304988]}}
 {"op_code":7,"worker_id":"6753521d-4fa6-48be-b71e-020c11e6a21e-133804208904000","trial_id":88,"step":0,"intermediate_value":19.489189928304988}
+{"op_code":8,"worker_id":"6753521d-4fa6-48be-b71e-020c11e6a21e-133804208904000","trial_id":88,"user_attr":{"fold_mse":[19.489189928304988,72.28747219183875]}}
+{"op_code":7,"worker_id":"6753521d-4fa6-48be-b71e-020c11e6a21e-133804208904000","trial_id":88,"step":1,"intermediate_value":45.88833106007186}
