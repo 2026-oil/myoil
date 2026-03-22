@@ -1,0 +1,35 @@
+{
+  "direction": "minimize",
+  "trial_count": 200,
+  "finished_trial_count": 200,
+  "state_counts": {
+    "complete": 200
+  },
+  "best_value": 34.013422137440415,
+  "best_trial_number": 42,
+  "objective_metric": "mean_fold_mse",
+  "study_name": "neuralforecast::brentoil_case3_HPT_n100::DLinear::residual-search::75bb066746ee",
+  "storage_backend": "journal",
+  "storage_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3_HPT_n100/scheduler/workers/DLinear/residual/DLinear/.optuna/residual-search.journal",
+  "requested_trial_count": 200,
+  "existing_trial_count_before_optimize": 0,
+  "existing_finished_trial_count_before_optimize": 0,
+  "remaining_trial_count": 200,
+  "requested_mode": "residual_auto_requested",
+  "validated_mode": "residual_auto",
+  "selected_search_params": [
+    "n_estimators",
+    "max_depth",
+    "learning_rate",
+    "subsample",
+    "colsample_bytree"
+  ],
+  "best_params": {
+    "n_estimators": 32,
+    "max_depth": 2,
+    "learning_rate": 0.1609499274787478,
+    "subsample": 0.533871016659822,
+    "colsample_bytree": 0.9402942419311074
+  },
+  "objective_stage": "tuning_pre_replay_residual_corrected_predictions"
+}

@@ -54,8 +54,6 @@ scheduler:
   worker_devices: 1
 residual:
   enabled: false
-  model: xgboost
-  params: {}
 jobs:
 - model: LSTM
   params:

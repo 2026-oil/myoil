@@ -1,0 +1,130 @@
+{
+  "manifest_version": "1",
+  "artifact_schema_version": "1",
+  "evaluation_protocol_version": "2",
+  "config_source_type": "yaml",
+  "config_source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/yaml/feature_set_HPT_c3/brentoil-case3.yaml",
+  "config_resolved_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3_HPT_n100/scheduler/workers/DLinear/config/config.resolved.json",
+  "config_input_sha256": "8e4e1fa1c0517a26449e9dade4d0db642ed1a205e2df661630b4533cf847d833",
+  "config_resolved_sha256": "6190a9c79da4dc1bfda9eefa335776b3286a635edf852b3348998676e1660eb0",
+  "search_space_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/search_space.yaml",
+  "search_space_sha256": "f226f846f18eaaa8c0506fd56b97de1f5fb6e409b1f1de60c77cc3dce7946ef8",
+  "entrypoint_version": "neuralforecast-residual-v1",
+  "compat_mode": "dual_read",
+  "jobs": [
+    {
+      "model": "PatchTST",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "n_heads",
+        "encoder_layers",
+        "linear_hidden_size",
+        "patch_len",
+        "stride",
+        "dropout",
+        "fc_dropout",
+        "attn_dropout",
+        "revin"
+      ]
+    },
+    {
+      "model": "DLinear",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "moving_avg_window"
+      ]
+    },
+    {
+      "model": "Naive",
+      "requested_mode": "baseline_fixed",
+      "validated_mode": "baseline_fixed",
+      "selected_search_params": []
+    },
+    {
+      "model": "iTransformer",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "n_heads",
+        "e_layers",
+        "d_ff",
+        "d_layers",
+        "factor",
+        "dropout",
+        "use_norm"
+      ]
+    },
+    {
+      "model": "LSTM",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "encoder_hidden_size",
+        "encoder_n_layers",
+        "inference_input_size",
+        "encoder_dropout",
+        "decoder_hidden_size",
+        "decoder_layers"
+      ]
+    },
+    {
+      "model": "NHITS",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "n_pool_kernel_size",
+        "n_freq_downsample",
+        "n_blocks",
+        "mlp_units",
+        "dropout_prob_theta",
+        "activation"
+      ]
+    }
+  ],
+  "training_search": {
+    "requested_mode": "training_auto_requested",
+    "validated_mode": "training_auto",
+    "selected_search_params": [
+      "input_size",
+      "learning_rate",
+      "scaler_type",
+      "model_step_size"
+    ]
+  },
+  "residual": {
+    "model": "xgboost",
+    "target": "level",
+    "requested_mode": "residual_disabled",
+    "validated_mode": "residual_disabled",
+    "selected_search_params": [],
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": false,
+        "sources": [],
+        "steps": [],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base"
+    ]
+  },
+  "training": {
+    "loss": "mse"
+  }
+}

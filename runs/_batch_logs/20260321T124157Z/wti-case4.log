@@ -1010,3 +1010,99 @@
 [model:PatchTST] idx=5/7 status=completed phase=replay [##################] 12/12 100% returncode=0
 [model:iTransformer] idx=6/7 status=running phase=replay fold=2/12 [##----------------] 1/12   8%
 [model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=4/7 failed=0 queued=1 current=Autoformer(4/7),iTransformer(6/7)
+[model:LSTM] idx=1/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/7 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:PatchTST] idx=5/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=6/7 status=running phase=replay fold=2/12 [###---------------] 2/12  17% mse=28.9831
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=4/7 failed=0 queued=1 current=Autoformer(4/7),iTransformer(6/7)
+[model:LSTM] idx=1/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/7 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:PatchTST] idx=5/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=6/7 status=running phase=replay fold=3/12 [###---------------] 2/12  17%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=4/7 failed=0 queued=1 current=Autoformer(4/7),iTransformer(6/7)
+[model:LSTM] idx=1/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/7 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:PatchTST] idx=5/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=6/7 status=running phase=replay fold=3/12 [####--------------] 3/12  25% mse=9.9147
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=4/7 failed=0 queued=1 current=Autoformer(4/7),iTransformer(6/7)
+[model:LSTM] idx=1/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/7 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:PatchTST] idx=5/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=6/7 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=4/7 failed=0 queued=1 current=Autoformer(4/7),iTransformer(6/7)
+[model:LSTM] idx=1/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/7 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:PatchTST] idx=5/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=6/7 status=running phase=replay fold=4/12 [######------------] 4/12  33% mse=15.8883
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=4/7 failed=0 queued=1 current=Autoformer(4/7),iTransformer(6/7)
+[model:LSTM] idx=1/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/7 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:PatchTST] idx=5/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=6/7 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=4/7 failed=0 queued=1 current=Autoformer(4/7),iTransformer(6/7)
+[model:LSTM] idx=1/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/7 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:PatchTST] idx=5/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=6/7 status=running phase=replay fold=5/12 [########----------] 5/12  42% mse=13.2111
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=4/7 failed=0 queued=1 current=Autoformer(4/7),iTransformer(6/7)
+[model:LSTM] idx=1/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/7 status=running phase=replay fold=4/12 [####--------------] 3/12  25%
+[model:PatchTST] idx=5/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=6/7 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=4/7 failed=0 queued=1 current=Autoformer(4/7),iTransformer(6/7)
+[model:LSTM] idx=1/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/7 status=running phase=replay fold=4/12 [######------------] 4/12  33% mse=36.6666
+[model:PatchTST] idx=5/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=6/7 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=4/7 failed=0 queued=1 current=Autoformer(4/7),iTransformer(6/7)
+[model:LSTM] idx=1/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/7 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:PatchTST] idx=5/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=6/7 status=running phase=replay fold=6/12 [########----------] 5/12  42%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=4/7 failed=0 queued=1 current=Autoformer(4/7),iTransformer(6/7)
+[model:LSTM] idx=1/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/7 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:PatchTST] idx=5/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=6/7 status=running phase=replay fold=6/12 [#########---------] 6/12  50% mse=27.6375
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%
+[summary] completed=4/7 failed=0 queued=1 current=Autoformer(4/7),iTransformer(6/7)
+[model:LSTM] idx=1/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:NHITS] idx=2/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:DLinear] idx=3/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:Autoformer] idx=4/7 status=running phase=replay fold=5/12 [######------------] 4/12  33%
+[model:PatchTST] idx=5/7 status=completed phase=replay [##################] 12/12 100% returncode=0
+[model:iTransformer] idx=6/7 status=running phase=replay fold=7/12 [#########---------] 6/12  50%
+[model:Naive] idx=7/7 status=queued [------------------] 0/1   0%

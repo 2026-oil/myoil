@@ -1,9 +1,0 @@
-{
-  "model": "PatchTST",
-  "fold_idx": 11,
-  "train_rows": 576,
-  "eval_rows": 8,
-  "train_end_ds": "2026-01-12 00:00:00",
-  "loss": "mse",
-  "loss_curve_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case2_res_level_lag_exg_xgb/scheduler/workers/PatchTST/models/PatchTST/folds/fold_011/loss_curve.png"
-}

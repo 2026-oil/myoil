@@ -17,7 +17,7 @@ dataset:
   static_exog_cols: []
 runtime:
   random_seed: 1
-  opt_n_trial: 200
+  opt_n_trial: 100
 training:
   train_protocol: expanding_window_tscv
   season_length: 52
@@ -44,9 +44,7 @@ scheduler:
   max_concurrent_jobs: 2
   worker_devices: 1
 residual:
-  enabled: true
-  model: xgboost
-  params: {}
+  enabled: false
 jobs:
 - model: PatchTST
   params: {}

@@ -55,9 +55,7 @@ scheduler:
   max_concurrent_jobs: 2
   worker_devices: 1
 residual:
-  enabled: true
-  model: xgboost
-  params: {}
+  enabled: false
 jobs:
 - model: PatchTST
   params: {}
