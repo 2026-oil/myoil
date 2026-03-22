@@ -2423,3 +2423,5 @@
 {"op_code":5,"worker_id":"6753521d-4fa6-48be-b71e-020c11e6a21e-133804208904000","trial_id":83,"param_name":"model_step_size","param_value_internal":2,"distribution":"{\"name\": \"CategoricalDistribution\", \"attributes\": {\"choices\": [1, 4, 8, 12]}}"}
 {"op_code":8,"worker_id":"6753521d-4fa6-48be-b71e-020c11e6a21e-133804208904000","trial_id":83,"user_attr":{"best_params":{"n_pool_kernel_size":[8,4,1],"n_freq_downsample":[8,4,1],"n_blocks":[1,1,1],"mlp_units":[[128,128],[128,128],[128,128]],"dropout_prob_theta":0.2,"activation":"SELU"}}}
 {"op_code":8,"worker_id":"6753521d-4fa6-48be-b71e-020c11e6a21e-133804208904000","trial_id":83,"user_attr":{"best_training_params":{"input_size":48,"batch_size":64,"valid_batch_size":128,"windows_batch_size":2048,"inference_windows_batch_size":512,"learning_rate":0.0011548551948228271,"scaler_type":"robust","model_step_size":8}}}
+{"op_code":8,"worker_id":"6753521d-4fa6-48be-b71e-020c11e6a21e-133804208904000","trial_id":83,"user_attr":{"fold_mse":[20.56085157264812]}}
+{"op_code":7,"worker_id":"6753521d-4fa6-48be-b71e-020c11e6a21e-133804208904000","trial_id":83,"step":0,"intermediate_value":20.56085157264812}
