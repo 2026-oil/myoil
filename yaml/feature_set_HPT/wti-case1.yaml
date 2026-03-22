@@ -61,8 +61,6 @@ residual:
 jobs:
 - model: PatchTST
   params: {}
-- model: DLinear
-  params: {}
 - model: Naive
   params: {}
 - model: iTransformer

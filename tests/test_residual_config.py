@@ -4452,6 +4452,22 @@ HPT_CASE12_YAML_FILES = [
     REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case2.yaml",
 ]
 
+HPT_YAML_FILES = [
+    REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case1.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case2.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case3.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case4.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case1.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case2.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case3.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case4.yaml",
+]
+
+HPT_CASE3_REP_YAML_FILES = [
+    REPO_ROOT / "yaml" / "feature_set_HPT_c3" / "brentoil-case3.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT_c3" / "wti-case3.yaml",
+]
+
 OPTUNA_CONFIG_YAML_FILES = [
     REPO_ROOT / "baseline-brentoil.yaml",
     REPO_ROOT / "baseline-brentoil_uni.yaml",
@@ -4493,13 +4509,6 @@ EXPECTED_CASE_MODEL_PARAMS = {
         "n_freq_downsample": [24, 12, 1],
         "dropout_prob_theta": 0.0,
     },
-    "DLinear": {"moving_avg_window": 7},
-    "Autoformer": {
-        "hidden_size": 64,
-        "dropout": 0.1,
-        "factor": 3,
-        "n_head": 4,
-    },
     "PatchTST": {
         "hidden_size": 64,
         "n_heads": 4,
@@ -4514,8 +4523,23 @@ EXPECTED_CASE_MODEL_PARAMS = {
         "d_ff": 256,
         "dropout": 0.1,
     },
+    "TSMixerx": {
+        "n_block": 2,
+        "ff_dim": 64,
+        "dropout": 0.0,
+        "revin": True,
+    },
     "Naive": {},
 }
+
+EXPECTED_CASE_MODEL_LIST = [
+    "PatchTST",
+    "TSMixerx",
+    "Naive",
+    "iTransformer",
+    "LSTM",
+    "NHITS",
+]
 
 EXPECTED_HPT_CASE12_TRAINING = {
     "train_protocol": "expanding_window_tscv",
@@ -4533,12 +4557,25 @@ EXPECTED_HPT_CASE12_TRAINING = {
 
 EXPECTED_HPT_CASE12_MODELS = [
     "PatchTST",
-    "DLinear",
     "Naive",
     "iTransformer",
     "LSTM",
     "NHITS",
 ]
+
+EXPECTED_HPT_CASE3_REP_MODELS = [
+    "PatchTST",
+    "TSMixerx",
+    "Naive",
+    "iTransformer",
+    "LSTM",
+    "NHITS",
+]
+
+EXPECTED_HPT_CASE3_SPLIT_MODELS = {
+    "wti-case3_split.yaml": ["PatchTST", "iTransformer", "NHITS"],
+    "wti-case3_split2.yaml": ["LSTM", "Naive"],
+}
 
 SEARCH_SPACE_MODELS = yaml.safe_load(
     (REPO_ROOT / "search_space.yaml").read_text(encoding="utf-8")
@@ -4801,6 +4838,12 @@ def test_case_yaml_training_mapping_matches_expected_across_all_files():
 
 
 @pytest.mark.parametrize("path", CASE_YAML_FILES, ids=lambda p: p.name)
+def test_case_yaml_jobs_keep_only_requested_models(path: Path):
+    payload = _load_case_yaml(path)
+    assert [job["model"] for job in payload["jobs"]] == EXPECTED_CASE_MODEL_LIST
+
+
+@pytest.mark.parametrize("path", CASE_YAML_FILES, ids=lambda p: p.name)
 def test_case_yaml_learned_model_params_match_expected(path: Path):
     jobs = _case_jobs_by_model(path)
 
@@ -4864,6 +4907,43 @@ def test_case_yaml_build_model_preserves_expected_fixed_params():
             assert actual_value == expected_value
 
 
+@pytest.mark.parametrize("path", HPT_CASE3_REP_YAML_FILES, ids=lambda p: p.name)
+def test_feature_set_hpt_case3_representative_jobs_include_tsmixerx(path: Path):
+    payload = _load_case_yaml(path)
+
+    assert [job["model"] for job in payload["jobs"]] == EXPECTED_HPT_CASE3_REP_MODELS
+    assert payload["jobs"][2]["params"] == {}
+
+
+@pytest.mark.parametrize("path", HPT_CASE3_REP_YAML_FILES, ids=lambda p: p.name)
+def test_feature_set_hpt_case3_representative_tsmixerx_normalizes_to_auto(
+    path: Path,
+):
+    loaded = load_app_config(REPO_ROOT, config_path=path)
+    jobs_by_model = {job.model: job for job in loaded.config.jobs}
+
+    tsmixerx = jobs_by_model["TSMixerx"]
+    assert tsmixerx.params == {}
+    assert tsmixerx.requested_mode == "learned_auto_requested"
+    assert tsmixerx.validated_mode == "learned_auto"
+    assert list(tsmixerx.selected_search_params) == list(SEARCH_SPACE_MODELS["TSMixerx"])
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        REPO_ROOT / "yaml" / "feature_set_HPT_c3" / "wti-case3_split.yaml",
+        REPO_ROOT / "yaml" / "feature_set_HPT_c3" / "wti-case3_split2.yaml",
+    ],
+    ids=lambda p: p.name,
+)
+def test_feature_set_hpt_case3_split_files_keep_requested_model_subsets(path: Path):
+    payload = _load_case_yaml(path)
+    assert [job["model"] for job in payload["jobs"]] == EXPECTED_HPT_CASE3_SPLIT_MODELS[
+        path.name
+    ]
+
+
 @pytest.mark.parametrize("path", HPT_CASE12_YAML_FILES, ids=lambda p: p.name)
 def test_feature_set_hpt_case12_training_keeps_only_fixed_controls(path: Path):
     payload = _load_case_yaml(path)
@@ -4889,6 +4969,13 @@ def test_feature_set_hpt_case12_cv_and_jobs_follow_optuna_scope(path: Path):
     payload = _load_case_yaml(path)
 
     assert payload["cv"]["n_windows"] == 5
+    assert [job["model"] for job in payload["jobs"]] == EXPECTED_HPT_CASE12_MODELS
+    assert all(job["params"] == {} for job in payload["jobs"])
+
+
+@pytest.mark.parametrize("path", HPT_YAML_FILES, ids=lambda p: p.name)
+def test_feature_set_hpt_jobs_keep_only_requested_models(path: Path):
+    payload = _load_case_yaml(path)
     assert [job["model"] for job in payload["jobs"]] == EXPECTED_HPT_CASE12_MODELS
     assert all(job["params"] == {} for job in payload["jobs"])
 

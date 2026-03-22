@@ -1,0 +1,10 @@
+{
+  "job_name": "LSTM",
+  "gpu_id": 0,
+  "devices": 1,
+  "cuda_visible_devices": "0",
+  "returncode": 0,
+  "stdout_path": "/content/myoil/runs/colab_batch/feature_set_HPT_c3__wti-case3_split2/scheduler/workers/LSTM/stdout.log",
+  "stderr_path": "/content/myoil/runs/colab_batch/feature_set_HPT_c3__wti-case3_split2/scheduler/workers/LSTM/stderr.log",
+  "completed_at": "2026-03-22T12:27:56.746521+00:00"
+}

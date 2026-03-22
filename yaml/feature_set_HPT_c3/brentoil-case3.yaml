@@ -54,7 +54,7 @@ residual:
 jobs:
 - model: PatchTST
   params: {}
-- model: DLinear
+- model: TSMixerx
   params: {}
 - model: Naive
   params: {}

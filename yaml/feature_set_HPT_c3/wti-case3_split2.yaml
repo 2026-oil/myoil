@@ -54,8 +54,5 @@ residual:
 jobs:
 - model: LSTM
   params: {}
-- model: DLinear
-  params: {}
 - model: Naive
   params: {}
-

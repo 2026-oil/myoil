@@ -52,6 +52,28 @@ scheduler:
 residual:
   enabled: false
 jobs:
+- model: PatchTST
+  params:
+    hidden_size: 64
+    n_heads: 4
+    encoder_layers: 2
+    patch_len: 16
+    dropout: 0.1
+- model: TSMixerx
+  params:
+    n_block: 2
+    ff_dim: 64
+    dropout: 0.0
+    revin: true
+- model: Naive
+  params: {}
+- model: iTransformer
+  params:
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 2
+    d_ff: 256
+    dropout: 0.1
 - model: LSTM
   params:
     encoder_hidden_size: 64
@@ -69,28 +91,3 @@ jobs:
     - 12
     - 1
     dropout_prob_theta: 0.0
-- model: DLinear
-  params:
-    moving_avg_window: 7
-- model: Autoformer
-  params:
-    hidden_size: 64
-    dropout: 0.1
-    factor: 3
-    n_head: 4
-- model: PatchTST
-  params:
-    hidden_size: 64
-    n_heads: 4
-    encoder_layers: 2
-    patch_len: 16
-    dropout: 0.1
-- model: iTransformer
-  params:
-    hidden_size: 64
-    n_heads: 4
-    e_layers: 2
-    d_ff: 256
-    dropout: 0.1
-- model: Naive
-  params: {}
