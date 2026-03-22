@@ -3,10 +3,10 @@
   "artifact_schema_version": "1",
   "evaluation_protocol_version": "2",
   "config_source_type": "yaml",
-  "config_source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/yaml/feature_set_HPT_c3/brentoil-case3.yaml",
-  "config_resolved_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3_HPT_n100/scheduler/workers/NHITS/config/config.resolved.json",
-  "config_input_sha256": "f046021678b20029f17fb89d6198123f6ae6e0625b44a9bab01978e212a42d77",
-  "config_resolved_sha256": "d6a215dbddf1bdd68ad8b5d0b4050495e593477ae5efd613b828873a73a94533",
+  "config_source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/yaml/feature_set_HPT_c3/wti-case3.yaml",
+  "config_resolved_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT_n100/scheduler/workers/TSMixerx/config/config.resolved.json",
+  "config_input_sha256": "d492fe14da0fc726831e21856f3589c3cc27fb0082dc9a7edfbbd2be7e7a6808",
+  "config_resolved_sha256": "9fcdf2304303afe38d34a536af0f7534a8b2bf200704bec60119cdb7fabdc08a",
   "search_space_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/search_space.yaml",
   "search_space_sha256": "c9c2a9c68ee3fe61b10fd52c410511fa18a8a5bbdfe2f6f372befb5e9631957d",
   "entrypoint_version": "neuralforecast-residual-v1",
@@ -30,18 +30,14 @@
       ]
     },
     {
-      "model": "DLinear",
+      "model": "TSMixerx",
       "requested_mode": "learned_auto_requested",
       "validated_mode": "learned_auto",
       "selected_search_params": [
-        "moving_avg_window"
+        "n_block",
+        "ff_dim",
+        "dropout"
       ]
-    },
-    {
-      "model": "Naive",
-      "requested_mode": "baseline_fixed",
-      "validated_mode": "baseline_fixed",
-      "selected_search_params": []
     },
     {
       "model": "iTransformer",
@@ -59,19 +55,6 @@
       ]
     },
     {
-      "model": "LSTM",
-      "requested_mode": "learned_auto_requested",
-      "validated_mode": "learned_auto",
-      "selected_search_params": [
-        "encoder_hidden_size",
-        "encoder_n_layers",
-        "inference_input_size",
-        "encoder_dropout",
-        "decoder_hidden_size",
-        "decoder_layers"
-      ]
-    },
-    {
       "model": "NHITS",
       "requested_mode": "learned_auto_requested",
       "validated_mode": "learned_auto",
@@ -82,11 +65,7 @@
         "mlp_units",
         "dropout_prob_theta",
         "activation"
-      ],
-      "model_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3_HPT_n100/scheduler/workers/NHITS/models/NHITS/best_params.json",
-      "model_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3_HPT_n100/scheduler/workers/NHITS/models/NHITS/optuna_study_summary.json",
-      "training_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3_HPT_n100/scheduler/workers/NHITS/models/NHITS/training_best_params.json",
-      "training_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3_HPT_n100/scheduler/workers/NHITS/models/NHITS/training_optuna_study_summary.json"
+      ]
     }
   ],
   "training_search": {
@@ -101,9 +80,7 @@
       "learning_rate",
       "scaler_type",
       "model_step_size"
-    ],
-    "best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3_HPT_n100/scheduler/workers/NHITS/models/NHITS/training_best_params.json",
-    "optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3_HPT_n100/scheduler/workers/NHITS/models/NHITS/training_optuna_study_summary.json"
+    ]
   },
   "residual": {
     "model": "xgboost",
@@ -130,8 +107,8 @@
           "Com_LME_Ni_Cash",
           "Com_Coal",
           "Com_LME_Al_Cash",
-          "Bonds_KOR_10Y",
           "Com_LMEX",
+          "Bonds_KOR_10Y",
           "Com_LME_Ni_Inv"
         ],
         "futr": [],
@@ -146,8 +123,8 @@
       "Com_LME_Ni_Cash",
       "Com_Coal",
       "Com_LME_Al_Cash",
-      "Bonds_KOR_10Y",
       "Com_LMEX",
+      "Bonds_KOR_10Y",
       "Com_LME_Ni_Inv"
     ]
   },

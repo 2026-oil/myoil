@@ -1,0 +1,26 @@
+[
+  {
+    "job_name": "PatchTST",
+    "devices": 1,
+    "phase": "full",
+    "worker_index": 0
+  },
+  {
+    "job_name": "TSMixerx",
+    "devices": 1,
+    "phase": "full",
+    "worker_index": 0
+  },
+  {
+    "job_name": "iTransformer",
+    "devices": 1,
+    "phase": "full",
+    "worker_index": 0
+  },
+  {
+    "job_name": "NHITS",
+    "devices": 1,
+    "phase": "full",
+    "worker_index": 0
+  }
+]

@@ -1,0 +1,33 @@
+{
+  "n_pool_kernel_size": [
+    8,
+    4,
+    1
+  ],
+  "n_freq_downsample": [
+    8,
+    4,
+    1
+  ],
+  "n_blocks": [
+    1,
+    1,
+    1
+  ],
+  "mlp_units": [
+    [
+      128,
+      128
+    ],
+    [
+      128,
+      128
+    ],
+    [
+      128,
+      128
+    ]
+  ],
+  "dropout_prob_theta": 0.2,
+  "activation": "SELU"
+}
