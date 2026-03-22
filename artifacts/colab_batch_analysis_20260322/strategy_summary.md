@@ -6,17 +6,17 @@
 - Last-3 detailed probe: `winner_last3_analysis.csv` for rank-1 winner of each yaml
 
 ## Core findings
-1. **WTI best overall is stable:** `bomb/wti-case3-family-h8-diff-exloss-i128*` with `LSTM`/`LSTM_res` dominates (nRMSE about 0.1983, R2 about 0.637).
+1. **WTI best overall is stable:** `bomb/wti-case3-family-h8-diff-exloss-i128*` with `LSTM`/`LSTM_res` dominates (nRMSE about 0.1983, R2 about 0.637). `LSTM_res` is effectively a tie/fallback, not a meaningfully separate lane.
 2. **Brent best overall is weaker and model-dependent:**
    - `i48` family: `TimeMixer_res` wins (nRMSE about 0.3240 to 0.3301)
    - `i128` family: `NHITS_res` wins (nRMSE about 0.3336 to 0.3422)
 3. **Residual correction usually helps on Brent and shorter-window cases**, but gives only marginal gain on the already-strong WTI i128 LSTM lane.
-4. **Last-3 failure mode is universal underprediction on upward spikes.** Every winner has negative `last3_bias`, especially horizons 7-8.
+4. **Last-3 failure mode is universal underprediction on upward spikes.** Every winner has negative `last3_bias`, especially horizons 7-8. This supports late-horizon/spike-aware optimization as the next experiment direction, but does not by itself prove causality.
 5. **Longer history helps WTI, shorter history helps Brent.** WTI i128 winner last3 RMSE is about 10.18, while WTI i48 winners are 15.63 to 18.07. Brent i48 winners are 17.65 to 18.08, slightly better than Brent i128 winners 18.36 to 19.60.
 
 ## Recommended strategy
 ### Priority 1: Split target strategy
-- **WTI main lane:** keep `h8 + diff + exloss + i128`, base model `LSTM`, optional residual-level as tie-breaker only.
+- **WTI main lane:** keep `h8 + diff + exloss + i128`, base model `LSTM`, with `LSTM_res` treated as a near-equal fallback/tie-breaker only.
 - **Brent main lane:** move default shortlist to `h8 + diff + exloss + i48 + residual-level`, base model `TimeMixer_res`; keep `NHITS_res i128` as secondary challenger.
 
 ### Priority 2: Optimize for last-3 explicitly
