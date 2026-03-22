@@ -4526,7 +4526,7 @@ EXPECTED_CASE_MODEL_PARAMS = {
     "TSMixerx": {
         "n_block": 2,
         "ff_dim": 64,
-        "dropout": 0.0,
+        "dropout": 0.1,
         "revin": True,
     },
     "Naive": {},
