@@ -1288,6 +1288,85 @@ def test_scheduler_streams_worker_stdout_to_terminal(
     assert PROGRESS_EVENT_PREFIX not in captured.out
 
 
+def test_scheduler_finalize_recreates_missing_worker_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n", encoding="utf-8"
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, _payload(), ".yaml")
+    )
+    launch = build_launch_plan(loaded.config, loaded.config.jobs[:1])[0]
+    scheduler_root = tmp_path / "scheduler"
+
+    class FakePopen:
+        def __init__(self, *_args, **_kwargs):
+            self.stdout = io.StringIO("")
+
+        def poll(self):
+            return 0
+
+        def wait(self):
+            worker_root = scheduler_root / "workers" / launch.job_name
+            if worker_root.exists():
+                for path in sorted(worker_root.rglob("*"), reverse=True):
+                    if path.is_file():
+                        path.unlink()
+                    else:
+                        path.rmdir()
+                worker_root.rmdir()
+            return 7
+
+    monkeypatch.setattr("residual.scheduler.subprocess.Popen", FakePopen)
+    monkeypatch.setattr(
+        "residual.scheduler._worker_command",
+        lambda *_args, **_kwargs: ["python", "fake_worker.py"],
+    )
+
+    results = run_parallel_jobs(tmp_path, loaded, [launch], scheduler_root)
+
+    assert results[0]["returncode"] == 7
+    summary_path = scheduler_root / "workers" / launch.job_name / "summary.json"
+    assert summary_path.exists()
+    assert json.loads(summary_path.read_text(encoding="utf-8"))["returncode"] == 7
+
+
+def test_open_persistent_study_retries_after_file_not_found(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n", encoding="utf-8"
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, _payload(), ".yaml")
+    )
+    from residual import runtime
+
+    calls = {"count": 0}
+    real_create_study = runtime.optuna.create_study
+
+    def flaky_create_study(*args, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise FileNotFoundError("simulated missing journal lock path")
+        return real_create_study(*args, **kwargs)
+
+    monkeypatch.setattr(runtime.optuna, "create_study", flaky_create_study)
+
+    study, metadata = runtime._open_persistent_study(
+        tmp_path / "models" / "iTransformer",
+        loaded=loaded,
+        stage="main-search",
+        job_name="iTransformer",
+        sampler=optuna.samplers.RandomSampler(seed=7),
+    )
+
+    assert calls["count"] == 2
+    assert study.study_name == metadata["study_name"]
+    assert Path(metadata["storage_path"]).exists()
+
+
 def test_runtime_executes_single_job_with_dummy_model(tmp_path: Path):
     payload = _payload()
     payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
