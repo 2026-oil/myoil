@@ -18,6 +18,9 @@ dataset:
   - Com_LME_Ni_Inv
   - Com_Corn
   - Com_Wheat
+  - Com_NaturalGas
+  - Idx_OVX
+  - Com_Gold
   futr_exog_cols: []
   static_exog_cols: []
 runtime:
@@ -67,4 +70,3 @@ jobs:
   params: {}
 - model: LSTM
   params: {}
-

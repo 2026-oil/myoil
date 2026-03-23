@@ -143,6 +143,19 @@ def test_generate_from_workbook_routes_yaml_to_family_directory(tmp_path: Path) 
     assert loaded.config.dataset.target_col == "Com_CrudeOil"
 
 
+def test_generate_rejects_unknown_family(tmp_path: Path) -> None:
+    repo_root = _repo_with_data(tmp_path)
+    workbook_path = _build_valid_workbook(tmp_path / "unknown-family.xlsx", family="feature_set", stem="family-case")
+    workbook = load_workbook(workbook_path)
+    row_idx = _row_index(workbook["Catalog"], "cfg1")
+    headers = [cell.value for cell in workbook["Catalog"][1]]
+    workbook["Catalog"].cell(row=row_idx, column=headers.index("family") + 1, value="mystery_family")
+    workbook.save(workbook_path)
+
+    with pytest.raises(xl_2_yaml.XL2YAMLError, match="Unsupported family"):
+        xl_2_yaml.generate_from_workbook(workbook_path, repo_root=repo_root, validate=False)
+
+
 def test_generate_from_workbook_rejects_colliding_targets(tmp_path: Path) -> None:
     repo_root = _repo_with_data(tmp_path)
     workbook_path = _build_valid_workbook(tmp_path / "collision.xlsx", family="feature_set", stem="dup")
@@ -205,6 +218,30 @@ def test_generate_from_workbook_rolls_back_on_validation_error(tmp_path: Path) -
         xl_2_yaml.generate_from_workbook(workbook_path, repo_root=repo_root, validate=True)
 
     assert not list((repo_root / "yaml").rglob("*.yaml"))
+
+
+@pytest.mark.parametrize(
+    ("sheet_name", "column_name"),
+    [
+        ("Runtime", "transformations"),
+        ("CV", "final_holdout"),
+        ("Residual", "train_source"),
+    ],
+)
+def test_generate_rejects_removed_legacy_workbook_columns(
+    tmp_path: Path, sheet_name: str, column_name: str
+) -> None:
+    repo_root = _repo_with_data(tmp_path)
+    workbook_path = _build_valid_workbook(tmp_path / f"{sheet_name}.xlsx", family="feature_set", stem="legacy-case")
+    workbook = load_workbook(workbook_path)
+    sheet = workbook[sheet_name]
+    extra_col = sheet.max_column + 1
+    sheet.cell(row=1, column=extra_col, value=column_name)
+    sheet.cell(row=2, column=extra_col, value="legacy")
+    workbook.save(workbook_path)
+
+    with pytest.raises(xl_2_yaml.XL2YAMLError, match="unsupported column"):
+        xl_2_yaml.generate_from_workbook(workbook_path, repo_root=repo_root, validate=False)
 
 
 def test_reverse_round_trip_preserves_semantics_and_explicit_defaults(tmp_path: Path) -> None:

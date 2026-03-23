@@ -146,7 +146,7 @@ top-level section:
 
 - 빈 Excel 템플릿 생성
 - Excel workbook -> `yaml/<family>/...` YAML 자동 생성
-- 생성 직후 config validation 수행
+- 생성 직후 내부 runtime validate-only helper 경로(`load_app_config` + job/adapter validation) 수행
 - 기존 YAML -> Excel workbook 역변환
 
 지원 family(현재 템플릿 dropdown 기준):
@@ -192,10 +192,11 @@ uv run python xl_2_yaml.py generate /tmp/nf-template.xlsx --catalog-id cfg1 --ca
 
 기본 동작:
 
+- `Catalog.family`는 지원 family 목록에 있어야만 합니다.
 - `Catalog.family` + `file_target`/`config_stem`으로 최종 경로 결정
 - 출력은 `yaml/<family>/...` 아래로 자동 배치
 - 충돌 경로는 fail-fast
-- 임시 staging 후 validation이 모두 통과해야 최종 경로로 promote
+- 임시 staging 후 내부 runtime validation이 모두 통과해야 최종 경로로 promote
 
 ### YAML -> Excel 역변환
 
@@ -239,6 +240,7 @@ uv run python xl_2_yaml.py reverse \
 - 다른 sheet row는 모두 `catalog_id`로 `Catalog` row에 귀속됩니다.
 - `Jobs`는 동일 `catalog_id` 아래 여러 row를 가질 수 있습니다.
 - adapter override는 allowlist 밖 field를 수정할 수 없습니다.
+- reverse conversion은 adapter provenance를 복원하지 않고, 확인 가능한 YAML 의미를 core sheet 기준으로 정규화합니다.
 - blank cell은 기본적으로 "omit" 의미이고, 명시적으로 적은 default 값은 재생성 시 유지됩니다.
 
 ## 4. `config.yaml` 설정표

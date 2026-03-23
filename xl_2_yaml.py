@@ -346,6 +346,10 @@ def _normalize_family(family: str) -> str:
         raise XL2YAMLError("Catalog.family is required")
     if "/" in normalized or normalized.startswith("."):
         raise XL2YAMLError(f"Unsafe family name: {family!r}")
+    if normalized not in DOCUMENTED_FAMILIES:
+        raise XL2YAMLError(
+            f"Unsupported family {normalized!r}; expected one of {', '.join(DOCUMENTED_FAMILIES)}"
+        )
     return normalized
 
 
@@ -416,12 +420,23 @@ def create_template_workbook(output_path: Path) -> Path:
     return output_path
 
 
-def _load_sheet_rows(path: Path, sheet_name: str) -> list[dict[str, Any]]:
+def _load_sheet_rows(path: Path, sheet_name: str, expected_headers: list[str]) -> list[dict[str, Any]]:
     workbook = load_workbook(path)
     if sheet_name not in workbook.sheetnames:
         raise XL2YAMLError(f"Workbook is missing required sheet: {sheet_name}")
     sheet = workbook[sheet_name]
     headers = [cell.value for cell in sheet[1]]
+    normalized_headers = [str(header).strip() for header in headers if not _is_blank(header)]
+    unknown_headers = sorted(set(normalized_headers).difference(expected_headers))
+    missing_headers = [header for header in expected_headers if header not in normalized_headers]
+    if unknown_headers:
+        raise XL2YAMLError(
+            f"Sheet {sheet_name} contains unsupported column(s): {', '.join(unknown_headers)}"
+        )
+    if missing_headers:
+        raise XL2YAMLError(
+            f"Sheet {sheet_name} is missing required column(s): {', '.join(missing_headers)}"
+        )
     rows: list[dict[str, Any]] = []
     for row in sheet.iter_rows(min_row=2, values_only=True):
         if not any(not _is_blank(value) for value in row):
@@ -445,7 +460,7 @@ def _read_workbook(
         raise XL2YAMLError(f"Workbook is missing required sheets: {', '.join(sorted(missing))}")
 
     catalog_entries: dict[str, CatalogEntry] = {}
-    catalog_rows = _load_sheet_rows(path, "Catalog")
+    catalog_rows = _load_sheet_rows(path, "Catalog", [spec.key for spec in CATALOG_SPECS])
     if not catalog_rows:
         raise XL2YAMLError("Catalog sheet must contain at least one row")
     for raw in catalog_rows:
@@ -473,7 +488,7 @@ def _read_workbook(
     single_rows: dict[str, dict[str, Any]] = {sheet: {} for sheet in SECTION_SPECS if sheet not in {"Jobs", "SearchSpace"}}
     multi_rows: dict[str, list[dict[str, Any]]] = {"Jobs": [], "SearchSpace": []}
     for sheet_name, specs in SECTION_SPECS.items():
-        rows = _load_sheet_rows(path, sheet_name)
+        rows = _load_sheet_rows(path, sheet_name, [spec.key for spec in specs])
         for raw in rows:
             catalog_id = str(raw.get("catalog_id", "")).strip()
             if catalog_id not in catalog_entries:
@@ -496,7 +511,7 @@ def _read_workbook(
         sheet_name = f"Adapter.{family}"
         if sheet_name not in workbook.sheetnames:
             continue
-        for raw in _load_sheet_rows(path, sheet_name):
+        for raw in _load_sheet_rows(path, sheet_name, [spec.key for spec in ADAPTER_SPECS]):
             catalog_id = str(raw.get("catalog_id", "")).strip()
             if catalog_id not in catalog_entries:
                 raise XL2YAMLError(f"Sheet {sheet_name} references unknown catalog_id: {catalog_id}")

@@ -63,14 +63,14 @@ _validate_patchtst_only_args() {
 }
 
 yaml_list=(
-  "yaml/feature_set/brentoil-case1.yaml"
-  "yaml/feature_set/brentoil-case2.yaml"
-  "yaml/feature_set/brentoil-case3.yaml"
-  "yaml/feature_set/brentoil-case4.yaml"
-  "yaml/feature_set/wti-case1.yaml"
-  "yaml/feature_set/wti-case2.yaml"
-  "yaml/feature_set/wti-case3.yaml"
-  "yaml/feature_set/wti-case4.yaml"
+  "yaml/feature_set_HPT_n100/brentoil-case4.yaml"
+  "yaml/feature_set_HPT_n100/wti-case4.yaml"
+  "yaml/feature_set_HPT_n100/brentoil-case2.yaml"
+  "yaml/feature_set_HPT_n100/wti-case2.yaml"
+  "yaml/feature_set_HPT_n100/brentoil-case1.yaml"
+  "yaml/feature_set_HPT_n100/wti-case1.yaml"
+  "yaml/feature_set_HPT_n100/brentoil-case3.yaml"
+  "yaml/feature_set_HPT_n100/wti-case3.yaml"
 )
 
 if [[ -n "${NF_CASE_CONFIGS:-}" ]]; then
