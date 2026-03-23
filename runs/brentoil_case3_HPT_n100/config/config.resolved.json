@@ -102,7 +102,16 @@
         ]
       },
       "exog_sources": {
-        "hist": [],
+        "hist": [
+          "Com_Gasoline",
+          "Com_BloombergCommodity_BCOM",
+          "Com_LME_Ni_Cash",
+          "Com_Coal",
+          "Com_LME_Al_Cash",
+          "Bonds_KOR_10Y",
+          "Com_LMEX",
+          "Com_LME_Ni_Inv"
+        ],
         "futr": [],
         "static": []
       }
@@ -131,12 +140,14 @@
       ]
     },
     {
-      "model": "DLinear",
+      "model": "TSMixerx",
       "params": {},
       "requested_mode": "learned_auto_requested",
       "validated_mode": "learned_auto",
       "selected_search_params": [
-        "moving_avg_window"
+        "n_block",
+        "ff_dim",
+        "dropout"
       ]
     },
     {

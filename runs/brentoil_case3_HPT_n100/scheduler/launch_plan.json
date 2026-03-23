@@ -1,38 +1,14 @@
 [
   {
-    "job_name": "PatchTST",
+    "job_name": "TSMixerx",
     "devices": 1,
-    "phase": "full",
+    "phase": "tune-main-only",
     "worker_index": 0
   },
   {
-    "job_name": "DLinear",
+    "job_name": "TSMixerx",
     "devices": 1,
-    "phase": "full",
-    "worker_index": 0
-  },
-  {
-    "job_name": "Naive",
-    "devices": 1,
-    "phase": "full",
-    "worker_index": 0
-  },
-  {
-    "job_name": "iTransformer",
-    "devices": 1,
-    "phase": "full",
-    "worker_index": 0
-  },
-  {
-    "job_name": "LSTM",
-    "devices": 1,
-    "phase": "full",
-    "worker_index": 0
-  },
-  {
-    "job_name": "NHITS",
-    "devices": 1,
-    "phase": "full",
-    "worker_index": 0
+    "phase": "tune-main-only",
+    "worker_index": 1
   }
 ]

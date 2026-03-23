@@ -37,7 +37,11 @@
         "n_block",
         "ff_dim",
         "dropout"
-      ]
+      ],
+      "model_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT_n100/scheduler/workers/TSMixerx/models/TSMixerx/best_params.json",
+      "model_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT_n100/scheduler/workers/TSMixerx/models/TSMixerx/optuna_study_summary.json",
+      "training_best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT_n100/scheduler/workers/TSMixerx/models/TSMixerx/training_best_params.json",
+      "training_optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT_n100/scheduler/workers/TSMixerx/models/TSMixerx/training_optuna_study_summary.json"
     },
     {
       "model": "iTransformer",
@@ -80,7 +84,9 @@
       "learning_rate",
       "scaler_type",
       "model_step_size"
-    ]
+    ],
+    "best_params_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT_n100/scheduler/workers/TSMixerx/models/TSMixerx/training_best_params.json",
+    "optuna_study_summary_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case3_HPT_n100/scheduler/workers/TSMixerx/models/TSMixerx/training_optuna_study_summary.json"
   },
   "residual": {
     "model": "xgboost",

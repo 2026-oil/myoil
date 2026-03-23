@@ -56,7 +56,11 @@ jobs:
   params: {}
 - model: TSMixerx
   params: {}
+- model: Naive
+  params: {}
 - model: iTransformer
+  params: {}
+- model: LSTM
   params: {}
 - model: NHITS
   params: {}
