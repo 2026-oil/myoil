@@ -19,6 +19,10 @@ _BASE_FEATURE_KEYS = (
 _FORBIDDEN_LAG_SOURCES = {"y", "residual_target"}
 
 
+def hist_exog_lag_feature_name(column: str) -> str:
+    return f"{column}_lag_1"
+
+
 @dataclass(frozen=True)
 class ResidualFeatureConfig:
     include_base_prediction: bool = True
@@ -239,7 +243,13 @@ def build_residual_feature_frame(
     for feature_name, feature_values in _build_lag_features(panel, config).items():
         features[feature_name] = feature_values
 
-    for column in (*config.hist, *config.futr, *config.static):
+    for column in config.hist:
+        feature_name = hist_exog_lag_feature_name(column)
+        source_column = column if column in panel else feature_name
+        if source_column in panel and feature_name not in features:
+            features[feature_name] = pd.to_numeric(panel[source_column], errors="coerce")
+
+    for column in (*config.futr, *config.static):
         if column in panel and column not in features:
             features[column] = pd.to_numeric(panel[column], errors="coerce")
 

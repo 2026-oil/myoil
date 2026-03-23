@@ -20,7 +20,7 @@ from optuna.trial import TrialState
 
 from .adapters import build_multivariate_inputs, build_univariate_inputs
 from .config import JobConfig, LoadedConfig, load_app_config
-from .features import build_residual_feature_frame
+from .features import build_residual_feature_frame, hist_exog_lag_feature_name
 from .manifest import (
     build_manifest,
     residual_active_feature_columns,
@@ -32,7 +32,6 @@ from .optuna_spaces import (
     DEFAULT_RESIDUAL_PARAMS_BY_MODEL,
     DEFAULT_OPTUNA_STUDY_DIRECTION,
     RESIDUAL_DEFAULTS,
-    RESIDUAL_PARAM_REGISTRY,
     SUPPORTED_AUTO_MODEL_NAMES,
     SUPPORTED_RESIDUAL_MODELS,
     LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD,
@@ -42,6 +41,7 @@ from .optuna_spaces import (
     suggest_model_params,
     suggest_residual_params,
     suggest_training_params,
+    training_param_registry_for_model,
     training_range_source_for_model,
 )
 from .plugins_base import ResidualContext
@@ -727,10 +727,18 @@ def _suggest_prefixed_residual_params(
     loaded: LoadedConfig,
     trial: optuna.Trial,
 ) -> dict[str, Any]:
-    registry = RESIDUAL_PARAM_REGISTRY[loaded.config.residual.model]
+    if loaded.search_space_payload is None:
+        raise ValueError("residual auto tuning requires loaded search-space specs")
+    registry = loaded.search_space_payload["residual"][loaded.config.residual.model]
     suggested = DEFAULT_RESIDUAL_PARAMS_BY_MODEL[loaded.config.residual.model].copy()
     for name in loaded.config.residual.selected_search_params:
-        suggested[name] = registry[name](trial, f"residual__{name}")
+        suggested[name] = suggest_residual_params(
+            loaded.config.residual.model,
+            (name,),
+            trial,
+            param_specs=registry,
+            name_prefix="residual__",
+        )[name]
     return suggested
 
 
@@ -972,12 +980,23 @@ def _main_job_objective(
 
     def objective(trial: optuna.Trial) -> float:
         candidate_params = suggest_model_params(
-            job.model, job.selected_search_params, trial
+            job.model,
+            job.selected_search_params,
+            trial,
+            param_specs=(
+                None
+                if loaded.search_space_payload is None
+                else loaded.search_space_payload["models"][job.model]
+            ),
         )
         candidate_training_params = suggest_training_params(
             loaded.config.training_search.selected_search_params,
             trial,
             model_name=job.model,
+            param_specs=training_param_registry_for_model(
+                job.model,
+                search_space_payload=loaded.search_space_payload,
+            ),
         )
         candidate_residual_params: dict[str, Any] | None = None
         if loaded.config.residual.enabled:
@@ -1112,7 +1131,10 @@ def _collect_main_tuning_result(
         "selected_training_search_params": list(
             loaded.config.training_search.selected_search_params
         ),
-        "training_range_source": training_range_source_for_model(job.model),
+        "training_range_source": training_range_source_for_model(
+            job.model,
+            search_space_payload=loaded.search_space_payload,
+        ),
         "best_params": best_params,
         "best_training_params": best_training_params,
         "fold_mse": best_trial.user_attrs["fold_mse"],
@@ -1459,8 +1481,11 @@ def _predict_with_fitted_model(nf: NeuralForecast, adapter_inputs) -> pd.DataFra
 
 def _selected_residual_exog_columns(loaded: LoadedConfig) -> list[str]:
     columns: list[str] = []
+    for column in loaded.config.residual.features.exog_sources.hist:
+        lagged = hist_exog_lag_feature_name(column)
+        if lagged not in columns:
+            columns.append(lagged)
     for column in (
-        *loaded.config.residual.features.exog_sources.hist,
         *loaded.config.residual.features.exog_sources.futr,
         *loaded.config.residual.features.exog_sources.static,
     ):
@@ -1477,7 +1502,7 @@ def _residual_panel_feature_values(
 ) -> dict[str, object]:
     values: dict[str, object] = {}
     for column in loaded.config.residual.features.exog_sources.hist:
-        values[column] = row_source[column]
+        values[hist_exog_lag_feature_name(column)] = static_source_df[column].iloc[-1]
     for column in loaded.config.residual.features.exog_sources.futr:
         values[column] = row_source[column]
     for column in loaded.config.residual.features.exog_sources.static:
@@ -1724,6 +1749,13 @@ def _apply_residual_plugin(
                 loaded.config.residual.model,
                 loaded.config.residual.selected_search_params,
                 trial,
+                param_specs=(
+                    None
+                    if loaded.search_space_payload is None
+                    else loaded.search_space_payload["residual"][
+                        loaded.config.residual.model
+                    ]
+                ),
             )
             trial.set_user_attr("best_params", candidate_params)
             for payload in fold_payloads:
@@ -2552,7 +2584,10 @@ def _run_single_job(
             training_best_params_path=models_dir / "training_best_params.json",
             training_study_summary_path=models_dir
             / "training_optuna_study_summary.json",
-            training_range_source=training_range_source_for_model(effective_job.model),
+            training_range_source=training_range_source_for_model(
+                effective_job.model,
+                search_space_payload=loaded.search_space_payload,
+            ),
         )
         effective_job = replace(job, params=best_params)
         effective_training_params = best_training_params

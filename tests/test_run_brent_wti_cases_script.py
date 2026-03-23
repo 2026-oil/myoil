@@ -96,10 +96,10 @@ fi
 
     assert (log_dir / "ok.log").exists()
     assert (log_dir / "fail.log").exists()
-    assert "runner main=main.py config=ok.yaml job=PatchTST output_root=" in (log_dir / "ok.log").read_text(
+    assert "runner main=main.py config=ok.yaml job= output_root=" in (log_dir / "ok.log").read_text(
         encoding="utf-8"
     )
-    assert "runner main=main.py config=fail.yaml job=PatchTST output_root=" in (log_dir / "fail.log").read_text(
+    assert "runner main=main.py config=fail.yaml job= output_root=" in (log_dir / "fail.log").read_text(
         encoding="utf-8"
     )
 
@@ -115,11 +115,9 @@ def test_run_brent_wti_cases_script_default_config_scope_uses_yaml_list_registra
     assert '"yaml/feature_set/brentoil-case4.yaml"' in script
     assert '"yaml/feature_set/wti-case1.yaml"' in script
     assert '"yaml/feature_set/wti-case4.yaml"' in script
-    assert '"yaml/feature_set_HPT_c3/brentoil-case3.yaml"' in script
-    assert '"yaml/feature_set_HPT_c3/wti-case3.yaml"' in script
     assert 'configs=("${yaml_list[@]}")' in script
-    assert "--jobs" in script
-    assert "PatchTST" in script
+    assert '--config" "$cfg" "$@' in script
+    assert "NF_CASE_PATCHTST_JOB" not in script
 
 
 def test_run_brent_wti_cases_script_does_not_auto_commit_or_push() -> None:
@@ -132,16 +130,49 @@ def test_run_brent_wti_cases_script_does_not_auto_commit_or_push() -> None:
     assert "git push" not in script
 
 
-def test_run_brent_wti_cases_script_rejects_jobs_and_output_root_overrides(tmp_path: Path) -> None:
+def test_run_brent_wti_cases_script_allows_jobs_override(tmp_path: Path) -> None:
+    configs_dir = tmp_path / "configs"
+    configs_dir.mkdir()
+    ok_cfg = configs_dir / "ok.yaml"
+    ok_cfg.write_text("task:\n  name: ok\n", encoding="utf-8")
+
+    runner = tmp_path / "fake_python.sh"
+    _write_executable(
+        runner,
+        """#!/usr/bin/env bash
+set -euo pipefail
+job=""
+while (($#)); do
+  if [[ "$1" == "--jobs" ]]; then
+    job="$2"
+    shift 2
+    continue
+  fi
+  shift
+done
+echo "job=${job}"
+""",
+    )
+
+    env = os.environ.copy()
+    env["NF_CASE_CONFIGS"] = str(ok_cfg)
+    env["NF_CASE_PYTHON_BIN"] = str(runner)
+    env["NF_CASE_LOG_ROOT"] = str(tmp_path / "logs")
+
     completed = subprocess.run(
         ["bash", str(SCRIPT_PATH), "--jobs", "NHITS"],
-        cwd=tmp_path,
+        cwd=configs_dir,
+        env=env,
         text=True,
         capture_output=True,
     )
-    assert completed.returncode == 2
-    assert "--jobs is managed by run.sh PatchTST mode" in completed.stderr
 
+    assert completed.returncode == 0
+    log_dir = next((tmp_path / "logs").iterdir())
+    assert "job=NHITS" in (log_dir / "ok.log").read_text(encoding="utf-8")
+
+
+def test_run_brent_wti_cases_script_rejects_output_root_override(tmp_path: Path) -> None:
     completed = subprocess.run(
         ["bash", str(SCRIPT_PATH), "--output-root", "runs/custom"],
         cwd=tmp_path,
@@ -149,4 +180,13 @@ def test_run_brent_wti_cases_script_rejects_jobs_and_output_root_overrides(tmp_p
         capture_output=True,
     )
     assert completed.returncode == 2
-    assert "--output-root is managed by run.sh PatchTST mode" in completed.stderr
+    assert "--output-root is managed by run.sh; do not pass it explicitly" in completed.stderr
+
+    completed = subprocess.run(
+        ["bash", str(SCRIPT_PATH), "--output-root=runs/custom"],
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+    )
+    assert completed.returncode == 2
+    assert "--output-root is managed by run.sh; do not pass it explicitly" in completed.stderr

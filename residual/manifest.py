@@ -11,6 +11,7 @@ from .config import (
     DEFAULT_MANIFEST_VERSION,
     LoadedConfig,
 )
+from .features import hist_exog_lag_feature_name
 
 
 def _coerce_mapping(value: Any) -> dict[str, Any]:
@@ -54,7 +55,11 @@ def residual_active_feature_columns(feature_config: Any) -> list[str]:
         for step in lag_steps:
             columns.append(f"{source}_lag_{step}")
 
-    for group in ("hist", "futr", "static"):
+    for column in exog_payload.get("hist", []):
+        name = hist_exog_lag_feature_name(str(column))
+        if name not in columns:
+            columns.append(name)
+    for group in ("futr", "static"):
         for column in exog_payload.get(group, []):
             name = str(column)
             if name not in columns:

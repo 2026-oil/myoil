@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
+import hashlib
 import os
 from pathlib import Path
 from typing import Any, Literal
-import hashlib
 
 import optuna
 import yaml
@@ -60,7 +61,6 @@ SUPPORTED_AUTO_MODEL_NAMES = {
 SUPPORTED_RESIDUAL_MODELS = {"xgboost", "randomforest", "lightgbm"}
 DEFAULT_OPTUNA_NUM_TRIALS = 20
 DEFAULT_OPTUNA_STUDY_DIRECTION = "minimize"
-
 DEFAULT_RESIDUAL_PARAMS_BY_MODEL = {
     "xgboost": {
         "n_estimators": 32,
@@ -88,14 +88,6 @@ DEFAULT_RESIDUAL_PARAMS = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["xgboost"].copy()
 RESIDUAL_DEFAULTS = {
     name: params.copy() for name, params in DEFAULT_RESIDUAL_PARAMS_BY_MODEL.items()
 }
-
-
-def default_residual_params(model_name: str) -> dict[str, Any]:
-    normalized = str(model_name).lower()
-    if normalized not in RESIDUAL_DEFAULTS:
-        raise KeyError(f"Unsupported residual model defaults: {normalized}")
-    return RESIDUAL_DEFAULTS[normalized].copy()
-
 DEFAULT_TRAINING_PARAMS = {
     "input_size": 64,
     "season_length": 52,
@@ -120,6 +112,7 @@ FIXED_TRAINING_VALUES = {
     "val_check_steps": 100,
 }
 FIXED_TRAINING_KEYS = tuple(FIXED_TRAINING_VALUES)
+GLOBAL_TRAINING_RANGE_SOURCE = "global_fallback"
 
 ExecutionMode = Literal[
     "baseline_fixed",
@@ -133,6 +126,8 @@ ResidualMode = Literal[
     "residual_auto_requested",
     "residual_auto",
 ]
+SearchParamType = Literal["categorical", "int", "float"]
+SearchParamSpec = dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -142,6 +137,13 @@ class SearchSpaceContract:
     sha256: str
 
 
+def default_residual_params(model_name: str) -> dict[str, Any]:
+    normalized = str(model_name).lower()
+    if normalized not in RESIDUAL_DEFAULTS:
+        raise KeyError(f"Unsupported residual model defaults: {normalized}")
+    return RESIDUAL_DEFAULTS[normalized].copy()
+
+
 def _hash_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -149,13 +151,6 @@ def _hash_text(text: str) -> str:
 def _read_yaml(path: Path) -> dict[str, Any]:
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     return {} if payload is None else payload
-
-
-def load_search_space_contract(repo_root: Path) -> SearchSpaceContract:
-    path = (repo_root / SEARCH_SPACE_FILENAME).resolve()
-    text = path.read_text(encoding="utf-8")
-    payload = _read_yaml(path)
-    return SearchSpaceContract(path=path, payload=payload, sha256=_hash_text(text))
 
 
 def optuna_num_trials(runtime_opt_n_trial: int | None = None) -> int:
@@ -174,445 +169,354 @@ def build_optuna_sampler(seed: int) -> optuna.samplers.BaseSampler:
     return optuna.samplers.TPESampler(seed=seed)
 
 
-def _categorical(options: list[Any]):
-    def _apply(trial: optuna.Trial, name: str) -> Any:
-        return trial.suggest_categorical(name, options)
-
-    return _apply
-
-
-def _int(low: int, high: int, step: int = 1):
-    def _apply(trial: optuna.Trial, name: str) -> int:
-        return trial.suggest_int(name, low, high, step=step)
-
-    return _apply
+def _normalize_choices(value: Any) -> list[Any]:
+    if not isinstance(value, list) or not value:
+        raise ValueError("categorical search-space choices must be a non-empty list")
+    return deepcopy(value)
 
 
-def _float(low: float, high: float, *, log: bool = False):
-    def _apply(trial: optuna.Trial, name: str) -> float:
-        return trial.suggest_float(name, low, high, log=log)
+def _normalize_param_spec(spec: Any, *, section: str, owner: str, name: str) -> SearchParamSpec:
+    if not isinstance(spec, dict):
+        raise ValueError(
+            f"search_space.{section}.{owner}.{name} must be a mapping with type metadata"
+        )
+    spec_type = str(spec.get("type", "")).strip().lower()
+    if spec_type == "categorical":
+        return {"type": "categorical", "choices": _normalize_choices(spec.get("choices"))}
+    if spec_type == "int":
+        low = spec.get("low")
+        high = spec.get("high")
+        step = spec.get("step", 1)
+        if any(isinstance(item, bool) or not isinstance(item, int) for item in (low, high, step)):
+            raise ValueError(
+                f"search_space.{section}.{owner}.{name} int spec requires integer low/high/step"
+            )
+        if low > high or step <= 0:
+            raise ValueError(
+                f"search_space.{section}.{owner}.{name} int spec must satisfy low <= high and step > 0"
+            )
+        return {"type": "int", "low": int(low), "high": int(high), "step": int(step)}
+    if spec_type == "float":
+        low = spec.get("low")
+        high = spec.get("high")
+        log = bool(spec.get("log", False))
+        if any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in (low, high)):
+            raise ValueError(
+                f"search_space.{section}.{owner}.{name} float spec requires numeric low/high"
+            )
+        low = float(low)
+        high = float(high)
+        if low > high:
+            raise ValueError(
+                f"search_space.{section}.{owner}.{name} float spec must satisfy low <= high"
+            )
+        if log and low <= 0:
+            raise ValueError(
+                f"search_space.{section}.{owner}.{name} float log spec requires low > 0"
+            )
+        normalized: SearchParamSpec = {"type": "float", "low": low, "high": high}
+        if log:
+            normalized["log"] = True
+        return normalized
+    raise ValueError(
+        f"search_space.{section}.{owner}.{name} must declare type one of: categorical, int, float"
+    )
 
-    return _apply
+
+MODEL_PARAM_REGISTRY: dict[str, dict[str, SearchParamSpec]]
+TRAINING_PARAM_REGISTRY: dict[str, SearchParamSpec]
+TRAINING_PARAM_REGISTRY_BY_MODEL: dict[str, dict[str, SearchParamSpec]]
+RESIDUAL_PARAM_REGISTRY: dict[str, dict[str, SearchParamSpec]]
 
 
+def _coerce_legacy_param_name_list(value: Any, *, section: str, owner: str) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        raise ValueError(
+            f"search_space.{section}.{owner} must be a mapping of param specs (or legacy list of names)"
+        )
+    out = tuple(str(item) for item in value)
+    if any(not item.strip() for item in out):
+        raise ValueError(f"search_space.{section}.{owner} contains an empty parameter name")
+    return out
+
+
+def _normalize_selector_specs(
+    value: Any,
+    *,
+    section: str,
+    owner: str,
+    fallback_specs: dict[str, SearchParamSpec] | None,
+) -> dict[str, SearchParamSpec]:
+    if isinstance(value, list):
+        names = _coerce_legacy_param_name_list(value, section=section, owner=owner)
+        if fallback_specs is None:
+            raise ValueError(
+                f"search_space.{section}.{owner} legacy selector lists require default fallback specs"
+            )
+        missing = sorted(set(names).difference(fallback_specs))
+        if missing:
+            raise ValueError(
+                f"search_space.{section}.{owner} contains unknown parameter(s): {', '.join(missing)}"
+            )
+        return {name: deepcopy(fallback_specs[name]) for name in names}
+    if not isinstance(value, dict):
+        raise ValueError(
+            f"search_space.{section}.{owner} must be a mapping of parameter specs"
+        )
+    return {
+        str(name): _normalize_param_spec(spec, section=section, owner=owner, name=str(name))
+        for name, spec in value.items()
+    }
+
+
+def normalize_search_space_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    if not payload:
+        raise ValueError("search_space.yaml is empty")
+    required_sections = {"models", "residual"}
+    missing = required_sections.difference(payload)
+    if missing:
+        raise ValueError(
+            "search_space.yaml must contain top-level sections: models and residual"
+        )
+    model_fallback = globals().get("MODEL_PARAM_REGISTRY")
+    residual_fallback = globals().get("RESIDUAL_PARAM_REGISTRY")
+    training_global_fallback = globals().get("TRAINING_PARAM_REGISTRY")
+
+    models_payload = payload.get("models")
+    if not isinstance(models_payload, dict):
+        raise ValueError("search_space.models must be a mapping")
+    models = {
+        str(model_name): _normalize_selector_specs(
+            model_specs,
+            section="models",
+            owner=str(model_name),
+            fallback_specs=(None if model_fallback is None else model_fallback.get(str(model_name))),
+        )
+        for model_name, model_specs in models_payload.items()
+    }
+    unknown_models = sorted(set(models).difference(SUPPORTED_AUTO_MODEL_NAMES))
+    if unknown_models:
+        raise ValueError(
+            "search_space.models contains unsupported learned model(s): "
+            + ", ".join(unknown_models)
+        )
+
+    residual_payload = payload.get("residual")
+    if not isinstance(residual_payload, dict):
+        raise ValueError("search_space.residual must be a mapping")
+    residual = {
+        str(model_name): _normalize_selector_specs(
+            model_specs,
+            section="residual",
+            owner=str(model_name),
+            fallback_specs=(None if residual_fallback is None else residual_fallback.get(str(model_name))),
+        )
+        for model_name, model_specs in residual_payload.items()
+    }
+    unknown_residual = sorted(set(residual).difference(SUPPORTED_RESIDUAL_MODELS))
+    if unknown_residual:
+        raise ValueError(
+            "search_space.residual contains unsupported residual model(s): "
+            + ", ".join(unknown_residual)
+        )
+
+    training_payload = payload.get("training")
+    if training_payload is None:
+        training = {"global": {}, "per_model": {}}
+    elif isinstance(training_payload, list):
+        training = {
+            "global": _normalize_selector_specs(
+                training_payload,
+                section="training",
+                owner="global",
+                fallback_specs=training_global_fallback,
+            ),
+            "per_model": {},
+        }
+    elif isinstance(training_payload, dict):
+        if "global" in training_payload or "per_model" in training_payload:
+            global_payload = training_payload.get("global", {})
+            per_model_payload = training_payload.get("per_model", {})
+        else:
+            global_payload = training_payload
+            per_model_payload = {}
+        global_specs = _normalize_selector_specs(
+            global_payload,
+            section="training",
+            owner="global",
+            fallback_specs=training_global_fallback,
+        )
+        if not isinstance(per_model_payload, dict):
+            raise ValueError("search_space.training.per_model must be a mapping")
+        per_model_specs = {
+            str(model_name): _normalize_selector_specs(
+                spec_payload,
+                section="training.per_model",
+                owner=str(model_name),
+                fallback_specs=global_specs,
+            )
+            for model_name, spec_payload in per_model_payload.items()
+        }
+        training = {"global": global_specs, "per_model": per_model_specs}
+    else:
+        raise ValueError("search_space.training must be a mapping or legacy list")
+
+    fixed_training = sorted(set(training["global"]).intersection(FIXED_TRAINING_KEYS))
+    if fixed_training:
+        raise ValueError(
+            "search_space.training.global contains fixed, non-tunable parameter(s): "
+            + ", ".join(fixed_training)
+        )
+    unknown_training = sorted(
+        set(training["global"]).difference({
+            key for key in (training_global_fallback or {})
+        })
+    )
+    if training_global_fallback is not None and unknown_training:
+        raise ValueError(
+            "search_space.training.global contains unknown parameter(s): "
+            + ", ".join(unknown_training)
+        )
+    unknown_training_models = sorted(
+        set(training["per_model"]).difference(SUPPORTED_AUTO_MODEL_NAMES)
+    )
+    if unknown_training_models:
+        raise ValueError(
+            "search_space.training.per_model contains unsupported model(s): "
+            + ", ".join(unknown_training_models)
+        )
+    for model_name, specs in training["per_model"].items():
+        extra = sorted(set(specs).difference(training["global"]))
+        if extra:
+            raise ValueError(
+                f"search_space.training.per_model.{model_name} cannot introduce new parameter(s): {', '.join(extra)}"
+            )
+    if "learning_rate" in training["global"]:
+        overlaps = sorted(
+            model_name for model_name, specs in models.items() if "learning_rate" in specs
+        )
+        if overlaps:
+            raise ValueError(
+                "search_space.training.global.learning_rate overlaps with model-level learning_rate selector(s): "
+                + ", ".join(overlaps)
+            )
+
+    return {
+        "models": models,
+        "training": training,
+        "residual": residual,
+    }
+
+
+def load_search_space_contract(repo_root: Path) -> SearchSpaceContract:
+    path = (repo_root / SEARCH_SPACE_FILENAME).resolve()
+    text = path.read_text(encoding="utf-8")
+    payload = normalize_search_space_payload(_read_yaml(path))
+    return SearchSpaceContract(path=path, payload=payload, sha256=_hash_text(text))
+
+
+def _default_search_space_contract() -> SearchSpaceContract:
+    return load_search_space_contract(Path(__file__).resolve().parents[1])
+
+
+_DEFAULT_CONTRACT = _default_search_space_contract()
 MODEL_PARAM_REGISTRY = {
-    "RNN": {
-        "encoder_hidden_size": _categorical([16, 32, 64, 128]),
-        "encoder_n_layers": _int(1, 3),
-        "context_size": _categorical([5, 10, 50]),
-        "decoder_hidden_size": _categorical([16, 32, 64, 128]),
-    },
-    "GRU": {
-        "encoder_hidden_size": _categorical([16, 32, 64, 128]),
-        "encoder_n_layers": _int(1, 3),
-        "context_size": _categorical([5, 10, 50]),
-        "decoder_hidden_size": _categorical([16, 32, 64, 128]),
-    },
-    "TFT": {
-        "hidden_size": _categorical([32, 64, 128, 256]),
-        "dropout": _float(0.0, 0.3),
-        "n_head": _categorical([4, 8]),
-    },
-    "VanillaTransformer": {
-        "hidden_size": _categorical([32, 64, 128, 256]),
-        "dropout": _float(0.0, 0.3),
-        "encoder_layers": _int(1, 4),
-        "n_head": _categorical([4, 8]),
-    },
-    "Informer": {
-        "hidden_size": _categorical([32, 64, 128, 256]),
-        "dropout": _float(0.0, 0.3),
-        "factor": _int(1, 5),
-        "n_head": _categorical([4, 8]),
-    },
-    "Autoformer": {
-        "hidden_size": _categorical([64, 128, 256]),
-        "n_head": _categorical([4, 8]),
-        "encoder_layers": _int(1, 3),
-        "decoder_layers": _int(1, 2),
-        "factor": _categorical([1, 3, 5]),
-        "MovingAvg_window": _categorical([5, 13, 25]),
-        "conv_hidden_size": _categorical([32, 64, 128]),
-        "dropout": _categorical([0.0, 0.1, 0.2, 0.3]),
-    },
-    "FEDformer": {
-        "hidden_size": _categorical([32, 64, 128, 256]),
-        "dropout": _float(0.0, 0.3),
-        "modes": _categorical([16, 32, 64]),
-        "n_head": _categorical([4, 8]),
-    },
-    "PatchTST": {
-        "hidden_size": _categorical([64, 128]),
-        "n_heads": _categorical([4, 8]),
-        "encoder_layers": _int(2, 3),
-        "linear_hidden_size": _categorical([128, 256, 512]),
-        "patch_len": _categorical([4, 8, 16]),
-        "stride": _categorical([2, 4, 8]),
-        "dropout": _categorical([0.0, 0.2, 0.3]),
-        "fc_dropout": _categorical([0.0, 0.2]),
-        "attn_dropout": _categorical([0.0, 0.1]),
-        "revin": _categorical([True, False]),
-    },
-    "LSTM": {
-        "encoder_hidden_size": _categorical([64, 128, 256]),
-        "encoder_n_layers": _int(1, 3),
-        "inference_input_size": _categorical([-1, 24, 48, 96]),
-        "encoder_dropout": _categorical([0.1, 0.2, 0.3]),
-        "decoder_hidden_size": _categorical([32, 64, 128]),
-        "decoder_layers": _int(1, 3),
-    },
-    "TCN": {
-        "encoder_hidden_size": _categorical([16, 32, 64, 128]),
-        "context_size": _categorical([5, 10, 50]),
-        "decoder_hidden_size": _categorical([16, 32, 64, 128]),
-        "kernel_size": _categorical([2, 3, 5]),
-    },
-    "DeepAR": {
-        "lstm_hidden_size": _categorical([16, 32, 64, 128]),
-        "lstm_n_layers": _int(1, 3),
-        "lstm_dropout": _float(0.0, 0.3),
-        "decoder_hidden_size": _categorical([16, 32, 64]),
-    },
-    "DilatedRNN": {
-        "cell_type": _categorical(["GRU", "LSTM"]),
-        "encoder_hidden_size": _categorical([16, 32, 64, 128]),
-        "context_size": _categorical([5, 10, 50]),
-        "decoder_hidden_size": _categorical([16, 32, 64, 128]),
-    },
-    "BiTCN": {
-        "hidden_size": _categorical([16, 32, 64, 128]),
-        "dropout": _float(0.0, 0.3),
-    },
-    "xLSTM": {
-        "encoder_hidden_size": _categorical([16, 32, 64, 128]),
-        "encoder_n_blocks": _int(1, 3),
-        "decoder_hidden_size": _categorical([16, 32, 64, 128]),
-        "encoder_dropout": _float(0.0, 0.3),
-    },
-    "MLP": {
-        "hidden_size": _categorical([32, 64, 128, 256]),
-        "num_layers": _int(1, 4),
-    },
-    "NBEATS": {
-        "n_blocks": _categorical([[1, 1, 1], [2, 2, 2], [3, 3, 3]]),
-        "mlp_units": _categorical(
-            [
-                [[64, 64], [64, 64], [64, 64]],
-                [[128, 128], [128, 128], [128, 128]],
-            ]
-        ),
-        "dropout_prob_theta": _float(0.0, 0.3),
-    },
-    "NBEATSx": {
-        "n_blocks": _categorical([[1, 1, 1], [2, 2, 2], [3, 3, 3]]),
-        "mlp_units": _categorical(
-            [
-                [[64, 64], [64, 64], [64, 64]],
-                [[128, 128], [128, 128], [128, 128]],
-            ]
-        ),
-        "dropout_prob_theta": _float(0.0, 0.3),
-    },
-    "NHITS": {
-        "n_pool_kernel_size": _categorical(
-            [[2, 2, 1], [4, 2, 1], [8, 4, 1]]
-        ),
-        "n_freq_downsample": _categorical(
-            [[4, 2, 1], [8, 4, 1], [12, 3, 1]]
-        ),
-        "n_blocks": _categorical([[1, 1, 1], [1, 2, 2], [2, 2, 2]]),
-        "mlp_units": _categorical(
-            [
-                [[128, 128], [128, 128], [128, 128]],
-                [[256, 256], [256, 256], [256, 256]],
-                [[512, 512], [512, 512], [512, 512]],
-            ]
-        ),
-        "dropout_prob_theta": _categorical([0.0, 0.1, 0.2]),
-        "activation": _categorical(
-            ["ReLU", "Softplus", "Tanh", "SELU", "LeakyReLU", "PReLU", "Sigmoid"]
-        ),
-    },
-    "DLinear": {
-        "moving_avg_window": _categorical([5, 9, 13, 25, 51]),
-    },
-    "NLinear": {
-        "learning_rate": _float(1e-4, 1e-1, log=True),
-    },
-    "TiDE": {
-        "hidden_size": _categorical([32, 64, 128, 256]),
-        "decoder_output_dim": _categorical([8, 16, 32]),
-        "temporal_decoder_dim": _categorical([8, 16, 32]),
-        "num_encoder_layers": _int(1, 3),
-    },
-    "DeepNPTS": {
-        "hidden_size": _categorical([16, 32, 64, 128]),
-        "dropout": _float(0.0, 0.3),
-        "n_layers": _int(1, 4),
-    },
-    "KAN": {
-        "grid_size": _categorical([3, 5, 8]),
-        "spline_order": _categorical([2, 3, 4]),
-        "hidden_size": _categorical([16, 32, 64, 128]),
-    },
-    "DeformTime": {
-        "d_model": _categorical([16, 32, 64]),
-        "n_heads": _categorical([2, 4, 8]),
-        "e_layers": _int(1, 3),
-        "patch_len": _categorical([4, 8, 16]),
-        "dropout": _float(0.0, 0.3),
-    },
-    "DeformableTST": {
-        "dims": _categorical([[64, 128, 256, 512], [32, 64, 128, 256]]),
-        "depths": _categorical([[1, 1, 3, 1], [1, 1, 2, 1]]),
-        "drop": _float(0.0, 0.3),
-        "heads": _categorical([[4, 8, 16, 32], [2, 4, 8, 16]]),
-    },
-    "iTransformer": {
-        "hidden_size": _categorical([64, 128]),
-        "n_heads": _categorical([4, 8]),
-        "e_layers": _int(1, 2),
-        "d_ff": _categorical([128, 256, 512]),
-        "d_layers": _int(1, 2),
-        "factor": _categorical([1, 3]),
-        "dropout": _categorical([0.0, 0.2, 0.3]),
-        "use_norm": _categorical([True, False]),
-    },
-    "TimeLLM": {
-        "patch_len": _categorical([8, 16, 24]),
-        "stride": _categorical([4, 8]),
-        "d_ff": _categorical([64, 128, 256]),
-        "top_k": _categorical([3, 5, 7]),
-        "d_model": _categorical([16, 32, 64]),
-        "n_heads": _categorical([4, 8]),
-        "dropout": _float(0.0, 0.3),
-    },
-    "TimeXer": {
-        "patch_len": _categorical([8, 16, 24]),
-        "hidden_size": _categorical([32, 64, 128, 256]),
-        "n_heads": _categorical([4, 8]),
-        "e_layers": _int(1, 4),
-    },
-    "TimesNet": {
-        "hidden_size": _categorical([32, 64, 128, 256]),
-        "conv_hidden_size": _categorical([32, 64, 128]),
-        "top_k": _categorical([3, 5, 7]),
-        "encoder_layers": _int(1, 4),
-    },
-    "StemGNN": {
-        "n_stacks": _categorical([1, 2, 3]),
-        "multi_layer": _categorical([3, 5, 7]),
-        "dropout_rate": _float(0.0, 0.3),
-    },
-    "TSMixer": {
-        "n_block": _categorical([1, 2, 3]),
-        "ff_dim": _categorical([16, 32, 64, 128]),
-        "dropout": _float(0.0, 0.3),
-    },
-    "TSMixerx": {
-        "n_block": _categorical([1, 2]),
-        "ff_dim": _categorical([32, 64, 128]),
-        "dropout": _categorical([0.05, 0.1, 0.2]),
-    },
-    "MLPMultivariate": {
-        "hidden_size": _categorical([32, 64, 128, 256]),
-        "num_layers": _int(1, 4),
-    },
-    "SOFTS": {
-        "hidden_size": _categorical([32, 64, 128, 256]),
-        "d_core": _categorical([16, 32, 64]),
-        "e_layers": _int(1, 4),
-        "d_ff": _categorical([64, 128, 256]),
-    },
-    "TimeMixer": {
-        "d_model": _categorical([16, 32, 64, 128]),
-        "d_ff": _categorical([32, 64, 128, 256]),
-        "down_sampling_layers": _categorical([1, 2, 3]),
-        "top_k": _categorical([3, 5, 7]),
-    },
-    "ModernTCN": {
-        "patch_size": _categorical([8, 16, 24]),
-        "patch_stride": _categorical([4, 8, 12]),
-        "ffn_ratio": _categorical([1, 2, 4]),
-        "large_size": _categorical([(5, 5, 3, 3), (7, 7, 5, 5)]),
-        "dims": _categorical([(8, 8, 8, 8), (16, 16, 16, 16)]),
-    },
-    "DUET": {
-        "n_block": _categorical([1, 2, 3]),
-        "hidden_size": _categorical([32, 64, 128]),
-        "ff_dim": _categorical([64, 128, 256]),
-        "moving_avg_window": _categorical([3, 5, 7]),
-        "dropout": _float(0.0, 0.3),
-        "revin": _categorical([True, False]),
-    },
-    "Mamba": {
-        "hidden_size": _categorical([16, 32, 64, 128]),
-        "n_block": _categorical([1, 2, 3]),
-        "expand_ratio": _categorical([1, 2, 4]),
-        "kernel_size": _categorical([3, 5]),
-        "dropout": _float(0.0, 0.3),
-    },
-    "SMamba": {
-        "hidden_size": _categorical([16, 32, 64, 128]),
-        "n_block": _categorical([1, 2, 3]),
-        "expand_ratio": _categorical([1, 2, 4]),
-        "kernel_size": _categorical([3, 5]),
-        "dropout": _float(0.0, 0.3),
-        "revin": _categorical([True, False]),
-    },
-    "CMamba": {
-        "hidden_size": _categorical([16, 32, 64, 128]),
-        "ff_dim": _categorical([32, 64, 128, 256]),
-        "n_block": _categorical([1, 2, 3]),
-        "expand_ratio": _categorical([1, 2, 4]),
-        "kernel_size": _categorical([3, 5]),
-        "dropout": _float(0.0, 0.3),
-        "revin": _categorical([True, False]),
-    },
-    "xLSTMMixer": {
-        "hidden_size": _categorical([16, 32, 64, 128]),
-        "n_block": _categorical([1, 2, 3]),
-        "ff_dim": _categorical([32, 64, 128, 256]),
-        "dropout": _float(0.0, 0.3),
-        "encoder_n_blocks": _categorical([1, 2, 3]),
-        "encoder_dropout": _float(0.0, 0.3),
-        "revin": _categorical([True, False]),
-    },
-    "RMoK": {
-        "taylor_order": _categorical([2, 3, 4]),
-        "jacobi_degree": _categorical([2, 3, 4]),
-        "wavelet_function": _categorical(["haar", "db2"]),
-        "dropout": _float(0.0, 0.3),
-    },
-    "XLinear": {
-        "hidden_size": _categorical([32, 64, 128, 256]),
-        "temporal_ff": _categorical([64, 128, 256]),
-        "channel_ff": _categorical([64, 128, 256]),
-        "temporal_dropout": _float(0.0, 0.3),
-    },
+    model_name: deepcopy(specs)
+    for model_name, specs in _DEFAULT_CONTRACT.payload["models"].items()
 }
-
-RESIDUAL_PARAM_REGISTRY = {
-    "xgboost": {
-        "n_estimators": _categorical([16, 32, 64, 128]),
-        "max_depth": _int(2, 6),
-        "learning_rate": _float(1e-3, 0.3, log=True),
-        "subsample": _float(0.5, 1.0),
-        "colsample_bytree": _float(0.5, 1.0),
-    },
-    "randomforest": {
-        "n_estimators": _categorical([64, 128, 200, 300]),
-        "max_depth": _categorical([4, 6, 8, 12, None]),
-        "min_samples_leaf": _categorical([1, 2, 4, 8]),
-        "max_features": _categorical(["sqrt", "log2", 1.0]),
-    },
-    "lightgbm": {
-        "n_estimators": _categorical([32, 64, 96, 128]),
-        "max_depth": _categorical([4, 6, 8, -1]),
-        "learning_rate": _float(1e-3, 0.1, log=True),
-        "num_leaves": _categorical([15, 31, 63]),
-        "min_child_samples": _categorical([10, 20, 40]),
-        "feature_fraction": _float(0.6, 1.0),
-    },
-}
-
-TRAINING_PARAM_REGISTRY = {
-    "input_size": _categorical([24, 36, 48, 64, 72, 96]),
-    "batch_size": _categorical([16, 32, 64, 128]),
-    "valid_batch_size": _categorical([16, 32, 64, 128]),
-    "windows_batch_size": _categorical([256, 512, 1024, 2048]),
-    "inference_windows_batch_size": _categorical([256, 512, 1024, 2048]),
-    "learning_rate": _float(3e-4, 1e-2, log=True),
-    "scaler_type": _categorical([None, "robust", "standard", "identity"]),
-    "model_step_size": _categorical([1, 4, 8, 12]),
-}
-
-GLOBAL_TRAINING_RANGE_SOURCE = "global_fallback"
-_PATCHTST_TRAINING_PARAM_REGISTRY = {
-    **TRAINING_PARAM_REGISTRY,
-    "input_size": _categorical([24, 36, 48, 64]),
-    "batch_size": _categorical([16, 32, 64]),
-    "valid_batch_size": _categorical([16, 32, 64]),
-    "windows_batch_size": _categorical([256, 512, 1024]),
-    "inference_windows_batch_size": _categorical([256, 512, 1024]),
-    "learning_rate": _float(3e-4, 9e-3, log=True),
-}
-_TSMIXERX_TRAINING_PARAM_REGISTRY = {
-    **TRAINING_PARAM_REGISTRY,
-    "input_size": _categorical([48, 64]),
-    "batch_size": _categorical([16, 32]),
-    "valid_batch_size": _categorical([32, 64, 128]),
-    "windows_batch_size": _categorical([512]),
-    "inference_windows_batch_size": _categorical([256, 512, 1024]),
-    "learning_rate": _float(4e-4, 1e-3, log=True),
-    "scaler_type": _categorical(["robust"]),
-    "model_step_size": _categorical([1]),
-}
-_ITRANSFORMER_TRAINING_PARAM_REGISTRY = {
-    **TRAINING_PARAM_REGISTRY,
-    "input_size": _categorical([24, 36, 48, 64, 72]),
-    "batch_size": _categorical([16, 32, 64]),
-    "valid_batch_size": _categorical([16, 32, 64]),
-    "windows_batch_size": _categorical([256, 512, 1024]),
-    "inference_windows_batch_size": _categorical([256, 512, 1024]),
-    "learning_rate": _float(4e-4, 7e-3, log=True),
-    "scaler_type": _categorical([None, "robust", "standard"]),
-}
-_LSTM_TRAINING_PARAM_REGISTRY = {
-    **TRAINING_PARAM_REGISTRY,
-    "input_size": _categorical([24, 48, 64, 96]),
-    "batch_size": _categorical([16, 32, 64]),
-    "valid_batch_size": _categorical([16, 32, 64]),
-    "windows_batch_size": _categorical([128, 256, 512, 1024]),
-    "inference_windows_batch_size": _categorical([256, 512, 1024]),
-    "learning_rate": _float(1e-3, 1e-2, log=True),
-    "scaler_type": _categorical(["robust", "standard", "identity"]),
-    "model_step_size": _categorical([4, 8, 12]),
-}
+TRAINING_PARAM_REGISTRY = deepcopy(_DEFAULT_CONTRACT.payload["training"]["global"])
 TRAINING_PARAM_REGISTRY_BY_MODEL = {
-    model_name: TRAINING_PARAM_REGISTRY.copy()
+    model_name: {
+        **deepcopy(TRAINING_PARAM_REGISTRY),
+        **deepcopy(_DEFAULT_CONTRACT.payload["training"]["per_model"].get(model_name, {})),
+    }
     for model_name in sorted(SUPPORTED_AUTO_MODEL_NAMES)
 }
-TRAINING_PARAM_REGISTRY_BY_MODEL.update(
-    {
-        "PatchTST": _PATCHTST_TRAINING_PARAM_REGISTRY,
-        "TSMixerx": _TSMIXERX_TRAINING_PARAM_REGISTRY,
-        "iTransformer": _ITRANSFORMER_TRAINING_PARAM_REGISTRY,
-        "LSTM": _LSTM_TRAINING_PARAM_REGISTRY,
-    }
-)
+RESIDUAL_PARAM_REGISTRY = {
+    model_name: deepcopy(specs)
+    for model_name, specs in _DEFAULT_CONTRACT.payload["residual"].items()
+}
 
 
 def training_param_registry_for_model(
     model_name: str | None,
-) -> dict[str, Any]:
+    *,
+    search_space_payload: dict[str, Any] | None = None,
+) -> dict[str, SearchParamSpec]:
+    if search_space_payload is None:
+        if model_name is None:
+            return deepcopy(TRAINING_PARAM_REGISTRY)
+        return deepcopy(
+            TRAINING_PARAM_REGISTRY_BY_MODEL.get(model_name, TRAINING_PARAM_REGISTRY)
+        )
+    global_specs = search_space_payload["training"]["global"]
     if model_name is None:
-        return TRAINING_PARAM_REGISTRY
-    return TRAINING_PARAM_REGISTRY_BY_MODEL.get(model_name, TRAINING_PARAM_REGISTRY)
+        return deepcopy(global_specs)
+    return {
+        **deepcopy(global_specs),
+        **deepcopy(search_space_payload["training"]["per_model"].get(model_name, {})),
+    }
 
 
-def training_range_source_for_model(model_name: str | None) -> str:
+def training_range_source_for_model(
+    model_name: str | None,
+    *,
+    search_space_payload: dict[str, Any] | None = None,
+) -> str:
     if model_name is None:
         return GLOBAL_TRAINING_RANGE_SOURCE
-    if model_name in TRAINING_PARAM_REGISTRY_BY_MODEL:
+    if search_space_payload is None:
+        if model_name in _DEFAULT_CONTRACT.payload["training"]["per_model"]:
+            return f"model_override:{model_name}"
+        return GLOBAL_TRAINING_RANGE_SOURCE
+    if model_name in search_space_payload["training"]["per_model"]:
         return f"model_override:{model_name}"
     return GLOBAL_TRAINING_RANGE_SOURCE
 
 
+def _suggest_from_spec(trial: optuna.Trial, name: str, spec: SearchParamSpec) -> Any:
+    spec_type = spec["type"]
+    if spec_type == "categorical":
+        return trial.suggest_categorical(name, deepcopy(spec["choices"]))
+    if spec_type == "int":
+        return trial.suggest_int(name, int(spec["low"]), int(spec["high"]), step=int(spec.get("step", 1)))
+    if spec_type == "float":
+        return trial.suggest_float(
+            name,
+            float(spec["low"]),
+            float(spec["high"]),
+            log=bool(spec.get("log", False)),
+        )
+    raise ValueError(f"Unsupported search-space type: {spec_type}")
+
+
 def suggest_model_params(
-    model_name: str, selected_names: tuple[str, ...], trial: optuna.Trial
+    model_name: str,
+    selected_names: tuple[str, ...],
+    trial: optuna.Trial,
+    *,
+    param_specs: dict[str, SearchParamSpec] | None = None,
+    name_prefix: str = "",
 ) -> dict[str, Any]:
-    registry = MODEL_PARAM_REGISTRY[model_name]
-    return {name: registry[name](trial, name) for name in selected_names}
+    registry = MODEL_PARAM_REGISTRY[model_name] if param_specs is None else param_specs
+    return {
+        name: _suggest_from_spec(trial, f"{name_prefix}{name}", registry[name])
+        for name in selected_names
+    }
 
 
 def suggest_residual_params(
-    model_name: str, selected_names: tuple[str, ...], trial: optuna.Trial
+    model_name: str,
+    selected_names: tuple[str, ...],
+    trial: optuna.Trial,
+    *,
+    param_specs: dict[str, SearchParamSpec] | None = None,
+    name_prefix: str = "",
 ) -> dict[str, Any]:
-    registry = RESIDUAL_PARAM_REGISTRY[model_name]
+    registry = RESIDUAL_PARAM_REGISTRY[model_name] if param_specs is None else param_specs
     suggested = DEFAULT_RESIDUAL_PARAMS_BY_MODEL[model_name].copy()
     for name in selected_names:
-        suggested[name] = registry[name](trial, name)
+        suggested[name] = _suggest_from_spec(trial, f"{name_prefix}{name}", registry[name])
     return suggested
 
 
@@ -621,6 +525,8 @@ def suggest_training_params(
     trial: optuna.Trial,
     *,
     model_name: str | None = None,
+    param_specs: dict[str, SearchParamSpec] | None = None,
+    name_prefix: str = "",
 ) -> dict[str, Any]:
     fixed = sorted(set(selected_names).intersection(FIXED_TRAINING_KEYS))
     if fixed:
@@ -628,8 +534,12 @@ def suggest_training_params(
             "selected training parameter(s) are fixed and non-tunable: "
             + ", ".join(fixed)
         )
-    suggested = {}
-    registry = training_param_registry_for_model(model_name)
-    for name in selected_names:
-        suggested[name] = registry[name](trial, name)
-    return suggested
+    registry = (
+        training_param_registry_for_model(model_name)
+        if param_specs is None
+        else param_specs
+    )
+    return {
+        name: _suggest_from_spec(trial, f"{name_prefix}{name}", registry[name])
+        for name in selected_names
+    }

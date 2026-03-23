@@ -14,8 +14,6 @@ from .optuna_spaces import (
     BASELINE_MODEL_NAMES,
     DEFAULT_TRAINING_PARAMS,
     FIXED_TRAINING_KEYS,
-    SUPPORTED_AUTO_MODEL_NAMES,
-    SUPPORTED_RESIDUAL_MODELS,
     MODEL_PARAM_REGISTRY,
     RESIDUAL_PARAM_REGISTRY,
     TRAINING_PARAM_REGISTRY,
@@ -23,6 +21,9 @@ from .optuna_spaces import (
     ResidualMode,
     SearchSpaceContract,
     load_search_space_contract,
+    normalize_search_space_payload,
+    SUPPORTED_AUTO_MODEL_NAMES,
+    SUPPORTED_RESIDUAL_MODELS,
 )
 
 CONFIG_FILENAMES = ("config.yaml", "config.yml", "config.toml")
@@ -280,6 +281,7 @@ class LoadedConfig:
     resolved_hash: str
     search_space_path: Path | None
     search_space_hash: str | None
+    search_space_payload: dict[str, Any] | None
 
 
 def _hash_text(text: str) -> str:
@@ -646,107 +648,10 @@ def _load_document(path: Path, source_type: str) -> dict[str, Any]:
     return {} if payload is None else payload
 
 
-def _coerce_param_name_list(value: Any, *, section: str, name: str) -> tuple[str, ...]:
-    if not isinstance(value, list):
-        raise ValueError(
-            f"search_space.{section}.{name} must be a list of canonical parameter names"
-        )
-    out = tuple(str(item) for item in value)
-    if any(not item.strip() for item in out):
-        raise ValueError(
-            f"search_space.{section}.{name} contains an empty parameter name"
-        )
-    return out
-
-
 def _validate_search_space_payload(
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    if not payload:
-        raise ValueError("search_space.yaml is empty")
-    required_sections = {"models", "residual"}
-    missing = required_sections.difference(payload)
-    if missing:
-        raise ValueError(
-            "search_space.yaml must contain top-level sections: models and residual"
-        )
-    normalized: dict[str, Any] = {
-        "models": {},
-        "training": (),
-        "residual": {},
-    }
-    for section in ("models", "residual"):
-        section_payload = payload.get(section)
-        if section_payload is None:
-            continue
-        if not isinstance(section_payload, dict):
-            raise ValueError(f"search_space.{section} must be a mapping")
-        for name, value in section_payload.items():
-            normalized[section][str(name)] = _coerce_param_name_list(
-                value, section=section, name=str(name)
-            )
-    training_payload = payload.get("training")
-    if training_payload is not None:
-        normalized["training"] = _coerce_param_name_list(
-            training_payload, section="training", name="selectors"
-        )
-    unknown_models = sorted(
-        set(normalized["models"]).difference(SUPPORTED_AUTO_MODEL_NAMES)
-    )
-    if unknown_models:
-        raise ValueError(
-            "search_space.models contains unsupported learned model(s): "
-            + ", ".join(unknown_models)
-        )
-    unknown_residual = sorted(
-        set(normalized["residual"]).difference(SUPPORTED_RESIDUAL_MODELS)
-    )
-    if unknown_residual:
-        raise ValueError(
-            "search_space.residual contains unsupported residual model(s): "
-            + ", ".join(unknown_residual)
-        )
-    for model_name, param_names in normalized["models"].items():
-        unknown = sorted(set(param_names).difference(MODEL_PARAM_REGISTRY[model_name]))
-        if unknown:
-            raise ValueError(
-                f"search_space.models.{model_name} contains unknown parameter(s): {', '.join(unknown)}"
-            )
-    fixed_training = sorted(
-        set(normalized["training"]).intersection(FIXED_TRAINING_KEYS)
-    )
-    if fixed_training:
-        raise ValueError(
-            "search_space.training contains fixed, non-tunable parameter(s): "
-            + ", ".join(fixed_training)
-        )
-    unknown_training = sorted(set(normalized["training"]).difference(TRAINING_PARAM_REGISTRY))
-    if unknown_training:
-        raise ValueError(
-            "search_space.training contains unknown parameter(s): "
-            + ", ".join(unknown_training)
-        )
-    for model_name, param_names in normalized["residual"].items():
-        unknown = sorted(
-            set(param_names).difference(RESIDUAL_PARAM_REGISTRY[model_name])
-        )
-        if unknown:
-            raise ValueError(
-                f"search_space.residual.{model_name} contains unknown parameter(s): {', '.join(unknown)}"
-            )
-    if "learning_rate" in normalized["training"]:
-        overlaps = sorted(
-            model_name
-            for model_name, param_names in normalized["models"].items()
-            if "learning_rate" in param_names
-        )
-        if overlaps:
-            raise ValueError(
-                "search_space.training.learning_rate overlaps with model-level "
-                "learning_rate selector(s): "
-                + ", ".join(overlaps)
-            )
-    return normalized
+    return normalize_search_space_payload(payload)
 
 
 def _requested_job_mode(model_name: str, params: dict[str, Any]) -> str:
@@ -768,7 +673,7 @@ def _requested_residual_mode(enabled: bool, params: dict[str, Any]) -> ResidualM
 def _normalize_job(
     job: dict[str, Any],
     *,
-    search_space: dict[str, dict[str, tuple[str, ...]]] | None,
+    search_space: dict[str, Any] | None,
     allow_missing_search_space: bool = False,
 ) -> JobConfig:
     model_name = str(job["model"])
@@ -797,12 +702,7 @@ def _normalize_job(
             raise ValueError(
                 f"jobs[{model_name}] requires search_space.models.{model_name} for learned_auto execution"
             )
-        selected = search_space["models"][model_name]
-        unknown = sorted(set(selected).difference(MODEL_PARAM_REGISTRY[model_name]))
-        if unknown:
-            raise ValueError(
-                f"search_space.models.{model_name} contains unknown parameter(s): {', '.join(unknown)}"
-            )
+        selected = tuple(search_space["models"][model_name])
         validated_mode = "learned_auto"
     return JobConfig(
         model=model_name,
@@ -817,7 +717,7 @@ def _normalize_payload(
     payload: dict[str, Any],
     base_dir: Path,
     *,
-    search_space: dict[str, dict[str, tuple[str, ...]]] | None,
+    search_space: dict[str, Any] | None,
     allow_missing_search_space: bool = False,
 ) -> AppConfig:
     task = dict(payload.get("task", {}))
@@ -1004,14 +904,7 @@ def _normalize_payload(
                     f"residual[{residual_model}] requires search_space.residual.{residual_model} for auto tuning"
                 )
         else:
-            residual_selected = search_space["residual"][residual_model]
-            unknown = sorted(
-                set(residual_selected).difference(RESIDUAL_PARAM_REGISTRY[residual_model])
-            )
-            if unknown:
-                raise ValueError(
-                    f"search_space.residual.{residual_model} contains unknown parameter(s): {', '.join(unknown)}"
-                )
+            residual_selected = tuple(search_space["residual"][residual_model])
             residual_validated_mode = "residual_auto"
     else:
         residual_validated_mode = residual_requested_mode
@@ -1070,7 +963,7 @@ def _normalize_payload(
     training_selected = ()
     if any(job.validated_mode == "learned_auto" for job in jobs):
         training_selected = (
-            search_space["training"] if search_space is not None else ()
+            tuple(search_space["training"]["global"]) if search_space is not None else ()
         )
     training_requested_mode = (
         "training_auto_requested" if training_selected else "training_fixed"
@@ -1181,4 +1074,5 @@ def load_app_config(
         resolved_hash=_hash_text(resolved_text),
         search_space_path=search_space_contract.path if search_space_contract else None,
         search_space_hash=search_space_contract.sha256 if search_space_contract else None,
+        search_space_payload=search_space_contract.payload if search_space_contract else None,
     )

@@ -790,7 +790,6 @@ def test_manifest_and_capability_report_include_residual_feature_visibility(
         "hist_a_lag_2",
         "futr_a_lag_1",
         "futr_a_lag_2",
-        "hist_a",
         "futr_a",
         "static_a",
     ]
@@ -848,6 +847,7 @@ def test_load_app_config_rejects_residual_lag_sources_without_matching_exog_opt_
     payload = _payload()
     payload["dataset"]["futr_exog_cols"] = ["futr_a"]
     payload["residual"]["features"] = {
+        "exog_sources": {"hist": []},
         "lag_features": {
             "enabled": True,
             "sources": ["hist_a"],
@@ -2720,15 +2720,21 @@ def test_fold_panels_include_selected_residual_exog_sources(
         train_df=train_df.iloc[:2].reset_index(drop=True),
     )
 
-    assert backcast_panel[["hist_a", "futr_a", "static_a"]].to_dict(
+    assert "hist_a_lag_1" in backcast_panel.columns
+    assert "hist_a_lag_1" in eval_panel.columns
+    assert "hist_a" not in backcast_panel.columns
+    assert "hist_a" not in eval_panel.columns
+    assert backcast_panel[["hist_a_lag_1", "futr_a", "static_a"]].to_dict(
         orient="records"
     ) == [
-        {"hist_a": 12, "futr_a": 102, "static_a": 1001},
-        {"hist_a": 13, "futr_a": 103, "static_a": 1001},
+        {"hist_a_lag_1": 11, "futr_a": 102, "static_a": 1001},
+        {"hist_a_lag_1": 11, "futr_a": 103, "static_a": 1001},
     ]
-    assert eval_panel[["hist_a", "futr_a", "static_a"]].to_dict(orient="records") == [
-        {"hist_a": 12, "futr_a": 102, "static_a": 1001},
-        {"hist_a": 13, "futr_a": 103, "static_a": 1001},
+    assert eval_panel[["hist_a_lag_1", "futr_a", "static_a"]].to_dict(
+        orient="records"
+    ) == [
+        {"hist_a_lag_1": 11, "futr_a": 102, "static_a": 1001},
+        {"hist_a_lag_1": 11, "futr_a": 103, "static_a": 1001},
     ]
 
 
@@ -4275,13 +4281,13 @@ def test_supported_auto_model_matrix_matches_registry_and_yaml():
     assert all(
         set(TRAINING_PARAM_REGISTRY_BY_MODEL[model_name])
         == set(TRAINING_PARAM_REGISTRY)
-        == set(search_space["training"])
+        == set(search_space["training"]["global"])
         for model_name in SUPPORTED_AUTO_MODEL_NAMES
     )
-    assert tuple(search_space["training"]) == tuple(TRAINING_PARAM_REGISTRY)
+    assert tuple(search_space["training"]["global"]) == tuple(TRAINING_PARAM_REGISTRY)
     assert set(search_space["residual"]) == {"xgboost", "randomforest", "lightgbm"}
     assert all(
-        isinstance(search_space["models"][model], list)
+        isinstance(search_space["models"][model], dict)
         for model in search_space["models"]
     )
     assert "learning_rate" not in search_space["models"]["NLinear"]
@@ -5267,15 +5273,25 @@ EXPECTED_HPT_CASE3_SPLIT_MODELS = {
     "wti-case3_split2.yaml": ["LSTM", "Naive"],
 }
 
-SEARCH_SPACE_MODELS = yaml.safe_load(
+SEARCH_SPACE_PAYLOAD = yaml.safe_load(
     (REPO_ROOT / "search_space.yaml").read_text(encoding="utf-8")
-)["models"]
-SEARCH_SPACE_TRAINING = yaml.safe_load(
-    (REPO_ROOT / "search_space.yaml").read_text(encoding="utf-8")
-)["training"]
-SEARCH_SPACE_RESIDUAL = yaml.safe_load(
-    (REPO_ROOT / "search_space.yaml").read_text(encoding="utf-8")
-)["residual"]
+)
+SEARCH_SPACE_MODELS_RAW = SEARCH_SPACE_PAYLOAD["models"]
+SEARCH_SPACE_MODELS = {
+    model_name: list(specs)
+    for model_name, specs in SEARCH_SPACE_MODELS_RAW.items()
+}
+SEARCH_SPACE_TRAINING_RAW = SEARCH_SPACE_PAYLOAD["training"]
+SEARCH_SPACE_TRAINING = list(SEARCH_SPACE_TRAINING_RAW["global"])
+SEARCH_SPACE_TRAINING_PER_MODEL = {
+    model_name: list(specs)
+    for model_name, specs in SEARCH_SPACE_TRAINING_RAW.get("per_model", {}).items()
+}
+SEARCH_SPACE_RESIDUAL_RAW = SEARCH_SPACE_PAYLOAD["residual"]
+SEARCH_SPACE_RESIDUAL = {
+    model_name: list(specs)
+    for model_name, specs in SEARCH_SPACE_RESIDUAL_RAW.items()
+}
 
 EXPECTED_REPO_AUTO_SELECTORS = {
     "LSTM": [
@@ -6557,7 +6573,7 @@ def test_apply_residual_plugin_writes_feature_visibility_metadata(
                         "y_hat_base": 10.0,
                         "y": 11.0,
                         "residual_target": 1.0,
-                        "hist_a": 2.0,
+                        "hist_a_lag_1": 2.0,
                         "futr_a": 20.0,
                         "static_a": 200.0,
                     },
@@ -6573,7 +6589,7 @@ def test_apply_residual_plugin_writes_feature_visibility_metadata(
                         "y_hat_base": 12.0,
                         "y": 13.0,
                         "residual_target": 1.0,
-                        "hist_a": 3.0,
+                        "hist_a_lag_1": 3.0,
                         "futr_a": 30.0,
                         "static_a": 200.0,
                     },
@@ -6593,7 +6609,7 @@ def test_apply_residual_plugin_writes_feature_visibility_metadata(
                         "y_hat_base": 14.0,
                         "y": 15.0,
                         "residual_target": 1.0,
-                        "hist_a": 4.0,
+                        "hist_a_lag_1": 4.0,
                         "futr_a": 40.0,
                         "static_a": 200.0,
                     }
@@ -6612,6 +6628,12 @@ def test_apply_residual_plugin_writes_feature_visibility_metadata(
     )
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    written_backcast = pd.read_csv(
+        run_root / "residual" / job.model / "folds" / "fold_000" / "backcast_panel.csv"
+    )
+    written_corrected = pd.read_csv(
+        run_root / "residual" / job.model / "folds" / "fold_000" / "corrected_eval.csv"
+    )
     plugin_metadata = json.loads(
         (run_root / "residual" / job.model / "plugin_metadata.json").read_text(
             encoding="utf-8"
@@ -6630,13 +6652,16 @@ def test_apply_residual_plugin_writes_feature_visibility_metadata(
         "y_hat_base_lag_1",
         "hist_a_lag_1",
         "futr_a_lag_1",
-        "hist_a",
         "futr_a",
         "static_a",
     ]
 
     assert manifest["residual"]["feature_policy"]["include_date_features"] is True
     assert manifest["residual"]["active_feature_columns"] == expected_columns
+    assert "hist_a_lag_1" in written_backcast.columns
+    assert "hist_a_lag_1" in written_corrected.columns
+    assert "hist_a" not in written_backcast.columns
+    assert "hist_a" not in written_corrected.columns
     assert plugin_metadata["0"]["active_feature_columns"] == expected_columns
     assert plugin_metadata["0"]["feature_policy"]["lag_features"]["steps"] == [1]
     assert diagnostics["active_feature_columns"] == expected_columns

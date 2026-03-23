@@ -1,256 +1,1517 @@
 models:
   RNN:
-    - encoder_hidden_size
-    - encoder_n_layers
-    - context_size
-    - decoder_hidden_size
+    encoder_hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    encoder_n_layers:
+      type: int
+      low: 1
+      high: 3
+      step: 1
+    context_size:
+      type: categorical
+      choices:
+      - 5
+      - 10
+      - 50
+    decoder_hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
   GRU:
-    - encoder_hidden_size
-    - encoder_n_layers
-    - context_size
-    - decoder_hidden_size
-  LSTM:
-    - encoder_hidden_size
-    - encoder_n_layers
-    - inference_input_size
-    - encoder_dropout
-    - decoder_hidden_size
-    - decoder_layers
-  TCN:
-    - encoder_hidden_size
-    - kernel_size
-    - context_size
-    - decoder_hidden_size
-  DeepAR:
-    - lstm_hidden_size
-    - lstm_n_layers
-    - lstm_dropout
-    - decoder_hidden_size
-  DilatedRNN:
-    - cell_type
-    - encoder_hidden_size
-    - context_size
-    - decoder_hidden_size
-  BiTCN:
-    - hidden_size
-    - dropout
-  xLSTM:
-    - encoder_hidden_size
-    - encoder_n_blocks
-    - decoder_hidden_size
-    - encoder_dropout
-  MLP:
-    - hidden_size
-    - num_layers
-  NBEATS:
-    - n_blocks
-    - mlp_units
-    - dropout_prob_theta
-  NBEATSx:
-    - n_blocks
-    - mlp_units
-    - dropout_prob_theta
-  NHITS:
-    - n_pool_kernel_size
-    - n_freq_downsample
-    - n_blocks
-    - mlp_units
-    - dropout_prob_theta
-    - activation
-  DLinear:
-    - moving_avg_window
-  NLinear: []
-  TiDE:
-    - hidden_size
-    - decoder_output_dim
-    - temporal_decoder_dim
-    - num_encoder_layers
-  DeepNPTS:
-    - hidden_size
-    - dropout
-    - n_layers
-  KAN:
-    - grid_size
-    - spline_order
-    - hidden_size
-  DeformTime:
-    - d_model
-    - n_heads
-    - e_layers
-    - patch_len
-    - dropout
-  DeformableTST:
-    - dims
-    - depths
-    - drop
-    - heads
+    encoder_hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    encoder_n_layers:
+      type: int
+      low: 1
+      high: 3
+      step: 1
+    context_size:
+      type: categorical
+      choices:
+      - 5
+      - 10
+      - 50
+    decoder_hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
   TFT:
-    - hidden_size
-    - dropout
-    - n_head
+    hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+      - 256
+    dropout:
+      type: float
+      low: 0.0
+      high: 0.3
+    n_head:
+      type: categorical
+      choices:
+      - 4
+      - 8
   VanillaTransformer:
-    - hidden_size
-    - dropout
-    - encoder_layers
-    - n_head
+    hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+      - 256
+    dropout:
+      type: float
+      low: 0.0
+      high: 0.3
+    encoder_layers:
+      type: int
+      low: 1
+      high: 4
+      step: 1
+    n_head:
+      type: categorical
+      choices:
+      - 4
+      - 8
   Informer:
-    - hidden_size
-    - dropout
-    - factor
-    - n_head
+    hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+      - 256
+    dropout:
+      type: float
+      low: 0.0
+      high: 0.3
+    factor:
+      type: int
+      low: 1
+      high: 5
+      step: 1
+    n_head:
+      type: categorical
+      choices:
+      - 4
+      - 8
   Autoformer:
-    - hidden_size
-    - n_head
-    - encoder_layers
-    - decoder_layers
-    - factor
-    - MovingAvg_window
-    - conv_hidden_size
-    - dropout
+    hidden_size:
+      type: categorical
+      choices:
+      - 64
+      - 128
+      - 256
+    n_head:
+      type: categorical
+      choices:
+      - 4
+      - 8
+    encoder_layers:
+      type: int
+      low: 1
+      high: 3
+      step: 1
+    decoder_layers:
+      type: int
+      low: 1
+      high: 2
+      step: 1
+    factor:
+      type: categorical
+      choices:
+      - 1
+      - 3
+      - 5
+    MovingAvg_window:
+      type: categorical
+      choices:
+      - 5
+      - 13
+      - 25
+    conv_hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+    dropout:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.1
+      - 0.2
+      - 0.3
   FEDformer:
-    - hidden_size
-    - modes
-    - dropout
+    hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+      - 256
+    dropout:
+      type: float
+      low: 0.0
+      high: 0.3
+    modes:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+    n_head:
+      type: categorical
+      choices:
+      - 4
+      - 8
   PatchTST:
-    - hidden_size
-    - n_heads
-    - encoder_layers
-    - linear_hidden_size
-    - patch_len
-    - stride
-    - dropout
-    - fc_dropout
-    - attn_dropout
-    - revin
+    hidden_size:
+      type: categorical
+      choices:
+      - 64
+      - 128
+    n_heads:
+      type: categorical
+      choices:
+      - 4
+      - 8
+    encoder_layers:
+      type: int
+      low: 2
+      high: 3
+      step: 1
+    linear_hidden_size:
+      type: categorical
+      choices:
+      - 128
+      - 256
+      - 512
+    patch_len:
+      type: categorical
+      choices:
+      - 4
+      - 8
+      - 16
+    stride:
+      type: categorical
+      choices:
+      - 2
+      - 4
+      - 8
+    dropout:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.2
+      - 0.3
+    fc_dropout:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.2
+    attn_dropout:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.1
+    revin:
+      type: categorical
+      choices:
+      - true
+      - false
+  LSTM:
+    encoder_hidden_size:
+      type: categorical
+      choices:
+      - 64
+      - 128
+      - 256
+    encoder_n_layers:
+      type: int
+      low: 1
+      high: 3
+      step: 1
+    inference_input_size:
+      type: categorical
+      choices:
+      - -1
+      - 24
+      - 48
+      - 96
+    encoder_dropout:
+      type: categorical
+      choices:
+      - 0.1
+      - 0.2
+      - 0.3
+    decoder_hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+    decoder_layers:
+      type: int
+      low: 1
+      high: 3
+      step: 1
+  TCN:
+    encoder_hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    context_size:
+      type: categorical
+      choices:
+      - 5
+      - 10
+      - 50
+    decoder_hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    kernel_size:
+      type: categorical
+      choices:
+      - 2
+      - 3
+      - 5
+  DeepAR:
+    lstm_hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    lstm_n_layers:
+      type: int
+      low: 1
+      high: 3
+      step: 1
+    lstm_dropout:
+      type: float
+      low: 0.0
+      high: 0.3
+    decoder_hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+  DilatedRNN:
+    cell_type:
+      type: categorical
+      choices:
+      - GRU
+      - LSTM
+    encoder_hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    context_size:
+      type: categorical
+      choices:
+      - 5
+      - 10
+      - 50
+    decoder_hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+  BiTCN:
+    hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    dropout:
+      type: float
+      low: 0.0
+      high: 0.3
+  xLSTM:
+    encoder_hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    encoder_n_blocks:
+      type: int
+      low: 1
+      high: 3
+      step: 1
+    decoder_hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    encoder_dropout:
+      type: float
+      low: 0.0
+      high: 0.3
+  MLP:
+    hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+      - 256
+    num_layers:
+      type: int
+      low: 1
+      high: 4
+      step: 1
+  NBEATS:
+    n_blocks:
+      type: categorical
+      choices:
+      - - 1
+        - 1
+        - 1
+      - - 2
+        - 2
+        - 2
+      - - 3
+        - 3
+        - 3
+    mlp_units:
+      type: categorical
+      choices:
+      - - - 64
+          - 64
+        - - 64
+          - 64
+        - - 64
+          - 64
+      - - - 128
+          - 128
+        - - 128
+          - 128
+        - - 128
+          - 128
+    dropout_prob_theta:
+      type: float
+      low: 0.0
+      high: 0.3
+  NBEATSx:
+    n_blocks:
+      type: categorical
+      choices:
+      - - 1
+        - 1
+        - 1
+      - - 2
+        - 2
+        - 2
+      - - 3
+        - 3
+        - 3
+    mlp_units:
+      type: categorical
+      choices:
+      - - - 64
+          - 64
+        - - 64
+          - 64
+        - - 64
+          - 64
+      - - - 128
+          - 128
+        - - 128
+          - 128
+        - - 128
+          - 128
+    dropout_prob_theta:
+      type: float
+      low: 0.0
+      high: 0.3
+  NHITS:
+    n_pool_kernel_size:
+      type: categorical
+      choices:
+      - - 2
+        - 2
+        - 1
+      - - 4
+        - 2
+        - 1
+      - - 8
+        - 4
+        - 1
+    n_freq_downsample:
+      type: categorical
+      choices:
+      - - 4
+        - 2
+        - 1
+      - - 8
+        - 4
+        - 1
+      - - 12
+        - 3
+        - 1
+    n_blocks:
+      type: categorical
+      choices:
+      - - 1
+        - 1
+        - 1
+      - - 1
+        - 2
+        - 2
+      - - 2
+        - 2
+        - 2
+    mlp_units:
+      type: categorical
+      choices:
+      - - - 128
+          - 128
+        - - 128
+          - 128
+        - - 128
+          - 128
+      - - - 256
+          - 256
+        - - 256
+          - 256
+        - - 256
+          - 256
+      - - - 512
+          - 512
+        - - 512
+          - 512
+        - - 512
+          - 512
+    dropout_prob_theta:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.1
+      - 0.2
+    activation:
+      type: categorical
+      choices:
+      - ReLU
+      - Softplus
+      - Tanh
+      - SELU
+      - LeakyReLU
+      - PReLU
+      - Sigmoid
+  DLinear:
+    moving_avg_window:
+      type: categorical
+      choices:
+      - 5
+      - 9
+      - 13
+      - 25
+      - 51
+  NLinear:
+    learning_rate:
+      type: float
+      low: 0.0001
+      high: 0.1
+      log: true
+  TiDE:
+    hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+      - 256
+    decoder_output_dim:
+      type: categorical
+      choices:
+      - 8
+      - 16
+      - 32
+    temporal_decoder_dim:
+      type: categorical
+      choices:
+      - 8
+      - 16
+      - 32
+    num_encoder_layers:
+      type: int
+      low: 1
+      high: 3
+      step: 1
+  DeepNPTS:
+    hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    dropout:
+      type: float
+      low: 0.0
+      high: 0.3
+    n_layers:
+      type: int
+      low: 1
+      high: 4
+      step: 1
+  KAN:
+    grid_size:
+      type: categorical
+      choices:
+      - 3
+      - 5
+      - 8
+    spline_order:
+      type: categorical
+      choices:
+      - 2
+      - 3
+      - 4
+    hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+  DeformTime:
+    d_model:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+    n_heads:
+      type: categorical
+      choices:
+      - 2
+      - 4
+      - 8
+    e_layers:
+      type: int
+      low: 1
+      high: 3
+      step: 1
+    patch_len:
+      type: categorical
+      choices:
+      - 4
+      - 8
+      - 16
+    dropout:
+      type: float
+      low: 0.0
+      high: 0.3
+  DeformableTST:
+    dims:
+      type: categorical
+      choices:
+      - - 64
+        - 128
+        - 256
+        - 512
+      - - 32
+        - 64
+        - 128
+        - 256
+    depths:
+      type: categorical
+      choices:
+      - - 1
+        - 1
+        - 3
+        - 1
+      - - 1
+        - 1
+        - 2
+        - 1
+    drop:
+      type: float
+      low: 0.0
+      high: 0.3
+    heads:
+      type: categorical
+      choices:
+      - - 4
+        - 8
+        - 16
+        - 32
+      - - 2
+        - 4
+        - 8
+        - 16
   iTransformer:
-    - hidden_size
-    - n_heads
-    - e_layers
-    - d_ff
-    - d_layers
-    - factor
-    - dropout
-    - use_norm
+    hidden_size:
+      type: categorical
+      choices:
+      - 64
+      - 128
+    n_heads:
+      type: categorical
+      choices:
+      - 4
+      - 8
+    e_layers:
+      type: int
+      low: 1
+      high: 2
+      step: 1
+    d_ff:
+      type: categorical
+      choices:
+      - 128
+      - 256
+      - 512
+    d_layers:
+      type: int
+      low: 1
+      high: 2
+      step: 1
+    factor:
+      type: categorical
+      choices:
+      - 1
+      - 3
+    dropout:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.2
+      - 0.3
+    use_norm:
+      type: categorical
+      choices:
+      - true
+      - false
   TimeLLM:
-    - patch_len
-    - stride
-    - d_ff
-    - top_k
-    - d_model
-    - n_heads
-    - dropout
+    patch_len:
+      type: categorical
+      choices:
+      - 8
+      - 16
+      - 24
+    stride:
+      type: categorical
+      choices:
+      - 4
+      - 8
+    d_ff:
+      type: categorical
+      choices:
+      - 64
+      - 128
+      - 256
+    top_k:
+      type: categorical
+      choices:
+      - 3
+      - 5
+      - 7
+    d_model:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+    n_heads:
+      type: categorical
+      choices:
+      - 4
+      - 8
+    dropout:
+      type: float
+      low: 0.0
+      high: 0.3
   TimeXer:
-    - patch_len
-    - hidden_size
-    - n_heads
-    - e_layers
+    patch_len:
+      type: categorical
+      choices:
+      - 8
+      - 16
+      - 24
+    hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+      - 256
+    n_heads:
+      type: categorical
+      choices:
+      - 4
+      - 8
+    e_layers:
+      type: int
+      low: 1
+      high: 4
+      step: 1
   TimesNet:
-    - hidden_size
-    - conv_hidden_size
-    - top_k
-    - encoder_layers
+    hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+      - 256
+    conv_hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+    top_k:
+      type: categorical
+      choices:
+      - 3
+      - 5
+      - 7
+    encoder_layers:
+      type: int
+      low: 1
+      high: 4
+      step: 1
   StemGNN:
-    - n_stacks
-    - multi_layer
-    - dropout_rate
+    n_stacks:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 3
+    multi_layer:
+      type: categorical
+      choices:
+      - 3
+      - 5
+      - 7
+    dropout_rate:
+      type: float
+      low: 0.0
+      high: 0.3
   TSMixer:
-    - n_block
-    - ff_dim
-    - dropout
+    n_block:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 3
+    ff_dim:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    dropout:
+      type: float
+      low: 0.0
+      high: 0.3
   TSMixerx:
-    - n_block
-    - ff_dim
-    - dropout
+    n_block:
+      type: categorical
+      choices:
+      - 1
+      - 2
+    ff_dim:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+    dropout:
+      type: categorical
+      choices:
+      - 0.05
+      - 0.1
+      - 0.2
   MLPMultivariate:
-    - hidden_size
-    - num_layers
+    hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+      - 256
+    num_layers:
+      type: int
+      low: 1
+      high: 4
+      step: 1
   SOFTS:
-    - hidden_size
-    - d_core
-    - e_layers
-    - d_ff
+    hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+      - 256
+    d_core:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+    e_layers:
+      type: int
+      low: 1
+      high: 4
+      step: 1
+    d_ff:
+      type: categorical
+      choices:
+      - 64
+      - 128
+      - 256
   TimeMixer:
-    - d_model
-    - d_ff
-    - down_sampling_layers
-    - top_k
+    d_model:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    d_ff:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+      - 256
+    down_sampling_layers:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 3
+    top_k:
+      type: categorical
+      choices:
+      - 3
+      - 5
+      - 7
   ModernTCN:
-    - patch_size
-    - patch_stride
-    - ffn_ratio
-    - large_size
-    - dims
+    patch_size:
+      type: categorical
+      choices:
+      - 8
+      - 16
+      - 24
+    patch_stride:
+      type: categorical
+      choices:
+      - 4
+      - 8
+      - 12
+    ffn_ratio:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 4
+    large_size:
+      type: categorical
+      choices:
+      - - 5
+        - 5
+        - 3
+        - 3
+      - - 7
+        - 7
+        - 5
+        - 5
+    dims:
+      type: categorical
+      choices:
+      - - 8
+        - 8
+        - 8
+        - 8
+      - - 16
+        - 16
+        - 16
+        - 16
   DUET:
-    - n_block
-    - hidden_size
-    - ff_dim
-    - moving_avg_window
-    - dropout
-    - revin
+    n_block:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 3
+    hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+    ff_dim:
+      type: categorical
+      choices:
+      - 64
+      - 128
+      - 256
+    moving_avg_window:
+      type: categorical
+      choices:
+      - 3
+      - 5
+      - 7
+    dropout:
+      type: float
+      low: 0.0
+      high: 0.3
+    revin:
+      type: categorical
+      choices:
+      - true
+      - false
   Mamba:
-    - hidden_size
-    - n_block
-    - expand_ratio
-    - kernel_size
-    - dropout
+    hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    n_block:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 3
+    expand_ratio:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 4
+    kernel_size:
+      type: categorical
+      choices:
+      - 3
+      - 5
+    dropout:
+      type: float
+      low: 0.0
+      high: 0.3
   SMamba:
-    - hidden_size
-    - n_block
-    - expand_ratio
-    - kernel_size
-    - dropout
-    - revin
+    hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    n_block:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 3
+    expand_ratio:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 4
+    kernel_size:
+      type: categorical
+      choices:
+      - 3
+      - 5
+    dropout:
+      type: float
+      low: 0.0
+      high: 0.3
+    revin:
+      type: categorical
+      choices:
+      - true
+      - false
   CMamba:
-    - hidden_size
-    - ff_dim
-    - n_block
-    - expand_ratio
-    - kernel_size
-    - dropout
-    - revin
+    hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    ff_dim:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+      - 256
+    n_block:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 3
+    expand_ratio:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 4
+    kernel_size:
+      type: categorical
+      choices:
+      - 3
+      - 5
+    dropout:
+      type: float
+      low: 0.0
+      high: 0.3
+    revin:
+      type: categorical
+      choices:
+      - true
+      - false
   xLSTMMixer:
-    - hidden_size
-    - n_block
-    - ff_dim
-    - dropout
-    - encoder_n_blocks
-    - encoder_dropout
-    - revin
+    hidden_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    n_block:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 3
+    ff_dim:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+      - 256
+    dropout:
+      type: float
+      low: 0.0
+      high: 0.3
+    encoder_n_blocks:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 3
+    encoder_dropout:
+      type: float
+      low: 0.0
+      high: 0.3
+    revin:
+      type: categorical
+      choices:
+      - true
+      - false
   RMoK:
-    - taylor_order
-    - jacobi_degree
-    - wavelet_function
-    - dropout
+    taylor_order:
+      type: categorical
+      choices:
+      - 2
+      - 3
+      - 4
+    jacobi_degree:
+      type: categorical
+      choices:
+      - 2
+      - 3
+      - 4
+    wavelet_function:
+      type: categorical
+      choices:
+      - haar
+      - db2
+    dropout:
+      type: float
+      low: 0.0
+      high: 0.3
   XLinear:
-    - hidden_size
-    - temporal_ff
-    - channel_ff
-    - temporal_dropout
+    hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+      - 256
+    temporal_ff:
+      type: categorical
+      choices:
+      - 64
+      - 128
+      - 256
+    channel_ff:
+      type: categorical
+      choices:
+      - 64
+      - 128
+      - 256
+    temporal_dropout:
+      type: float
+      low: 0.0
+      high: 0.3
 training:
-  - input_size
-  - batch_size
-  - valid_batch_size
-  - windows_batch_size
-  - inference_windows_batch_size
-  - learning_rate
-  - scaler_type
-  - model_step_size
+  global:
+    input_size:
+      type: categorical
+      choices:
+      - 24
+      - 36
+      - 48
+      - 64
+      - 72
+      - 96
+    batch_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    valid_batch_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    windows_batch_size:
+      type: categorical
+      choices:
+      - 256
+      - 512
+      - 1024
+      - 2048
+    inference_windows_batch_size:
+      type: categorical
+      choices:
+      - 256
+      - 512
+      - 1024
+      - 2048
+    learning_rate:
+      type: float
+      low: 0.0003
+      high: 0.01
+      log: true
+    scaler_type:
+      type: categorical
+      choices:
+      - null
+      - robust
+      - standard
+      - identity
+    model_step_size:
+      type: categorical
+      choices:
+      - 1
+      - 4
+      - 8
+      - 12
+  per_model:
+    LSTM:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 48
+        - 64
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 128
+        - 256
+        - 512
+        - 1024
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+      learning_rate:
+        type: float
+        low: 0.001
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 4
+        - 8
+        - 12
+    PatchTST:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.009
+        log: true
+    TSMixerx:
+      input_size:
+        type: categorical
+        choices:
+        - 48
+        - 64
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 512
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+      learning_rate:
+        type: float
+        low: 0.0004
+        high: 0.001
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - robust
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+    iTransformer:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+      learning_rate:
+        type: float
+        low: 0.0004
+        high: 0.007
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
 residual:
   xgboost:
-    - n_estimators
-    - max_depth
-    - learning_rate
-    - subsample
-    - colsample_bytree
+    n_estimators:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+      - 128
+    max_depth:
+      type: int
+      low: 2
+      high: 6
+      step: 1
+    learning_rate:
+      type: float
+      low: 0.001
+      high: 0.3
+      log: true
+    subsample:
+      type: float
+      low: 0.5
+      high: 1.0
+    colsample_bytree:
+      type: float
+      low: 0.5
+      high: 1.0
   randomforest:
-    - n_estimators
-    - max_depth
-    - min_samples_leaf
-    - max_features
+    n_estimators:
+      type: categorical
+      choices:
+      - 64
+      - 128
+      - 200
+      - 300
+    max_depth:
+      type: categorical
+      choices:
+      - 4
+      - 6
+      - 8
+      - 12
+      - null
+    min_samples_leaf:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 4
+      - 8
+    max_features:
+      type: categorical
+      choices:
+      - sqrt
+      - log2
+      - 1.0
   lightgbm:
-    - n_estimators
-    - max_depth
-    - learning_rate
-    - num_leaves
-    - min_child_samples
-    - feature_fraction
+    n_estimators:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 96
+      - 128
+    max_depth:
+      type: categorical
+      choices:
+      - 4
+      - 6
+      - 8
+      - -1
+    learning_rate:
+      type: float
+      low: 0.001
+      high: 0.1
+      log: true
+    num_leaves:
+      type: categorical
+      choices:
+      - 15
+      - 31
+      - 63
+    min_child_samples:
+      type: categorical
+      choices:
+      - 10
+      - 20
+      - 40
+    feature_fraction:
+      type: float
+      low: 0.6
+      high: 1.0
