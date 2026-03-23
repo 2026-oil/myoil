@@ -14,8 +14,6 @@ summary_txt="${log_dir}/summary.txt"
 python_bin="${NF_CASE_PYTHON_BIN:-python3}"
 summary_python_bin="${NF_CASE_SUMMARY_PYTHON_BIN:-python3}"
 use_pty_mode="${NF_CASE_USE_PTY:-auto}"
-auto_git_mode="${NF_CASE_AUTO_GIT:-1}"
-git_remote="${NF_CASE_GIT_REMOTE:-origin}"
 patchtst_job="${NF_CASE_PATCHTST_JOB:-PatchTST}"
 
 _should_use_pty() {
@@ -43,27 +41,6 @@ _join_argv_for_script() {
   printf '%s' "${out# }"
 }
 
-_should_auto_git() {
-  case "$auto_git_mode" in
-    1|true|yes|on) return 0 ;;
-    0|false|no|off) return 1 ;;
-    *)
-      echo "[batch] invalid NF_CASE_AUTO_GIT=$auto_git_mode (use: 0|1|true|false)" >&2
-      return 1
-      ;;
-  esac
-}
-
-_append_globbed_configs() {
-  local pattern="$1"
-  local cfg
-  shopt -s nullglob
-  for cfg in $pattern; do
-    configs+=("$cfg")
-  done
-  shopt -u nullglob
-}
-
 _validate_patchtst_only_args() {
   local arg
   local expects_value="0"
@@ -85,71 +62,10 @@ _validate_patchtst_only_args() {
   done
 }
 
-_commit_and_push_all_changes() {
-  if ! _should_auto_git; then
-    echo "[batch] auto git disabled (NF_CASE_AUTO_GIT=$auto_git_mode)"
-    return 0
-  fi
-
-  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    echo "[batch] auto git skipped: not inside a git work tree" >&2
-    return 0
-  fi
-
-  local branch
-  branch="$(git branch --show-current)"
-  if [[ -z "$branch" ]]; then
-    echo "[batch] auto git skipped: detached HEAD cannot be pushed safely" >&2
-    return 1
-  fi
-
-  if [[ -z "$(git status --porcelain)" ]]; then
-    echo "[batch] auto git: no changes to commit"
-    return 0
-  fi
-
-  local commit_msg_file
-  commit_msg_file="$(mktemp)"
-  cat >"$commit_msg_file" <<EOF
-Persist batch run outputs after the sweep finishes
-
-The batch runner writes logs, summaries, and per-case artifacts into the
-working tree. Capturing the full tree at the end keeps the generated run data
-and any follow-up edits together in a single commit and push.
-
-Constraint: Must preserve the batch exit status while still publishing outputs
-Rejected: Commit only successful runs | would drop failure artifacts and partial outputs
-Confidence: high
-Scope-risk: moderate
-Directive: This path uses git add -A; only rely on it when the whole tree should be captured
-Tested: bash -n run.sh
-Not-tested: Remote rejection, credential failure, or detached HEAD recovery
-EOF
-
-  echo "[batch] auto git: staging all changes"
-  git add -A
-
-  if git diff --cached --quiet; then
-    echo "[batch] auto git: nothing staged after git add -A"
-    rm -f "$commit_msg_file"
-    return 0
-  fi
-
-  echo "[batch] auto git: committing changes"
-  if ! git commit -F "$commit_msg_file"; then
-    rm -f "$commit_msg_file"
-    return 1
-  fi
-  rm -f "$commit_msg_file"
-
-  echo "[batch] auto git: pushing to $git_remote/$branch"
-  if ! git push "$git_remote" "$branch"; then
-    echo "[batch] auto git: push failed" >&2
-    return 1
-  fi
-
-  echo "[batch] auto git: push complete"
-}
+yaml_list=(
+  "yaml/feature_set_HPT_c3/brentoil-case3.yaml"
+  "yaml/feature_set_HPT_c3/wti-case3.yaml"
+)
 
 if [[ -n "${NF_CASE_CONFIGS:-}" ]]; then
   mapfile -t _raw_configs <<<"${NF_CASE_CONFIGS}"
@@ -160,9 +76,7 @@ if [[ -n "${NF_CASE_CONFIGS:-}" ]]; then
     fi
   done
 else
-  configs=()
-  _append_globbed_configs "yaml/feature_set/*.yaml"
-  _append_globbed_configs "yaml/feature_set_HPT_c3/*.yaml"
+  configs=("${yaml_list[@]}")
 fi
 
 if ! _validate_patchtst_only_args "$@"; then
@@ -316,10 +230,6 @@ if ((${#failed[@]})) || ((${#missing[@]})); then
   exit_code=1
 else
   exit_code=0
-fi
-
-if ! _commit_and_push_all_changes; then
-  exit_code=1
 fi
 
 exit "$exit_code"

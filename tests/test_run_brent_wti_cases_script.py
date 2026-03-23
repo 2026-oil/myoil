@@ -107,13 +107,29 @@ fi
     assert "[batch] passed=1 failed=1 missing=1" in summary_txt
 
 
-def test_run_brent_wti_cases_script_default_config_scope_targets_feature_set_and_hpt_c3():
+def test_run_brent_wti_cases_script_default_config_scope_uses_yaml_list_registration():
     script = SCRIPT_PATH.read_text(encoding="utf-8")
 
-    assert '_append_globbed_configs "yaml/feature_set/*.yaml"' in script
-    assert '_append_globbed_configs "yaml/feature_set_HPT_c3/*.yaml"' in script
+    assert "yaml_list=(" in script
+    assert '"yaml/feature_set/brentoil-case1.yaml"' in script
+    assert '"yaml/feature_set/brentoil-case4.yaml"' in script
+    assert '"yaml/feature_set/wti-case1.yaml"' in script
+    assert '"yaml/feature_set/wti-case4.yaml"' in script
+    assert '"yaml/feature_set_HPT_c3/brentoil-case3.yaml"' in script
+    assert '"yaml/feature_set_HPT_c3/wti-case3.yaml"' in script
+    assert 'configs=("${yaml_list[@]}")' in script
     assert "--jobs" in script
     assert "PatchTST" in script
+
+
+def test_run_brent_wti_cases_script_does_not_auto_commit_or_push() -> None:
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+
+    assert "NF_CASE_AUTO_GIT" not in script
+    assert "NF_CASE_GIT_REMOTE" not in script
+    assert "_commit_and_push_all_changes" not in script
+    assert "git commit" not in script
+    assert "git push" not in script
 
 
 def test_run_brent_wti_cases_script_rejects_jobs_and_output_root_overrides(tmp_path: Path) -> None:
