@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+from tempfile import TemporaryDirectory
 from typing import Any, Sequence
 from datetime import datetime, timezone
 
@@ -28,8 +29,10 @@ from .manifest import (
 )
 from .models import BASELINE_MODEL_NAMES, build_model, validate_job
 from .optuna_spaces import (
+    DEFAULT_RESIDUAL_PARAMS_BY_MODEL,
     DEFAULT_OPTUNA_STUDY_DIRECTION,
     RESIDUAL_DEFAULTS,
+    RESIDUAL_PARAM_REGISTRY,
     SUPPORTED_AUTO_MODEL_NAMES,
     SUPPORTED_RESIDUAL_MODELS,
     LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD,
@@ -70,15 +73,8 @@ DEFAULT_SAMPLE_STRUCTURE = {
     "results_intro": "- 각 run의 leaderboard.csv 기준 결과를 아래에 정리했다.",
     "section_model_tables": "### 각 모형별 Table",
 }
-MIN_PRUNE_FOLD_IDX = 10
-
-
 class _OptunaTrialFailure(RuntimeError):
     """Recoverable per-trial failure that should not abort the whole study."""
-
-
-def _can_prune_at_fold(fold_idx: int) -> bool:
-    return fold_idx >= MIN_PRUNE_FOLD_IDX
 
 
 def _now_iso() -> str:
@@ -711,6 +707,89 @@ def _mean_fold_metric(values: Sequence[float]) -> float:
     return float(sum(values) / len(values))
 
 
+def _objective_stage_label(loaded: LoadedConfig) -> str:
+    if loaded.config.residual.enabled:
+        return "tuning_pre_replay_corrected_predictions"
+    return "tuning_pre_replay_direct_predictions"
+
+
+def _residual_plugin_config(
+    loaded: LoadedConfig, params: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        "model": loaded.config.residual.model,
+        "params": params,
+        "cpu_threads": loaded.config.residual.cpu_threads,
+    }
+
+
+def _suggest_prefixed_residual_params(
+    loaded: LoadedConfig,
+    trial: optuna.Trial,
+) -> dict[str, Any]:
+    registry = RESIDUAL_PARAM_REGISTRY[loaded.config.residual.model]
+    suggested = DEFAULT_RESIDUAL_PARAMS_BY_MODEL[loaded.config.residual.model].copy()
+    for name in loaded.config.residual.selected_search_params:
+        suggested[name] = registry[name](trial, f"residual__{name}")
+    return suggested
+
+
+def _score_main_trial_with_residual(
+    loaded: LoadedConfig,
+    job: JobConfig,
+    *,
+    train_df: pd.DataFrame,
+    future_df: pd.DataFrame,
+    fold_idx: int,
+    train_end_ds: pd.Timestamp,
+    target_predictions: pd.DataFrame,
+    target_actuals: pd.Series,
+    nf: NeuralForecast,
+    residual_params: dict[str, Any],
+    scratch_root: Path,
+) -> float:
+    backcast_panel = _build_fold_backcast_panel(
+        loaded,
+        job,
+        nf,
+        train_df,
+        loaded.config.dataset.dt_col,
+        loaded.config.dataset.target_col,
+        fold_idx,
+    )
+    if backcast_panel.empty:
+        return _compute_metrics(target_actuals, target_predictions[job.model])["MSE"]
+    eval_panel = _build_fold_eval_panel(
+        loaded,
+        job,
+        fold_idx,
+        train_end_ds,
+        target_predictions,
+        target_actuals,
+        future_df,
+        train_df,
+    )
+    with TemporaryDirectory(dir=scratch_root, prefix="residual-main-objective-") as tmpdir:
+        plugin = build_residual_plugin(_residual_plugin_config(loaded, residual_params))
+        plugin.fit(
+            backcast_panel,
+            _build_residual_context(
+                loaded,
+                job,
+                Path(tmpdir),
+                model_name=job.model,
+            ),
+        )
+        predicted = plugin.predict(eval_panel.copy())
+    corrected = eval_panel.reset_index(drop=True).copy()
+    corrected["residual_hat"] = predicted["residual_hat"].astype(float).values
+    corrected["y_hat_corrected"] = reconstruct_corrected_forecast(
+        corrected,
+        loaded.config.residual.target,
+    )
+    return _compute_metrics(corrected["y"], corrected["y_hat_corrected"])["MSE"]
+
+
 def _build_study_name(
     loaded: LoadedConfig, *, stage: str, job_name: str, suffix: str = ""
 ) -> str:
@@ -883,6 +962,7 @@ def _main_job_objective(
     loaded: LoadedConfig,
     job: JobConfig,
     *,
+    study_root: Path,
     source_df: pd.DataFrame,
     freq: str,
     splits: list[tuple[list[int], list[int]]],
@@ -899,8 +979,21 @@ def _main_job_objective(
             trial,
             model_name=job.model,
         )
+        candidate_residual_params: dict[str, Any] | None = None
+        if loaded.config.residual.enabled:
+            if loaded.config.residual.validated_mode == "residual_auto":
+                candidate_residual_params = _suggest_prefixed_residual_params(
+                    loaded, trial
+                )
+            else:
+                candidate_residual_params = {
+                    **RESIDUAL_DEFAULTS[loaded.config.residual.model],
+                    **loaded.config.residual.params,
+                }
         trial.set_user_attr("best_params", candidate_params)
         trial.set_user_attr("best_training_params", candidate_training_params)
+        if candidate_residual_params is not None:
+            trial.set_user_attr("best_residual_params", candidate_residual_params)
         fold_mse: list[float] = []
         for fold_idx, (train_idx, test_idx) in enumerate(splits):
             phase = f"tune-trial-{trial.number + 1}/{trial_count}"
@@ -909,7 +1002,13 @@ def _main_job_objective(
                     fold_idx, total_folds=len(splits), phase=phase
                 )
             try:
-                target_predictions, target_actuals, _, _, _ = _fit_and_predict_fold(
+                (
+                    target_predictions,
+                    target_actuals,
+                    train_end_ds,
+                    train_df,
+                    nf,
+                ) = _fit_and_predict_fold(
                     loaded,
                     job,
                     source_df=source_df,
@@ -919,14 +1018,30 @@ def _main_job_objective(
                     params_override=candidate_params,
                     training_override=candidate_training_params,
                 )
-                mse = _compute_metrics(
-                    target_actuals, target_predictions[job.model]
-                )["MSE"]
+                if candidate_residual_params is None:
+                    mse = _compute_metrics(
+                        target_actuals, target_predictions[job.model]
+                    )["MSE"]
+                else:
+                    future_df = source_df.iloc[test_idx].reset_index(drop=True)
+                    mse = _score_main_trial_with_residual(
+                        loaded,
+                        job,
+                        train_df=train_df,
+                        future_df=future_df,
+                        fold_idx=fold_idx,
+                        train_end_ds=train_end_ds,
+                        target_predictions=target_predictions,
+                        target_actuals=target_actuals,
+                        nf=nf,
+                        residual_params=candidate_residual_params,
+                        scratch_root=study_root,
+                    )
                 fold_mse.append(mse)
                 interim_metric = _mean_fold_metric(fold_mse)
                 trial.set_user_attr("fold_mse", fold_mse.copy())
                 trial.report(interim_metric, step=fold_idx)
-                if _can_prune_at_fold(fold_idx) and trial.should_prune():
+                if trial.should_prune():
                     trial.set_user_attr("pruned_after_fold", fold_idx)
                     if progress is not None:
                         progress.fold_completed(
@@ -982,6 +1097,11 @@ def _collect_main_tuning_result(
     )
     best_params = dict(best_trial.user_attrs["best_params"])
     best_training_params = dict(best_trial.user_attrs["best_training_params"])
+    best_residual_params = (
+        dict(best_trial.user_attrs["best_residual_params"])
+        if "best_residual_params" in best_trial.user_attrs
+        else None
+    )
     summary = {
         **_trial_metrics_summary(study),
         **study_metadata,
@@ -996,8 +1116,10 @@ def _collect_main_tuning_result(
         "best_params": best_params,
         "best_training_params": best_training_params,
         "fold_mse": best_trial.user_attrs["fold_mse"],
-        "objective_stage": "tuning_pre_replay_direct_predictions",
+        "objective_stage": _objective_stage_label(loaded),
     }
+    if best_residual_params is not None:
+        summary["best_residual_params"] = best_residual_params
     return best_params, best_training_params, summary
 
 
@@ -1015,6 +1137,7 @@ def _tune_main_job(
     objective = _main_job_objective(
         loaded,
         job,
+        study_root=models_dir,
         source_df=source_df,
         freq=freq,
         splits=splits,
@@ -1059,6 +1182,7 @@ def _parallel_tune_main_job_worker(
     objective = _main_job_objective(
         loaded,
         job,
+        study_root=models_dir,
         source_df=source_df,
         freq=freq,
         splits=splits,
@@ -1123,9 +1247,7 @@ def _score_residual_params(
     for step_idx, payload in enumerate(fold_payloads):
         fold_idx = int(payload["fold_idx"])
         try:
-            plugin = build_residual_plugin(
-                {"model": loaded.config.residual.model, "params": params}
-            )
+            plugin = build_residual_plugin(_residual_plugin_config(loaded, params))
             plugin.fit(
                 payload["backcast_panel"],
                 _build_residual_context(
@@ -1148,7 +1270,7 @@ def _score_residual_params(
             interim_metric = _mean_fold_metric(mse_scores)
             trial.set_user_attr("fold_mse", mse_scores.copy())
             trial.report(interim_metric, step=step_idx)
-            if _can_prune_at_fold(fold_idx) and trial.should_prune():
+            if trial.should_prune():
                 trial.set_user_attr("pruned_after_fold", fold_idx)
                 raise optuna.TrialPruned(
                     f"Pruned residual trial after fold {fold_idx} with mean_mse={interim_metric:.4f}"
@@ -1550,6 +1672,8 @@ def _apply_residual_plugin(
     fold_payloads: list[dict[str, Any]],
     *,
     manifest_path: Path,
+    residual_params_override: dict[str, Any] | None = None,
+    residual_study_summary_override: dict[str, Any] | None = None,
 ) -> None:
     if job.model in BASELINE_MODEL_NAMES:
         return
@@ -1565,8 +1689,33 @@ def _apply_residual_plugin(
     corrected_groups: list[pd.DataFrame] = []
     checkpoint_metadata: dict[str, dict[str, object]] = {}
     total_backcast_rows = 0
-    residual_params = {**RESIDUAL_DEFAULTS[loaded.config.residual.model], **loaded.config.residual.params}
-    if loaded.config.residual.validated_mode == "residual_auto":
+    residual_params = {
+        **RESIDUAL_DEFAULTS[loaded.config.residual.model],
+        **loaded.config.residual.params,
+    }
+    if residual_params_override is not None:
+        residual_params = {
+            **RESIDUAL_DEFAULTS[loaded.config.residual.model],
+            **residual_params_override,
+        }
+        best_params_path = residual_root / "best_params.json"
+        best_params_path.write_text(
+            json.dumps(residual_params, indent=2), encoding="utf-8"
+        )
+        residual_summary_path: Path | None = None
+        if residual_study_summary_override is not None:
+            residual_summary_path = residual_root / "optuna_study_summary.json"
+            residual_summary_path.write_text(
+                json.dumps(residual_study_summary_override, indent=2),
+                encoding="utf-8",
+            )
+        _update_manifest_artifacts(
+            manifest_path,
+            job_name=job.model,
+            residual_best_params_path=best_params_path,
+            residual_study_summary_path=residual_summary_path,
+        )
+    elif loaded.config.residual.validated_mode == "residual_auto":
         sampler = build_optuna_sampler(optuna_seed(loaded.config.runtime.random_seed))
         residual_trial_count = optuna_num_trials(loaded.config.runtime.opt_n_trial)
 
@@ -1644,9 +1793,7 @@ def _apply_residual_plugin(
         base_checkpoint_dir = fold_root / "base_checkpoint"
         residual_checkpoint_dir = fold_root / "residual_checkpoint"
         base_checkpoint_dir.mkdir(parents=True, exist_ok=True)
-        plugin = build_residual_plugin(
-            {"model": loaded.config.residual.model, "params": residual_params}
-        )
+        plugin = build_residual_plugin(_residual_plugin_config(loaded, residual_params))
 
         backcast_panel.to_csv(fold_root / "backcast_panel.csv", index=False)
         (base_checkpoint_dir / "fit_summary.json").write_text(
@@ -2340,6 +2487,8 @@ def _run_single_job(
     fold_payloads: list[dict[str, Any]] = []
     effective_job = job
     effective_training_params: dict[str, Any] = {}
+    effective_residual_params: dict[str, Any] | None = None
+    residual_study_summary: dict[str, Any] | None = None
     models_dir = run_root / "models" / job.model
     models_dir.mkdir(parents=True, exist_ok=True)
     total_steps = len(splits)
@@ -2407,6 +2556,49 @@ def _run_single_job(
         )
         effective_job = replace(job, params=best_params)
         effective_training_params = best_training_params
+        if loaded.config.residual.enabled:
+            residual_params = study_summary.get("best_residual_params")
+            if isinstance(residual_params, dict) and residual_params:
+                effective_residual_params = dict(residual_params)
+                if loaded.config.residual.validated_mode == "residual_auto":
+                    residual_study_summary = {
+                        "direction": study_summary.get("direction"),
+                        "trial_count": study_summary.get("trial_count"),
+                        "finished_trial_count": study_summary.get(
+                            "finished_trial_count"
+                        ),
+                        "state_counts": study_summary.get("state_counts", {}),
+                        "best_value": study_summary.get("best_value"),
+                        "best_trial_number": study_summary.get("best_trial_number"),
+                        "objective_metric": study_summary.get("objective_metric"),
+                        "storage_backend": study_summary.get("storage_backend"),
+                        "storage_path": study_summary.get("storage_path"),
+                        "study_name": study_summary.get("study_name"),
+                        "requested_trial_count": study_summary.get(
+                            "requested_trial_count"
+                        ),
+                        "existing_trial_count_before_optimize": study_summary.get(
+                            "existing_trial_count_before_optimize"
+                        ),
+                        "existing_finished_trial_count_before_optimize": study_summary.get(
+                            "existing_finished_trial_count_before_optimize"
+                        ),
+                        "remaining_trial_count": study_summary.get(
+                            "remaining_trial_count"
+                        ),
+                        "reserved_trial_slots": study_summary.get(
+                            "reserved_trial_slots"
+                        ),
+                        "requested_mode": loaded.config.residual.requested_mode,
+                        "validated_mode": loaded.config.residual.validated_mode,
+                        "selected_search_params": list(
+                            loaded.config.residual.selected_search_params
+                        ),
+                        "best_params": effective_residual_params,
+                        "objective_stage": "tuning_pre_replay_joint_corrected_predictions",
+                        "source_study_name": study_summary.get("study_name"),
+                        "source_storage_path": study_summary.get("storage_path"),
+                    }
 
     if effective_job.model in BASELINE_MODEL_NAMES:
         train_series = source_df[[dt_col, target_col]].copy()
@@ -2567,9 +2759,14 @@ def _run_single_job(
                 "dataloader_kwargs": loaded.config.training.dataloader_kwargs,
                 "loss": loaded.config.training.loss,
                 "evaluation_policy": "tscv_only",
-                "tuning_objective_metric": "mean_fold_mse_on_direct_predictions"
-                if job.validated_mode == "learned_auto"
-                else None,
+                "tuning_objective_metric": (
+                    "mean_fold_mse_on_corrected_predictions"
+                    if job.validated_mode == "learned_auto"
+                    and loaded.config.residual.enabled
+                    else "mean_fold_mse_on_direct_predictions"
+                    if job.validated_mode == "learned_auto"
+                    else None
+                ),
                 "fold_count": len(splits),
             },
             indent=2,
@@ -2583,6 +2780,8 @@ def _run_single_job(
             run_root,
             fold_payloads,
             manifest_path=manifest_path,
+            residual_params_override=effective_residual_params,
+            residual_study_summary_override=residual_study_summary,
         )
     progress.model_finished(detail="run-complete")
 

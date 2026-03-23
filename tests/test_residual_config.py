@@ -3640,7 +3640,7 @@ def test_runtime_main_does_not_recurse_parallel_tuning_inside_worker(
     assert called["count"] == 0
 
 
-def test_runtime_auto_mode_prunes_trials_only_after_fold_ten(
+def test_runtime_auto_mode_can_prune_from_first_fold(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     payload = _payload()
@@ -3666,13 +3666,6 @@ def test_runtime_auto_mode_prunes_trials_only_after_fold_ten(
 
     from residual import runtime
 
-    real_create_study = runtime.optuna.create_study
-
-    def _create_study_with_pruner(*args, **kwargs):
-        kwargs.setdefault("pruner", optuna.pruners.ThresholdPruner(upper=0.5))
-        return real_create_study(*args, **kwargs)
-
-    real_should_prune = optuna.trial.Trial.should_prune
     should_prune_steps: list[int] = []
 
     def _fake_fit_and_predict_fold(
@@ -3706,11 +3699,10 @@ def test_runtime_auto_mode_prunes_trials_only_after_fold_ten(
 
     def _should_prune_with_trace(self):
         should_prune_steps.append(len(self.user_attrs.get("fold_mse", [])))
-        return real_should_prune(self)
+        return self.number == 0
 
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
     monkeypatch.setenv("NEURALFORECAST_OPTUNA_SEED", "7")
-    monkeypatch.setattr(runtime.optuna, "create_study", _create_study_with_pruner)
     monkeypatch.setattr(runtime.optuna.trial.Trial, "should_prune", _should_prune_with_trace)
     monkeypatch.setattr(runtime, "_fit_and_predict_fold", _fake_fit_and_predict_fold)
     monkeypatch.setattr(
@@ -3745,14 +3737,14 @@ def test_runtime_auto_mode_prunes_trials_only_after_fold_ten(
         (output_root / "models" / "TFT" / "optuna_study_summary.json").read_text()
     )
     assert code == 0
-    assert summary["trial_count"] == 2
+    assert summary["trial_count"] >= 2
     assert summary["state_counts"]["complete"] == 1
     assert summary["state_counts"]["pruned"] == 1
-    assert len(should_prune_steps) == 2
-    assert all(step == 11 for step in should_prune_steps)
+    assert should_prune_steps[0] == 1
+    assert min(should_prune_steps) == 1
 
 
-def test_residual_auto_mode_prunes_trials_only_after_fold_ten(
+def test_residual_auto_mode_can_prune_from_first_fold(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     from residual import runtime
@@ -3836,8 +3828,8 @@ def test_residual_auto_mode_prunes_trials_only_after_fold_ten(
             trial=trial,
         )
 
-    assert trial.reported_steps == list(range(11))
-    assert trial.prune_checks == [11]
+    assert trial.reported_steps == [0]
+    assert trial.prune_checks == [1]
 
 
 def test_runtime_auto_mode_catches_recoverable_trial_failures(
@@ -6107,6 +6099,266 @@ def test_apply_residual_plugin_writes_residual_target_to_diagnostics(
     )
 
     assert diagnostics["residual.target"] == "delta"
+
+
+def test_runtime_main_joint_auto_mode_records_residual_best_params(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from residual import runtime
+
+    payload = _payload()
+    payload["runtime"]["opt_n_trial"] = 2
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": True, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"]},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    captured: dict[str, Any] = {}
+
+    def _fake_fit_and_predict_fold(
+        loaded,
+        job,
+        *,
+        source_df,
+        freq,
+        train_idx,
+        test_idx,
+        params_override=None,
+        training_override=None,
+    ):
+        predictions = pd.DataFrame(
+            {
+                "unique_id": [loaded.config.dataset.target_col],
+                "ds": pd.Series(["2020-01-22"]),
+                job.model: [1.0],
+            }
+        )
+        actuals = pd.Series([1.0])
+        return (
+            predictions,
+            actuals,
+            pd.Timestamp("2020-01-15"),
+            source_df.iloc[train_idx].reset_index(drop=True),
+            SimpleNamespace(),
+        )
+
+    def _fake_score_main_trial_with_residual(
+        loaded,
+        job,
+        *,
+        residual_params,
+        **_kwargs,
+    ):
+        return float(residual_params["n_estimators"])
+
+    def _fake_suggest_prefixed_residual_params(loaded, trial):
+        return {"n_estimators": 8 + trial.number}
+
+    def _fake_build_fold_panel(*_args, **_kwargs):
+        return _residual_target_panel(
+            [
+                {
+                    "model_name": "TFT",
+                    "fold_idx": 0,
+                    "panel_split": "fold_eval",
+                    "unique_id": "target",
+                    "cutoff": "2020-01-15",
+                    "train_end_ds": "2020-01-15",
+                    "ds": "2020-01-22",
+                    "horizon_step": 1,
+                    "y_hat_base": 1.0,
+                    "y": 1.0,
+                    "residual_target": 0.0,
+                }
+            ]
+        )
+
+    def _fake_apply_residual_plugin(*args, **kwargs):
+        captured["residual_params_override"] = kwargs.get("residual_params_override")
+        captured["residual_study_summary_override"] = kwargs.get(
+            "residual_study_summary_override"
+        )
+        return None
+
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    monkeypatch.setenv("NEURALFORECAST_OPTUNA_SEED", "7")
+    monkeypatch.setattr(
+        runtime,
+        "load_app_config",
+        lambda _repo_root, **kwargs: load_app_config(tmp_path, **kwargs),
+    )
+    monkeypatch.setattr(runtime, "_fit_and_predict_fold", _fake_fit_and_predict_fold)
+    monkeypatch.setattr(
+        runtime,
+        "_score_main_trial_with_residual",
+        _fake_score_main_trial_with_residual,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_suggest_prefixed_residual_params",
+        _fake_suggest_prefixed_residual_params,
+    )
+    monkeypatch.setattr(runtime, "_build_fold_backcast_panel", _fake_build_fold_panel)
+    monkeypatch.setattr(runtime, "_build_fold_eval_panel", _fake_build_fold_panel)
+    monkeypatch.setattr(
+        runtime,
+        "suggest_model_params",
+        lambda *_args, **_kwargs: {"hidden_size": 32},
+    )
+    monkeypatch.setattr(
+        runtime,
+        "suggest_training_params",
+        lambda *_args, **_kwargs: {},
+    )
+    monkeypatch.setattr(runtime, "_apply_residual_plugin", _fake_apply_residual_plugin)
+    monkeypatch.setattr(runtime, "_should_build_summary_artifacts", lambda: False)
+
+    output_root = tmp_path / "run_joint_auto"
+    code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "TFT",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    summary = json.loads(
+        (output_root / "models" / "TFT" / "optuna_study_summary.json").read_text()
+    )
+    fit_summary = json.loads(
+        (output_root / "models" / "TFT" / "fit_summary.json").read_text()
+    )
+
+    assert code == 0
+    assert summary["objective_stage"] == "tuning_pre_replay_corrected_predictions"
+    assert summary["best_residual_params"] == {"n_estimators": 8}
+    assert fit_summary["tuning_objective_metric"] == (
+        "mean_fold_mse_on_corrected_predictions"
+    )
+    assert captured["residual_params_override"] == {"n_estimators": 8}
+    assert (
+        captured["residual_study_summary_override"]["objective_stage"]
+        == "tuning_pre_replay_joint_corrected_predictions"
+    )
+
+
+def test_apply_residual_plugin_uses_override_params_without_running_residual_study(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from residual import runtime
+
+    class _ZeroResidualPlugin(ResidualPlugin):
+        name = "zero"
+
+        def fit(self, panel_df: pd.DataFrame, context: ResidualContext) -> None:
+            return None
+
+        def predict(self, panel_df: pd.DataFrame) -> pd.DataFrame:
+            return panel_df.copy().assign(residual_hat=0.0)
+
+        def metadata(self) -> dict[str, object]:
+            return {"plugin": self.name}
+
+    monkeypatch.setattr(
+        runtime,
+        "build_residual_plugin",
+        lambda _config: _ZeroResidualPlugin(),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_score_residual_params",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("serial residual study should be skipped")
+        ),
+    )
+
+    payload = _payload()
+    payload["residual"] = {"enabled": True, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n",
+        encoding="utf-8",
+    )
+    _write_search_space(tmp_path)
+    loaded = load_app_config(
+        tmp_path,
+        config_path=_write_config(tmp_path, payload, ".yaml"),
+    )
+    job = loaded.config.jobs[0]
+    run_root = tmp_path / "run_override"
+    manifest_path = run_root / "manifest" / "run_manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps({"jobs": [{"model": job.model}], "residual": {}}, indent=2),
+        encoding="utf-8",
+    )
+    panel = _residual_target_panel(
+        [
+            {
+                "model_name": job.model,
+                "fold_idx": 0,
+                "panel_split": "fold_eval",
+                "unique_id": "target",
+                "cutoff": "2020-01-15",
+                "train_end_ds": "2020-01-15",
+                "ds": "2020-01-22",
+                "horizon_step": 1,
+                "y_hat_base": 12.0,
+                "y": 13.0,
+                "residual_target": 1.0,
+            }
+        ]
+    )
+    fold_payloads = [
+        {
+            "fold_idx": 0,
+            "trial_dir": run_root / "residual" / job.model / "_optuna_trial",
+            "backcast_panel": panel.copy(),
+            "eval_panel": panel.copy(),
+            "base_summary": {"fold_idx": 0},
+        }
+    ]
+
+    runtime._apply_residual_plugin(
+        loaded,
+        job,
+        run_root,
+        fold_payloads,
+        manifest_path=manifest_path,
+        residual_params_override={"n_estimators": 17},
+        residual_study_summary_override={
+            "objective_stage": "tuning_pre_replay_joint_corrected_predictions"
+        },
+    )
+
+    assert json.loads(
+        (run_root / "residual" / job.model / "best_params.json").read_text()
+    ) == {
+        "n_estimators": 17,
+        "max_depth": 3,
+        "learning_rate": 0.1,
+        "subsample": 1.0,
+        "colsample_bytree": 1.0,
+    }
+    assert json.loads(
+        (run_root / "residual" / job.model / "optuna_study_summary.json").read_text()
+    )["objective_stage"] == "tuning_pre_replay_joint_corrected_predictions"
 
 
 def test_apply_residual_plugin_prefers_yaml_opt_n_trial_over_env(
