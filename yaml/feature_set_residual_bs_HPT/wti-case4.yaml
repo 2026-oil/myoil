@@ -1,5 +1,5 @@
 task:
-  name: wti_case4_residual_bs
+  name: wti_case4_residual_bs_hpt
 dataset:
   path: data/df.csv
   target_col: Com_CrudeOil
