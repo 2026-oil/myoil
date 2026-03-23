@@ -3287,7 +3287,7 @@ def test_suggest_training_params_supports_batch_size_selector():
     assert suggested["batch_size"] == 16
     assert contextual["batch_size"] == 16
     assert training_range_source_for_model(None) == "global_fallback"
-    assert training_range_source_for_model("TFT") == "model_override:TFT"
+    assert training_range_source_for_model("PatchTST") == "model_override:PatchTST"
     assert training_range_source_for_model("unknown-model") == "global_fallback"
 
 
@@ -4158,11 +4158,11 @@ def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
     assert code == 0
     assert calls[-1]["batch_size"] == 123
     assert manifest["training_search"]["selected_search_params"] == ["batch_size"]
-    assert manifest["training_search"]["training_range_source"] == "model_override:TFT"
+    assert manifest["training_search"]["training_range_source"] == "global_fallback"
     assert manifest["jobs"][0]["training_best_params_path"]
     assert manifest["jobs"][0]["training_optuna_study_summary_path"]
     assert capability["training_search"]["validated_mode"] == "training_auto"
-    assert training_summary["training_range_source"] == "model_override:TFT"
+    assert training_summary["training_range_source"] == "global_fallback"
     assert training_best == {"batch_size": 123}
 
 
@@ -4291,7 +4291,7 @@ def test_supported_auto_model_matrix_matches_registry_and_yaml():
         for model in search_space["models"]
     )
     assert "learning_rate" not in search_space["models"]["NLinear"]
-    assert training_range_source_for_model("TFT") == "model_override:TFT"
+    assert training_range_source_for_model("PatchTST") == "model_override:PatchTST"
     assert training_range_source_for_model(None) == "global_fallback"
 
 
