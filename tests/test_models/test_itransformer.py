@@ -1,6 +1,7 @@
 from neuralforecast.auto import AutoiTransformer, iTransformer
 from neuralforecast.common._base_auto import MockTrial
 from neuralforecast.common._model_checks import check_model
+import pytest
 import torch
 
 from .test_helpers import check_args
@@ -84,3 +85,61 @@ def test_itransformer_forward_uses_hist_exog():
     assert y_pred.shape == (1, 2, 1)
     assert recorder.last_x_mark is not None
     assert recorder.last_x_mark.shape == (1, 4, 1)
+
+
+def test_itransformer_forward_raises_on_non_finite_hist_exog():
+    model = iTransformer(
+        h=2,
+        input_size=4,
+        n_series=1,
+        max_steps=1,
+        learning_rate=1e-3,
+        batch_size=1,
+        valid_batch_size=1,
+        windows_batch_size=1,
+        inference_windows_batch_size=1,
+        hist_exog_list=["hist_a"],
+        hidden_size=4,
+        n_heads=1,
+        e_layers=1,
+        d_ff=8,
+    )
+
+    windows_batch = {
+        "insample_y": torch.zeros(1, 4, 1),
+        "hist_exog": torch.tensor([[[[1.0], [float("nan")], [1.0], [1.0]]]]),
+    }
+
+    with pytest.raises(ValueError, match="hist_exog"):
+        model(windows_batch)
+
+
+def test_itransformer_forward_raises_on_non_finite_forecast_output():
+    model = iTransformer(
+        h=2,
+        input_size=4,
+        n_series=1,
+        max_steps=1,
+        learning_rate=1e-3,
+        batch_size=1,
+        valid_batch_size=1,
+        windows_batch_size=1,
+        inference_windows_batch_size=1,
+        hist_exog_list=["hist_a"],
+        hidden_size=4,
+        n_heads=1,
+        e_layers=1,
+        d_ff=8,
+    )
+
+    def forecast_with_nan(x_enc, x_mark_enc=None):
+        return torch.full((x_enc.shape[0], model.h, model.n_series), float("nan"))
+
+    model.forecast = forecast_with_nan
+    windows_batch = {
+        "insample_y": torch.zeros(1, 4, 1),
+        "hist_exog": torch.ones(1, 1, 4, 1),
+    }
+
+    with pytest.raises(ValueError, match="y_pred"):
+        model(windows_batch)

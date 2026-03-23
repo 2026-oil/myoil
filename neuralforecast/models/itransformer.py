@@ -195,6 +195,20 @@ class iTransformer(BaseModel):
             self.hidden_size, h * self.loss.outputsize_multiplier, bias=True
         )
 
+    @staticmethod
+    def _check_finite(name: str, tensor: Optional[torch.Tensor]) -> None:
+        if tensor is None:
+            return
+        if torch.isfinite(tensor).all():
+            return
+
+        non_finite = ~torch.isfinite(tensor)
+        bad_count = int(non_finite.sum().item())
+        raise ValueError(
+            f"iTransformer received non-finite values in {name}: "
+            f"count={bad_count}, shape={tuple(tensor.shape)}"
+        )
+
     def forecast(self, x_enc, x_mark_enc=None):
         if self.use_norm:
             # Normalization from Non-stationary Transformer
@@ -244,13 +258,18 @@ class iTransformer(BaseModel):
         insample_y = windows_batch["insample_y"]
         hist_exog = windows_batch["hist_exog"]
 
+        self._check_finite("insample_y", insample_y)
+        self._check_finite("hist_exog", hist_exog)
+
         x_mark_enc = None
         if self.hist_exog_size > 0:
             x_mark_enc = hist_exog.permute(0, 2, 1, 3).reshape(
                 insample_y.shape[0], self.input_size, -1
             )
+            self._check_finite("x_mark_enc", x_mark_enc)
 
         y_pred = self.forecast(insample_y, x_mark_enc=x_mark_enc)
+        self._check_finite("y_pred", y_pred)
         if self.hist_exog_size > 0:
             y_pred = y_pred[:, :, : self.n_series]
         y_pred = y_pred.reshape(insample_y.shape[0], self.h, -1)
