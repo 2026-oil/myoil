@@ -3,32 +3,45 @@
   "artifact_schema_version": "1",
   "evaluation_protocol_version": "2",
   "config_source_type": "yaml",
-  "config_source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/tests/fixtures/residual_feature_default_no_dates.yaml",
+  "config_source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/tests/fixtures/optuna_learned_auto.yaml",
   "config_resolved_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/validation/config/config.resolved.json",
-  "config_input_sha256": "e07093e32046f34b095d275baaf45ece0dd398c4b62d6c0c2859dcb30ff301ed",
-  "config_resolved_sha256": "56ebdfa07161c6737e178cad3c8459e970bee0806f8e930c9bf777d3ae791814",
-  "search_space_path": null,
-  "search_space_sha256": null,
+  "config_input_sha256": "8977d4e24b8ea8e99cb1ab3177b2d8b01f6d37dcbe7c67c2a7d51694dd5c9d3e",
+  "config_resolved_sha256": "e086725b143f3626da8f065c2392178911e83f95b6bab4fc746dc19b06961646",
+  "search_space_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/search_space.yaml",
+  "search_space_sha256": "f2b6d78a3d71317cfc188ae8699e257117b3debb1dc80613bc8455402a98c7e9",
   "entrypoint_version": "neuralforecast-residual-v1",
   "compat_mode": "dual_read",
   "jobs": [
     {
       "model": "TFT",
-      "requested_mode": "learned_fixed",
-      "validated_mode": "learned_fixed",
-      "selected_search_params": []
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "dropout",
+        "n_head"
+      ]
     }
   ],
   "training_search": {
-    "requested_mode": "training_fixed",
-    "validated_mode": "training_fixed",
-    "selected_search_params": []
+    "requested_mode": "training_auto_requested",
+    "validated_mode": "training_auto",
+    "selected_search_params": [
+      "input_size",
+      "batch_size",
+      "valid_batch_size",
+      "windows_batch_size",
+      "inference_windows_batch_size",
+      "learning_rate",
+      "scaler_type",
+      "model_step_size"
+    ]
   },
   "residual": {
     "model": "xgboost",
     "target": "level",
-    "requested_mode": "residual_fixed",
-    "validated_mode": "residual_fixed",
+    "requested_mode": "residual_disabled",
+    "validated_mode": "residual_disabled",
     "selected_search_params": [],
     "feature_policy": {
       "include_base_prediction": true,

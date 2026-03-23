@@ -1247,6 +1247,804 @@ training:
       - 8
       - 12
   per_model:
+    Autoformer:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    BiTCN:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    CMamba:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    DLinear:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    DUET:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    DeepAR:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    DeepNPTS:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    DeformTime:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    DeformableTST:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    DilatedRNN:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    FEDformer:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    GRU:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    Informer:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    KAN:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
     LSTM:
       input_size:
         type: categorical
@@ -1297,6 +2095,462 @@ training:
         - 4
         - 8
         - 12
+    MLP:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    MLPMultivariate:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    Mamba:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    ModernTCN:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    NBEATS:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    NBEATSx:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    NHITS:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    NLinear:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
     PatchTST:
       input_size:
         type: categorical
@@ -1334,6 +2588,476 @@ training:
         low: 0.0003
         high: 0.009
         log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    RMoK:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    RNN:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    SMamba:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    SOFTS:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    StemGNN:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    TCN:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    TFT:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    TSMixer:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
     TSMixerx:
       input_size:
         type: categorical
@@ -1374,6 +3098,405 @@ training:
         type: categorical
         choices:
         - 1
+    TiDE:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    TimeLLM:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    TimeMixer:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    TimeXer:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    TimesNet:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    VanillaTransformer:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    XLinear:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
     iTransformer:
       input_size:
         type: categorical
@@ -1418,6 +3541,127 @@ training:
         - null
         - robust
         - standard
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    xLSTM:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
+    xLSTMMixer:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 36
+        - 48
+        - 64
+        - 72
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      valid_batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+        - 128
+      windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      inference_windows_batch_size:
+        type: categorical
+        choices:
+        - 256
+        - 512
+        - 1024
+        - 2048
+      learning_rate:
+        type: float
+        low: 0.0003
+        high: 0.01
+        log: true
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+        - robust
+        - standard
+        - identity
+      model_step_size:
+        type: categorical
+        choices:
+        - 1
+        - 4
+        - 8
+        - 12
 residual:
   xgboost:
     n_estimators:

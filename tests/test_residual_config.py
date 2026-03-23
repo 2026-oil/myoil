@@ -4158,11 +4158,11 @@ def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
     assert code == 0
     assert calls[-1]["batch_size"] == 123
     assert manifest["training_search"]["selected_search_params"] == ["batch_size"]
-    assert manifest["training_search"]["training_range_source"] == "global_fallback"
+    assert manifest["training_search"]["training_range_source"] == "model_override:TFT"
     assert manifest["jobs"][0]["training_best_params_path"]
     assert manifest["jobs"][0]["training_optuna_study_summary_path"]
     assert capability["training_search"]["validated_mode"] == "training_auto"
-    assert training_summary["training_range_source"] == "global_fallback"
+    assert training_summary["training_range_source"] == "model_override:TFT"
     assert training_best == {"batch_size": 123}
 
 
@@ -4278,8 +4278,10 @@ def test_supported_auto_model_matrix_matches_registry_and_yaml():
     assert SUPPORTED_AUTO_MODEL_NAMES == learned_registry_models
     assert SUPPORTED_AUTO_MODEL_NAMES == set(search_space["models"])
     assert set(TRAINING_PARAM_REGISTRY_BY_MODEL) == SUPPORTED_AUTO_MODEL_NAMES
+    assert set(search_space["training"]["per_model"]) == SUPPORTED_AUTO_MODEL_NAMES
     assert all(
         set(TRAINING_PARAM_REGISTRY_BY_MODEL[model_name])
+        == set(search_space["training"]["per_model"][model_name])
         == set(TRAINING_PARAM_REGISTRY)
         == set(search_space["training"]["global"])
         for model_name in SUPPORTED_AUTO_MODEL_NAMES
@@ -4292,6 +4294,7 @@ def test_supported_auto_model_matrix_matches_registry_and_yaml():
     )
     assert "learning_rate" not in search_space["models"]["NLinear"]
     assert training_range_source_for_model("PatchTST") == "model_override:PatchTST"
+    assert training_range_source_for_model("TFT") == "model_override:TFT"
     assert training_range_source_for_model(None) == "global_fallback"
 
 
@@ -5746,6 +5749,7 @@ def test_repo_search_space_updates_requested_auto_selectors_only():
         assert SEARCH_SPACE_MODELS[model_name] == expected
 
     assert SEARCH_SPACE_TRAINING == EXPECTED_REPO_TRAINING_SELECTORS
+    assert set(SEARCH_SPACE_TRAINING_PER_MODEL) == SUPPORTED_AUTO_MODEL_NAMES
     assert set(FIXED_TRAINING_KEYS).isdisjoint(SEARCH_SPACE_TRAINING)
     assert "step_size" not in SEARCH_SPACE_TRAINING
     assert "early_stop_patience_steps" not in SEARCH_SPACE_TRAINING

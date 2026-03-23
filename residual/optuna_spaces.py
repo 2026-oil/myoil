@@ -385,11 +385,23 @@ def normalize_search_space_payload(payload: dict[str, Any]) -> dict[str, Any]:
             "search_space.training.per_model contains unsupported model(s): "
             + ", ".join(unknown_training_models)
         )
+    missing_training_models = sorted(
+        set(SUPPORTED_AUTO_MODEL_NAMES).difference(training["per_model"])
+    )
+    for model_name in missing_training_models:
+        training["per_model"][model_name] = deepcopy(training["global"])
     for model_name, specs in training["per_model"].items():
-        extra = sorted(set(specs).difference(training["global"]))
+        spec_keys = set(specs)
+        global_keys = set(training["global"])
+        extra = sorted(spec_keys.difference(global_keys))
+        missing = sorted(global_keys.difference(spec_keys))
         if extra:
             raise ValueError(
                 f"search_space.training.per_model.{model_name} cannot introduce new parameter(s): {', '.join(extra)}"
+            )
+        if missing:
+            raise ValueError(
+                f"search_space.training.per_model.{model_name} must define every training selector explicitly; missing: {', '.join(missing)}"
             )
     if "learning_rate" in training["global"]:
         overlaps = sorted(
@@ -426,10 +438,7 @@ MODEL_PARAM_REGISTRY = {
 }
 TRAINING_PARAM_REGISTRY = deepcopy(_DEFAULT_CONTRACT.payload["training"]["global"])
 TRAINING_PARAM_REGISTRY_BY_MODEL = {
-    model_name: {
-        **deepcopy(TRAINING_PARAM_REGISTRY),
-        **deepcopy(_DEFAULT_CONTRACT.payload["training"]["per_model"].get(model_name, {})),
-    }
+    model_name: deepcopy(_DEFAULT_CONTRACT.payload["training"]["per_model"][model_name])
     for model_name in sorted(SUPPORTED_AUTO_MODEL_NAMES)
 }
 RESIDUAL_PARAM_REGISTRY = {
@@ -446,16 +455,11 @@ def training_param_registry_for_model(
     if search_space_payload is None:
         if model_name is None:
             return deepcopy(TRAINING_PARAM_REGISTRY)
-        return deepcopy(
-            TRAINING_PARAM_REGISTRY_BY_MODEL.get(model_name, TRAINING_PARAM_REGISTRY)
-        )
+        return deepcopy(TRAINING_PARAM_REGISTRY_BY_MODEL[model_name])
     global_specs = search_space_payload["training"]["global"]
     if model_name is None:
         return deepcopy(global_specs)
-    return {
-        **deepcopy(global_specs),
-        **deepcopy(search_space_payload["training"]["per_model"].get(model_name, {})),
-    }
+    return deepcopy(search_space_payload["training"]["per_model"][model_name])
 
 
 def training_range_source_for_model(
@@ -466,12 +470,12 @@ def training_range_source_for_model(
     if model_name is None:
         return GLOBAL_TRAINING_RANGE_SOURCE
     if search_space_payload is None:
-        if model_name in _DEFAULT_CONTRACT.payload["training"]["per_model"]:
-            return f"model_override:{model_name}"
-        return GLOBAL_TRAINING_RANGE_SOURCE
-    if model_name in search_space_payload["training"]["per_model"]:
+        if model_name not in TRAINING_PARAM_REGISTRY_BY_MODEL:
+            return GLOBAL_TRAINING_RANGE_SOURCE
         return f"model_override:{model_name}"
-    return GLOBAL_TRAINING_RANGE_SOURCE
+    if model_name not in search_space_payload["training"]["per_model"]:
+        return GLOBAL_TRAINING_RANGE_SOURCE
+    return f"model_override:{model_name}"
 
 
 def _suggest_from_spec(trial: optuna.Trial, name: str, spec: SearchParamSpec) -> Any:

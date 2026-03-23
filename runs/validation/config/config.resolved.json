@@ -10,29 +10,44 @@
   },
   "runtime": {
     "random_seed": 7,
-    "opt_n_trial": null
+    "opt_n_trial": 20
   },
   "training": {
     "train_protocol": "expanding_window_tscv",
     "input_size": 1,
+    "season_length": 1,
     "batch_size": 1,
     "valid_batch_size": 1,
     "windows_batch_size": 8,
     "inference_windows_batch_size": 8,
     "learning_rate": 0.001,
     "scaler_type": null,
+    "model_step_size": 1,
     "max_steps": 1,
     "val_size": 1,
     "val_check_steps": 1,
     "early_stop_patience_steps": -1,
     "num_lr_decays": -1,
     "loss": "mse",
-    "step_size": 1
+    "accelerator": null,
+    "devices": null,
+    "strategy": null,
+    "precision": null,
+    "dataloader_kwargs": {}
   },
   "training_search": {
-    "requested_mode": "training_fixed",
-    "validated_mode": "training_fixed",
-    "selected_search_params": []
+    "requested_mode": "training_auto_requested",
+    "validated_mode": "training_auto",
+    "selected_search_params": [
+      "input_size",
+      "batch_size",
+      "valid_batch_size",
+      "windows_batch_size",
+      "inference_windows_batch_size",
+      "learning_rate",
+      "scaler_type",
+      "model_step_size"
+    ]
   },
   "cv": {
     "horizon": 1,
@@ -47,17 +62,15 @@
       0
     ],
     "max_concurrent_jobs": 1,
-    "worker_devices": 1
+    "worker_devices": 1,
+    "parallelize_single_job_tuning": true
   },
   "residual": {
-    "enabled": true,
+    "enabled": false,
     "model": "xgboost",
     "target": "level",
-    "params": {
-      "n_estimators": 8,
-      "max_depth": 2,
-      "learning_rate": 0.2
-    },
+    "cpu_threads": null,
+    "params": {},
     "features": {
       "include_base_prediction": true,
       "include_horizon_step": true,
@@ -76,23 +89,23 @@
         "static": []
       }
     },
-    "requested_mode": "residual_fixed",
-    "validated_mode": "residual_fixed",
+    "requested_mode": "residual_disabled",
+    "validated_mode": "residual_disabled",
     "selected_search_params": []
   },
   "jobs": [
     {
       "model": "TFT",
-      "params": {
-        "hidden_size": 32,
-        "n_head": 4,
-        "dropout": 0.1
-      },
-      "requested_mode": "learned_fixed",
-      "validated_mode": "learned_fixed",
-      "selected_search_params": []
+      "params": {},
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_auto",
+      "selected_search_params": [
+        "hidden_size",
+        "dropout",
+        "n_head"
+      ]
     }
   ],
-  "search_space_path": null,
-  "search_space_sha256": null
+  "search_space_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/search_space.yaml",
+  "search_space_sha256": "f2b6d78a3d71317cfc188ae8699e257117b3debb1dc80613bc8455402a98c7e9"
 }
