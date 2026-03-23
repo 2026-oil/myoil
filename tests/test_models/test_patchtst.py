@@ -70,8 +70,10 @@ def test_patchtst_forward_concatenates_hist_exog():
         "hist_exog": torch.tensor([[[10.0], [11.0], [12.0], [13.0]]]),
     }
 
-    _ = model(windows_batch)
+    forecast = model(windows_batch)
 
     assert recorder.last_input.shape == (1, 2, 4)
     assert torch.equal(recorder.last_input[0, 0], torch.tensor([1.0, 2.0, 3.0, 4.0]))
     assert torch.equal(recorder.last_input[0, 1], torch.tensor([10.0, 11.0, 12.0, 13.0]))
+    assert forecast.shape == (1, 2, 1)
+    assert torch.equal(forecast[:, :, 0], torch.tensor([[4.0, 4.0]]))

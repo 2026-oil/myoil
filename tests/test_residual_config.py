@@ -9,6 +9,7 @@ from typing import Any, TypedDict, cast
 import optuna
 import pandas as pd
 import pytest
+import torch
 import yaml
 
 import neuralforecast.auto as nf_auto
@@ -925,6 +926,63 @@ def test_model_builder_passes_hist_exog_to_patchtst(tmp_path: Path):
 
     assert model.hist_exog_list == ["hist_a"]
     assert model.hist_exog_size == 1
+
+
+def test_model_builder_patchtst_forecasts_target_only_with_hist_exog(tmp_path: Path):
+    payload = _payload()
+    payload["training"]["input_size"] = 4
+    payload["cv"]["horizon"] = 2
+    payload["jobs"] = [
+        {
+            "model": "PatchTST",
+            "params": {
+                "hidden_size": 4,
+                "n_heads": 1,
+                "encoder_layers": 1,
+                "patch_len": 2,
+                "stride": 1,
+            },
+        }
+    ]
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n"
+        "2020-01-01,1,10\n"
+        "2020-01-08,2,11\n"
+        "2020-01-15,3,12\n"
+        "2020-01-22,4,13\n",
+        encoding="utf-8",
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    model = build_model(loaded.config, loaded.config.jobs[0])
+
+    class Recorder(torch.nn.Module):
+        def __init__(self, h):
+            super().__init__()
+            self.h = h
+            self.last_input = None
+
+        def forward(self, x):
+            self.last_input = x
+            return x[:, :, -1:].repeat(1, 1, self.h)
+
+    recorder = Recorder(h=loaded.config.cv.horizon)
+    model.model = recorder
+    windows_batch = {
+        "insample_y": torch.tensor([[[1.0], [2.0], [3.0], [4.0]]]),
+        "hist_exog": torch.tensor([[[10.0], [11.0], [12.0], [13.0]]]),
+        "futr_exog": None,
+        "stat_exog": None,
+        "insample_mask": torch.ones(1, 4, 1),
+    }
+
+    forecast = model(windows_batch)
+
+    assert recorder.last_input.shape == (1, 2, 4)
+    assert forecast.shape == (1, 2, 1)
+    assert torch.equal(forecast[:, :, 0], torch.tensor([[4.0, 4.0]]))
 
 
 @pytest.mark.parametrize(

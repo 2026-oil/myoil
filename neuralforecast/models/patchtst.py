@@ -1027,6 +1027,7 @@ class PatchTST(BaseModel):
 
         x = x.permute(0, 2, 1)  # x: [Batch, 1 + hist_exog_size, input_size]
         x = self.model(x)
-        forecast = x.reshape(x.shape[0], self.h, -1)  # x: [Batch, h, c_out]
+        x = x[:, :1, :]  # keep target channel only; hist exog channels are inputs, not forecast targets
+        forecast = x.permute(0, 2, 1)  # x: [Batch, h, c_out]
 
         return forecast
