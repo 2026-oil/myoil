@@ -60,10 +60,12 @@ def test_itransformer_model(suppress_warnings):
 def test_autoitransformer(setup_dataset):
     check_args(AutoiTransformer, exclude_args=["cls_model"])
 
-    my_config = AutoiTransformer.get_default_config(h=12, n_series=1, backend="optuna")
+    optuna_config = AutoiTransformer.get_default_config(
+        h=12, n_series=1, backend="optuna"
+    )
 
     def my_config_new(trial):
-        config = {**my_config(trial)}
+        config = {**optuna_config(trial)}
         config.update(
             {
                 "max_steps": 1,
@@ -88,17 +90,17 @@ def test_autoitransformer(setup_dataset):
     assert model.config(MockTrial())["h"] == 12
     model.fit(dataset=setup_dataset)
 
-    my_config = AutoiTransformer.get_default_config(h=12, n_series=1, backend="ray")
-    my_config["max_steps"] = 1
-    my_config["val_check_steps"] = 1
-    my_config["input_size"] = 12
-    my_config["hidden_size"] = 16
-    my_config["accelerator"] = "cpu"
-    my_config["devices"] = 1
+    ray_config = AutoiTransformer.get_default_config(h=12, n_series=1, backend="ray")
+    ray_config["max_steps"] = 1
+    ray_config["val_check_steps"] = 1
+    ray_config["input_size"] = 12
+    ray_config["hidden_size"] = 16
+    ray_config["accelerator"] = "cpu"
+    ray_config["devices"] = 1
     model = AutoiTransformer(
         h=12,
         n_series=1,
-        config=my_config,
+        config=ray_config,
         backend="ray",
         num_samples=1,
         cpus=1,
