@@ -227,13 +227,31 @@ def _selected_jobs(loaded: LoadedConfig, names: list[str] | None):
     return [job for job in loaded.config.jobs if job.model in allowed]
 
 
+def _safe_output_root_part(value: str) -> str:
+    return "".join(
+        char if char.isalnum() or char in {"-", "_", "."} else "-" for char in value
+    ).strip(".-")
+
+
 def _default_output_root(repo_root: Path, loaded: LoadedConfig) -> Path:
     task_name = (loaded.config.task.name or "").strip()
     if not task_name:
         return repo_root / "runs" / "validation"
-    safe_name = "".join(
-        char if char.isalnum() or char in {"-", "_", "."} else "-" for char in task_name
-    ).strip(".-")
+    config_parent = loaded.source_path.parent
+    parent_name = (
+        repo_root.name
+        if config_parent.resolve() == repo_root.resolve()
+        else config_parent.name
+    )
+    safe_parts = [
+        part
+        for part in (
+            _safe_output_root_part(parent_name),
+            _safe_output_root_part(task_name),
+        )
+        if part
+    ]
+    safe_name = "_".join(safe_parts)
     return repo_root / "runs" / (safe_name or "validation")
 
 

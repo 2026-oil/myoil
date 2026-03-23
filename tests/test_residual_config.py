@@ -2026,7 +2026,9 @@ def test_runtime_outer_cv_cutoffs_follow_step_size(tmp_path: Path):
     ]
 
 
-def test_runtime_uses_task_name_for_default_run_directory(tmp_path: Path):
+def test_runtime_uses_config_parent_and_task_name_for_default_run_directory(
+    tmp_path: Path,
+):
     payload = _payload()
     payload["task"] = {"name": "pytest_task_default_output"}
     payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
@@ -2043,7 +2045,7 @@ def test_runtime_uses_task_name_for_default_run_directory(tmp_path: Path):
 
     code = runtime_main(["--config", str(config_path), "--jobs", "DummyUnivariate"])
 
-    output_root = REPO_ROOT / "runs" / "pytest_task_default_output"
+    output_root = REPO_ROOT / "runs" / f"{tmp_path.name}_pytest_task_default_output"
     try:
         assert code == 0
         assert (output_root / "cv" / "DummyUnivariate_forecasts.csv").exists()
@@ -2057,6 +2059,37 @@ def test_runtime_uses_task_name_for_default_run_directory(tmp_path: Path):
             import shutil
 
             shutil.rmtree(output_root)
+
+
+def test_default_output_root_uses_repo_name_for_repo_root_config():
+    from residual.runtime import _default_output_root
+
+    loaded = load_app_config(REPO_ROOT)
+
+    assert _default_output_root(REPO_ROOT, loaded) == (
+        REPO_ROOT / "runs" / "neuralforecast_semi_test"
+    )
+
+
+@pytest.mark.parametrize(
+    ("config_path", "expected_name"),
+    [
+        ("yaml/feature_set/wti-case3.yaml", "feature_set_wti_case3"),
+        (
+            "yaml/feature_set_HPT/brentoil-case3.yaml",
+            "feature_set_HPT_brentoil_case3_HPT",
+        ),
+    ],
+)
+def test_default_output_root_uses_config_parent_for_nested_repo_configs(
+    config_path: str,
+    expected_name: str,
+):
+    from residual.runtime import _default_output_root
+
+    loaded = load_app_config(REPO_ROOT, config_path=config_path)
+
+    assert _default_output_root(REPO_ROOT, loaded) == (REPO_ROOT / "runs" / expected_name)
 
 
 def test_runtime_infers_freq_when_omitted(tmp_path: Path):
