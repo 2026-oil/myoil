@@ -89,7 +89,7 @@ class DLinear(BaseModel):
 
     # Class attributes
     EXOGENOUS_FUTR = False
-    EXOGENOUS_HIST = False
+    EXOGENOUS_HIST = True
     EXOGENOUS_STAT = False
     MULTIVARIATE = False  # If the model produces multivariate forecasts (True) or univariate (False)
     RECURRENT = (
@@ -181,10 +181,17 @@ class DLinear(BaseModel):
         self.linear_season = nn.Linear(
             self.input_size, self.loss.outputsize_multiplier * h, bias=True
         )
+        if self.hist_exog_size > 0:
+            self.hist_exog_projection = nn.Linear(
+                self.input_size * self.hist_exog_size,
+                self.loss.outputsize_multiplier * h,
+                bias=True,
+            )
 
     def forward(self, windows_batch):
         # Parse windows_batch
         insample_y = windows_batch["insample_y"].squeeze(-1)
+        hist_exog = windows_batch["hist_exog"]
 
         # Parse inputs
         batch_size = len(insample_y)
@@ -195,5 +202,8 @@ class DLinear(BaseModel):
 
         # Final
         forecast = trend_part + seasonal_part
+        if self.hist_exog_size > 0:
+            hist_exog = hist_exog.reshape(batch_size, -1)
+            forecast = forecast + self.hist_exog_projection(hist_exog)
         forecast = forecast.reshape(batch_size, self.h, self.loss.outputsize_multiplier)
         return forecast

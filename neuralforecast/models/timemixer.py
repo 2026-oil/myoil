@@ -303,7 +303,7 @@ class TimeMixer(BaseModel):
 
     # Class attributes
     EXOGENOUS_FUTR = False
-    EXOGENOUS_HIST = False
+    EXOGENOUS_HIST = True
     EXOGENOUS_STAT = False
     MULTIVARIATE = True  # If the model produces multivariate forecasts (True) or univariate (False)
     RECURRENT = (
@@ -496,6 +496,12 @@ class TimeMixer(BaseModel):
             self.distr_output = nn.Linear(
                 self.n_series, self.n_series * self.loss.outputsize_multiplier
             )
+        if self.hist_exog_size > 0:
+            self.hist_exog_projection = nn.Linear(
+                self.input_size * self.hist_exog_size * self.n_series,
+                self.h * self.n_series,
+                bias=True,
+            )
 
     def out_projection(self, dec_out, i, out_res):
         dec_out = self.projection_layer(dec_out)
@@ -660,6 +666,7 @@ class TimeMixer(BaseModel):
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]
         futr_exog = windows_batch["futr_exog"]
+        hist_exog = windows_batch["hist_exog"]
 
         if self.futr_exog_size > 0:
             x_mark_enc = futr_exog[:, :, : self.input_size, :]
@@ -670,6 +677,12 @@ class TimeMixer(BaseModel):
 
         y_pred = self.forecast(insample_y, x_mark_enc, x_mark_dec)
         y_pred = y_pred[:, -self.h :, :]
+        if self.hist_exog_size > 0:
+            hist_exog = hist_exog.reshape(insample_y.shape[0], -1)
+            hist_exog = self.hist_exog_projection(hist_exog).reshape(
+                insample_y.shape[0], self.h, self.n_series
+            )
+            y_pred = y_pred + hist_exog
         if self.loss.outputsize_multiplier > 1:
             y_pred = self.distr_output(y_pred)
 

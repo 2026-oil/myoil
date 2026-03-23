@@ -72,7 +72,7 @@ class iTransformer(BaseModel):
 
     # Class attributes
     EXOGENOUS_FUTR = False
-    EXOGENOUS_HIST = False
+    EXOGENOUS_HIST = True
     EXOGENOUS_STAT = False
     MULTIVARIATE = True
     RECURRENT = False
@@ -195,7 +195,7 @@ class iTransformer(BaseModel):
             self.hidden_size, h * self.loss.outputsize_multiplier, bias=True
         )
 
-    def forecast(self, x_enc):
+    def forecast(self, x_enc, x_mark_enc=None):
         if self.use_norm:
             # Normalization from Non-stationary Transformer
             means = x_enc.mean(1, keepdim=True).detach()
@@ -213,7 +213,7 @@ class iTransformer(BaseModel):
         # Embedding
         # B L N -> B N E                (B L N -> B L E in the vanilla Transformer)
         enc_out = self.enc_embedding(
-            x_enc, None
+            x_enc, x_mark_enc
         )  # covariates (e.g timestamp) can be also embedded as tokens
 
         # B N E -> B N E                (B L E -> B L E in the vanilla Transformer)
@@ -242,8 +242,17 @@ class iTransformer(BaseModel):
 
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]
+        hist_exog = windows_batch["hist_exog"]
 
-        y_pred = self.forecast(insample_y)
+        x_mark_enc = None
+        if self.hist_exog_size > 0:
+            x_mark_enc = hist_exog.permute(0, 2, 1, 3).reshape(
+                insample_y.shape[0], self.input_size, -1
+            )
+
+        y_pred = self.forecast(insample_y, x_mark_enc=x_mark_enc)
+        if self.hist_exog_size > 0:
+            y_pred = y_pred[:, :, : self.n_series]
         y_pred = y_pred.reshape(insample_y.shape[0], self.h, -1)
 
         return y_pred

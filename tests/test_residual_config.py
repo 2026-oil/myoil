@@ -927,6 +927,40 @@ def test_model_builder_passes_hist_exog_to_patchtst(tmp_path: Path):
     assert model.hist_exog_size == 1
 
 
+@pytest.mark.parametrize(
+    ("model_name", "params"),
+    [
+        ("DLinear", {"moving_avg_window": 3}),
+        (
+            "iTransformer",
+            {"hidden_size": 16, "n_heads": 1, "e_layers": 1, "d_ff": 32},
+        ),
+        (
+            "TimeMixer",
+            {"d_model": 16, "d_ff": 32, "down_sampling_layers": 1, "top_k": 3},
+        ),
+    ],
+)
+def test_model_builder_passes_hist_exog_to_selected_models(
+    tmp_path: Path, model_name: str, params: dict[str, Any]
+):
+    payload = _payload()
+    payload["jobs"] = [{"model": model_name, "params": params}]
+    _write_search_space(tmp_path)
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    model = build_model(loaded.config, loaded.config.jobs[0], n_series=1)
+
+    assert model.hist_exog_list == ["hist_a"]
+    assert model.hist_exog_size == 1
+
+
 def test_model_builder_applies_exloss_and_multivariate_n_series(tmp_path: Path):
     payload = _payload()
     payload["training"].update(
