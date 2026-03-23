@@ -19,7 +19,8 @@ dataset:
 
 runtime:
   random_seed: 1
-  transformations: diff
+  transformations_target: diff
+  transformations_exog: diff
 
 training:
   train_protocol: expanding_window_tscv

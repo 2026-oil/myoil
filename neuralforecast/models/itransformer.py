@@ -199,11 +199,11 @@ class iTransformer(BaseModel):
     def _check_finite(name: str, tensor: Optional[torch.Tensor]) -> None:
         if tensor is None:
             return
-        if torch.isfinite(tensor).all():
+        finite_mask = torch.isfinite(tensor)
+        if finite_mask.all():
             return
 
-        non_finite = ~torch.isfinite(tensor)
-        bad_count = int(non_finite.sum().item())
+        bad_count = int((~finite_mask).sum().item())
         raise ValueError(
             f"iTransformer received non-finite values in {name}: "
             f"count={bad_count}, shape={tuple(tensor.shape)}"
