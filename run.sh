@@ -16,6 +16,7 @@ summary_python_bin="${NF_CASE_SUMMARY_PYTHON_BIN:-python3}"
 use_pty_mode="${NF_CASE_USE_PTY:-auto}"
 auto_git_mode="${NF_CASE_AUTO_GIT:-1}"
 git_remote="${NF_CASE_GIT_REMOTE:-origin}"
+patchtst_job="${NF_CASE_PATCHTST_JOB:-PatchTST}"
 
 _should_use_pty() {
   case "$use_pty_mode" in
@@ -51,6 +52,37 @@ _should_auto_git() {
       return 1
       ;;
   esac
+}
+
+_append_globbed_configs() {
+  local pattern="$1"
+  local cfg
+  shopt -s nullglob
+  for cfg in $pattern; do
+    configs+=("$cfg")
+  done
+  shopt -u nullglob
+}
+
+_validate_patchtst_only_args() {
+  local arg
+  local expects_value="0"
+  for arg in "$@"; do
+    if [[ "$expects_value" == "1" ]]; then
+      expects_value="0"
+      continue
+    fi
+    case "$arg" in
+      --jobs|--output-root)
+        echo "[batch] $arg is managed by run.sh PatchTST mode; do not pass it explicitly" >&2
+        return 1
+        ;;
+      --jobs=*|--output-root=*)
+        echo "[batch] ${arg%%=*} is managed by run.sh PatchTST mode; do not pass it explicitly" >&2
+        return 1
+        ;;
+    esac
+  done
 }
 
 _commit_and_push_all_changes() {
@@ -128,10 +160,13 @@ if [[ -n "${NF_CASE_CONFIGS:-}" ]]; then
     fi
   done
 else
-  configs=(
-    "yaml/feature_set_HPT_c3/brentoil-case3.yaml"
-    "yaml/feature_set_HPT_c3/wti-case3.yaml"
-  )
+  configs=()
+  _append_globbed_configs "yaml/feature_set/*.yaml"
+  _append_globbed_configs "yaml/feature_set_HPT_c3/*.yaml"
+fi
+
+if ! _validate_patchtst_only_args "$@"; then
+  exit 2
 fi
 
 passed=()
@@ -148,6 +183,7 @@ echo "[batch] repo_root=$repo_root"
 echo "[batch] timestamp=$timestamp"
 echo "[batch] log_dir=$log_dir"
 echo "[batch] runner=$python_bin main.py"
+echo "[batch] job=$patchtst_job"
 echo "[batch] use_pty=$pty_enabled (NF_CASE_USE_PTY=$use_pty_mode)"
 echo "[batch] extra_args=${*:-<none>}"
 echo
@@ -169,7 +205,7 @@ for cfg in "${configs[@]}"; do
   cfg_name="$(basename -- "$cfg")"
   log_path="${log_dir}/${cfg_name%.yaml}.log"
   if _should_use_pty; then
-    cmd="$(_join_argv_for_script "$python_bin" "main.py" "--config" "$cfg" "$@")"
+    cmd="$(_join_argv_for_script "$python_bin" "main.py" "--config" "$cfg" "--jobs" "$patchtst_job" "$@")"
     if script -q -e -c "$cmd" /dev/null 2>&1 | tee "$log_path"; then
       echo "[batch] ok: $cfg (log: $log_path)"
       passed+=("$cfg")
@@ -182,7 +218,7 @@ for cfg in "${configs[@]}"; do
       printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
         "$cfg" "failed" "$status" "$log_path" "$cfg_start" "$(date -u +%FT%TZ)" >>"$results_tsv"
     fi
-  elif "$python_bin" main.py --config "$cfg" "$@" 2>&1 | tee "$log_path"; then
+  elif "$python_bin" main.py --config "$cfg" --jobs "$patchtst_job" "$@" 2>&1 | tee "$log_path"; then
     echo "[batch] ok: $cfg (log: $log_path)"
     passed+=("$cfg")
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' \

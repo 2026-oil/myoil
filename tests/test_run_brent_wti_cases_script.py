@@ -8,8 +8,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SCRIPT_PATH = REPO_ROOT / "run_brent_wti_cases.sh"
-CONFIG_SOURCE_PATH = REPO_ROOT / "run.sh"
+SCRIPT_PATH = REPO_ROOT / "run.sh"
 
 
 def _write_executable(path: Path, content: str) -> None:
@@ -33,15 +32,27 @@ set -euo pipefail
 main_py="$1"
 shift
 config=""
+job=""
+output_root=""
 while (($#)); do
   if [[ "$1" == "--config" ]]; then
     config="$2"
     shift 2
     continue
   fi
+  if [[ "$1" == "--jobs" ]]; then
+    job="$2"
+    shift 2
+    continue
+  fi
+  if [[ "$1" == "--output-root" ]]; then
+    output_root="$2"
+    shift 2
+    continue
+  fi
   shift
 done
-echo "runner main=${main_py##*/} config=${config##*/}"
+echo "runner main=${main_py##*/} config=${config##*/} job=${job} output_root=${output_root}"
 if [[ "${config##*/}" == "fail.yaml" ]]; then
   exit 7
 fi
@@ -85,10 +96,10 @@ fi
 
     assert (log_dir / "ok.log").exists()
     assert (log_dir / "fail.log").exists()
-    assert "runner main=main.py config=ok.yaml" in (log_dir / "ok.log").read_text(
+    assert "runner main=main.py config=ok.yaml job=PatchTST output_root=" in (log_dir / "ok.log").read_text(
         encoding="utf-8"
     )
-    assert "runner main=main.py config=fail.yaml" in (log_dir / "fail.log").read_text(
+    assert "runner main=main.py config=fail.yaml job=PatchTST output_root=" in (log_dir / "fail.log").read_text(
         encoding="utf-8"
     )
 
@@ -96,10 +107,30 @@ fi
     assert "[batch] passed=1 failed=1 missing=1" in summary_txt
 
 
-def test_run_brent_wti_cases_script_default_config_list_targets_case3_hpt_configs():
-    script = CONFIG_SOURCE_PATH.read_text(encoding="utf-8")
+def test_run_brent_wti_cases_script_default_config_scope_targets_feature_set_and_hpt_c3():
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
 
-    assert 'yaml/feature_set_HPT_c3/brentoil-case3.yaml' in script
-    assert 'yaml/feature_set_HPT_c3/wti-case3.yaml' in script
-    assert 'yaml/feature_set_HPT_c3/brentoil-case4.yaml' not in script
-    assert 'yaml/feature_set_HPT_c3/wti-case4.yaml' not in script
+    assert '_append_globbed_configs "yaml/feature_set/*.yaml"' in script
+    assert '_append_globbed_configs "yaml/feature_set_HPT_c3/*.yaml"' in script
+    assert "--jobs" in script
+    assert "PatchTST" in script
+
+
+def test_run_brent_wti_cases_script_rejects_jobs_and_output_root_overrides(tmp_path: Path) -> None:
+    completed = subprocess.run(
+        ["bash", str(SCRIPT_PATH), "--jobs", "NHITS"],
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+    )
+    assert completed.returncode == 2
+    assert "--jobs is managed by run.sh PatchTST mode" in completed.stderr
+
+    completed = subprocess.run(
+        ["bash", str(SCRIPT_PATH), "--output-root", "runs/custom"],
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+    )
+    assert completed.returncode == 2
+    assert "--output-root is managed by run.sh PatchTST mode" in completed.stderr
