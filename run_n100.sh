@@ -69,8 +69,6 @@ yaml_list=(
   "yaml/feature_set_HPT_n100/wti-case2.yaml"
   "yaml/feature_set_HPT_n100/brentoil-case1.yaml"
   "yaml/feature_set_HPT_n100/wti-case1.yaml"
-  "yaml/feature_set_HPT_n100/brentoil-case3.yaml"
-  "yaml/feature_set_HPT_n100/wti-case3.yaml"
 )
 
 if [[ -n "${NF_CASE_CONFIGS:-}" ]]; then
