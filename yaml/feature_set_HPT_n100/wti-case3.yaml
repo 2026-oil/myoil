@@ -1,8 +1,8 @@
 task:
-  name: brentoil_case3_HPT_n100_re
+  name: wti_case3_HPT_n100
 dataset:
   path: data/df.csv
-  target_col: Com_BrentCrudeOil
+  target_col: Com_CrudeOil
   dt_col: dt
   hist_exog_cols:
   - Com_Gasoline
@@ -10,8 +10,8 @@ dataset:
   - Com_LME_Ni_Cash
   - Com_Coal
   - Com_LME_Al_Cash
-  - Bonds_KOR_10Y
   - Com_LMEX
+  - Bonds_KOR_10Y
   - Com_LME_Ni_Inv
   futr_exog_cols: []
   static_exog_cols: []
@@ -62,4 +62,3 @@ jobs:
   params: {}
 - model: LSTM
   params: {}
-

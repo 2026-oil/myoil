@@ -1,18 +1,23 @@
 task:
-  name: wti_case3_HPT_n100
+  name: brentoil_case2_HPT_n100
 dataset:
   path: data/df.csv
-  target_col: Com_CrudeOil
+  target_col: Com_BrentCrudeOil
   dt_col: dt
   hist_exog_cols:
   - Com_Gasoline
   - Com_BloombergCommodity_BCOM
   - Com_LME_Ni_Cash
   - Com_Coal
+  - Com_Cotton
   - Com_LME_Al_Cash
-  - Com_LMEX
   - Bonds_KOR_10Y
+  - Com_Barley
+  - Com_Canola
+  - Com_LMEX
   - Com_LME_Ni_Inv
+  - Com_Corn
+  - Com_Wheat
   futr_exog_cols: []
   static_exog_cols: []
 runtime:
@@ -62,5 +67,4 @@ jobs:
   params: {}
 - model: LSTM
   params: {}
-- model: NHITS
-  params: {}
+

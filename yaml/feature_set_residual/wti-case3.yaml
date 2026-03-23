@@ -1,8 +1,8 @@
 task:
-  name: brentoil_case3
+  name: wti_case3_residual
 dataset:
   path: data/df.csv
-  target_col: Com_BrentCrudeOil
+  target_col: Com_CrudeOil
   dt_col: dt
   hist_exog_cols:
   - Com_Gasoline
@@ -10,8 +10,8 @@ dataset:
   - Com_LME_Ni_Cash
   - Com_Coal
   - Com_LME_Al_Cash
-  - Bonds_KOR_10Y
   - Com_LMEX
+  - Bonds_KOR_10Y
   - Com_LME_Ni_Inv
   futr_exog_cols: []
   static_exog_cols: []
@@ -25,7 +25,7 @@ training:
   valid_batch_size: 32
   windows_batch_size: 1024
   inference_windows_batch_size: 1024
-  learning_rate: 0.0001
+  learning_rate: 0.001
   max_steps: 1000
   val_size: 8
   val_check_steps: 100
@@ -45,7 +45,43 @@ scheduler:
   max_concurrent_jobs: 2
   worker_devices: 1
 residual:
-  enabled: false
+  enabled: true
+  model: xgboost
+  target: level
+  params:
+    n_estimators: 96
+    max_depth: 4
+    learning_rate: 0.0001
+    subsample: 0.8
+    colsample_bytree: 0.8
+  features:
+    include_base_prediction: true
+    include_horizon_step: true
+    include_date_features: false
+    lag_features:
+      enabled: true
+      sources:
+      - y_hat_base
+      steps:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 6
+      transforms:
+      - raw
+    exog_sources:
+      hist:
+      - Com_Gasoline
+      - Com_BloombergCommodity_BCOM
+      - Com_LME_Ni_Cash
+      - Com_Coal
+      - Com_LME_Al_Cash
+      - Bonds_KOR_10Y
+      - Com_LMEX
+      - Com_LME_Ni_Inv
+      futr: []
+      static: []
 jobs:
 - model: PatchTST
   params:
