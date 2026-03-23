@@ -17,7 +17,7 @@ dataset:
   static_exog_cols: []
 runtime:
   random_seed: 1
-  opt_n_trial: 30
+  opt_n_trial: 100
 training:
   train_protocol: expanding_window_tscv
   season_length: 52

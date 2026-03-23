@@ -62,6 +62,4 @@ jobs:
   params: {}
 - model: LSTM
   params: {}
-- model: NHITS
-  params: {}
 
