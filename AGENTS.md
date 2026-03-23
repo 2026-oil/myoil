@@ -1,22 +1,70 @@
-# Repository Guidelines
+<!-- Generated: 2026-03-23 | Updated: 2026-03-23 -->
 
-## Project Structure & Module Organization
-`neuralforecast/` contains the Python package: core orchestration lives in `core.py`, auto-tuning helpers in `auto.py`, shared utilities in `common/`, losses in `losses/`, and model implementations in `models/`. Tests mirror the package layout under `tests/` (`tests/test_models/`, `tests/test_common/`, etc.). Documentation sources live in `docs/` and `nbs/`, while reproducible research and benchmarks live in `experiments/`. Small maintenance scripts are kept in `scripts/`.
+# neuralforecast
 
-## Build, Test, and Development Commands
-- `make devenv` — install all extras with `uv` and set up pre-commit hooks.
-- `uv sync --group dev --torch-backend auto` — create/update the recommended dev environment.
-- `uv run pytest` — run the full test suite with coverage.
-- `uv run pytest tests/test_models/test_nhits.py` — run a focused test file while iterating.
-- `pre-commit run --all-files` — run Ruff, mypy, and repository hooks before pushing.
-- `make all_docs` — regenerate API and notebook-based docs.
-- `make preview_docs` — preview Mintlify docs locally.
+## Purpose
+This checkout is not just the upstream `neuralforecast` package. It is a hybrid workspace that combines the library source under `neuralforecast/` with a local experiment runner built around `main.py`, `residual/`, `config.yaml`, `search_space.yaml`, and the curated `yaml/` case matrix used for Brent/WTI research runs.
 
-## Coding Style & Naming Conventions
-Target Python 3.10+ and follow existing package style: 4-space indentation, snake_case for functions/modules, PascalCase for classes, and short imperative method names. Keep lines within 88 characters to match Ruff/Black defaults. Lint with Ruff and type-check with mypy via pre-commit. Preserve surrounding formatting in edited files; avoid unrelated whitespace-only churn. Use Google-style docstrings for public APIs so docs can be regenerated from source.
+## Key Files
+| File | Description |
+|------|-------------|
+| `main.py` | Bootstrap entrypoint that re-execs into `.venv` and hands control to `residual.runtime.main()`. |
+| `config.yaml` | Default experiment config used when no explicit config path is passed. |
+| `search_space.yaml` | Central Optuna/search-space contract shared by runtime config validation. |
+| `run.sh` | Batch runner that executes config sweeps, records summaries, and can auto-commit/push outputs. |
+| `run_case3_bomb.sh` | Preloads the case3 bomb config set into `run.sh`. |
+| `run_bomb_trans.sh` | Preloads the case3 transformation bomb config set into `run.sh`. |
+| `run_after_pid7130_feature_set.sh` | Wait-chain runner that resumes queued feature-set jobs after another PID exits. |
+| `README.md` | Wrapper-focused operator README for `uv` setup, config semantics, and runtime usage. |
+| `residual_guide.md` | Additional notes for the residual runtime layer. |
+| `pyproject.toml` | Python package metadata and test/lint configuration. |
 
-## Testing Guidelines
-Pytest is the test runner, and the repository enforces at least 80% coverage (`--cov-fail-under=80`). Add regression tests with every behavior change. Place tests next to the affected area using `test_*.py` naming, for example `tests/test_losses/test_pytorch.py` or `tests/test_models/test_patchtst.py`. Prefer targeted runs during development, then finish with `uv run pytest`.
+## Subdirectories
+| Directory | Purpose |
+|-----------|---------|
+| `neuralforecast/` | Upstream-style forecasting package sources plus added model surfaces (see `neuralforecast/AGENTS.md`). |
+| `residual/` | Config parsing, runtime orchestration, Optuna integration, and residual plugin support (see `residual/AGENTS.md`). |
+| `yaml/` | Experiment matrix for Brent/WTI, bomb, HPT, univariate, and ad-hoc case families (see `yaml/AGENTS.md`). |
+| `tests/` | Regression coverage for package code, residual runtime, YAML contracts, and shell helpers (see `tests/AGENTS.md`). |
+| `scripts/` | Analysis and helper utilities used around the runtime and research workflows (see `scripts/AGENTS.md`). |
+| `docs/` | Generated API docs and local docs notes for this checkout (see `docs/AGENTS.md`). |
+| `data/` | Local datasets and small research artifacts used by validate-only and live runs (see `data/AGENTS.md`). |
+| `experiments/` | Upstream benchmark/reference experiments kept alongside the wrapper code (see `experiments/AGENTS.md`). |
+| `runs/`, `lightning_logs/`, `htmlcov/`, `.omx/` | Generated runtime/test artifacts; do not mass-edit or clean them unless the task explicitly asks for it. |
 
-## Commit & Pull Request Guidelines
-Recent history favors short, imperative commit subjects, often prefixed with `[FIX]`, `[FEAT]`, or `[CHORE]` (for example, `[FIX] Deprecate the losses.numpy module`). Keep each PR focused, link the relevant issue, explain the problem and solution, and include tests for functional changes. Do not mix style-only edits with behavior changes. If you change docs, notebooks, or public APIs, update the generated docs and mention that in the PR.
+## For AI Agents
+
+### Working In This Repository
+- Default to `uv run ...` for Python execution, tests, and validation.
+- Treat this repo as a config-driven experiment harness layered on top of the library package; changes often need package code, residual runtime code, and YAML/test parity together.
+- Preserve the current wrapper contract: `main.py` is the operator entrypoint, while the real scheduler/runtime lives under `residual/`.
+- When adding or retiring model support, check shared surfaces together: `neuralforecast/models/__init__.py`, `neuralforecast/auto.py`, `neuralforecast/core.py`, `residual/models.py`, `residual/optuna_spaces.py`, `search_space.yaml`, and the relevant tests.
+- When changing residual behavior, keep config validation, plugin registry, runtime manifests, and validate-only smoke fixtures aligned.
+- Avoid editing generated outputs under `runs/`, `lightning_logs/`, `htmlcov/`, or `.omx/` unless the user explicitly asks for artifact manipulation.
+
+### Testing Requirements
+- Package/model changes: start with targeted `uv run pytest --no-cov` selectors, then finish with the broader affected suite.
+- Residual runtime/config changes: run `uv run pytest --no-cov tests/test_residual_config.py tests/test_residual_main.py` plus a validate-only smoke using a representative config.
+- YAML/run-script changes: validate with `uv run python main.py --validate-only --config <path>` and the matching shell-script tests under `tests/test_run_*.py` or `tests/test_bomb_yaml_configs.py`.
+- Repo-wide confidence pass when needed: `pre-commit run --all-files` or `uv run pytest`.
+
+### Common Patterns
+- `task.name` and `--output-root` drive run-folder naming under `runs/`.
+- Brent/WTI case configs live under `yaml/` and are typically grouped by case family (`feature_set`, `feature_set_HPT`, `bomb`, `bomb_trans`, `univar`, etc.).
+- Residual backends are plugin-based and currently support `xgboost`, `randomforest`, and `lightgbm` while preserving the `residual_checkpoint/model.ubj` artifact path contract.
+- Runtime transformations are normalized in config/runtime code via `transformations_target` / `transformations_exog` rather than ad-hoc YAML fields.
+
+## Dependencies
+
+### Internal
+- `main.py` depends on `residual/runtime.py`.
+- `residual/` depends on both `neuralforecast/` model surfaces and `search_space.yaml`.
+- `tests/` includes both package-style tests and wrapper/runtime contract tests.
+
+### External
+- `uv` for environment and command execution.
+- `pytest`, Ruff, and mypy/pre-commit tooling for verification.
+- `optuna`, `pandas`, `numpy`, and PyTorch/Lightning-adjacent stack for tuning and training.
+- Residual backends including `xgboost`, `lightgbm`, and scikit-learn random forest support.
+
+<!-- MANUAL: Add repository-specific notes below this line. -->
