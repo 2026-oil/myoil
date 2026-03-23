@@ -5144,6 +5144,26 @@ CASE_YAML_FILES = [
     REPO_ROOT / "yaml" / "feature_set" / "wti-case4.yaml",
 ]
 
+FEATURE_SET_RESIDUAL_YAML_FILES = [
+    REPO_ROOT / "yaml" / "feature_set_residual" / "brentoil-case1.yaml",
+    REPO_ROOT / "yaml" / "feature_set_residual" / "brentoil-case2.yaml",
+    REPO_ROOT / "yaml" / "feature_set_residual" / "brentoil-case3.yaml",
+    REPO_ROOT / "yaml" / "feature_set_residual" / "brentoil-case4.yaml",
+    REPO_ROOT / "yaml" / "feature_set_residual" / "wti-case1.yaml",
+    REPO_ROOT / "yaml" / "feature_set_residual" / "wti-case2.yaml",
+    REPO_ROOT / "yaml" / "feature_set_residual" / "wti-case3.yaml",
+    REPO_ROOT / "yaml" / "feature_set_residual" / "wti-case4.yaml",
+]
+
+NEW_FEATURE_SET_RESIDUAL_YAML_FILES = [
+    REPO_ROOT / "yaml" / "feature_set_residual" / "brentoil-case1.yaml",
+    REPO_ROOT / "yaml" / "feature_set_residual" / "brentoil-case2.yaml",
+    REPO_ROOT / "yaml" / "feature_set_residual" / "brentoil-case4.yaml",
+    REPO_ROOT / "yaml" / "feature_set_residual" / "wti-case1.yaml",
+    REPO_ROOT / "yaml" / "feature_set_residual" / "wti-case2.yaml",
+    REPO_ROOT / "yaml" / "feature_set_residual" / "wti-case4.yaml",
+]
+
 HPT_CASE12_YAML_FILES = [
     REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case1.yaml",
     REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case2.yaml",
@@ -5369,6 +5389,27 @@ EXPECTED_FIXED_TRAINING_VALUES = {
     "val_check_steps": 100,
 }
 
+FEATURE_SET_RESIDUAL_EXPECTED_FILENAMES = [
+    "brentoil-case1.yaml",
+    "brentoil-case2.yaml",
+    "brentoil-case3.yaml",
+    "brentoil-case4.yaml",
+    "wti-case1.yaml",
+    "wti-case2.yaml",
+    "wti-case3.yaml",
+    "wti-case4.yaml",
+]
+
+EXPECTED_FEATURE_SET_RESIDUAL_PARAMS = {
+    "n_estimators": 96,
+    "max_depth": 4,
+    "learning_rate": 0.0001,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+}
+
+EXPECTED_FEATURE_SET_RESIDUAL_LAG_STEPS = [1, 2, 3, 4, 6, 12]
+
 EXPECTED_CASE_METADATA = {
     "brentoil-case1.yaml": {
         "task_name": "brentoil_case1_re",
@@ -5593,6 +5634,63 @@ def test_case_yaml_normalizes_to_fixed_modes_without_auto(path: Path):
             assert job.validated_mode == "learned_fixed"
 
     assert all(job.validated_mode != "learned_auto" for job in loaded.config.jobs)
+
+
+def test_feature_set_residual_directory_contains_expected_case_files():
+    actual = sorted(path.name for path in (REPO_ROOT / "yaml" / "feature_set_residual").glob("*.yaml"))
+
+    assert actual == FEATURE_SET_RESIDUAL_EXPECTED_FILENAMES
+
+
+@pytest.mark.parametrize("path", FEATURE_SET_RESIDUAL_YAML_FILES, ids=lambda p: p.name)
+def test_feature_set_residual_yaml_tracks_base_case_metadata(path: Path):
+    payload = _load_case_yaml(path)
+    base_payload = _load_case_yaml(REPO_ROOT / "yaml" / "feature_set" / path.name)
+
+    assert payload["task"]["name"] == f'{base_payload["task"]["name"]}_residual'
+    assert payload["dataset"]["target_col"] == base_payload["dataset"]["target_col"]
+    assert payload["dataset"]["hist_exog_cols"] == base_payload["dataset"]["hist_exog_cols"]
+
+
+@pytest.mark.parametrize("path", FEATURE_SET_RESIDUAL_YAML_FILES, ids=lambda p: p.name)
+def test_feature_set_residual_yaml_residual_block_matches_template(path: Path):
+    payload = _load_case_yaml(path)
+    residual = payload["residual"]
+
+    assert residual["enabled"] is True
+    assert residual["model"] == "xgboost"
+    assert residual["target"] == "level"
+    assert residual["params"] == EXPECTED_FEATURE_SET_RESIDUAL_PARAMS
+    assert residual["features"]["include_base_prediction"] is True
+    assert residual["features"]["include_horizon_step"] is True
+    assert residual["features"]["include_date_features"] is False
+    assert residual["features"]["lag_features"]["enabled"] is True
+    assert residual["features"]["lag_features"]["sources"] == ["y_hat_base"]
+    assert residual["features"]["lag_features"]["steps"] == EXPECTED_FEATURE_SET_RESIDUAL_LAG_STEPS
+    assert residual["features"]["lag_features"]["transforms"] == ["raw"]
+    assert residual["features"]["exog_sources"]["futr"] == []
+    assert residual["features"]["exog_sources"]["static"] == []
+
+
+@pytest.mark.parametrize("path", NEW_FEATURE_SET_RESIDUAL_YAML_FILES, ids=lambda p: p.name)
+def test_new_feature_set_residual_yaml_exog_sources_hist_matches_base_dataset(path: Path):
+    payload = _load_case_yaml(path)
+    base_payload = _load_case_yaml(REPO_ROOT / "yaml" / "feature_set" / path.name)
+
+    assert payload["residual"]["features"]["exog_sources"]["hist"] == base_payload["dataset"]["hist_exog_cols"]
+
+
+@pytest.mark.parametrize("path", FEATURE_SET_RESIDUAL_YAML_FILES, ids=lambda p: p.name)
+def test_feature_set_residual_yaml_default_output_root_uses_parent_dir(path: Path):
+    from residual.runtime import _default_output_root
+
+    loaded = load_app_config(REPO_ROOT, config_path=path)
+    base_payload = _load_case_yaml(REPO_ROOT / "yaml" / "feature_set" / path.name)
+    expected_task_name = f'{base_payload["task"]["name"]}_residual'
+
+    assert _default_output_root(REPO_ROOT, loaded) == (
+        REPO_ROOT / "runs" / f"feature_set_residual_{expected_task_name}"
+    )
 
 
 def test_case_yaml_build_model_preserves_expected_fixed_params():

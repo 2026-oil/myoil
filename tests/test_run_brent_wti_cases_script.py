@@ -111,10 +111,24 @@ def test_run_brent_wti_cases_script_default_config_scope_uses_yaml_list_registra
     script = SCRIPT_PATH.read_text(encoding="utf-8")
 
     assert "yaml_list=(" in script
-    assert '"yaml/feature_set/brentoil-case1.yaml"' in script
-    assert '"yaml/feature_set/brentoil-case4.yaml"' in script
-    assert '"yaml/feature_set/wti-case1.yaml"' in script
-    assert '"yaml/feature_set/wti-case4.yaml"' in script
+    assert script.count('"yaml/') == 26
+    assert '"yaml/feature_set_HPT_n100_bs/brentoil-case1.yaml"' in script
+    assert '"yaml/feature_set_HPT_n100_bs/wti-case4.yaml"' in script
+    assert '"yaml/feature_set_residual_bs_HPT/brentoil-case1.yaml"' in script
+    assert '"yaml/feature_set_residual_bs_HPT/wti-case4.yaml"' in script
+    assert '"yaml/feature_set_residual/brentoil-case3.yaml"' in script
+    assert '"yaml/feature_set_residual/wti-case3.yaml"' in script
+    assert '"yaml/feature_set_residual_bs/brentoil-case1.yaml"' in script
+    assert '"yaml/feature_set_residual_bs/wti-case4.yaml"' in script
+    assert script.index('"yaml/feature_set_HPT_n100_bs/brentoil-case1.yaml"') < script.index(
+        '"yaml/feature_set_residual_bs_HPT/brentoil-case1.yaml"'
+    )
+    assert script.index('"yaml/feature_set_residual_bs_HPT/brentoil-case1.yaml"') < script.index(
+        '"yaml/feature_set_residual/brentoil-case3.yaml"'
+    )
+    assert script.index('"yaml/feature_set_residual/brentoil-case3.yaml"') < script.index(
+        '"yaml/feature_set_residual_bs/brentoil-case1.yaml"'
+    )
     assert 'configs=("${yaml_list[@]}")' in script
     assert '--config" "$cfg" "$@' in script
     assert "NF_CASE_PATCHTST_JOB" not in script
