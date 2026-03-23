@@ -1,0 +1,131 @@
+task:
+  name: brentoil_case1_residual_bs
+dataset:
+  path: data/df.csv
+  target_col: Com_BrentCrudeOil
+  dt_col: dt
+  hist_exog_cols:
+  - Com_Gasoline
+  - Com_Steel
+  - Bonds_US_Spread_10Y_1Y
+  - Bonds_CHN_Spread_30Y_5Y
+  - EX_USD_BRL
+  - Com_Cheese
+  - Bonds_BRZ_Spread_10Y_1Y
+  - Com_Cu_Gold_Ratio
+  - Idx_OVX
+  - Com_Oil_Spread
+  - Com_LME_Zn_Spread
+  - Idx_CSI300
+  - Bonds_CHN_Spread_5Y_1Y
+  - Com_LME_Cu_Spread
+  - Com_LME_Pb_Spread
+  - Com_LME_Al_Spread
+  - BS_Core_Index_A
+  - BS_Core_Index_B
+  - BS_Core_Index_C
+  - BS_Core_Index_Integrated
+  futr_exog_cols: []
+  static_exog_cols: []
+runtime:
+  random_seed: 1
+training:
+  train_protocol: expanding_window_tscv
+  input_size: 64
+  season_length: 52
+  batch_size: 32
+  valid_batch_size: 32
+  windows_batch_size: 1024
+  inference_windows_batch_size: 1024
+  learning_rate: 0.001
+  max_steps: 1000
+  val_size: 8
+  val_check_steps: 100
+  early_stop_patience_steps: 5
+  loss: mse
+cv:
+  horizon: 8
+  step_size: 8
+  n_windows: 12
+  gap: 0
+  max_train_size: null
+  overlap_eval_policy: by_cutoff_mean
+scheduler:
+  gpu_ids:
+  - 0
+  - 1
+  max_concurrent_jobs: 2
+  worker_devices: 1
+residual:
+  enabled: true
+  model: xgboost
+  target: level
+  params:
+    n_estimators: 96
+    max_depth: 4
+    learning_rate: 0.0001
+    subsample: 0.8
+    colsample_bytree: 0.8
+  features:
+    include_base_prediction: true
+    include_horizon_step: true
+    include_date_features: false
+    lag_features:
+      enabled: true
+      sources:
+      - y_hat_base
+      steps:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 6
+      - 12
+      transforms:
+      - raw
+    exog_sources:
+      hist:
+      - Com_Gasoline
+      - Com_BloombergCommodity_BCOM
+      - Com_LME_Ni_Cash
+      - Com_Coal
+      - Com_LME_Al_Cash
+      - Bonds_KOR_10Y
+      - Com_LMEX
+      - Com_LME_Ni_Inv
+      - BS_Core_Index_A
+      - BS_Core_Index_B
+      - BS_Core_Index_C
+      - BS_Core_Index_Integrated
+      futr: []
+      static: []
+jobs:
+- model: PatchTST
+  params:
+    hidden_size: 64
+    n_heads: 4
+    encoder_layers: 2
+    patch_len: 16
+    dropout: 0.1
+- model: TSMixerx
+  params:
+    n_block: 2
+    ff_dim: 64
+    dropout: 0.1
+    revin: true
+- model: Naive
+  params: {}
+- model: iTransformer
+  params:
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 2
+    d_ff: 256
+    dropout: 0.1
+- model: LSTM
+  params:
+    encoder_hidden_size: 64
+    decoder_hidden_size: 64
+    encoder_n_layers: 2
+    context_size: 10
+
