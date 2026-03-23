@@ -38,6 +38,7 @@ from .optuna_spaces import (
     suggest_model_params,
     suggest_residual_params,
     suggest_training_params,
+    training_range_source_for_model,
 )
 from .plugins_base import ResidualContext
 from .progress import (
@@ -319,6 +320,7 @@ def _update_manifest_artifacts(
     model_study_summary_path: Path | None = None,
     training_best_params_path: Path | None = None,
     training_study_summary_path: Path | None = None,
+    training_range_source: str | None = None,
     residual_best_params_path: Path | None = None,
     residual_study_summary_path: Path | None = None,
     residual_feature_policy: dict[str, Any] | None = None,
@@ -337,6 +339,8 @@ def _update_manifest_artifacts(
                 job["training_optuna_study_summary_path"] = str(
                     training_study_summary_path
                 )
+            if training_range_source is not None:
+                job["training_range_source"] = training_range_source
             if residual_best_params_path is not None:
                 job["residual_best_params_path"] = str(residual_best_params_path)
             if residual_study_summary_path is not None:
@@ -356,6 +360,15 @@ def _update_manifest_artifacts(
         manifest.setdefault("training_search", {})["optuna_study_summary_path"] = str(
             training_study_summary_path
         )
+    if training_range_source is not None:
+        training_payload = manifest.setdefault("training_search", {})
+        training_payload.setdefault("training_range_source_by_job", {})[job_name] = (
+            training_range_source
+        )
+        if len(manifest.get("jobs", [])) == 1:
+            training_payload["training_range_source"] = training_range_source
+        else:
+            training_payload.pop("training_range_source", None)
     if residual_study_summary_path is not None:
         manifest.setdefault("residual", {})["optuna_study_summary_path"] = str(
             residual_study_summary_path
@@ -831,7 +844,9 @@ def _main_job_objective(
             job.model, job.selected_search_params, trial
         )
         candidate_training_params = suggest_training_params(
-            loaded.config.training_search.selected_search_params, trial
+            loaded.config.training_search.selected_search_params,
+            trial,
+            model_name=job.model,
         )
         trial.set_user_attr("best_params", candidate_params)
         trial.set_user_attr("best_training_params", candidate_training_params)
@@ -926,6 +941,7 @@ def _collect_main_tuning_result(
         "selected_training_search_params": list(
             loaded.config.training_search.selected_search_params
         ),
+        "training_range_source": training_range_source_for_model(job.model),
         "best_params": best_params,
         "best_training_params": best_training_params,
         "fold_mse": best_trial.user_attrs["fold_mse"],
@@ -2336,6 +2352,7 @@ def _run_single_job(
             training_best_params_path=models_dir / "training_best_params.json",
             training_study_summary_path=models_dir
             / "training_optuna_study_summary.json",
+            training_range_source=training_range_source_for_model(effective_job.model),
         )
         effective_job = replace(job, params=best_params)
         effective_training_params = best_training_params

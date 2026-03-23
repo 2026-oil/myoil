@@ -32,8 +32,11 @@ from residual.optuna_spaces import (
     SUPPORTED_AUTO_MODEL_NAMES,
     SUPPORTED_RESIDUAL_MODELS,
     TRAINING_PARAM_REGISTRY,
+    TRAINING_PARAM_REGISTRY_BY_MODEL,
     suggest_training_params,
+    suggest_model_params,
     optuna_num_trials,
+    training_range_source_for_model,
 )
 from residual.plugins_base import ResidualContext, ResidualPlugin
 from residual.progress import PROGRESS_EVENT_PREFIX
@@ -3230,8 +3233,13 @@ def test_suggest_training_params_supports_batch_size_selector():
             return options[0]
 
     suggested = suggest_training_params(("batch_size",), _Trial())
+    contextual = suggest_training_params(("batch_size",), _Trial(), model_name="TFT")
 
     assert suggested["batch_size"] == 16
+    assert contextual["batch_size"] == 16
+    assert training_range_source_for_model(None) == "global_fallback"
+    assert training_range_source_for_model("TFT") == "model_override:TFT"
+    assert training_range_source_for_model("unknown-model") == "global_fallback"
 
 
 def test_load_app_config_rejects_training_model_learning_rate_overlap(tmp_path: Path):
@@ -4017,7 +4025,7 @@ def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
         tmp_path,
         {
             "models": {"TFT": ["hidden_size"]},
-            "training": ["max_steps"],
+            "training": ["batch_size"],
             "residual": {"xgboost": ["n_estimators"]},
         },
     )
@@ -4066,7 +4074,7 @@ def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
     monkeypatch.setattr(
         runtime,
         "suggest_training_params",
-        lambda *_args, **_kwargs: {"max_steps": 123},
+        lambda *_args, **_kwargs: {"batch_size": 123},
     )
     monkeypatch.setattr(
         runtime,
@@ -4092,6 +4100,14 @@ def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
     capability = json.loads(
         (output_root / "config" / "capability_report.json").read_text(encoding="utf-8")
     )
+    training_summary = json.loads(
+        (
+            output_root
+            / "models"
+            / "TFT"
+            / "training_optuna_study_summary.json"
+        ).read_text(encoding="utf-8")
+    )
     training_best = json.loads(
         (output_root / "models" / "TFT" / "training_best_params.json").read_text(
             encoding="utf-8"
@@ -4099,14 +4115,56 @@ def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
     )
 
     assert code == 0
-    assert calls[-1]["max_steps"] == 123
-    assert manifest["training_search"]["selected_search_params"] == [
-        "max_steps",
-    ]
+    assert calls[-1]["batch_size"] == 123
+    assert manifest["training_search"]["selected_search_params"] == ["batch_size"]
+    assert manifest["training_search"]["training_range_source"] == "model_override:TFT"
     assert manifest["jobs"][0]["training_best_params_path"]
     assert manifest["jobs"][0]["training_optuna_study_summary_path"]
     assert capability["training_search"]["validated_mode"] == "training_auto"
-    assert training_best == {"max_steps": 123}
+    assert training_summary["training_range_source"] == "model_override:TFT"
+    assert training_best == {"batch_size": 123}
+
+
+def test_update_manifest_artifacts_tracks_training_range_source_per_job(
+    tmp_path: Path,
+):
+    from residual import runtime
+
+    manifest_path = tmp_path / "run_manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "jobs": [
+                    {"model": "PatchTST"},
+                    {"model": "TFT"},
+                ],
+                "training_search": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    runtime._update_manifest_artifacts(
+        manifest_path,
+        job_name="PatchTST",
+        training_range_source="model_override:PatchTST",
+    )
+    runtime._update_manifest_artifacts(
+        manifest_path,
+        job_name="TFT",
+        training_range_source="model_override:TFT",
+    )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    jobs = {job["model"]: job for job in manifest["jobs"]}
+
+    assert "training_range_source" not in manifest["training_search"]
+    assert manifest["training_search"]["training_range_source_by_job"] == {
+        "PatchTST": "model_override:PatchTST",
+        "TFT": "model_override:TFT",
+    }
+    assert jobs["PatchTST"]["training_range_source"] == "model_override:PatchTST"
+    assert jobs["TFT"]["training_range_source"] == "model_override:TFT"
 
 
 def test_effective_config_pins_val_size_to_horizon_for_training_auto(tmp_path: Path):
@@ -4178,6 +4236,13 @@ def test_supported_auto_model_matrix_matches_registry_and_yaml():
     assert SUPPORTED_AUTO_MODEL_NAMES == learned_model_classes
     assert SUPPORTED_AUTO_MODEL_NAMES == learned_registry_models
     assert SUPPORTED_AUTO_MODEL_NAMES == set(search_space["models"])
+    assert set(TRAINING_PARAM_REGISTRY_BY_MODEL) == SUPPORTED_AUTO_MODEL_NAMES
+    assert all(
+        set(TRAINING_PARAM_REGISTRY_BY_MODEL[model_name])
+        == set(TRAINING_PARAM_REGISTRY)
+        == set(search_space["training"])
+        for model_name in SUPPORTED_AUTO_MODEL_NAMES
+    )
     assert tuple(search_space["training"]) == tuple(TRAINING_PARAM_REGISTRY)
     assert set(search_space["residual"]) == {"xgboost", "randomforest", "lightgbm"}
     assert all(
@@ -4185,6 +4250,164 @@ def test_supported_auto_model_matrix_matches_registry_and_yaml():
         for model in search_space["models"]
     )
     assert "learning_rate" not in search_space["models"]["NLinear"]
+    assert training_range_source_for_model("TFT") == "model_override:TFT"
+    assert training_range_source_for_model(None) == "global_fallback"
+
+
+def test_narrowed_model_param_ranges_are_explicit_for_selected_auto_models():
+    class _RangeRecordingTrial:
+        def __init__(self) -> None:
+            self.categorical: dict[str, tuple[Any, ...]] = {}
+            self.integer: dict[str, tuple[int, int, int]] = {}
+            self.floating: dict[str, tuple[float, float, bool]] = {}
+
+        def suggest_categorical(self, name, options):
+            self.categorical[name] = tuple(options)
+            return options[0]
+
+        def suggest_int(self, name, low, high, step=1):
+            self.integer[name] = (low, high, step)
+            return low
+
+        def suggest_float(self, name, low, high, log=False):
+            self.floating[name] = (low, high, log)
+            return low
+
+    expectations = {
+        "PatchTST": {
+            "categorical": {
+                "hidden_size": (64, 128),
+                "n_heads": (4, 8),
+                "linear_hidden_size": (128, 256, 512),
+                "patch_len": (4, 8, 16),
+                "stride": (2, 4, 8),
+                "dropout": (0.0, 0.2, 0.3),
+                "fc_dropout": (0.0, 0.2),
+                "attn_dropout": (0.0, 0.1),
+                "revin": (True, False),
+            },
+        },
+        "TSMixerx": {
+            "categorical": {
+                "n_block": (1, 2),
+                "ff_dim": (32, 64, 128),
+                "dropout": (0.05, 0.1, 0.2),
+            },
+        },
+        "iTransformer": {
+            "categorical": {
+                "hidden_size": (64, 128),
+                "n_heads": (4, 8),
+                "d_ff": (128, 256, 512),
+                "factor": (1, 3),
+                "dropout": (0.0, 0.2, 0.3),
+                "use_norm": (True, False),
+            },
+            "integer": {
+                "e_layers": (1, 2, 1),
+                "d_layers": (1, 2, 1),
+            },
+        },
+        "LSTM": {
+            "categorical": {
+                "encoder_hidden_size": (64, 128, 256),
+                "inference_input_size": (-1, 24, 48, 96),
+                "encoder_dropout": (0.1, 0.2, 0.3),
+                "decoder_hidden_size": (32, 64, 128),
+            },
+            "integer": {
+                "encoder_n_layers": (1, 3, 1),
+                "decoder_layers": (1, 3, 1),
+            },
+        },
+    }
+
+    for model_name, expected in expectations.items():
+        trial = _RangeRecordingTrial()
+        suggested = suggest_model_params(
+            model_name, tuple(MODEL_PARAM_REGISTRY[model_name]), trial
+        )
+        assert set(suggested) == set(MODEL_PARAM_REGISTRY[model_name])
+        for name, options in expected.get("categorical", {}).items():
+            assert trial.categorical[name] == options
+        for name, bounds in expected.get("integer", {}).items():
+            assert trial.integer[name] == bounds
+
+
+def test_priority_models_have_narrowed_training_range_overrides():
+    class _RangeRecordingTrial:
+        def __init__(self) -> None:
+            self.categorical: dict[str, tuple[Any, ...]] = {}
+            self.floating: dict[str, tuple[float, float, bool]] = {}
+
+        def suggest_categorical(self, name, options):
+            self.categorical[name] = tuple(options)
+            return options[0]
+
+        def suggest_float(self, name, low, high, log=False):
+            self.floating[name] = (low, high, log)
+            return low
+
+    cases = {
+        "PatchTST": {
+            "categorical": {
+                "input_size": (24, 36, 48, 64),
+                "batch_size": (16, 32, 64),
+                "valid_batch_size": (16, 32, 64),
+                "windows_batch_size": (256, 512, 1024),
+                "inference_windows_batch_size": (256, 512, 1024),
+            },
+            "floating": {"learning_rate": (3e-4, 9e-3, True)},
+        },
+        "TSMixerx": {
+            "categorical": {
+                "input_size": (48, 64),
+                "batch_size": (16, 32),
+                "valid_batch_size": (32, 64, 128),
+                "windows_batch_size": (512,),
+                "inference_windows_batch_size": (256, 512, 1024),
+                "scaler_type": ("robust",),
+                "model_step_size": (1,),
+            },
+            "floating": {"learning_rate": (4e-4, 1e-3, True)},
+        },
+        "iTransformer": {
+            "categorical": {
+                "input_size": (24, 36, 48, 64, 72),
+                "batch_size": (16, 32, 64),
+                "valid_batch_size": (16, 32, 64),
+                "windows_batch_size": (256, 512, 1024),
+                "inference_windows_batch_size": (256, 512, 1024),
+                "scaler_type": (None, "robust", "standard"),
+            },
+            "floating": {"learning_rate": (4e-4, 7e-3, True)},
+        },
+        "LSTM": {
+            "categorical": {
+                "input_size": (24, 48, 64, 96),
+                "batch_size": (16, 32, 64),
+                "valid_batch_size": (16, 32, 64),
+                "windows_batch_size": (128, 256, 512, 1024),
+                "inference_windows_batch_size": (256, 512, 1024),
+                "scaler_type": ("robust", "standard", "identity"),
+                "model_step_size": (4, 8, 12),
+            },
+            "floating": {"learning_rate": (1e-3, 1e-2, True)},
+        },
+    }
+
+    for model_name, expected in cases.items():
+        trial = _RangeRecordingTrial()
+        suggested = suggest_training_params(
+            tuple(TRAINING_PARAM_REGISTRY),
+            trial,
+            model_name=model_name,
+        )
+        assert set(suggested) == set(TRAINING_PARAM_REGISTRY)
+        for name, options in expected["categorical"].items():
+            assert trial.categorical[name] == options
+        for name, bounds in expected["floating"].items():
+            assert trial.floating[name] == bounds
 
 
 def test_supported_residual_model_matrix_matches_defaults_registry_and_yaml():
@@ -5215,11 +5438,9 @@ def test_feature_set_hpt_case12_normalizes_to_auto_training_and_learned_jobs(
     assert list(loaded.config.training_search.selected_search_params) == list(
         TRAINING_PARAM_REGISTRY
     )
-    assert loaded.config.residual.requested_mode == "residual_auto_requested"
-    assert loaded.config.residual.validated_mode == "residual_auto"
-    assert list(loaded.config.residual.selected_search_params) == list(
-        SEARCH_SPACE_RESIDUAL["xgboost"]
-    )
+    assert loaded.config.residual.requested_mode == "residual_disabled"
+    assert loaded.config.residual.validated_mode == "residual_disabled"
+    assert loaded.config.residual.selected_search_params == ()
 
     for job in loaded.config.jobs:
         if job.model == "Naive":

@@ -242,23 +242,23 @@ MODEL_PARAM_REGISTRY = {
         "n_head": _categorical([4, 8]),
     },
     "PatchTST": {
-        "hidden_size": _categorical([64, 128, 256]),
+        "hidden_size": _categorical([64, 128]),
         "n_heads": _categorical([4, 8]),
-        "encoder_layers": _int(2, 4),
+        "encoder_layers": _int(2, 3),
         "linear_hidden_size": _categorical([128, 256, 512]),
-        "patch_len": _categorical([4, 8, 12, 16]),
+        "patch_len": _categorical([4, 8, 16]),
         "stride": _categorical([2, 4, 8]),
-        "dropout": _categorical([0.0, 0.1, 0.2, 0.3]),
-        "fc_dropout": _categorical([0.0, 0.1, 0.2]),
+        "dropout": _categorical([0.0, 0.2, 0.3]),
+        "fc_dropout": _categorical([0.0, 0.2]),
         "attn_dropout": _categorical([0.0, 0.1]),
         "revin": _categorical([True, False]),
     },
     "LSTM": {
-        "encoder_hidden_size": _categorical([32, 64, 128, 256]),
+        "encoder_hidden_size": _categorical([64, 128, 256]),
         "encoder_n_layers": _int(1, 3),
         "inference_input_size": _categorical([-1, 24, 48, 96]),
-        "encoder_dropout": _categorical([0.0, 0.1, 0.2, 0.3]),
-        "decoder_hidden_size": _categorical([32, 64, 128, 256]),
+        "encoder_dropout": _categorical([0.1, 0.2, 0.3]),
+        "decoder_hidden_size": _categorical([32, 64, 128]),
         "decoder_layers": _int(1, 3),
     },
     "TCN": {
@@ -369,13 +369,13 @@ MODEL_PARAM_REGISTRY = {
         "heads": _categorical([[4, 8, 16, 32], [2, 4, 8, 16]]),
     },
     "iTransformer": {
-        "hidden_size": _categorical([64, 128, 256]),
+        "hidden_size": _categorical([64, 128]),
         "n_heads": _categorical([4, 8]),
-        "e_layers": _int(1, 3),
+        "e_layers": _int(1, 2),
         "d_ff": _categorical([128, 256, 512]),
         "d_layers": _int(1, 2),
-        "factor": _categorical([1, 3, 5]),
-        "dropout": _categorical([0.0, 0.1, 0.2, 0.3]),
+        "factor": _categorical([1, 3]),
+        "dropout": _categorical([0.0, 0.2, 0.3]),
         "use_norm": _categorical([True, False]),
     },
     "TimeLLM": {
@@ -410,9 +410,9 @@ MODEL_PARAM_REGISTRY = {
         "dropout": _float(0.0, 0.3),
     },
     "TSMixerx": {
-        "n_block": _categorical([1, 2, 3]),
-        "ff_dim": _categorical([16, 32, 64, 128]),
-        "dropout": _float(0.0, 0.3),
+        "n_block": _categorical([1, 2]),
+        "ff_dim": _categorical([32, 64, 128]),
+        "dropout": _categorical([0.05, 0.1, 0.2]),
     },
     "MLPMultivariate": {
         "hidden_size": _categorical([32, 64, 128, 256]),
@@ -527,6 +527,77 @@ TRAINING_PARAM_REGISTRY = {
     "model_step_size": _categorical([1, 4, 8, 12]),
 }
 
+GLOBAL_TRAINING_RANGE_SOURCE = "global_fallback"
+_PATCHTST_TRAINING_PARAM_REGISTRY = {
+    **TRAINING_PARAM_REGISTRY,
+    "input_size": _categorical([24, 36, 48, 64]),
+    "batch_size": _categorical([16, 32, 64]),
+    "valid_batch_size": _categorical([16, 32, 64]),
+    "windows_batch_size": _categorical([256, 512, 1024]),
+    "inference_windows_batch_size": _categorical([256, 512, 1024]),
+    "learning_rate": _float(3e-4, 9e-3, log=True),
+}
+_TSMIXERX_TRAINING_PARAM_REGISTRY = {
+    **TRAINING_PARAM_REGISTRY,
+    "input_size": _categorical([48, 64]),
+    "batch_size": _categorical([16, 32]),
+    "valid_batch_size": _categorical([32, 64, 128]),
+    "windows_batch_size": _categorical([512]),
+    "inference_windows_batch_size": _categorical([256, 512, 1024]),
+    "learning_rate": _float(4e-4, 1e-3, log=True),
+    "scaler_type": _categorical(["robust"]),
+    "model_step_size": _categorical([1]),
+}
+_ITRANSFORMER_TRAINING_PARAM_REGISTRY = {
+    **TRAINING_PARAM_REGISTRY,
+    "input_size": _categorical([24, 36, 48, 64, 72]),
+    "batch_size": _categorical([16, 32, 64]),
+    "valid_batch_size": _categorical([16, 32, 64]),
+    "windows_batch_size": _categorical([256, 512, 1024]),
+    "inference_windows_batch_size": _categorical([256, 512, 1024]),
+    "learning_rate": _float(4e-4, 7e-3, log=True),
+    "scaler_type": _categorical([None, "robust", "standard"]),
+}
+_LSTM_TRAINING_PARAM_REGISTRY = {
+    **TRAINING_PARAM_REGISTRY,
+    "input_size": _categorical([24, 48, 64, 96]),
+    "batch_size": _categorical([16, 32, 64]),
+    "valid_batch_size": _categorical([16, 32, 64]),
+    "windows_batch_size": _categorical([128, 256, 512, 1024]),
+    "inference_windows_batch_size": _categorical([256, 512, 1024]),
+    "learning_rate": _float(1e-3, 1e-2, log=True),
+    "scaler_type": _categorical(["robust", "standard", "identity"]),
+    "model_step_size": _categorical([4, 8, 12]),
+}
+TRAINING_PARAM_REGISTRY_BY_MODEL = {
+    model_name: TRAINING_PARAM_REGISTRY.copy()
+    for model_name in sorted(SUPPORTED_AUTO_MODEL_NAMES)
+}
+TRAINING_PARAM_REGISTRY_BY_MODEL.update(
+    {
+        "PatchTST": _PATCHTST_TRAINING_PARAM_REGISTRY,
+        "TSMixerx": _TSMIXERX_TRAINING_PARAM_REGISTRY,
+        "iTransformer": _ITRANSFORMER_TRAINING_PARAM_REGISTRY,
+        "LSTM": _LSTM_TRAINING_PARAM_REGISTRY,
+    }
+)
+
+
+def training_param_registry_for_model(
+    model_name: str | None,
+) -> dict[str, Any]:
+    if model_name is None:
+        return TRAINING_PARAM_REGISTRY
+    return TRAINING_PARAM_REGISTRY_BY_MODEL.get(model_name, TRAINING_PARAM_REGISTRY)
+
+
+def training_range_source_for_model(model_name: str | None) -> str:
+    if model_name is None:
+        return GLOBAL_TRAINING_RANGE_SOURCE
+    if model_name in TRAINING_PARAM_REGISTRY_BY_MODEL:
+        return f"model_override:{model_name}"
+    return GLOBAL_TRAINING_RANGE_SOURCE
+
 
 def suggest_model_params(
     model_name: str, selected_names: tuple[str, ...], trial: optuna.Trial
@@ -546,7 +617,10 @@ def suggest_residual_params(
 
 
 def suggest_training_params(
-    selected_names: tuple[str, ...], trial: optuna.Trial
+    selected_names: tuple[str, ...],
+    trial: optuna.Trial,
+    *,
+    model_name: str | None = None,
 ) -> dict[str, Any]:
     fixed = sorted(set(selected_names).intersection(FIXED_TRAINING_KEYS))
     if fixed:
@@ -555,6 +629,7 @@ def suggest_training_params(
             + ", ".join(fixed)
         )
     suggested = {}
+    registry = training_param_registry_for_model(model_name)
     for name in selected_names:
-        suggested[name] = TRAINING_PARAM_REGISTRY[name](trial, name)
+        suggested[name] = registry[name](trial, name)
     return suggested
