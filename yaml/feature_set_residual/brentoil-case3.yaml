@@ -25,7 +25,7 @@ training:
   valid_batch_size: 32
   windows_batch_size: 1024
   inference_windows_batch_size: 1024
-  learning_rate: 0.0001
+  learning_rate: 0.001
   max_steps: 1000
   val_size: 8
   val_check_steps: 100

@@ -2092,6 +2092,16 @@ def test_default_output_root_uses_config_parent_for_nested_repo_configs(
     assert _default_output_root(REPO_ROOT, loaded) == (REPO_ROOT / "runs" / expected_name)
 
 
+def test_default_output_root_for_feature_set_residual_wti_case3_config():
+    from residual.runtime import _default_output_root
+
+    loaded = load_app_config(REPO_ROOT, config_path="yaml/feature_set_residual/wti-case3.yaml")
+
+    assert _default_output_root(REPO_ROOT, loaded) == (
+        REPO_ROOT / "runs" / "feature_set_residual_wti_case3_residual"
+    )
+
+
 def test_runtime_infers_freq_when_omitted(tmp_path: Path):
     payload = _payload()
     payload["dataset"].pop("freq", None)
@@ -4762,6 +4772,240 @@ def test_runtime_executes_multivariate_model_without_hist_exog(
     )
     assert code == 0
     assert (output_root / "cv" / "iTransformer_forecasts.csv").exists()
+
+
+def test_runtime_single_job_rerun_prunes_stale_model_artifacts_and_rebuilds_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    payload = _payload()
+    payload["task"] = {"name": "wti_case3_residual"}
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
+    payload["jobs"] = [
+        {
+            "model": "iTransformer",
+            "params": {"hidden_size": 32, "n_heads": 4, "e_layers": 2, "d_ff": 64},
+        }
+    ]
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,9\n2020-01-08,2,8\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(tmp_path)
+
+    from residual import runtime
+
+    def _write_metrics_and_forecasts(
+        root: Path,
+        model_name: str,
+        *,
+        mae: float,
+        nrmse: float,
+        y_hat: float,
+    ) -> None:
+        cv_dir = root / "cv"
+        cv_dir.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            [
+                {
+                    "fold_idx": 0,
+                    "cutoff": "2020-01-08",
+                    "MAE": mae,
+                    "MSE": mae**2,
+                    "RMSE": mae,
+                    "MAPE": mae / 10,
+                    "NRMSE": nrmse,
+                    "R2": 1 - mae,
+                }
+            ]
+        ).to_csv(cv_dir / f"{model_name}_metrics_by_cutoff.csv", index=False)
+        pd.DataFrame(
+            [
+                {
+                    "model": model_name,
+                    "fold_idx": 0,
+                    "cutoff": "2020-01-08",
+                    "train_end_ds": "2020-01-08",
+                    "unique_id": "target",
+                    "ds": "2020-01-15",
+                    "horizon_step": 1,
+                    "y": 1.0,
+                    "y_hat": y_hat,
+                }
+            ]
+        ).to_csv(cv_dir / f"{model_name}_forecasts.csv", index=False)
+
+    def _write_residual_artifacts(
+        root: Path,
+        model_name: str,
+        *,
+        mae: float,
+        nrmse: float,
+        y_hat_corrected: float,
+    ) -> None:
+        residual_root = root / "residual" / model_name
+        fold_root = residual_root / "folds" / "fold_000"
+        fold_root.mkdir(parents=True, exist_ok=True)
+        (fold_root / "metrics.json").write_text(
+            json.dumps(
+                {
+                    "fold_idx": 0,
+                    "cutoff": "2020-01-08",
+                    "corrected_metrics": {
+                        "MAE": mae,
+                        "MSE": mae**2,
+                        "RMSE": mae,
+                        "MAPE": mae / 10,
+                        "NRMSE": nrmse,
+                        "R2": 1 - mae,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        pd.DataFrame(
+            [
+                {
+                    "fold_idx": 0,
+                    "cutoff": "2020-01-08",
+                    "train_end_ds": "2020-01-08",
+                    "unique_id": "target",
+                    "ds": "2020-01-15",
+                    "horizon_step": 1,
+                    "y": 1.0,
+                    "y_hat_corrected": y_hat_corrected,
+                }
+            ]
+        ).to_csv(residual_root / "corrected_folds.csv", index=False)
+
+    run_root = tmp_path / "rerun_root"
+    sibling_files: dict[Path, bytes] = {}
+    sibling_models = ["PatchTST", "TSMixerx", "Naive", "LSTM"]
+    for index, model_name in enumerate(sibling_models, start=1):
+        worker_root = run_root / "scheduler" / "workers" / model_name
+        _write_metrics_and_forecasts(
+            worker_root,
+            model_name,
+            mae=float(index),
+            nrmse=0.1 * index,
+            y_hat=1.0 + index,
+        )
+        for path in sorted((worker_root / "cv").glob("*")):
+            sibling_files[path] = path.read_bytes()
+
+    stale_worker_root = run_root / "scheduler" / "workers" / "iTransformer"
+    _write_metrics_and_forecasts(
+        stale_worker_root,
+        "iTransformer",
+        mae=77.0,
+        nrmse=7.7,
+        y_hat=77.0,
+    )
+    _write_residual_artifacts(
+        stale_worker_root,
+        "iTransformer",
+        mae=66.0,
+        nrmse=6.6,
+        y_hat_corrected=66.0,
+    )
+    (stale_worker_root / "summary.json").write_text(
+        json.dumps({"job_name": "iTransformer", "returncode": 1}),
+        encoding="utf-8",
+    )
+
+    _write_metrics_and_forecasts(
+        run_root,
+        "iTransformer",
+        mae=99.0,
+        nrmse=9.9,
+        y_hat=99.0,
+    )
+    _write_residual_artifacts(
+        run_root,
+        "iTransformer",
+        mae=88.0,
+        nrmse=8.8,
+        y_hat_corrected=88.0,
+    )
+    stale_model_dir = run_root / "models" / "iTransformer"
+    stale_model_dir.mkdir(parents=True, exist_ok=True)
+    (stale_model_dir / "fit_summary.json").write_text(
+        json.dumps({"stale": True}),
+        encoding="utf-8",
+    )
+
+    def _fake_run_single_job(
+        loaded,
+        job,
+        run_root_arg: Path,
+        *,
+        manifest_path: Path,
+        main_stage: str = "full",
+    ) -> None:
+        assert job.model == "iTransformer"
+        assert run_root_arg == run_root
+        assert main_stage == "full"
+        _write_metrics_and_forecasts(
+            run_root_arg,
+            "iTransformer",
+            mae=0.7,
+            nrmse=0.07,
+            y_hat=1.7,
+        )
+        _write_residual_artifacts(
+            run_root_arg,
+            "iTransformer",
+            mae=0.3,
+            nrmse=0.03,
+            y_hat_corrected=1.3,
+        )
+        model_dir = run_root_arg / "models" / "iTransformer"
+        model_dir.mkdir(parents=True, exist_ok=True)
+        (model_dir / "fit_summary.json").write_text(
+            json.dumps({"stale": False, "main_stage": main_stage}),
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(
+        runtime,
+        "load_app_config",
+        lambda _repo_root, **kwargs: load_app_config(tmp_path, **kwargs),
+    )
+    monkeypatch.setattr(runtime, "_run_single_job", _fake_run_single_job)
+
+    code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "iTransformer",
+            "--output-root",
+            str(run_root),
+        ]
+    )
+
+    assert code == 0
+    for path, content in sibling_files.items():
+        assert path.read_bytes() == content
+    assert not stale_worker_root.exists()
+    assert json.loads((run_root / "models" / "iTransformer" / "fit_summary.json").read_text()) == {
+        "stale": False,
+        "main_stage": "full",
+    }
+
+    leaderboard = pd.read_csv(run_root / "summary" / "leaderboard.csv")
+    assert sorted(leaderboard["model"].tolist()) == sorted(
+        [*sibling_models, "iTransformer", "iTransformer_res"]
+    )
+    itransformer_row = leaderboard.loc[leaderboard["model"] == "iTransformer"].iloc[0]
+    residual_row = leaderboard.loc[leaderboard["model"] == "iTransformer_res"].iloc[0]
+    assert itransformer_row["mean_fold_mae"] == pytest.approx(0.7)
+    assert itransformer_row["mean_fold_nrmse"] == pytest.approx(0.07)
+    assert residual_row["mean_fold_mae"] == pytest.approx(0.3)
+    assert residual_row["mean_fold_nrmse"] == pytest.approx(0.03)
+    assert (run_root / "summary" / "sample.md").exists()
+    assert (run_root / "summary" / "last_fold_all_models.png").exists()
 
 
 @pytest.mark.parametrize(

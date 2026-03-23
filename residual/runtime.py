@@ -7,6 +7,7 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import shutil
 from typing import Any, Sequence
 from datetime import datetime, timezone
 
@@ -253,6 +254,38 @@ def _default_output_root(repo_root: Path, loaded: LoadedConfig) -> Path:
     ]
     safe_name = "_".join(safe_parts)
     return repo_root / "runs" / (safe_name or "validation")
+
+
+def _remove_existing_artifact(path: Path) -> None:
+    if not path.exists():
+        return
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+        return
+    path.unlink()
+
+
+def _prune_model_run_artifacts(run_root: Path, model_name: str) -> None:
+    workers_root = run_root / "scheduler" / "workers"
+    targets = [
+        run_root / "cv" / f"{model_name}_forecasts.csv",
+        run_root / "cv" / f"{model_name}_metrics_by_cutoff.csv",
+        run_root / "models" / model_name,
+        run_root / "residual" / model_name,
+        workers_root / model_name,
+    ]
+    for target in targets:
+        _remove_existing_artifact(target)
+    if not workers_root.exists():
+        return
+    for worker_root in sorted(workers_root.glob(f"{model_name}#*")):
+        _remove_existing_artifact(worker_root)
+
+
+def _should_prune_model_run_artifacts(job: JobConfig, *, main_stage: str) -> bool:
+    if main_stage == "tune-main-only":
+        return False
+    return job.validated_mode != "learned_auto"
 
 
 def _build_resolved_artifacts(
@@ -2572,6 +2605,8 @@ def _run_single_job_with_parallel_tuning(
     *,
     manifest_path: Path,
 ) -> list[dict[str, object]]:
+    if _should_prune_model_run_artifacts(job, main_stage="full"):
+        _prune_model_run_artifacts(run_root, job.model)
     scheduler_dir = run_root / "scheduler"
     scheduler_dir.mkdir(parents=True, exist_ok=True)
     tune_launches = build_tuning_launch_plan(
@@ -2638,6 +2673,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 manifest_path=paths["manifest_path"],
             )
         else:
+            if _should_prune_model_run_artifacts(
+                selected_jobs[0], main_stage=args.internal_stage
+            ):
+                _prune_model_run_artifacts(paths["run_root"], selected_jobs[0].model)
             _run_single_job(
                 loaded,
                 selected_jobs[0],

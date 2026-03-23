@@ -1,5 +1,5 @@
 task:
-  name: brentoil_case2_HPO
+  name: brentoil_case4_HPO
 dataset:
   path: data/df.csv
   target_col: Com_BrentCrudeOil

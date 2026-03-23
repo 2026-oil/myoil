@@ -1,5 +1,5 @@
 task:
-  name: wti_case3_HPT_n100
+  name: wti_case3_HPO
 dataset:
   path: data/df.csv
   target_col: Com_CrudeOil
