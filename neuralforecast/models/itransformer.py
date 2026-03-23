@@ -209,6 +209,16 @@ class iTransformer(BaseModel):
             f"count={bad_count}, shape={tuple(tensor.shape)}"
         )
 
+    @staticmethod
+    def _normalize_hist_exog(hist_exog: Optional[torch.Tensor]) -> Optional[torch.Tensor]:
+        if hist_exog is None:
+            return None
+        means = hist_exog.mean(dim=2, keepdim=True).detach()
+        stdev = torch.sqrt(
+            torch.var(hist_exog, dim=2, keepdim=True, unbiased=False) + 1e-5
+        )
+        return (hist_exog - means) / stdev
+
     def forecast(self, x_enc, x_mark_enc=None):
         if self.use_norm:
             # Normalization from Non-stationary Transformer
@@ -260,6 +270,8 @@ class iTransformer(BaseModel):
 
         self._check_finite("insample_y", insample_y)
         self._check_finite("hist_exog", hist_exog)
+        hist_exog = self._normalize_hist_exog(hist_exog)
+        self._check_finite("hist_exog_normalized", hist_exog)
 
         x_mark_enc = None
         if self.hist_exog_size > 0:

@@ -143,6 +143,67 @@ def test_itransformer_forward_uses_hist_exog():
     assert y_pred.shape == (1, 2, 1)
     assert recorder.last_x_mark is not None
     assert recorder.last_x_mark.shape == (1, 4, 1)
+    assert torch.isfinite(recorder.last_x_mark).all()
+    assert torch.allclose(
+        recorder.last_x_mark.mean(dim=1), torch.zeros(1, 1), atol=1e-5
+    )
+
+
+def test_itransformer_forward_normalizes_large_hist_exog_before_embedding():
+    model = _make_model()
+
+    class RecorderEmbedding(torch.nn.Module):
+        def __init__(self, hidden_size):
+            super().__init__()
+            self.hidden_size = hidden_size
+            self.last_x_mark = None
+
+        def forward(self, x, x_mark):
+            self.last_x_mark = x_mark
+            tokens = x.shape[2] + (0 if x_mark is None else x_mark.shape[2])
+            return torch.zeros(x.shape[0], tokens, self.hidden_size)
+
+    class IdentityEncoder(torch.nn.Module):
+        def forward(self, x, attn_mask=None):
+            return x, None
+
+    recorder = RecorderEmbedding(model.hidden_size)
+    model.enc_embedding = recorder
+    model.encoder = IdentityEncoder()
+
+    raw_hist_exog = torch.tensor([[[[10_000.0], [20_000.0], [30_000.0], [40_000.0]]]])
+    windows_batch = {
+        "insample_y": torch.zeros(1, 4, 1),
+        "hist_exog": raw_hist_exog,
+    }
+
+    model(windows_batch)
+
+    assert recorder.last_x_mark is not None
+    assert torch.isfinite(recorder.last_x_mark).all()
+    assert recorder.last_x_mark.abs().max() < raw_hist_exog.abs().max()
+    assert torch.allclose(
+        recorder.last_x_mark.mean(dim=1), torch.zeros(1, 1), atol=1e-5
+    )
+
+
+def test_itransformer_backward_stays_finite_with_large_hist_exog():
+    model = _make_model()
+
+    windows_batch = {
+        "insample_y": torch.tensor([[[1.0], [2.0], [3.0], [4.0]]]),
+        "hist_exog": torch.tensor(
+            [[[[10_000.0], [20_000.0], [30_000.0], [40_000.0]]]]
+        ),
+    }
+
+    output = model(windows_batch)
+    loss = output.square().mean()
+    loss.backward()
+
+    grads = [param.grad for param in model.parameters() if param.grad is not None]
+    assert grads
+    assert all(torch.isfinite(grad).all() for grad in grads)
 
 
 def test_itransformer_forward_raises_on_non_finite_hist_exog():
