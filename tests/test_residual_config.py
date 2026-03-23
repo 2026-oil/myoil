@@ -900,6 +900,33 @@ def test_model_builder_applies_common_loss_and_multivariate_n_series(tmp_path: P
     assert getattr(multivariate_model, "n_series", 2) == 2
 
 
+def test_model_builder_passes_hist_exog_to_patchtst(tmp_path: Path):
+    payload = _payload()
+    payload["jobs"] = [
+        {
+            "model": "PatchTST",
+            "params": {
+                "hidden_size": 16,
+                "n_heads": 4,
+                "encoder_layers": 2,
+                "patch_len": 4,
+            },
+        }
+    ]
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    model = build_model(loaded.config, loaded.config.jobs[0])
+
+    assert model.hist_exog_list == ["hist_a"]
+    assert model.hist_exog_size == 1
+
+
 def test_model_builder_applies_exloss_and_multivariate_n_series(tmp_path: Path):
     payload = _payload()
     payload["training"].update(

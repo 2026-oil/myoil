@@ -868,7 +868,7 @@ class PatchTST(BaseModel):
 
     # Class attributes
     EXOGENOUS_FUTR = False
-    EXOGENOUS_HIST = False
+    EXOGENOUS_HIST = True
     EXOGENOUS_STAT = False
     MULTIVARIATE = False  # If the model produces multivariate forecasts (True) or univariate (False)
     RECURRENT = (
@@ -964,7 +964,7 @@ class PatchTST(BaseModel):
         c_out = self.loss.outputsize_multiplier
 
         # Fixed hyperparameters
-        c_in = 1  # Always univariate
+        c_in = 1 + self.hist_exog_size
         padding_patch = "end"  # Padding at the end
         pretrain_head = False  # No pretrained head
         norm = "BatchNorm"  # Use BatchNorm (if batch_normalization is True)
@@ -1020,8 +1020,12 @@ class PatchTST(BaseModel):
 
         # Parse windows_batch
         x = windows_batch["insample_y"]
+        hist_exog = windows_batch["hist_exog"]
 
-        x = x.permute(0, 2, 1)  # x: [Batch, 1, input_size]
+        if self.hist_exog_size > 0:
+            x = torch.cat((x, hist_exog), dim=2)
+
+        x = x.permute(0, 2, 1)  # x: [Batch, 1 + hist_exog_size, input_size]
         x = self.model(x)
         forecast = x.reshape(x.shape[0], self.h, -1)  # x: [Batch, h, c_out]
 
