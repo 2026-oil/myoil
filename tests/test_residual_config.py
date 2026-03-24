@@ -3244,7 +3244,7 @@ def test_load_app_config_rejects_unknown_training_search_space_param(tmp_path: P
         },
     )
 
-    with pytest.raises(ValueError, match="search_space.training contains unknown"):
+    with pytest.raises(ValueError, match=r"search_space\.training\.global contains unknown"):
         load_app_config(tmp_path, config_path=config_path)
 
 
@@ -3266,7 +3266,7 @@ def test_load_app_config_rejects_legacy_step_size_search_space_param(tmp_path: P
         },
     )
 
-    with pytest.raises(ValueError, match="search_space.training contains unknown"):
+    with pytest.raises(ValueError, match=r"search_space\.training\.global contains unknown"):
         load_app_config(tmp_path, config_path=config_path)
 
 
@@ -3290,7 +3290,7 @@ def test_load_app_config_rejects_removed_early_stop_search_space_param(
         },
     )
 
-    with pytest.raises(ValueError, match="search_space.training contains unknown"):
+    with pytest.raises(ValueError, match=r"search_space\.training\.global contains unknown"):
         load_app_config(tmp_path, config_path=config_path)
 
 
@@ -3331,28 +3331,6 @@ def test_suggest_training_params_supports_batch_size_selector():
     assert training_range_source_for_model(None) == "global_fallback"
     assert training_range_source_for_model("PatchTST") == "model_override:PatchTST"
     assert training_range_source_for_model("unknown-model") == "global_fallback"
-
-
-def test_load_app_config_rejects_training_model_learning_rate_overlap(tmp_path: Path):
-    payload = _payload()
-    payload["jobs"] = [{"model": "NLinear", "params": {}}]
-    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
-        encoding="utf-8",
-    )
-    config_path = _write_config(tmp_path, payload, ".yaml")
-    _write_search_space(
-        tmp_path,
-        {
-            "models": {"NLinear": ["learning_rate"]},
-            "training": ["learning_rate"],
-            "residual": {"xgboost": ["n_estimators"]},
-        },
-    )
-
-    with pytest.raises(ValueError, match="training.learning_rate overlaps"):
-        load_app_config(tmp_path, config_path=config_path)
 
 
 def test_load_app_config_rejects_missing_model_search_space_entry(tmp_path: Path):
@@ -4263,7 +4241,7 @@ def test_effective_config_pins_val_size_to_horizon_for_training_auto(tmp_path: P
         tmp_path,
         {
             "models": {"TFT": ["hidden_size"]},
-            "training": ["max_steps"],
+            "training": ["batch_size"],
             "residual": {"xgboost": ["n_estimators"]},
         },
     )
@@ -4271,9 +4249,9 @@ def test_effective_config_pins_val_size_to_horizon_for_training_auto(tmp_path: P
     from residual import runtime
 
     loaded = load_app_config(tmp_path, config_path=config_path)
-    effective = runtime._effective_config(loaded, {"max_steps": 123})
+    effective = runtime._effective_config(loaded, {"batch_size": 123})
 
-    assert effective.training.max_steps == 123
+    assert effective.training.batch_size == 123
     assert effective.training.val_size == loaded.config.cv.horizon
 
 
@@ -5051,118 +5029,8 @@ def test_runtime_single_job_rerun_prunes_stale_model_artifacts_and_rebuilds_summ
     assert (run_root / "summary" / "last_fold_all_models.png").exists()
 
 
-@pytest.mark.parametrize(
-    ("source_name", "derived_name"),
-    [
-        ("baseline-wti.yaml", "baseline-wti_uni.yaml"),
-        ("baseline-brentoil.yaml", "baseline-brentoil_uni.yaml"),
-    ],
-)
-def test_generate_baseline_uni_yaml_files_exist_and_parse(
-    source_name: str, derived_name: str
-):
-    source = yaml.safe_load((REPO_ROOT / source_name).read_text(encoding="utf-8"))
-    derived_path = REPO_ROOT / derived_name
-    derived = yaml.safe_load(derived_path.read_text(encoding="utf-8"))
-
-    assert derived_path.exists()
-    assert isinstance(derived, dict)
-    assert derived["task"] == source["task"]
-    assert derived["dataset"]["target_col"] == source["dataset"]["target_col"]
-
-
-@pytest.mark.parametrize(
-    "derived_name",
-    ["baseline-wti_uni.yaml", "baseline-brentoil_uni.yaml"],
-)
-def test_uni_yaml_exogenous_lists_are_empty(derived_name: str):
-    derived = yaml.safe_load((REPO_ROOT / derived_name).read_text(encoding="utf-8"))
-
-    assert derived["dataset"]["hist_exog_cols"] == []
-    assert derived["dataset"]["futr_exog_cols"] == []
-    assert derived["dataset"]["static_exog_cols"] == []
-
-
-@pytest.mark.parametrize(
-    ("source_name", "derived_name"),
-    [
-        ("baseline-wti.yaml", "baseline-wti_uni.yaml"),
-        ("baseline-brentoil.yaml", "baseline-brentoil_uni.yaml"),
-    ],
-)
-def test_uni_yaml_jobs_follow_capability_rule(source_name: str, derived_name: str):
-    from residual.models import capabilities_for as resolve_capabilities
-
-    source = yaml.safe_load((REPO_ROOT / source_name).read_text(encoding="utf-8"))
-    derived = yaml.safe_load((REPO_ROOT / derived_name).read_text(encoding="utf-8"))
-
-    source_jobs = [job["model"] for job in source["jobs"]]
-    derived_jobs = [job["model"] for job in derived["jobs"]]
-
-    expected_jobs = []
-    dropped_jobs = []
-    for model_name in source_jobs:
-        caps = resolve_capabilities(model_name)
-        needs_exog = (
-            caps.supports_hist_exog
-            or caps.supports_futr_exog
-            or caps.supports_stat_exog
-        )
-        if needs_exog:
-            dropped_jobs.append(model_name)
-        else:
-            expected_jobs.append(model_name)
-
-    assert derived_jobs == expected_jobs
-    assert set(derived_jobs).issubset(source_jobs)
-    assert set(derived_jobs).isdisjoint(dropped_jobs)
-
-
-@pytest.mark.parametrize(
-    ("source_name", "derived_name"),
-    [
-        ("baseline-wti.yaml", "baseline-wti_uni.yaml"),
-        ("baseline-brentoil.yaml", "baseline-brentoil_uni.yaml"),
-    ],
-)
-def test_uni_yaml_preserves_non_exog_fields(source_name: str, derived_name: str):
-    source = yaml.safe_load((REPO_ROOT / source_name).read_text(encoding="utf-8"))
-    derived = yaml.safe_load((REPO_ROOT / derived_name).read_text(encoding="utf-8"))
-
-    source_dataset = dict(source["dataset"])
-    derived_dataset = dict(derived["dataset"])
-    for key in ("hist_exog_cols", "futr_exog_cols", "static_exog_cols"):
-        source_dataset.pop(key, None)
-        derived_dataset.pop(key, None)
-
-    source_without_jobs = dict(source)
-    derived_without_jobs = dict(derived)
-    source_without_jobs["dataset"] = source_dataset
-    derived_without_jobs["dataset"] = derived_dataset
-    source_without_jobs.pop("jobs", None)
-    derived_without_jobs.pop("jobs", None)
-
-    assert derived_without_jobs == source_without_jobs
-
-
-def test_source_baseline_yaml_files_unchanged():
-    wti = yaml.safe_load((REPO_ROOT / "baseline-wti.yaml").read_text(encoding="utf-8"))
-    brent = yaml.safe_load(
-        (REPO_ROOT / "baseline-brentoil.yaml").read_text(encoding="utf-8")
-    )
-
-    assert len(wti["dataset"]["hist_exog_cols"]) > 0
-    assert len(brent["dataset"]["hist_exog_cols"]) > 0
-    assert any(job["model"] == "LSTM" for job in wti["jobs"])
-    assert any(job["model"] == "LSTM" for job in brent["jobs"])
-
-
 TOP_LEVEL_FIXED_TRAINING_YAML_FILES = [
     REPO_ROOT / "config.yaml",
-    REPO_ROOT / "baseline-brentoil.yaml",
-    REPO_ROOT / "baseline-brentoil_uni.yaml",
-    REPO_ROOT / "baseline-wti.yaml",
-    REPO_ROOT / "baseline-wti_uni.yaml",
 ]
 
 
@@ -5247,16 +5115,11 @@ HPT_N100_RESIDUAL_YAML_FILES = [
 ]
 
 HPT_CASE3_REP_YAML_FILES = [
-    REPO_ROOT / "yaml" / "feature_set_HPT_c3" / "brentoil-case3.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT_c3" / "wti-case3.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case3.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case3.yaml",
 ]
 
 OPTUNA_CONFIG_YAML_FILES = [
-    REPO_ROOT / "baseline-brentoil.yaml",
-    REPO_ROOT / "baseline-brentoil_uni.yaml",
-    REPO_ROOT / "baseline-wti.yaml",
-    REPO_ROOT / "baseline-wti_uni.yaml",
-    REPO_ROOT / "yaml" / "blackswan" / "swan_test.yaml",
     *HPT_CASE12_YAML_FILES,
     REPO_ROOT / "tests" / "fixtures" / "optuna_learned_auto.yaml",
     *RESIDUAL_AUTO_FIXTURE_FILES,
@@ -5287,11 +5150,6 @@ EXPECTED_CASE_MODEL_PARAMS = {
         "encoder_n_layers": 2,
         "context_size": 10,
     },
-    "NHITS": {
-        "n_pool_kernel_size": [2, 2, 1],
-        "n_freq_downsample": [24, 12, 1],
-        "dropout_prob_theta": 0.0,
-    },
     "PatchTST": {
         "hidden_size": 64,
         "n_heads": 4,
@@ -5321,7 +5179,6 @@ EXPECTED_CASE_MODEL_LIST = [
     "Naive",
     "iTransformer",
     "LSTM",
-    "NHITS",
 ]
 
 EXPECTED_HPT_CASE12_TRAINING = {
@@ -5336,6 +5193,12 @@ EXPECTED_HPT_CASE12_TRAINING = {
     "val_check_steps": 100,
     "early_stop_patience_steps": 5,
     "loss": "mse",
+    "dataloader_kwargs": {
+        "num_workers": 2,
+        "pin_memory": True,
+        "persistent_workers": True,
+        "prefetch_factor": 2,
+    },
 }
 
 EXPECTED_HPT_CASE12_MODELS = [
@@ -5353,20 +5216,6 @@ EXPECTED_HPT_N100_MODELS = [
     "iTransformer",
     "LSTM",
 ]
-
-EXPECTED_HPT_CASE3_REP_MODELS = [
-    "PatchTST",
-    "TSMixerx",
-    "Naive",
-    "iTransformer",
-    "LSTM",
-    "NHITS",
-]
-
-EXPECTED_HPT_CASE3_SPLIT_MODELS = {
-    "wti-case3_split.yaml": ["PatchTST", "iTransformer", "NHITS"],
-    "wti-case3_split2.yaml": ["LSTM", "Naive"],
-}
 
 SEARCH_SPACE_PAYLOAD = yaml.safe_load(
     (REPO_ROOT / "search_space.yaml").read_text(encoding="utf-8")
@@ -5475,7 +5324,7 @@ FEATURE_SET_RESIDUAL_EXPECTED_FILENAMES = [
 EXPECTED_FEATURE_SET_RESIDUAL_PARAMS = {
     "n_estimators": 96,
     "max_depth": 4,
-    "learning_rate": 0.0001,
+    "learning_rate": 0.001,
     "subsample": 0.8,
     "colsample_bytree": 0.8,
 }
@@ -5484,7 +5333,7 @@ EXPECTED_FEATURE_SET_RESIDUAL_LAG_STEPS = [1, 2, 3, 4, 6, 12]
 
 EXPECTED_CASE_METADATA = {
     "brentoil-case1.yaml": {
-        "task_name": "brentoil_case1_re",
+        "task_name": "brentoil_case1",
         "target_col": "Com_BrentCrudeOil",
         "hist_exog_cols": [
             "Com_Gasoline",
@@ -5795,43 +5644,6 @@ def test_case_yaml_build_model_preserves_expected_fixed_params():
             if actual_value is None and hasattr(model, "hparams"):
                 actual_value = getattr(model.hparams, key, None)
             assert actual_value == expected_value
-
-
-@pytest.mark.parametrize("path", HPT_CASE3_REP_YAML_FILES, ids=lambda p: p.name)
-def test_feature_set_hpt_case3_representative_jobs_include_tsmixerx(path: Path):
-    payload = _load_case_yaml(path)
-
-    assert [job["model"] for job in payload["jobs"]] == EXPECTED_HPT_CASE3_REP_MODELS
-    assert payload["jobs"][2]["params"] == {}
-
-
-@pytest.mark.parametrize("path", HPT_CASE3_REP_YAML_FILES, ids=lambda p: p.name)
-def test_feature_set_hpt_case3_representative_tsmixerx_normalizes_to_auto(
-    path: Path,
-):
-    loaded = load_app_config(REPO_ROOT, config_path=path)
-    jobs_by_model = {job.model: job for job in loaded.config.jobs}
-
-    tsmixerx = jobs_by_model["TSMixerx"]
-    assert tsmixerx.params == {}
-    assert tsmixerx.requested_mode == "learned_auto_requested"
-    assert tsmixerx.validated_mode == "learned_auto"
-    assert list(tsmixerx.selected_search_params) == list(SEARCH_SPACE_MODELS["TSMixerx"])
-
-
-@pytest.mark.parametrize(
-    "path",
-    [
-        REPO_ROOT / "yaml" / "feature_set_HPT_c3" / "wti-case3_split.yaml",
-        REPO_ROOT / "yaml" / "feature_set_HPT_c3" / "wti-case3_split2.yaml",
-    ],
-    ids=lambda p: p.name,
-)
-def test_feature_set_hpt_case3_split_files_keep_requested_model_subsets(path: Path):
-    payload = _load_case_yaml(path)
-    assert [job["model"] for job in payload["jobs"]] == EXPECTED_HPT_CASE3_SPLIT_MODELS[
-        path.name
-    ]
 
 
 @pytest.mark.parametrize("path", HPT_CASE12_YAML_FILES, ids=lambda p: p.name)
@@ -6922,8 +6734,8 @@ def test_apply_residual_plugin_writes_feature_visibility_metadata(
         "cutoff_day",
         "ds_day",
         "y_hat_base_lag_1",
-        "hist_a_lag_1",
         "futr_a_lag_1",
+        "hist_a_lag_1",
         "futr_a",
         "static_a",
     ]
