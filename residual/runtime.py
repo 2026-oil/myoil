@@ -471,14 +471,6 @@ def _validate_adapters(loaded: LoadedConfig, selected_jobs) -> None:
                 source_df, job, dataset=loaded.config.dataset, dt_col=dt_col
             )
 
-
-def _cutoff_train_end(
-    total_rows: int, horizon: int, step_size: int, n_windows: int, fold_idx: int
-) -> int:
-    remaining = horizon + step_size * (n_windows - 1 - fold_idx)
-    return total_rows - remaining
-
-
 def _resolve_freq(loaded: LoadedConfig, source_df: pd.DataFrame) -> str:
     if loaded.config.dataset.freq:
         return loaded.config.dataset.freq

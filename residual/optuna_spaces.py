@@ -136,14 +136,6 @@ class SearchSpaceContract:
     payload: dict[str, Any]
     sha256: str
 
-
-def default_residual_params(model_name: str) -> dict[str, Any]:
-    normalized = str(model_name).lower()
-    if normalized not in RESIDUAL_DEFAULTS:
-        raise KeyError(f"Unsupported residual model defaults: {normalized}")
-    return RESIDUAL_DEFAULTS[normalized].copy()
-
-
 def _hash_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
