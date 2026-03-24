@@ -30,16 +30,16 @@ def _needs_reexec() -> bool:
         return True
 
 
-def _exec_args(argv: Sequence[str]) -> list[str]:
-    return [str(VENV_PYTHON), str(Path(__file__).resolve()), *argv]
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     if _needs_reexec():
         env = _build_env()
         env[_BOOTSTRAP_ENV] = '1'
-        os.execvpe(str(VENV_PYTHON), _exec_args(args), env)
+        os.execvpe(
+            str(VENV_PYTHON),
+            [str(VENV_PYTHON), str(Path(__file__).resolve()), *args],
+            env,
+        )
 
     os.environ.update(_build_env())
     from residual.runtime import main as residual_main

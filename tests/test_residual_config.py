@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import io
 from pathlib import Path
 import json
@@ -1207,6 +1208,16 @@ def test_build_model_supports_duet(tmp_path: Path):
     assert duet.hparams.hidden_size == 32
 
 
+def test_worker_env_supports_scalar_gpu_id():
+    env = worker_env(0)
+
+    assert env["CUDA_VISIBLE_DEVICES"] == "0"
+    assert env["NEURALFORECAST_ASSIGNED_GPU_IDS"] == "0"
+    assert env["NEURALFORECAST_WORKER_DEVICES"] == "1"
+    assert env["NEURALFORECAST_PROGRESS_MODE"] == "structured"
+    assert env["NEURALFORECAST_SKIP_SUMMARY_ARTIFACTS"] == "1"
+
+
 def test_scheduler_plan_and_worker_env_support_device_groups(tmp_path: Path):
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n", encoding="utf-8"
@@ -2118,6 +2129,18 @@ def test_default_output_root_for_feature_set_residual_wti_case3_config():
 
     assert _default_output_root(REPO_ROOT, loaded) == (
         REPO_ROOT / "runs" / "feature_set_residual_wti_case3_residual"
+    )
+
+
+def test_default_output_root_for_feature_set_hpt_n100_residual_wti_case3_config():
+    from residual.runtime import _default_output_root
+
+    loaded = load_app_config(
+        REPO_ROOT, config_path="yaml/feature_set_HPT_n100_residual/wti-case3.yaml"
+    )
+
+    assert _default_output_root(REPO_ROOT, loaded) == (
+        REPO_ROOT / "runs" / "feature_set_HPT_n100_residual_wti_case3_HPO_residual"
     )
 
 
@@ -5201,6 +5224,28 @@ HPT_YAML_FILES = [
     REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case4.yaml",
 ]
 
+HPT_N100_YAML_FILES = [
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "brentoil-case1.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "brentoil-case2.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "brentoil-case3.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "brentoil-case4.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "wti-case1.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "wti-case2.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "wti-case3.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "wti-case4.yaml",
+]
+
+HPT_N100_RESIDUAL_YAML_FILES = [
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "brentoil-case1.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "brentoil-case2.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "brentoil-case3.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "brentoil-case4.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "wti-case1.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "wti-case2.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "wti-case3.yaml",
+    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "wti-case4.yaml",
+]
+
 HPT_CASE3_REP_YAML_FILES = [
     REPO_ROOT / "yaml" / "feature_set_HPT_c3" / "brentoil-case3.yaml",
     REPO_ROOT / "yaml" / "feature_set_HPT_c3" / "wti-case3.yaml",
@@ -5299,6 +5344,14 @@ EXPECTED_HPT_CASE12_MODELS = [
     "iTransformer",
     "LSTM",
     "NHITS",
+]
+
+EXPECTED_HPT_N100_MODELS = [
+    "PatchTST",
+    "TSMixerx",
+    "Naive",
+    "iTransformer",
+    "LSTM",
 ]
 
 EXPECTED_HPT_CASE3_REP_MODELS = [
@@ -5600,6 +5653,17 @@ def _case_jobs_by_model(path: Path) -> dict[str, dict[str, Any]]:
     return {job["model"]: job["params"] for job in _load_case_yaml(path)["jobs"]}
 
 
+def _hpt_n100_source_path_for_residual(path: Path) -> Path:
+    return REPO_ROOT / "yaml" / "feature_set_HPT_n100" / path.name
+
+
+def _normalized_payload_without_task_and_residual(payload: dict[str, Any]) -> dict[str, Any]:
+    normalized = copy.deepcopy(payload)
+    normalized["task"]["name"] = "__SOURCE_TASK__"
+    normalized.pop("residual", None)
+    return normalized
+
+
 def test_case_yaml_training_mapping_matches_expected_across_all_files():
     for path in CASE_YAML_FILES:
         payload = _load_case_yaml(path)
@@ -5815,6 +5879,93 @@ def test_feature_set_hpt_case12_preserves_metadata(path: Path):
     assert payload["task"]["name"] == expected_task_name
     assert payload["dataset"]["target_col"] == expected["target_col"]
     assert payload["dataset"]["hist_exog_cols"] == expected["hist_exog_cols"]
+
+
+def test_feature_set_hpt_n100_residual_directory_contains_expected_files():
+    actual = sorted(
+        path.name
+        for path in (REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual").glob("*.yaml")
+    )
+    assert actual == sorted(path.name for path in HPT_N100_YAML_FILES)
+
+
+@pytest.mark.parametrize("path", HPT_N100_RESIDUAL_YAML_FILES, ids=lambda p: p.name)
+def test_feature_set_hpt_n100_residual_files_preserve_non_residual_sections(path: Path):
+    payload = _load_case_yaml(path)
+    source_payload = _load_case_yaml(_hpt_n100_source_path_for_residual(path))
+
+    assert (
+        _normalized_payload_without_task_and_residual(payload)
+        == _normalized_payload_without_task_and_residual(source_payload)
+    )
+    assert payload["task"]["name"] == f'{source_payload["task"]["name"]}_residual'
+
+
+@pytest.mark.parametrize("path", HPT_N100_RESIDUAL_YAML_FILES, ids=lambda p: p.name)
+def test_feature_set_hpt_n100_residual_files_apply_requested_residual_policy(path: Path):
+    payload = _load_case_yaml(path)
+    residual = payload["residual"]
+
+    assert residual["enabled"] is True
+    assert residual["model"] == "xgboost"
+    assert residual["target"] == "level"
+    assert residual["params"] == {}
+    assert residual["features"]["include_base_prediction"] is True
+    assert residual["features"]["include_horizon_step"] is True
+    assert residual["features"]["include_date_features"] is False
+    assert residual["features"]["lag_features"]["enabled"] is True
+    assert residual["features"]["lag_features"]["sources"] == ["y_hat_base"]
+    assert residual["features"]["lag_features"]["steps"] == [1, 2, 3, 4, 6, 12]
+    assert residual["features"]["lag_features"]["transforms"] == ["raw"]
+    assert residual["features"]["exog_sources"]["hist"] == payload["dataset"]["hist_exog_cols"]
+    assert residual["features"]["exog_sources"]["futr"] == []
+    assert residual["features"]["exog_sources"]["static"] == []
+
+
+@pytest.mark.parametrize("path", HPT_N100_RESIDUAL_YAML_FILES, ids=lambda p: p.name)
+def test_feature_set_hpt_n100_residual_files_preserve_n100_knobs(path: Path):
+    payload = _load_case_yaml(path)
+    source_payload = _load_case_yaml(_hpt_n100_source_path_for_residual(path))
+
+    assert payload["runtime"]["opt_n_trial"] == 100
+    assert payload["runtime"]["opt_n_trial"] == source_payload["runtime"]["opt_n_trial"]
+    assert payload["scheduler"]["parallelize_single_job_tuning"] is True
+    assert (
+        payload["scheduler"]["parallelize_single_job_tuning"]
+        == source_payload["scheduler"]["parallelize_single_job_tuning"]
+    )
+    assert [job["model"] for job in payload["jobs"]] == EXPECTED_HPT_N100_MODELS
+    assert payload["jobs"] == source_payload["jobs"]
+
+
+@pytest.mark.parametrize("path", HPT_N100_RESIDUAL_YAML_FILES, ids=lambda p: p.name)
+def test_feature_set_hpt_n100_residual_files_normalize_to_auto_modes(path: Path):
+    loaded = load_app_config(REPO_ROOT, config_path=path)
+
+    assert loaded.config.training_search.requested_mode == "training_auto_requested"
+    assert loaded.config.training_search.validated_mode == "training_auto"
+    assert list(loaded.config.training_search.selected_search_params) == list(
+        TRAINING_PARAM_REGISTRY
+    )
+    assert loaded.config.residual.model == "xgboost"
+    assert loaded.config.residual.requested_mode == "residual_auto_requested"
+    assert loaded.config.residual.validated_mode == "residual_auto"
+    assert list(loaded.config.residual.selected_search_params) == list(
+        SEARCH_SPACE_RESIDUAL["xgboost"]
+    )
+
+    for job in loaded.config.jobs:
+        if job.model == "Naive":
+            assert job.requested_mode == "baseline_fixed"
+            assert job.validated_mode == "baseline_fixed"
+            assert job.selected_search_params == ()
+        else:
+            assert job.params == {}
+            assert job.requested_mode == "learned_auto_requested"
+            assert job.validated_mode == "learned_auto"
+            assert list(job.selected_search_params) == list(
+                SEARCH_SPACE_MODELS[job.model]
+            )
 
 
 @pytest.mark.parametrize("path", RESIDUAL_AUTO_FIXTURE_FILES, ids=lambda p: p.name)
