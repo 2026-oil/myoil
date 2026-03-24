@@ -44,6 +44,7 @@ training:
     pin_memory: true
     persistent_workers: true
     prefetch_factor: 2
+  model_step_size: 8
 cv:
   horizon: 8
   step_size: 8
@@ -61,7 +62,7 @@ scheduler:
 residual:
   enabled: false
 jobs:
-- model: PatchTST
+- model: TimeXer
   params: {}
 - model: TSMixerx
   params: {}

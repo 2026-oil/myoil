@@ -191,39 +191,45 @@ models:
     n_heads:
       type: categorical
       choices:
+      - 4
       - 8
     encoder_layers:
-      type: int
-      low: 2
-      high: 3
-      step: 1
+      type: categorical
+      choices:
+      - 4
+      - 8
     linear_hidden_size:
       type: categorical
       choices:
       - 128
+      - 256
       - 512
     patch_len:
       type: categorical
       choices:
       - 4
       - 8
+      - 16
     stride:
       type: categorical
       choices:
       - 8
+      - 16
     dropout:
       type: categorical
       choices:
-      - 0.2
+      - 0.1
       - 0.3
     fc_dropout:
       type: categorical
       choices:
-      - 0.2
+      - 0.1
+      - 0.3
     attn_dropout:
       type: categorical
       choices:
-      - 0.0
+      - 0.1
+      - 0.3
     revin:
       type: categorical
       choices:
@@ -237,14 +243,16 @@ models:
       - 128
       - 256
     encoder_n_layers:
-      type: int
-      low: 3
-      high: 3
-      step: 1
+      type: categorical
+      choices:
+      - 4
+      - 8
     inference_input_size:
       type: categorical
       choices:
-      - -1
+      - 48
+      - 64
+      - 96
     encoder_dropout:
       type: categorical
       choices:
@@ -253,12 +261,13 @@ models:
     decoder_hidden_size:
       type: categorical
       choices:
+      - 64
       - 128
     decoder_layers:
-      type: int
-      low: 2
-      high: 2
-      step: 1
+      type: categorical
+      choices:
+      - 4
+      - 8
   TCN:
     encoder_hidden_size:
       type: categorical
@@ -664,10 +673,13 @@ models:
     hidden_size:
       type: categorical
       choices:
+      - 64
       - 128
+      - 256
     n_heads:
       type: categorical
       choices:
+      - 4
       - 8
     e_layers:
       type: int
@@ -682,11 +694,12 @@ models:
     d_layers:
       type: int
       low: 1
-      high: 2
+      high: 1
       step: 1
     factor:
       type: categorical
       choices:
+      - 1
       - 3
     dropout:
       type: categorical
@@ -696,6 +709,7 @@ models:
     use_norm:
       type: categorical
       choices:
+      - true
       - false
   TimeLLM:
     patch_len:
@@ -824,22 +838,23 @@ models:
     n_block:
       type: categorical
       choices:
-      - 1
       - 2
+      - 4
     ff_dim:
       type: categorical
       choices:
-      - 32
+      - 64
       - 128
+      - 256
     dropout:
       type: categorical
       choices:
-      - 0.05
+      - 0.1
+      - 0.3
   MLPMultivariate:
     hidden_size:
       type: categorical
       choices:
-      - 32
       - 64
       - 128
       - 256
@@ -1170,11 +1185,8 @@ training:
     input_size:
       type: categorical
       choices:
-      - 24
-      - 36
       - 48
       - 64
-      - 72
       - 96
     batch_size:
       type: categorical
@@ -1684,11 +1696,8 @@ training:
       input_size:
         type: categorical
         choices:
-        - 24
-        - 36
         - 48
         - 64
-        - 72
         - 96
       batch_size:
         type: categorical
@@ -2026,16 +2035,18 @@ training:
       input_size:
         type: categorical
         choices:
+        - 24
         - 48
         - 96
       batch_size:
         type: categorical
         choices:
         - 32
+        - 64
       valid_batch_size:
         type: categorical
         choices:
-        - 16
+        - 32
         - 64
       windows_batch_size:
         type: categorical
@@ -2047,28 +2058,27 @@ training:
         - 1024
       learning_rate:
         type: float
-        low: 0.001
+        low: 0.0005
         high: 0.01
         log: true
       scaler_type:
         type: categorical
         choices:
+        - robust
         - standard
         - identity
       model_step_size:
         type: categorical
         choices:
+        - 1
+        - 4
         - 8
-        - 12
     MLP:
       input_size:
         type: categorical
         choices:
-        - 24
-        - 36
         - 48
         - 64
-        - 72
         - 96
       batch_size:
         type: categorical
@@ -2520,8 +2530,9 @@ training:
       input_size:
         type: categorical
         choices:
-        - 36
         - 48
+        - 64
+        - 96
       batch_size:
         type: categorical
         choices:
@@ -2529,7 +2540,6 @@ training:
       valid_batch_size:
         type: categorical
         choices:
-        - 16
         - 32
       windows_batch_size:
         type: categorical
@@ -2544,7 +2554,7 @@ training:
       learning_rate:
         type: float
         low: 0.0003
-        high: 0.009
+        high: 0.008
         log: true
       scaler_type:
         type: categorical
@@ -2560,12 +2570,8 @@ training:
       input_size:
         type: categorical
         choices:
-        - 24
-        - 36
         - 48
         - 64
-        - 72
-        - 96
       batch_size:
         type: categorical
         choices:
@@ -2959,12 +2965,9 @@ training:
       input_size:
         type: categorical
         choices:
-        - 24
-        - 36
         - 48
         - 64
         - 72
-        - 96
       batch_size:
         type: categorical
         choices:
@@ -3016,16 +3019,16 @@ training:
       input_size:
         type: categorical
         choices:
+        - 48
         - 64
+        - 72
       batch_size:
         type: categorical
         choices:
         - 16
-        - 32
       valid_batch_size:
         type: categorical
         choices:
-        - 64
         - 128
       windows_batch_size:
         type: categorical
@@ -3034,31 +3037,29 @@ training:
       inference_windows_batch_size:
         type: categorical
         choices:
-        - 256
         - 512
       learning_rate:
         type: float
-        low: 0.0004
-        high: 0.001
+        low: 0.0003
+        high: 0.002
         log: true
       scaler_type:
         type: categorical
         choices:
         - robust
+        - standard
       model_step_size:
         type: categorical
         choices:
         - 1
+        - 4
     TiDE:
       input_size:
         type: categorical
         choices:
-        - 24
-        - 36
         - 48
         - 64
         - 72
-        - 96
       batch_size:
         type: categorical
         choices:
@@ -3110,12 +3111,9 @@ training:
       input_size:
         type: categorical
         choices:
-        - 24
-        - 36
         - 48
         - 64
         - 72
-        - 96
       batch_size:
         type: categorical
         choices:
@@ -3167,11 +3165,8 @@ training:
       input_size:
         type: categorical
         choices:
-        - 24
-        - 36
         - 48
         - 64
-        - 72
         - 96
       batch_size:
         type: categorical
@@ -3224,11 +3219,8 @@ training:
       input_size:
         type: categorical
         choices:
-        - 24
-        - 36
         - 48
         - 64
-        - 72
         - 96
       batch_size:
         type: categorical
@@ -3281,11 +3273,8 @@ training:
       input_size:
         type: categorical
         choices:
-        - 24
-        - 36
         - 48
         - 64
-        - 72
         - 96
       batch_size:
         type: categorical
@@ -3338,11 +3327,8 @@ training:
       input_size:
         type: categorical
         choices:
-        - 24
-        - 36
         - 48
         - 64
-        - 72
         - 96
       batch_size:
         type: categorical
@@ -3452,12 +3438,13 @@ training:
       input_size:
         type: categorical
         choices:
-        - 72
+        - 48
+        - 64
+        - 96
       batch_size:
         type: categorical
         choices:
         - 16
-        - 32
       valid_batch_size:
         type: categorical
         choices:
@@ -3467,7 +3454,6 @@ training:
         type: categorical
         choices:
         - 512
-        - 1024
       inference_windows_batch_size:
         type: categorical
         choices:
@@ -3481,21 +3467,18 @@ training:
         type: categorical
         choices:
         - null
-        - standard
+        - robust
       model_step_size:
         type: categorical
         choices:
+        - 1
         - 4
-        - 12
     xLSTM:
       input_size:
         type: categorical
         choices:
-        - 24
-        - 36
         - 48
         - 64
-        - 72
         - 96
       batch_size:
         type: categorical

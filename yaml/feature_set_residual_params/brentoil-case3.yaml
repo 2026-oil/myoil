@@ -30,6 +30,7 @@ training:
   windows_batch_size: 1024
   inference_windows_batch_size: 1024
   learning_rate: 0.001
+  model_step_size: 8
   max_steps: 1000
   val_size: 8
   val_check_steps: 50
@@ -87,12 +88,12 @@ residual:
       futr: []
       static: []
 jobs:
-- model: PatchTST
+- model: TimeXer
   params:
+    patch_len: 16
     hidden_size: 64
     n_heads: 4
-    encoder_layers: 2
-    patch_len: 16
+    e_layers: 2
     dropout: 0.1
 - model: TSMixerx
   params:
@@ -115,4 +116,3 @@ jobs:
     decoder_hidden_size: 64
     encoder_n_layers: 2
     context_size: 10
-

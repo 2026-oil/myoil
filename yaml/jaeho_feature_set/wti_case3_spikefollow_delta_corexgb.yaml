@@ -1,6 +1,5 @@
 task:
   name: wti_case3_spikefollow_delta_corexgb
-
 dataset:
   path: data/df.csv
   target_col: Com_CrudeOil
@@ -20,10 +19,8 @@ dataset:
   - BS_Core_Index_Integrated
   futr_exog_cols: []
   static_exog_cols: []
-
 runtime:
   random_seed: 1
-
 training:
   train_protocol: expanding_window_tscv
   input_size: 32
@@ -33,13 +30,13 @@ training:
   windows_batch_size: 256
   inference_windows_batch_size: 256
   learning_rate: 0.003
+  model_step_size: 8
   max_steps: 800
   val_size: 8
   val_check_steps: 50
   early_stop_patience_steps: 20
   loss: mse
   scaler_type: robust
-
 cv:
   horizon: 8
   step_size: 8
@@ -47,12 +44,12 @@ cv:
   gap: 0
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean
-
 scheduler:
-  gpu_ids: [0, 1]
+  gpu_ids:
+  - 0
+  - 1
   max_concurrent_jobs: 2
   worker_devices: 1
-
 residual:
   enabled: true
   model: xgboost
@@ -88,7 +85,6 @@ residual:
       - BS_Core_Index_Integrated
       futr: []
       static: []
-
 jobs:
 - model: LSTM
   params:
@@ -100,24 +96,34 @@ jobs:
     decoder_layers: 3
 - model: NHITS
   params:
-    n_pool_kernel_size: [8, 4, 1]
-    n_freq_downsample: [4, 2, 1]
-    n_blocks: [2, 2, 2]
-    mlp_units: [[512, 512], [512, 512], [512, 512]]
+    n_pool_kernel_size:
+    - 8
+    - 4
+    - 1
+    n_freq_downsample:
+    - 4
+    - 2
+    - 1
+    n_blocks:
+    - 2
+    - 2
+    - 2
+    mlp_units:
+    - - 512
+      - 512
+    - - 512
+      - 512
+    - - 512
+      - 512
     dropout_prob_theta: 0.2
     activation: LeakyReLU
-- model: PatchTST
+- model: TimeXer
   params:
+    patch_len: 4
     hidden_size: 128
     n_heads: 4
-    encoder_layers: 4
-    linear_hidden_size: 256
-    patch_len: 4
-    stride: 8
+    e_layers: 4
     dropout: 0.3
-    fc_dropout: 0.2
-    attn_dropout: 0.0
-    revin: true
 - model: DLinear
   params:
     moving_avg_window: 13

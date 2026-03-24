@@ -3561,6 +3561,7 @@ def test_runtime_auto_mode_prefers_yaml_opt_n_trial_over_env(
         (output_root / "models" / "TFT" / "optuna_study_summary.json").read_text()
     )
     assert study_summary["trial_count"] == 2
+    assert study_summary["objective_metric"] == "mean_fold_mape"
 
 
 def test_runtime_main_parallelizes_single_auto_job_tuning(
@@ -3724,7 +3725,7 @@ def test_runtime_auto_mode_can_prune_from_first_fold(
         )
 
     def _should_prune_with_trace(self):
-        should_prune_steps.append(len(self.user_attrs.get("fold_mse", [])))
+        should_prune_steps.append(len(self.user_attrs.get("fold_mape", [])))
         return self.number == 0
 
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
@@ -3766,6 +3767,7 @@ def test_runtime_auto_mode_can_prune_from_first_fold(
     assert summary["trial_count"] >= 2
     assert summary["state_counts"]["complete"] == 1
     assert summary["state_counts"]["pruned"] == 1
+    assert summary["objective_metric"] == "mean_fold_mape"
     assert should_prune_steps[0] == 1
     assert min(should_prune_steps) == 1
 
@@ -3814,7 +3816,7 @@ def test_residual_auto_mode_can_prune_from_first_fold(
             self.reported_steps.append(step)
 
         def should_prune(self) -> bool:
-            self.prune_checks.append(len(self.user_attrs.get("fold_mse", [])))
+            self.prune_checks.append(len(self.user_attrs.get("fold_mape", [])))
             return True
 
     monkeypatch.setattr(
@@ -3952,6 +3954,7 @@ def test_runtime_auto_mode_catches_recoverable_trial_failures(
     assert summary["trial_count"] == 2
     assert summary["state_counts"]["complete"] == 1
     assert summary["state_counts"]["fail"] == 1
+    assert summary["objective_metric"] == "mean_fold_mape"
 
 
 def test_runtime_auto_mode_resumes_persistent_study_budget(
@@ -4341,47 +4344,48 @@ def test_narrowed_model_param_ranges_are_explicit_for_selected_auto_models():
         "PatchTST": {
             "categorical": {
                 "hidden_size": (64, 128),
-                "n_heads": (4, 8),
-                "linear_hidden_size": (128, 256, 512),
-                "patch_len": (4, 8, 16),
-                "stride": (2, 4, 8),
-                "dropout": (0.0, 0.2, 0.3),
-                "fc_dropout": (0.0, 0.2),
-                "attn_dropout": (0.0, 0.1),
+                "n_heads": (8,),
+                "linear_hidden_size": (128, 512),
+                "patch_len": (4, 8),
+                "stride": (8,),
+                "dropout": (0.3,),
+                "fc_dropout": (0.2,),
+                "attn_dropout": (0.0,),
                 "revin": (True, False),
             },
+            "integer": {"encoder_layers": (2, 3, 1)},
         },
         "TSMixerx": {
             "categorical": {
-                "n_block": (1, 2),
-                "ff_dim": (32, 64, 128),
-                "dropout": (0.05, 0.1, 0.2),
+                "n_block": (1, 2, 4),
+                "ff_dim": (32, 128, 256),
+                "dropout": (0.05,),
             },
         },
         "iTransformer": {
             "categorical": {
-                "hidden_size": (64, 128),
-                "n_heads": (4, 8),
-                "d_ff": (128, 256, 512),
-                "factor": (1, 3),
-                "dropout": (0.0, 0.2, 0.3),
-                "use_norm": (True, False),
+                "hidden_size": (128,),
+                "n_heads": (8,),
+                "d_ff": (128,),
+                "factor": (3,),
+                "dropout": (0.0, 0.3),
+                "use_norm": (False,),
             },
             "integer": {
-                "e_layers": (1, 2, 1),
-                "d_layers": (1, 2, 1),
+                "e_layers": (1, 1, 1),
+                "d_layers": (1, 1, 1),
             },
         },
         "LSTM": {
             "categorical": {
-                "encoder_hidden_size": (64, 128, 256),
-                "inference_input_size": (-1, 24, 48, 96),
-                "encoder_dropout": (0.1, 0.2, 0.3),
-                "decoder_hidden_size": (32, 64, 128),
+                "encoder_hidden_size": (128,),
+                "inference_input_size": (-1,),
+                "encoder_dropout": (0.3,),
+                "decoder_hidden_size": (128,),
             },
             "integer": {
-                "encoder_n_layers": (1, 3, 1),
-                "decoder_layers": (1, 3, 1),
+                "encoder_n_layers": (3, 3, 1),
+                "decoder_layers": (2, 2, 1),
             },
         },
     }
@@ -4415,21 +4419,23 @@ def test_priority_models_have_narrowed_training_range_overrides():
     cases = {
         "PatchTST": {
             "categorical": {
-                "input_size": (24, 36, 48, 64),
-                "batch_size": (16, 32, 64),
-                "valid_batch_size": (16, 32, 64),
-                "windows_batch_size": (256, 512, 1024),
-                "inference_windows_batch_size": (256, 512, 1024),
+                "input_size": (36,),
+                "batch_size": (16,),
+                "valid_batch_size": (32,),
+                "windows_batch_size": (256, 1024),
+                "inference_windows_batch_size": (256, 512),
+                "scaler_type": (None, "robust"),
+                "model_step_size": (1, 12),
             },
-            "floating": {"learning_rate": (3e-4, 9e-3, True)},
+            "floating": {"learning_rate": (3e-4, 1.5e-2, True)},
         },
         "TSMixerx": {
             "categorical": {
-                "input_size": (48, 64),
-                "batch_size": (16, 32),
-                "valid_batch_size": (32, 64, 128),
+                "input_size": (64,),
+                "batch_size": (16,),
+                "valid_batch_size": (128,),
                 "windows_batch_size": (512,),
-                "inference_windows_batch_size": (256, 512, 1024),
+                "inference_windows_batch_size": (512,),
                 "scaler_type": ("robust",),
                 "model_step_size": (1,),
             },
@@ -4437,24 +4443,25 @@ def test_priority_models_have_narrowed_training_range_overrides():
         },
         "iTransformer": {
             "categorical": {
-                "input_size": (24, 36, 48, 64, 72),
-                "batch_size": (16, 32, 64),
-                "valid_batch_size": (16, 32, 64),
-                "windows_batch_size": (256, 512, 1024),
-                "inference_windows_batch_size": (256, 512, 1024),
-                "scaler_type": (None, "robust", "standard"),
+                "input_size": (72,),
+                "batch_size": (16,),
+                "valid_batch_size": (16, 32),
+                "windows_batch_size": (512,),
+                "inference_windows_batch_size": (512,),
+                "scaler_type": (None,),
+                "model_step_size": (4,),
             },
             "floating": {"learning_rate": (4e-4, 7e-3, True)},
         },
         "LSTM": {
             "categorical": {
-                "input_size": (24, 48, 64, 96),
-                "batch_size": (16, 32, 64),
-                "valid_batch_size": (16, 32, 64),
-                "windows_batch_size": (128, 256, 512, 1024),
-                "inference_windows_batch_size": (256, 512, 1024),
-                "scaler_type": ("robust", "standard", "identity"),
-                "model_step_size": (4, 8, 12),
+                "input_size": (48,),
+                "batch_size": (32,),
+                "valid_batch_size": (16,),
+                "windows_batch_size": (1024,),
+                "inference_windows_batch_size": (1024,),
+                "scaler_type": ("identity",),
+                "model_step_size": (8,),
             },
             "floating": {"learning_rate": (1e-3, 1e-2, True)},
         },
@@ -5135,9 +5142,10 @@ EXPECTED_CASE_TRAINING = {
     "windows_batch_size": 1024,
     "inference_windows_batch_size": 1024,
     "learning_rate": 0.001,
+    "model_step_size": 8,
     "max_steps": 1000,
     "val_size": 8,
-    "val_check_steps": 100,
+    "val_check_steps": 50,
     "train_protocol": "expanding_window_tscv",
     "early_stop_patience_steps": 5,
     "loss": "mse",
@@ -5150,11 +5158,11 @@ EXPECTED_CASE_MODEL_PARAMS = {
         "encoder_n_layers": 2,
         "context_size": 10,
     },
-    "PatchTST": {
+    "TimeXer": {
+        "patch_len": 16,
         "hidden_size": 64,
         "n_heads": 4,
-        "encoder_layers": 2,
-        "patch_len": 16,
+        "e_layers": 2,
         "dropout": 0.1,
     },
     "iTransformer": {
@@ -5174,7 +5182,7 @@ EXPECTED_CASE_MODEL_PARAMS = {
 }
 
 EXPECTED_CASE_MODEL_LIST = [
-    "PatchTST",
+    "TimeXer",
     "TSMixerx",
     "Naive",
     "iTransformer",
@@ -5210,7 +5218,7 @@ EXPECTED_HPT_CASE12_MODELS = [
 ]
 
 EXPECTED_HPT_N100_MODELS = [
-    "PatchTST",
+    "TimeXer",
     "TSMixerx",
     "Naive",
     "iTransformer",
@@ -5307,7 +5315,7 @@ EXPECTED_FIXED_TRAINING_VALUES = {
     "inference_windows_batch_size": 1024,
     "max_steps": 1000,
     "val_size": 8,
-    "val_check_steps": 100,
+    "val_check_steps": 50,
 }
 
 FEATURE_SET_RESIDUAL_EXPECTED_FILENAMES = [
@@ -6348,9 +6356,10 @@ def test_runtime_main_joint_auto_mode_records_residual_best_params(
 
     assert code == 0
     assert summary["objective_stage"] == "tuning_pre_replay_corrected_predictions"
+    assert summary["objective_metric"] == "mean_fold_mape"
     assert summary["best_residual_params"] == {"n_estimators": 8}
     assert fit_summary["tuning_objective_metric"] == (
-        "mean_fold_mse_on_corrected_predictions"
+        "mean_fold_mape_on_corrected_predictions"
     )
     assert captured["residual_params_override"] == {"n_estimators": 8}
     assert (

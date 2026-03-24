@@ -669,7 +669,9 @@ def _fit_and_predict_fold(
     return target_predictions, target_actuals, train_end_ds, train_df, nf
 
 
-def _trial_metrics_summary(study: optuna.Study) -> dict[str, Any]:
+def _trial_metrics_summary(
+    study: optuna.Study, *, objective_metric: str = "mean_fold_mape"
+) -> dict[str, Any]:
     state_counts: dict[str, int] = {}
     finished_trial_count = 0
     for trial in study.trials:
@@ -689,14 +691,18 @@ def _trial_metrics_summary(study: optuna.Study) -> dict[str, Any]:
         "state_counts": state_counts,
         "best_value": best_value,
         "best_trial_number": best_trial_number,
-        "objective_metric": "mean_fold_mse",
+        "objective_metric": objective_metric,
     }
 
 
-def _mean_fold_metric(values: Sequence[float]) -> float:
+def _mean_fold_metric(values: Sequence[float], *, metric_name: str = "metric") -> float:
     if not values:
         raise ValueError("fold metric values must be non-empty")
-    return float(sum(values) / len(values))
+    array = np.asarray(list(values), dtype=float)
+    finite = array[np.isfinite(array)]
+    if finite.size == 0:
+        raise ValueError(f"fold {metric_name} values must include at least one finite value")
+    return float(finite.mean())
 
 
 def _objective_stage_label(loaded: LoadedConfig) -> str:
@@ -758,7 +764,7 @@ def _score_main_trial_with_residual(
         fold_idx,
     )
     if backcast_panel.empty:
-        return _compute_metrics(target_actuals, target_predictions[job.model])["MSE"]
+        return _compute_metrics(target_actuals, target_predictions[job.model])["MAPE"]
     eval_panel = _build_fold_eval_panel(
         loaded,
         job,
@@ -787,7 +793,7 @@ def _score_main_trial_with_residual(
         corrected,
         loaded.config.residual.target,
     )
-    return _compute_metrics(corrected["y"], corrected["y_hat_corrected"])["MSE"]
+    return _compute_metrics(corrected["y"], corrected["y_hat_corrected"])["MAPE"]
 
 
 def _build_study_name(
@@ -1005,7 +1011,7 @@ def _main_job_objective(
         trial.set_user_attr("best_training_params", candidate_training_params)
         if candidate_residual_params is not None:
             trial.set_user_attr("best_residual_params", candidate_residual_params)
-        fold_mse: list[float] = []
+        fold_mape: list[float] = []
         for fold_idx, (train_idx, test_idx) in enumerate(splits):
             phase = f"tune-trial-{trial.number + 1}/{trial_count}"
             if progress is not None:
@@ -1030,12 +1036,12 @@ def _main_job_objective(
                     training_override=candidate_training_params,
                 )
                 if candidate_residual_params is None:
-                    mse = _compute_metrics(
+                    metric = _compute_metrics(
                         target_actuals, target_predictions[job.model]
-                    )["MSE"]
+                    )["MAPE"]
                 else:
                     future_df = source_df.iloc[test_idx].reset_index(drop=True)
-                    mse = _score_main_trial_with_residual(
+                    metric = _score_main_trial_with_residual(
                         loaded,
                         job,
                         train_df=train_df,
@@ -1048,9 +1054,9 @@ def _main_job_objective(
                         residual_params=candidate_residual_params,
                         scratch_root=study_root,
                     )
-                fold_mse.append(mse)
-                interim_metric = _mean_fold_metric(fold_mse)
-                trial.set_user_attr("fold_mse", fold_mse.copy())
+                fold_mape.append(metric)
+                interim_metric = _mean_fold_metric(fold_mape, metric_name="mape")
+                trial.set_user_attr("fold_mape", fold_mape.copy())
                 trial.report(interim_metric, step=fold_idx)
                 if trial.should_prune():
                     trial.set_user_attr("pruned_after_fold", fold_idx)
@@ -1059,17 +1065,17 @@ def _main_job_objective(
                             fold_idx,
                             total_folds=len(splits),
                             phase=phase,
-                            detail=f"pruned mean_mse={interim_metric:.4f}",
+                            detail=f"pruned mean_mape={interim_metric:.4f}",
                         )
                     raise optuna.TrialPruned(
-                        f"Pruned after fold {fold_idx} with mean_mse={interim_metric:.4f}"
+                        f"Pruned after fold {fold_idx} with mean_mape={interim_metric:.4f}"
                     )
                 if progress is not None:
                     progress.fold_completed(
                         fold_idx,
                         total_folds=len(splits),
                         phase=phase,
-                        detail=f"mse={mse:.4f}",
+                        detail=f"mape={metric:.4f}",
                     )
             except optuna.TrialPruned:
                 raise
@@ -1088,8 +1094,8 @@ def _main_job_objective(
                 raise _OptunaTrialFailure(
                     f"{job.model} tuning failed on fold {fold_idx}: {type(exc).__name__}: {exc}"
                 ) from exc
-        metric = _mean_fold_metric(fold_mse)
-        trial.set_user_attr("fold_mse", fold_mse)
+        metric = _mean_fold_metric(fold_mape, metric_name="mape")
+        trial.set_user_attr("fold_mape", fold_mape)
         return metric
 
     return objective
@@ -1114,7 +1120,7 @@ def _collect_main_tuning_result(
         else None
     )
     summary = {
-        **_trial_metrics_summary(study),
+        **_trial_metrics_summary(study, objective_metric="mean_fold_mape"),
         **study_metadata,
         **optimize_metadata,
         "requested_mode": job.requested_mode,
@@ -1129,7 +1135,7 @@ def _collect_main_tuning_result(
         ),
         "best_params": best_params,
         "best_training_params": best_training_params,
-        "fold_mse": best_trial.user_attrs["fold_mse"],
+        "fold_mape": best_trial.user_attrs["fold_mape"],
         "objective_stage": _objective_stage_label(loaded),
     }
     if best_residual_params is not None:
@@ -1257,7 +1263,7 @@ def _score_residual_params(
     *,
     trial: optuna.Trial,
 ) -> float:
-    mse_scores: list[float] = []
+    mape_scores: list[float] = []
     for step_idx, payload in enumerate(fold_payloads):
         fold_idx = int(payload["fold_idx"])
         try:
@@ -1278,16 +1284,16 @@ def _score_residual_params(
                 corrected,
                 loaded.config.residual.target,
             )
-            mse_scores.append(
-                _compute_metrics(corrected["y"], corrected["y_hat_corrected"])["MSE"]
+            mape_scores.append(
+                _compute_metrics(corrected["y"], corrected["y_hat_corrected"])["MAPE"]
             )
-            interim_metric = _mean_fold_metric(mse_scores)
-            trial.set_user_attr("fold_mse", mse_scores.copy())
+            interim_metric = _mean_fold_metric(mape_scores, metric_name="mape")
+            trial.set_user_attr("fold_mape", mape_scores.copy())
             trial.report(interim_metric, step=step_idx)
             if trial.should_prune():
                 trial.set_user_attr("pruned_after_fold", fold_idx)
                 raise optuna.TrialPruned(
-                    f"Pruned residual trial after fold {fold_idx} with mean_mse={interim_metric:.4f}"
+                    f"Pruned residual trial after fold {fold_idx} with mean_mape={interim_metric:.4f}"
                 )
         except optuna.TrialPruned:
             raise
@@ -1299,7 +1305,7 @@ def _score_residual_params(
             raise _OptunaTrialFailure(
                 f"{job.model} residual tuning failed on fold {fold_idx}: {type(exc).__name__}: {exc}"
             ) from exc
-    return _mean_fold_metric(mse_scores)
+    return _mean_fold_metric(mape_scores, metric_name="mape")
 
 
 def _residual_trajectory_group_keys() -> list[str]:
@@ -2787,10 +2793,10 @@ def _run_single_job(
                 "loss": loaded.config.training.loss,
                 "evaluation_policy": "tscv_only",
                 "tuning_objective_metric": (
-                    "mean_fold_mse_on_corrected_predictions"
+                    "mean_fold_mape_on_corrected_predictions"
                     if job.validated_mode == "learned_auto"
                     and loaded.config.residual.enabled
-                    else "mean_fold_mse_on_direct_predictions"
+                    else "mean_fold_mape_on_direct_predictions"
                     if job.validated_mode == "learned_auto"
                     else None
                 ),
