@@ -1,25 +1,28 @@
 task:
-  name: wti_case1
+  name: brentoil_case2
 dataset:
   path: data/df.csv
-  target_col: Com_CrudeOil
+  target_col: Com_BrentCrudeOil
   dt_col: dt
   hist_exog_cols:
   - Com_Gasoline
-  - Com_LME_Zn_Inv
-  - Com_OrangeJuice
-  - Com_Cheese
-  - Bonds_BRZ_1Y
-  - Idx_OVX
-  - Com_Cu_Gold_Ratio
-  - Com_LME_Sn_Inv
-  - Idx_CSI300
-  - Com_LME_Zn_Spread
-  - Bonds_CHN_Spread_5Y_2Y
-  - Com_LME_Al_Spread
-  - Bonds_CHN_Spread_2Y_1Y
-  - Com_Oil_Spread
-  - Bonds_CHN_Spread_10Y_5Y
+  - Com_BloombergCommodity_BCOM
+  - Com_LME_Ni_Cash
+  - Com_Coal
+  - Com_Cotton
+  - Com_LME_Al_Cash
+  - Bonds_KOR_10Y
+  - Com_Barley
+  - Com_Canola
+  - Com_LMEX
+  - Com_LME_Ni_Inv
+  - Com_Corn
+  - Com_Wheat
+  - BS_Core_Index_A
+  - BS_Core_Index_B
+  - BS_Core_Index_C
+  - BS_Core_Index_Integrated
+
   futr_exog_cols: []
   static_exog_cols: []
 runtime:
