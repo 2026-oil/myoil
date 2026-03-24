@@ -698,7 +698,7 @@ models:
       choices:
       - 2
       - 4
-      - 6
+      - 8
     d_ff:
       type: categorical
       choices:
@@ -710,6 +710,7 @@ models:
       choices:
       - 2
       - 4
+      - 8
     factor:
       type: categorical
       choices:
@@ -789,9 +790,8 @@ models:
     e_layers:
       type: categorical
       choices:
-      - 2
       - 4
-      - 6
+      - 8
     d_ff:
       type: categorical
       choices:
@@ -880,7 +880,6 @@ models:
     n_block:
       type: categorical
       choices:
-      - 2
       - 4
       - 8
     ff_dim:
@@ -910,10 +909,10 @@ models:
       - 128
       - 256
     num_layers:
-      type: int
-      low: 1
-      high: 4
-      step: 1
+      type: categorical
+      choices:
+      - 4
+      - 8
   SOFTS:
     hidden_size:
       type: categorical
@@ -1156,9 +1155,9 @@ models:
     n_block:
       type: categorical
       choices:
-      - 1
       - 2
-      - 3
+      - 4
+      - 8
     ff_dim:
       type: categorical
       choices:
@@ -1173,9 +1172,9 @@ models:
     encoder_n_blocks:
       type: categorical
       choices:
-      - 1
       - 2
-      - 3
+      - 4
+      - 8
     encoder_dropout:
       type: float
       low: 0.0
