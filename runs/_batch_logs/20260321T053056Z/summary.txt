@@ -1,9 +1,0 @@
-[batch] summary
-[batch] repo_root=/home/sonet/.openclaw/workspace/research/neuralforecast
-[batch] log_dir=runs/_batch_logs/20260321T053056Z
-[batch] started_at=2026-03-21T05:30:56Z
-[batch] finished_at=2026-03-21T05:31:05Z
-[batch] passed=0 failed=2 missing=0
-[batch] failed:
-  - yaml/feature_set/brentoil-case1.yaml (exit=1)
-  - yaml/feature_set/wti-case4.yaml (exit=1)

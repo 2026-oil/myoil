@@ -1,6 +1,0 @@
-{
-  "hidden_size": 256,
-  "n_heads": 4,
-  "e_layers": 1,
-  "d_ff": 512
-}

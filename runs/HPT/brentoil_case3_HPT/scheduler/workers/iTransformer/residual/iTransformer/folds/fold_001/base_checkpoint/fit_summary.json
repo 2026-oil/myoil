@@ -1,9 +1,0 @@
-{
-  "model": "iTransformer",
-  "fold_idx": 1,
-  "train_rows": 552,
-  "eval_rows": 8,
-  "train_end_ds": "2025-07-28 00:00:00",
-  "loss": "mse",
-  "loss_curve_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case3_HPT/scheduler/workers/iTransformer/models/iTransformer/folds/fold_001/loss_curve.png"
-}

@@ -1,1 +1,0 @@
-{"ok": true, "jobs": ["LSTM", "NHITS", "DLinear", "Autoformer", "FEDformer", "PatchTST", "iTransformer", "TimesNet", "Naive"]}

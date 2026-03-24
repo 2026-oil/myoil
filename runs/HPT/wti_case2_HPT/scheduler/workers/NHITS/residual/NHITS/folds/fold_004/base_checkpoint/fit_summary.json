@@ -1,9 +1,0 @@
-{
-  "model": "NHITS",
-  "fold_idx": 4,
-  "train_rows": 576,
-  "eval_rows": 8,
-  "train_end_ds": "2026-01-12 00:00:00",
-  "loss": "mse",
-  "loss_curve_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/wti_case2_HPT/scheduler/workers/NHITS/models/NHITS/folds/fold_004/loss_curve.png"
-}

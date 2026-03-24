@@ -1,6 +1,0 @@
-[2026-03-20T14:51:36Z] watcher started pid=787166 results=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/_batch_logs/20260320T135519Z/results.tsv
-[2026-03-20T16:00:28Z] detected completion row for brentoil-case1.yaml
-[2026-03-20T16:00:28Z] sent SIGKILL to 787166
-[2026-03-20T16:00:30Z] renamed /home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case1 -> /home/sonet/.openclaw/workspace/research/neuralforecast/runs/brentoil_case1_pre
-[2026-03-20T16:00:30Z] restarted ./run_brent_wti_cases.sh as pid=1351787 log=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/_batch_logs/restart_after_brentoil_case1_pre_20260320T145136Z.log
-[2026-03-20T16:00:30Z] watcher finished

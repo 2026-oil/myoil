@@ -1,3 +1,0 @@
-config	status	exit_code	log_path	started_at	finished_at
-yaml/feature_set/brentoil-case1.yaml	failed	1	runs/_batch_logs/20260321T053056Z/brentoil-case1.log	2026-03-21T05:30:56Z	2026-03-21T05:31:00Z
-yaml/feature_set/wti-case4.yaml	failed	1	runs/_batch_logs/20260321T053056Z/wti-case4.log	2026-03-21T05:31:00Z	2026-03-21T05:31:05Z

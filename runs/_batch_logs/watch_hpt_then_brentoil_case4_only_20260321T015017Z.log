@@ -1,5 +1,0 @@
-[2026-03-21T01:50:17Z] watcher started latest=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/_batch_logs/20260321T003911Z pid=3669023
-[2026-03-21T01:52:13Z] detected HPT phase start
-[2026-03-21T01:52:16Z] stopped old batch pid=3669023
-[2026-03-21T01:52:16Z] removed runs/brentoil_case4
-[2026-03-21T01:52:16Z] restarted run_brent_wti_cases.sh with only brentoil-case4.yaml pid=3991970 log=/home/sonet/.openclaw/workspace/research/neuralforecast/runs/_batch_logs/restart_brentoil_case4_only_20260321T015017Z.log

@@ -1,8 +1,0 @@
-config	status	exit_code	log_path	started_at	finished_at
-yaml/feature_set_res_level_lag_exg_xgb/brentoil-case1.yaml	passed	0	runs/_batch_logs/20260321T124157Z/brentoil-case1.log	2026-03-21T12:41:57Z	2026-03-21T12:56:38Z
-yaml/feature_set_res_level_lag_exg_xgb/brentoil-case2.yaml	passed	0	runs/_batch_logs/20260321T124157Z/brentoil-case2.log	2026-03-21T12:56:38Z	2026-03-21T13:11:21Z
-yaml/feature_set_res_level_lag_exg_xgb/brentoil-case3.yaml	passed	0	runs/_batch_logs/20260321T124157Z/brentoil-case3.log	2026-03-21T13:11:21Z	2026-03-21T13:26:32Z
-yaml/feature_set_res_level_lag_exg_xgb/brentoil-case4.yaml	passed	0	runs/_batch_logs/20260321T124157Z/brentoil-case4.log	2026-03-21T13:26:32Z	2026-03-21T13:42:51Z
-yaml/feature_set_res_level_lag_exg_xgb/wti-case1.yaml	passed	0	runs/_batch_logs/20260321T124157Z/wti-case1.log	2026-03-21T13:42:51Z	2026-03-21T13:59:18Z
-yaml/feature_set_res_level_lag_exg_xgb/wti-case2.yaml	passed	0	runs/_batch_logs/20260321T124157Z/wti-case2.log	2026-03-21T13:59:18Z	2026-03-21T14:15:06Z
-yaml/feature_set_res_level_lag_exg_xgb/wti-case3.yaml	failed	1	runs/_batch_logs/20260321T124157Z/wti-case3.log	2026-03-21T14:15:06Z	2026-03-21T14:29:53Z
