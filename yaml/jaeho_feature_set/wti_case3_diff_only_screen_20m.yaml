@@ -33,7 +33,7 @@ training:
   learning_rate: 0.004
   max_steps: 400
   val_size: 8
-  val_check_steps: 100
+  val_check_steps: 50
   early_stop_patience_steps: 5
   num_lr_decays: 1
   model_step_size: 1

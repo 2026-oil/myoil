@@ -114,27 +114,15 @@ _config_worker_devices() {
   fi
 }
 
-yaml_list=(
+yaml_list=(  
   "yaml/feature_set_HPT_n100_bs/brentoil-case3.yaml"
-  "yaml/feature_set_HPT_n100_bs/brentoil-case4.yaml"
-
   "yaml/feature_set_HPT_n100_bs/wti-case3.yaml"
+  "yaml/feature_set_HPT_n100_bs/brentoil-case4.yaml"
   "yaml/feature_set_HPT_n100_bs/wti-case4.yaml"
-
-  "yaml/feature_set_residual_bs_HPT/brentoil-case3.yaml"
-  "yaml/feature_set_residual_bs_HPT/brentoil-case4.yaml"
-
-  "yaml/feature_set_residual_bs_HPT/wti-case3.yaml"
-  "yaml/feature_set_residual_bs_HPT/wti-case4.yaml"
-
-  "yaml/feature_set_residual/brentoil-case3.yaml"
-  "yaml/feature_set_residual/wti-case3.yaml"
-
-  "yaml/feature_set_residual_bs/brentoil-case3.yaml"
-  "yaml/feature_set_residual_bs/brentoil-case4.yaml"
-
-  "yaml/feature_set_residual_bs/wti-case3.yaml"
-  "yaml/feature_set_residual_bs/wti-case4.yaml"
+  "yaml/feature_set_HPT_n100_bs/brentoil-case2.yaml"
+  "yaml/feature_set_HPT_n100_bs/wti-case2.yaml"
+  "yaml/feature_set_HPT_n100_bs/brentoil-case1.yaml"
+  "yaml/feature_set_HPT_n100_bs/wti-case1.yaml"
 )
 
 if [[ -n "${NF_CASE_CONFIGS:-}" ]]; then

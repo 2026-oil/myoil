@@ -38,8 +38,8 @@ training:
   learning_rate: 0.0015
   max_steps: 800
   val_size: 8
-  val_check_steps: 100
-  early_stop_patience_steps: 10
+  val_check_steps: 50
+  early_stop_patience_steps: 3
   loss: mse
 
 cv:
