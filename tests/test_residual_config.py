@@ -4344,48 +4344,58 @@ def test_narrowed_model_param_ranges_are_explicit_for_selected_auto_models():
         "PatchTST": {
             "categorical": {
                 "hidden_size": (64, 128),
-                "n_heads": (8,),
-                "linear_hidden_size": (128, 512),
-                "patch_len": (4, 8),
-                "stride": (8,),
-                "dropout": (0.3,),
-                "fc_dropout": (0.2,),
-                "attn_dropout": (0.0,),
+                "n_heads": (4, 8),
+                "encoder_layers": (4, 8),
+                "linear_hidden_size": (128, 256, 512),
+                "patch_len": (4, 8, 16),
+                "stride": (8, 16),
+                "dropout": (0.1, 0.3),
+                "fc_dropout": (0.1, 0.3),
+                "attn_dropout": (0.1, 0.3),
                 "revin": (True, False),
             },
-            "integer": {"encoder_layers": (2, 3, 1)},
         },
         "TSMixerx": {
             "categorical": {
-                "n_block": (1, 2, 4),
-                "ff_dim": (32, 128, 256),
-                "dropout": (0.05,),
+                "n_block": (2, 4, 8),
+                "ff_dim": (128, 256, 512, 1024),
+                "dropout": (0.0, 0.1, 0.2, 0.3),
+                "revin": (True, False),
+            },
+        },
+        "TimeXer": {
+            "categorical": {
+                "patch_len": (8, 16, 32),
+                "hidden_size": (256, 512, 768),
+                "n_heads": (8, 16, 32),
+                "e_layers": (2, 4, 6),
+                "d_ff": (512, 1024, 2048),
+                "factor": (2, 4, 8),
+                "dropout": (0.0, 0.1, 0.2, 0.3),
+                "use_norm": (True, False),
             },
         },
         "iTransformer": {
             "categorical": {
-                "hidden_size": (128,),
-                "n_heads": (8,),
-                "d_ff": (128,),
-                "factor": (3,),
-                "dropout": (0.0, 0.3),
-                "use_norm": (False,),
-            },
-            "integer": {
-                "e_layers": (1, 1, 1),
-                "d_layers": (1, 1, 1),
+                "hidden_size": (256, 512, 768),
+                "n_heads": (8, 16, 32),
+                "e_layers": (2, 4, 6),
+                "d_ff": (512, 1024, 2048),
+                "d_layers": (2, 4),
+                "factor": (2, 4, 8),
+                "dropout": (0.0, 0.1, 0.2, 0.3),
+                "use_norm": (True, False),
             },
         },
         "LSTM": {
             "categorical": {
-                "encoder_hidden_size": (128,),
-                "inference_input_size": (-1,),
-                "encoder_dropout": (0.3,),
-                "decoder_hidden_size": (128,),
-            },
-            "integer": {
-                "encoder_n_layers": (3, 3, 1),
-                "decoder_layers": (2, 2, 1),
+                "encoder_hidden_size": (128, 256, 512),
+                "encoder_n_layers": (2, 4, 6),
+                "inference_input_size": (32, 64, 128),
+                "encoder_dropout": (0.0, 0.1, 0.2, 0.3),
+                "decoder_hidden_size": (128, 256, 512),
+                "decoder_layers": (2, 4),
+                "context_size": (8, 16, 32, 64),
             },
         },
     }
@@ -5253,6 +5263,7 @@ EXPECTED_REPO_AUTO_SELECTORS = {
         "encoder_dropout",
         "decoder_hidden_size",
         "decoder_layers",
+        "context_size",
     ],
     "NHITS": [
         "n_pool_kernel_size",
@@ -5294,6 +5305,22 @@ EXPECTED_REPO_AUTO_SELECTORS = {
         "factor",
         "dropout",
         "use_norm",
+    ],
+    "TimeXer": [
+        "patch_len",
+        "hidden_size",
+        "n_heads",
+        "e_layers",
+        "d_ff",
+        "factor",
+        "dropout",
+        "use_norm",
+    ],
+    "TSMixerx": [
+        "n_block",
+        "ff_dim",
+        "dropout",
+        "revin",
     ],
 }
 EXPECTED_REPO_TRAINING_SELECTORS = [
@@ -5841,7 +5868,7 @@ def test_repo_search_space_updates_requested_auto_selectors_only():
     assert set(FIXED_TRAINING_KEYS).isdisjoint(SEARCH_SPACE_TRAINING)
     assert "step_size" not in SEARCH_SPACE_TRAINING
     assert "early_stop_patience_steps" not in SEARCH_SPACE_TRAINING
-    assert "context_size" not in SEARCH_SPACE_MODELS["LSTM"]
+    assert "context_size" in SEARCH_SPACE_MODELS["LSTM"]
     assert SEARCH_SPACE_MODELS["GRU"] == [
         "encoder_hidden_size",
         "encoder_n_layers",

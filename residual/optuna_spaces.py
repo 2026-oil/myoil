@@ -470,7 +470,11 @@ def training_range_source_for_model(
     return f"model_override:{model_name}"
 
 
-def _suggest_from_spec(trial: optuna.Trial, name: str, spec: SearchParamSpec) -> Any:
+def _suggest_from_spec(
+    trial: optuna.Trial,
+    name: str,
+    spec: SearchParamSpec,
+) -> Any:
     spec_type = spec["type"]
     if spec_type == "categorical":
         return trial.suggest_categorical(name, deepcopy(spec["choices"]))
