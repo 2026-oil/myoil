@@ -1223,9 +1223,28 @@ def test_scheduler_plan_and_worker_env_support_device_groups(tmp_path: Path):
     assert len(tuning_launches) == 1
     env = worker_env((0, 1))
     assert env["CUDA_VISIBLE_DEVICES"] == "0,1"
+    assert env["NEURALFORECAST_ASSIGNED_GPU_IDS"] == "0,1"
     assert env["NEURALFORECAST_WORKER_DEVICES"] == "2"
     assert env["NEURALFORECAST_PROGRESS_MODE"] == "structured"
     assert env["NEURALFORECAST_SKIP_SUMMARY_ARTIFACTS"] == "1"
+
+
+def test_build_device_groups_respects_assigned_gpu_ids_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n", encoding="utf-8"
+    )
+    payload = _payload()
+    payload["scheduler"]["gpu_ids"] = [0, 1]
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    monkeypatch.setenv("NEURALFORECAST_ASSIGNED_GPU_IDS", "1")
+
+    assert build_device_groups(loaded.config) == [(1,)]
+    assert len(build_tuning_launch_plan(loaded.config, job_name="TFT")) == 1
 
 
 def test_load_app_config_rejects_non_divisible_scheduler_groups(tmp_path: Path):

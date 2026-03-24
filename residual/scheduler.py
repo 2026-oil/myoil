@@ -25,7 +25,15 @@ class WorkerLaunch:
 
 
 def build_device_groups(config: AppConfig) -> list[tuple[int, ...]]:
-    gpu_ids = list(config.scheduler.gpu_ids)
+    assigned_gpu_ids = os.environ.get("NEURALFORECAST_ASSIGNED_GPU_IDS", "").strip()
+    if assigned_gpu_ids:
+        gpu_ids = [
+            int(part.strip())
+            for part in assigned_gpu_ids.split(",")
+            if part.strip()
+        ]
+    else:
+        gpu_ids = list(config.scheduler.gpu_ids)
     group_size = max(1, int(config.scheduler.worker_devices))
     groups: list[tuple[int, ...]] = []
     for start in range(0, len(gpu_ids), group_size):
@@ -71,6 +79,9 @@ def worker_env(gpu_ids: int | Sequence[int]) -> dict[str, str]:
     env = os.environ.copy()
     if assigned_gpu_ids:
         env["CUDA_VISIBLE_DEVICES"] = ",".join(str(gpu_id) for gpu_id in assigned_gpu_ids)
+        env["NEURALFORECAST_ASSIGNED_GPU_IDS"] = ",".join(
+            str(gpu_id) for gpu_id in assigned_gpu_ids
+        )
     env["NEURALFORECAST_WORKER_DEVICES"] = str(len(assigned_gpu_ids))
     env["NEURALFORECAST_PROGRESS_MODE"] = "structured"
     env["NEURALFORECAST_SKIP_SUMMARY_ARTIFACTS"] = "1"
