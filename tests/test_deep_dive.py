@@ -429,6 +429,24 @@ def test_resume_reuse_requires_matching_generated_run_guard(temp_repo: Path, tmp
     )
 
 
+def test_configure_search_models_accepts_tsmixerx_only() -> None:
+    original_search = DEEP_DIVE.SEARCH_MODELS
+    original_expected = DEEP_DIVE.EXPECTED_MODELS
+    try:
+        selected = DEEP_DIVE.configure_search_models(["TSMixerx"])
+        assert selected == ("TSMixerx",)
+        assert DEEP_DIVE.SEARCH_MODELS == ("TSMixerx",)
+        assert DEEP_DIVE.EXPECTED_MODELS == ("TSMixerx", "Naive")
+    finally:
+        DEEP_DIVE.SEARCH_MODELS = original_search
+        DEEP_DIVE.EXPECTED_MODELS = original_expected
+
+
+def test_configure_search_models_rejects_unknown() -> None:
+    with pytest.raises(ValueError):
+        DEEP_DIVE.configure_search_models(["UnknownModel"])
+
+
 def test_continue_picks_latest_run_root(monkeypatch: pytest.MonkeyPatch, temp_repo: Path) -> None:
     older = temp_repo / "runs" / "deep_dive_20260325T010000Z"
     newer = temp_repo / "runs" / "deep_dive_20260325T020000Z"
