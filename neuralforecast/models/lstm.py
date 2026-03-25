@@ -171,6 +171,7 @@ class LSTM(BaseModel):
         # MLP decoder
         self.decoder_hidden_size = decoder_hidden_size
         self.decoder_layers = decoder_layers
+        self.horizon_embedding_dim = min(16, max(4, self.encoder_hidden_size // 16))
 
         # LSTM input size (1 for target variable y)
         input_encoder = (
@@ -192,8 +193,16 @@ class LSTM(BaseModel):
 
         # Decoder MLP
         if not self.RECURRENT:
+            self.horizon_embeddings = nn.Embedding(
+                num_embeddings=self.h,
+                embedding_dim=self.horizon_embedding_dim,
+            )
             self.mlp_decoder = MLP(
-                in_features=self.encoder_hidden_size + self.futr_exog_size,
+                in_features=(
+                    self.encoder_hidden_size
+                    + self.horizon_embedding_dim
+                    + self.futr_exog_size
+                ),
                 out_features=self.loss.outputsize_multiplier,
                 hidden_size=self.decoder_hidden_size,
                 num_layers=self.decoder_layers,
@@ -262,11 +271,20 @@ class LSTM(BaseModel):
                     :, -self.h :
                 ]  # [B, seq_len, rnn_hidden_state] -> [B, h, rnn_hidden_state]
 
+            horizon_ids = torch.arange(self.h, device=hidden_state.device)
+            horizon_embeddings = self.horizon_embeddings(horizon_ids)
+            horizon_embeddings = horizon_embeddings.unsqueeze(0).expand(
+                hidden_state.shape[0], -1, -1
+            )
+            hidden_state = torch.cat(
+                (hidden_state, horizon_embeddings), dim=-1
+            )  # [B, h, rnn_hidden_state] + [B, h, horizon_dim]
+
             if self.futr_exog_size > 0:
                 futr_exog_futr = futr_exog[:, -self.h :]  # [B, h, F]
                 hidden_state = torch.cat(
                     (hidden_state, futr_exog_futr), dim=-1
-                )  # [B, h, rnn_hidden_state] + [B, h, F] -> [B, h, rnn_hidden_state + F]
+                )  # [B, h, rnn_hidden_state + horizon_dim] + [B, h, F]
 
             output = self.mlp_decoder(
                 hidden_state
