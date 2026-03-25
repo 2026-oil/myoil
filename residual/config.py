@@ -20,6 +20,7 @@ from .optuna_spaces import (
     load_search_space_contract,
     normalize_search_space_payload,
     SUPPORTED_AUTO_MODEL_NAMES,
+    SUPPORTED_BS_PREFORCAST_MODELS,
     SUPPORTED_RESIDUAL_MODELS,
 )
 
@@ -66,6 +67,15 @@ RESIDUAL_FEATURE_KEYS = {
 }
 RESIDUAL_LAG_FEATURE_KEYS = {"enabled", "sources", "steps", "transforms"}
 RESIDUAL_EXOG_SOURCE_KEYS = {"hist", "futr", "static"}
+BS_PREFORCAST_KEYS = {
+    "enabled",
+    "using_futr_exog",
+    "target_columns",
+    "task",
+    "routing",
+}
+BS_PREFORCAST_TASK_KEYS = {"multivariable"}
+BS_PREFORCAST_ROUTING_KEYS = {"univariable_config", "multivariable_config"}
 SUPPORTED_RESIDUAL_LAG_TRANSFORMS = {"raw"}
 SUPPORTED_TRAINER_ACCELERATORS = {"auto", "cpu", "gpu"}
 SUPPORTED_DATALOADER_KWARGS = {
@@ -106,6 +116,27 @@ class RuntimeConfig:
 @dataclass(frozen=True)
 class TaskConfig:
     name: str | None = None
+
+
+@dataclass(frozen=True)
+class BsPreforcastTaskConfig:
+    multivariable: bool = False
+
+
+@dataclass(frozen=True)
+class BsPreforcastRoutingConfig:
+    univariable_config: str | None = None
+    multivariable_config: str | None = None
+    selected_config_path: str | None = None
+
+
+@dataclass(frozen=True)
+class BsPreforcastConfig:
+    enabled: bool = False
+    using_futr_exog: bool = False
+    target_columns: tuple[str, ...] = field(default_factory=tuple)
+    task: BsPreforcastTaskConfig = field(default_factory=BsPreforcastTaskConfig)
+    routing: BsPreforcastRoutingConfig = field(default_factory=BsPreforcastRoutingConfig)
 
 
 
@@ -228,6 +259,7 @@ class JobConfig:
 @dataclass(frozen=True)
 class AppConfig:
     task: TaskConfig
+    bs_preforcast: BsPreforcastConfig
     dataset: DatasetConfig
     runtime: RuntimeConfig
     training: TrainingConfig
@@ -241,6 +273,12 @@ class AppConfig:
         payload = asdict(self)
         if self.task.name is None:
             payload.pop("task", None)
+        if not payload["bs_preforcast"].get("enabled", False):
+            payload.pop("bs_preforcast", None)
+        else:
+            payload["bs_preforcast"]["target_columns"] = list(
+                payload["bs_preforcast"]["target_columns"]
+            )
         payload["dataset"]["path"] = str(self.dataset.path)
         for key in ("transformations_target", "transformations_exog"):
             if payload["runtime"].get(key) is None:
@@ -269,6 +307,19 @@ class AppConfig:
 
 
 @dataclass(frozen=True)
+class BsPreforcastStageLoadedConfig:
+    config: AppConfig
+    source_path: Path
+    source_type: str
+    normalized_payload: dict[str, Any]
+    input_hash: str
+    resolved_hash: str
+    search_space_path: Path | None
+    search_space_hash: str | None
+    search_space_payload: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
 class LoadedConfig:
     config: AppConfig
     source_path: Path
@@ -279,6 +330,7 @@ class LoadedConfig:
     search_space_path: Path | None
     search_space_hash: str | None
     search_space_payload: dict[str, Any] | None
+    bs_preforcast_stage1: BsPreforcastStageLoadedConfig | None = None
 
 
 def _hash_text(text: str) -> str:
@@ -321,6 +373,17 @@ def _coerce_name_tuple(value: Any, *, field_name: str) -> tuple[str, ...]:
             f"{field_name} contains duplicate value(s): {', '.join(duplicated)}"
         )
     return names
+
+
+def _coerce_optional_path_string(value: Any, *, field_name: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a string")
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError(f"{field_name} must not be empty")
+    return normalized
 
 
 
@@ -607,6 +670,88 @@ def _normalize_residual_feature_config(
     )
 
 
+def _normalize_bs_preforcast_config(value: Any) -> BsPreforcastConfig:
+    if value is None:
+        return BsPreforcastConfig()
+    if not isinstance(value, dict):
+        raise ValueError("bs_preforcast must be a mapping")
+    payload = dict(value)
+    _unknown_keys(payload, allowed=BS_PREFORCAST_KEYS, section="bs_preforcast")
+
+    task_payload = dict(payload.get("task") or {})
+    routing_payload = dict(payload.get("routing") or {})
+    if not isinstance(payload.get("task", {}), (dict, type(None))):
+        raise ValueError("bs_preforcast.task must be a mapping")
+    if not isinstance(payload.get("routing", {}), (dict, type(None))):
+        raise ValueError("bs_preforcast.routing must be a mapping")
+    _unknown_keys(
+        task_payload,
+        allowed=BS_PREFORCAST_TASK_KEYS,
+        section="bs_preforcast.task",
+    )
+    _unknown_keys(
+        routing_payload,
+        allowed=BS_PREFORCAST_ROUTING_KEYS,
+        section="bs_preforcast.routing",
+    )
+
+    enabled = _coerce_bool(
+        payload.get("enabled"),
+        field_name="bs_preforcast.enabled",
+        default=False,
+    )
+    using_futr_exog = _coerce_bool(
+        payload.get("using_futr_exog"),
+        field_name="bs_preforcast.using_futr_exog",
+        default=False,
+    )
+    target_columns = _coerce_name_tuple(
+        payload.get("target_columns"),
+        field_name="bs_preforcast.target_columns",
+    )
+    multivariable = _coerce_bool(
+        task_payload.get("multivariable"),
+        field_name="bs_preforcast.task.multivariable",
+        default=False,
+    )
+    routing = BsPreforcastRoutingConfig(
+        univariable_config=_coerce_optional_path_string(
+            routing_payload.get("univariable_config"),
+            field_name="bs_preforcast.routing.univariable_config",
+        ),
+        multivariable_config=_coerce_optional_path_string(
+            routing_payload.get("multivariable_config"),
+            field_name="bs_preforcast.routing.multivariable_config",
+        ),
+    )
+    selected_config_path = (
+        routing.multivariable_config if multivariable else routing.univariable_config
+    )
+    if enabled:
+        if not target_columns:
+            raise ValueError(
+                "bs_preforcast.target_columns must be non-empty when bs_preforcast.enabled is true"
+            )
+        if selected_config_path is None:
+            route_key = (
+                "bs_preforcast.routing.multivariable_config"
+                if multivariable
+                else "bs_preforcast.routing.univariable_config"
+            )
+            raise ValueError(f"{route_key} is required when bs_preforcast.enabled is true")
+    return BsPreforcastConfig(
+        enabled=enabled,
+        using_futr_exog=using_futr_exog,
+        target_columns=target_columns,
+        task=BsPreforcastTaskConfig(multivariable=multivariable),
+        routing=BsPreforcastRoutingConfig(
+            univariable_config=routing.univariable_config,
+            multivariable_config=routing.multivariable_config,
+            selected_config_path=selected_config_path if enabled else None,
+        ),
+    )
+
+
 def resolve_config_path(
     repo_root: Path,
     config_path: str | Path | None = None,
@@ -672,9 +817,15 @@ def _normalize_job(
     *,
     search_space: dict[str, Any] | None,
     allow_missing_search_space: bool = False,
+    model_search_space_key: str = "models",
 ) -> JobConfig:
     model_name = str(job["model"])
     params = dict(job.get("params", {}))
+    supported_auto_models = (
+        SUPPORTED_BS_PREFORCAST_MODELS
+        if model_search_space_key == "bs_preforcast_models"
+        else SUPPORTED_AUTO_MODEL_NAMES
+    )
     requested_mode = _requested_job_mode(model_name, params)
     selected: tuple[str, ...] = ()
     if requested_mode == "baseline_fixed":
@@ -682,11 +833,19 @@ def _normalize_job(
     elif requested_mode == "learned_fixed":
         validated_mode = "learned_fixed"
     else:
-        if model_name not in SUPPORTED_AUTO_MODEL_NAMES:
+        if model_name not in supported_auto_models:
             raise ValueError(
                 f"jobs[{model_name}] uses empty params but has no supported learned_auto Optuna mapping"
             )
-        if search_space is None or model_name not in search_space["models"]:
+        search_space_models = None
+        if search_space is not None:
+            search_space_models = search_space.get(model_search_space_key)
+            if (
+                search_space_models is None
+                and model_search_space_key == "bs_preforcast_models"
+            ):
+                search_space_models = search_space.get("models")
+        if search_space_models is None or model_name not in search_space_models:
             if allow_missing_search_space:
                 validated_mode = "learned_fixed"
                 return JobConfig(
@@ -697,9 +856,9 @@ def _normalize_job(
                     selected_search_params=selected,
                 )
             raise ValueError(
-                f"jobs[{model_name}] requires search_space.models.{model_name} for learned_auto execution"
+                f"jobs[{model_name}] requires search_space.{model_search_space_key}.{model_name} for learned_auto execution"
             )
-        selected = tuple(search_space["models"][model_name])
+        selected = tuple(search_space_models[model_name])
         validated_mode = "learned_auto"
     return JobConfig(
         model=model_name,
@@ -716,6 +875,8 @@ def _normalize_payload(
     *,
     search_space: dict[str, Any] | None,
     allow_missing_search_space: bool = False,
+    model_search_space_key: str = "models",
+    training_search_space_key: str = "training",
 ) -> AppConfig:
     task = dict(payload.get("task", {}))
     dataset = dict(payload.get("dataset", {}))
@@ -736,6 +897,7 @@ def _normalize_payload(
 
     scheduler = dict(payload.get("scheduler", {}))
     residual = dict(payload.get("residual", {}))
+    bs_preforcast = _normalize_bs_preforcast_config(payload.get("bs_preforcast"))
 
     target_col = str(dataset.get("target_col", "")).strip()
     if not target_col:
@@ -941,6 +1103,7 @@ def _normalize_payload(
             job,
             search_space=search_space,
             allow_missing_search_space=allow_missing_search_space,
+            model_search_space_key=model_search_space_key,
         )
         for job in jobs_payload
     )
@@ -959,8 +1122,18 @@ def _normalize_payload(
             )
     training_selected = ()
     if any(job.validated_mode == "learned_auto" for job in jobs):
+        training_search_payload = None
+        if search_space is not None:
+            training_search_payload = search_space.get(training_search_space_key)
+            if (
+                training_search_payload is None
+                and training_search_space_key == "bs_preforcast_training"
+            ):
+                training_search_payload = search_space.get("training")
         training_selected = (
-            tuple(search_space["training"]["global"]) if search_space is not None else ()
+            tuple(training_search_payload["global"])
+            if training_search_payload is not None
+            else ()
         )
     training_requested_mode = (
         "training_auto_requested" if training_selected else "training_fixed"
@@ -973,6 +1146,7 @@ def _normalize_payload(
         task=TaskConfig(name=str(task["name"]).strip() or None)
         if "name" in task
         else TaskConfig(),
+        bs_preforcast=bs_preforcast,
         dataset=DatasetConfig(
             path=dataset_path,
             target_col=target_col,
@@ -1001,11 +1175,163 @@ def _normalize_payload(
     )
 
 
+def _resolve_relative_config_reference(
+    repo_root: Path,
+    source_path: Path,
+    reference: str,
+) -> Path:
+    candidate = Path(reference)
+    if candidate.is_absolute():
+        return candidate.resolve()
+    repo_candidate = (repo_root / candidate).resolve()
+    local_candidate = (source_path.parent / candidate).resolve()
+    if local_candidate.exists():
+        return local_candidate
+    return repo_candidate
+
+
+def _bs_preforcast_stage_search_space(
+    search_space_payload: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if search_space_payload is None:
+        return None
+    model_payload = search_space_payload.get("bs_preforcast_models", {})
+    training_payload = search_space_payload.get(
+        "bs_preforcast_training", {"global": {}, "per_model": {}}
+    )
+    return {
+        "models": model_payload,
+        "training": training_payload,
+        "bs_preforcast_models": model_payload,
+        "bs_preforcast_training": training_payload,
+        "residual": search_space_payload.get("residual", {}),
+    }
+
+
+def _stage_payload_requests_search_space(stage_payload: dict[str, Any]) -> bool:
+    for job in stage_payload.get("jobs", []):
+        if str(job.get("model")) not in BASELINE_MODEL_NAMES and not dict(
+            job.get("params", {})
+        ):
+            return True
+    residual_payload = dict(stage_payload.get("residual", {}))
+    if residual_payload.get("enabled", True) and not dict(
+        residual_payload.get("params", {})
+    ):
+        return True
+    return False
+
+
+def _rewrite_bs_preforcast_search_space_error(message: str) -> str:
+    return (
+        message.replace("search_space.models.", "search_space.bs_preforcast_models.")
+        .replace("search_space.training.", "search_space.bs_preforcast_training.")
+        .replace("search_space.models ", "search_space.bs_preforcast_models ")
+        .replace("search_space.training ", "search_space.bs_preforcast_training ")
+    )
+
+
+def _load_bs_preforcast_stage1(
+    repo_root: Path,
+    *,
+    source_path: Path,
+    source_type: str,
+    bs_preforcast: BsPreforcastConfig,
+    search_space_contract: SearchSpaceContract | None,
+) -> BsPreforcastStageLoadedConfig:
+    selected_config_path = bs_preforcast.routing.selected_config_path
+    if not bs_preforcast.enabled or selected_config_path is None:
+        raise ValueError("bs_preforcast stage1 loading requires an enabled selected route")
+    stage_source_path = _resolve_relative_config_reference(
+        repo_root,
+        source_path,
+        selected_config_path,
+    )
+    if not stage_source_path.exists():
+        raise FileNotFoundError(
+            f"bs_preforcast selected route does not exist: {stage_source_path}"
+        )
+    stage_source_type = source_type
+    if stage_source_path.suffix.lower() == ".toml":
+        stage_source_type = "toml"
+    elif stage_source_path.suffix.lower() in {".yaml", ".yml"}:
+        stage_source_type = "yaml"
+    stage_raw_text = stage_source_path.read_text(encoding="utf-8")
+    stage_payload = _load_document(stage_source_path, stage_source_type)
+    if stage_payload.get("bs_preforcast") not in (None, {}):
+        raise ValueError("bs_preforcast routed YAML must not define its own bs_preforcast block")
+    stage_search_space = _bs_preforcast_stage_search_space(
+        search_space_contract.payload if search_space_contract else None
+    )
+    stage_dataset_path = Path(stage_payload.get("dataset", {}).get("path", "df.csv"))
+    if stage_dataset_path.is_absolute():
+        stage_base_dir = stage_source_path.parent
+    else:
+        repo_candidate = (repo_root / stage_dataset_path).resolve()
+        local_candidate = (stage_source_path.parent / stage_dataset_path).resolve()
+        stage_base_dir = (
+            repo_root
+            if repo_candidate.exists() or not local_candidate.exists()
+            else stage_source_path.parent
+        )
+    try:
+        stage_base_config = _normalize_payload(
+            stage_payload,
+            stage_base_dir,
+            search_space=None,
+            allow_missing_search_space=True,
+            model_search_space_key="bs_preforcast_models",
+            training_search_space_key="training",
+        )
+        stage_config = (
+            _normalize_payload(
+                stage_payload,
+                stage_base_dir,
+                search_space=stage_search_space,
+                model_search_space_key="bs_preforcast_models",
+                training_search_space_key="training",
+            )
+            if stage_search_space is not None
+            else stage_base_config
+        )
+    except ValueError as exc:
+        raise ValueError(_rewrite_bs_preforcast_search_space_error(str(exc))) from exc
+    stage_normalized_payload = stage_config.to_dict()
+    stage_normalized_payload["bs_preforcast"] = {
+        "enabled": True,
+        "using_futr_exog": bs_preforcast.using_futr_exog,
+        "target_columns": list(bs_preforcast.target_columns),
+        "task": {"multivariable": bs_preforcast.task.multivariable},
+        "routing": {
+            "selected_config_path": str(stage_source_path),
+        },
+    }
+    if search_space_contract is not None:
+        stage_normalized_payload["search_space_path"] = str(search_space_contract.path)
+        stage_normalized_payload["search_space_sha256"] = search_space_contract.sha256
+    resolved_text = json.dumps(
+        stage_normalized_payload, sort_keys=True, ensure_ascii=False
+    )
+    return BsPreforcastStageLoadedConfig(
+        config=stage_config,
+        source_path=stage_source_path,
+        source_type=stage_source_type,
+        normalized_payload=stage_normalized_payload,
+        input_hash=_hash_text(stage_raw_text),
+        resolved_hash=_hash_text(resolved_text),
+        search_space_path=search_space_contract.path if search_space_contract else None,
+        search_space_hash=search_space_contract.sha256 if search_space_contract else None,
+        search_space_payload=stage_search_space,
+    )
+
+
 def load_app_config(
     repo_root: Path,
     *,
     config_path: str | Path | None = None,
     config_toml_path: str | Path | None = None,
+    model_search_space_key: str = "models",
+    training_search_space_key: str = "training",
 ) -> LoadedConfig:
     source_path, source_type = resolve_config_path(
         repo_root,
@@ -1014,6 +1340,30 @@ def load_app_config(
     )
     raw_text = source_path.read_text(encoding="utf-8")
     payload = _load_document(source_path, source_type)
+    raw_bs_preforcast = _normalize_bs_preforcast_config(payload.get("bs_preforcast"))
+    stage_source_path: Path | None = None
+    stage_payload_probe: dict[str, Any] | None = None
+    if raw_bs_preforcast.enabled:
+        selected_config_path = raw_bs_preforcast.routing.selected_config_path
+        if selected_config_path is None:
+            raise ValueError("bs_preforcast enabled but selected route was not resolved")
+        stage_source_path = _resolve_relative_config_reference(
+            repo_root,
+            source_path,
+            selected_config_path,
+        )
+        if not stage_source_path.exists():
+            raise FileNotFoundError(
+                f"bs_preforcast selected route does not exist: {stage_source_path}"
+            )
+        stage_source_type = (
+            "toml" if stage_source_path.suffix.lower() == ".toml" else "yaml"
+        )
+        stage_payload_probe = _load_document(stage_source_path, stage_source_type)
+        if stage_payload_probe.get("bs_preforcast") not in (None, {}):
+            raise ValueError(
+                "bs_preforcast routed YAML must not define its own bs_preforcast block"
+            )
     search_space_contract: SearchSpaceContract | None = None
     requested_search_space = False
     jobs_payload = payload.get("jobs", [])
@@ -1025,6 +1375,10 @@ def load_app_config(
     if (
         residual_payload.get("enabled", True)
         and not dict(residual_payload.get("params", {}))
+    ):
+        requested_search_space = True
+    if stage_payload_probe is not None and _stage_payload_requests_search_space(
+        stage_payload_probe
     ):
         requested_search_space = True
     if requested_search_space:
@@ -1048,13 +1402,60 @@ def load_app_config(
         dataset_base_dir,
         search_space=None,
         allow_missing_search_space=True,
+        model_search_space_key=model_search_space_key,
+        training_search_space_key=training_search_space_key,
     )
     config = (
-        _normalize_payload(payload, dataset_base_dir, search_space=search_space)
+        _normalize_payload(
+            payload,
+            dataset_base_dir,
+            search_space=search_space,
+            model_search_space_key=model_search_space_key,
+            training_search_space_key=training_search_space_key,
+        )
         if search_space is not None
         else base_config
     )
     normalized_payload = config.to_dict()
+    bs_preforcast_stage1 = None
+    if config.bs_preforcast.enabled and config.bs_preforcast.routing.selected_config_path:
+        stage_source_path = _resolve_relative_config_reference(
+            repo_root,
+            source_path,
+            config.bs_preforcast.routing.selected_config_path,
+        )
+        if stage_source_path.exists():
+            stage_search_space_contract = search_space_contract
+            if stage_search_space_contract is None:
+                candidate = (repo_root / "search_space.yaml").resolve()
+                if candidate.exists():
+                    stage_search_space_contract = load_search_space_contract(repo_root)
+            bs_preforcast_stage1 = _load_bs_preforcast_stage1(
+                repo_root,
+                source_path=source_path,
+                source_type=source_type,
+                bs_preforcast=config.bs_preforcast,
+                search_space_contract=stage_search_space_contract,
+            )
+            normalized_payload.setdefault("bs_preforcast", {})["stage1"] = {
+                "source_path": str(bs_preforcast_stage1.source_path),
+                "source_type": bs_preforcast_stage1.source_type,
+                "config_input_sha256": bs_preforcast_stage1.input_hash,
+                "config_resolved_sha256": bs_preforcast_stage1.resolved_hash,
+                "search_space_path": (
+                    str(bs_preforcast_stage1.search_space_path)
+                    if bs_preforcast_stage1.search_space_path is not None
+                    else None
+                ),
+                "search_space_sha256": bs_preforcast_stage1.search_space_hash,
+                "target_columns": list(config.bs_preforcast.target_columns),
+            }
+            if search_space_contract is None:
+                search_space_contract = stage_search_space_contract
+        elif Path(config.bs_preforcast.routing.selected_config_path).is_absolute():
+            raise FileNotFoundError(
+                f"bs_preforcast selected route does not exist: {stage_source_path}"
+            )
     normalized_payload["search_space_path"] = (
         str(search_space_contract.path) if search_space_contract else None
     )
@@ -1072,4 +1473,5 @@ def load_app_config(
         search_space_path=search_space_contract.path if search_space_contract else None,
         search_space_hash=search_space_contract.sha256 if search_space_contract else None,
         search_space_payload=search_space_contract.payload if search_space_contract else None,
+        bs_preforcast_stage1=bs_preforcast_stage1,
     )

@@ -274,7 +274,8 @@ def test_candidate_generation_uses_canonical_search_space_contract(temp_repo: Pa
 
 def test_search_models_exclude_tsmixerx() -> None:
     assert "TSMixerx" not in DEEP_DIVE.SEARCH_MODELS
-    assert set(DEEP_DIVE.EXPECTED_MODELS) == {"TimeXer", "iTransformer", "LSTM", "Naive"}
+    assert "TimeXer" not in DEEP_DIVE.SEARCH_MODELS
+    assert set(DEEP_DIVE.EXPECTED_MODELS) == {"iTransformer", "LSTM", "Naive"}
     assert DEEP_DIVE.SUCCESS_TARGET_CASES == 4
 
 

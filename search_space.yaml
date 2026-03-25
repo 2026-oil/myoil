@@ -376,3 +376,250 @@ residual:
       type: float
       low: 0.6
       high: 1.0
+bs_preforcast_models:
+  AutoARIMA:
+    season_length:
+      type: categorical
+      choices:
+      - 1
+      - 4
+      - 8
+      - 12
+  ES:
+    season_length:
+      type: categorical
+      choices:
+      - 1
+      - 4
+      - 8
+      - 12
+  xgboost:
+    n_estimators:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+    max_depth:
+      type: int
+      low: 2
+      high: 6
+      step: 1
+  lightgbm:
+    n_estimators:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 96
+    max_depth:
+      type: categorical
+      choices:
+      - 4
+      - 6
+      - -1
+    num_leaves:
+      type: categorical
+      choices:
+      - 15
+      - 31
+      - 63
+    min_child_samples:
+      type: categorical
+      choices:
+      - 10
+      - 20
+      - 40
+    feature_fraction:
+      type: float
+      low: 0.6
+      high: 1.0
+  LSTM:
+    encoder_hidden_size:
+      type: categorical
+      choices:
+      - 256
+      - 512
+      - 768
+    encoder_n_layers:
+      type: categorical
+      choices:
+      - 4
+      - 6
+      - 8
+    inference_input_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+      - 128
+    encoder_dropout:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.1
+      - 0.2
+      - 0.3
+    decoder_hidden_size:
+      type: categorical
+      choices:
+      - 256
+      - 512
+      - 768
+    decoder_layers:
+      type: categorical
+      choices:
+      - 2
+      - 4
+    context_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+  TSMixerx:
+    n_block:
+      type: categorical
+      choices:
+      - 4
+      - 8
+    ff_dim:
+      type: categorical
+      choices:
+      - 256
+      - 512
+      - 1024
+    dropout:
+      type: categorical
+      choices:
+      - 0.1
+      - 0.2
+      - 0.3
+    revin:
+      type: categorical
+      choices:
+      - true
+      - false
+  TimeXer:
+    patch_len:
+      type: categorical
+      choices:
+      - 8
+      - 16
+    hidden_size:
+      type: categorical
+      choices:
+      - 256
+      - 512
+    n_heads:
+      type: categorical
+      choices:
+      - 16
+      - 32
+    e_layers:
+      type: categorical
+      choices:
+      - 4
+      - 8
+    d_ff:
+      type: categorical
+      choices:
+      - 512
+      - 1024
+    factor:
+      type: categorical
+      choices:
+      - 4
+      - 8
+    dropout:
+      type: categorical
+      choices:
+      - 0.1
+      - 0.2
+      - 0.3
+    use_norm:
+      type: categorical
+      choices:
+      - true
+      - false
+  TFT:
+    hidden_size:
+      type: categorical
+      choices:
+      - 32
+      - 64
+    dropout:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.1
+    n_head:
+      type: categorical
+      choices:
+      - 2
+      - 4
+bs_preforcast_training:
+  global:
+    input_size:
+      type: categorical
+      choices:
+      - 48
+      - 64
+      - 96
+    batch_size:
+      type: categorical
+      choices:
+      - 16
+      - 32
+      - 64
+    scaler_type:
+      type: categorical
+      choices:
+      - null
+    model_step_size:
+      type: categorical
+      choices:
+      - 4
+      - 8
+  per_model:
+    LSTM:
+      input_size:
+        type: categorical
+        choices:
+        - 24
+        - 48
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 32
+        - 64
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+      model_step_size:
+        type: categorical
+        choices:
+        - 4
+        - 8
+    TSMixerx:
+      input_size:
+        type: categorical
+        choices:
+        - 48
+        - 64
+        - 72
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+      model_step_size:
+        type: categorical
+        choices:
+        - 4
+        - 8

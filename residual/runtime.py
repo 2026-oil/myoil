@@ -19,6 +19,10 @@ from neuralforecast import NeuralForecast
 from optuna.trial import TrialState
 
 from .adapters import build_multivariate_inputs, build_univariate_inputs
+from .bs_preforcast_runtime import (
+    materialize_bs_preforcast_stage,
+    prepare_bs_preforcast_fold_inputs,
+)
 from .config import JobConfig, LoadedConfig, load_app_config
 from .features import build_residual_feature_frame, hist_exog_lag_feature_name
 from .manifest import (
@@ -418,6 +422,11 @@ def _build_resolved_artifacts(
 
 
 def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -> None:
+    selected_bs_config_path = (
+        str(loaded.bs_preforcast_stage1.source_path)
+        if loaded.bs_preforcast_stage1 is not None
+        else loaded.config.bs_preforcast.routing.selected_config_path
+    )
     payload = {}
     for job in selected_jobs:
         caps = validate_job(job)
@@ -460,6 +469,15 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
         ),
         "unknown_search_params": [],
         "validation_error": None,
+    }
+    payload["bs_preforcast"] = {
+        "enabled": loaded.config.bs_preforcast.enabled,
+        "using_futr_exog": loaded.config.bs_preforcast.using_futr_exog,
+        "target_columns": list(loaded.config.bs_preforcast.target_columns),
+        "multivariable": loaded.config.bs_preforcast.task.multivariable,
+        "selected_config_path": selected_bs_config_path,
+        "univariable_config": loaded.config.bs_preforcast.routing.univariable_config,
+        "multivariable_config": loaded.config.bs_preforcast.routing.multivariable_config,
     }
     capability_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
@@ -733,15 +751,23 @@ def _fit_and_predict_fold(
     params_override: dict[str, Any] | None = None,
     training_override: dict[str, Any] | None = None,
 ) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, NeuralForecast]:
-    effective_config = _effective_config(loaded, training_override)
+    effective_loaded = loaded
     dt_col = loaded.config.dataset.dt_col
     target_col = loaded.config.dataset.target_col
     train_df = source_df.iloc[train_idx].reset_index(drop=True)
     future_df = source_df.iloc[test_idx].reset_index(drop=True)
-    diff_context = _build_fold_diff_context(loaded, train_df)
+    if loaded.config.bs_preforcast.enabled:
+        effective_loaded, train_df, future_df, _ = prepare_bs_preforcast_fold_inputs(
+            loaded,
+            job,
+            train_df,
+            future_df,
+        )
+    effective_config = _effective_config(effective_loaded, training_override)
+    diff_context = _build_fold_diff_context(effective_loaded, train_df)
     transformed_train_df = _transform_training_frame(train_df, diff_context)
     adapter_inputs = _build_adapter_inputs(
-        loaded,
+        effective_loaded,
         transformed_train_df,
         future_df,
         job,
@@ -2999,6 +3025,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     paths = _build_resolved_artifacts(repo_root, loaded, resolved_roots["run_root"])
     _validate_jobs(loaded, selected_jobs, paths["capability_path"])
     _validate_adapters(loaded, selected_jobs)
+    if loaded.config.bs_preforcast.enabled:
+        materialize_bs_preforcast_stage(
+            loaded=loaded,
+            selected_jobs=selected_jobs,
+            run_root=paths["run_root"],
+            main_resolved_path=paths["resolved_path"],
+            main_capability_path=paths["capability_path"],
+            main_manifest_path=paths["manifest_path"],
+            entrypoint_version=ENTRYPOINT_VERSION,
+            validate_only=args.validate_only,
+        )
     if args.validate_only:
         print(json.dumps({"ok": True, "jobs": [job.model for job in selected_jobs]}))
         return 0

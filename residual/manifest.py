@@ -105,6 +105,40 @@ def build_manifest(
                 loaded.config.training_search.selected_search_params
             ),
         },
+        'bs_preforcast': {
+            'enabled': loaded.config.bs_preforcast.enabled,
+            'using_futr_exog': loaded.config.bs_preforcast.using_futr_exog,
+            'target_columns': list(loaded.config.bs_preforcast.target_columns),
+            'multivariable': loaded.config.bs_preforcast.task.multivariable,
+            'routing': {
+                'univariable_config': loaded.config.bs_preforcast.routing.univariable_config,
+                'multivariable_config': loaded.config.bs_preforcast.routing.multivariable_config,
+                'selected_config_path': (
+                    loaded.normalized_payload.get('bs_preforcast', {})
+                    .get('routing', {})
+                    .get(
+                        'selected_config_path',
+                        loaded.config.bs_preforcast.routing.selected_config_path,
+                    )
+                ),
+            },
+            'stage1': (
+                {
+                    'source_path': str(loaded.bs_preforcast_stage1.source_path),
+                    'source_type': loaded.bs_preforcast_stage1.source_type,
+                    'config_input_sha256': loaded.bs_preforcast_stage1.input_hash,
+                    'config_resolved_sha256': loaded.bs_preforcast_stage1.resolved_hash,
+                    'search_space_path': (
+                        str(loaded.bs_preforcast_stage1.search_space_path)
+                        if loaded.bs_preforcast_stage1.search_space_path is not None
+                        else None
+                    ),
+                    'search_space_sha256': loaded.bs_preforcast_stage1.search_space_hash,
+                }
+                if loaded.bs_preforcast_stage1 is not None
+                else None
+            ),
+        },
         'residual': {
             'model': loaded.config.residual.model,
             'target': loaded.config.residual.target,

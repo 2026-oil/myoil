@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 import hashlib
+import inspect
 import os
 from pathlib import Path
 from typing import Any, Literal
@@ -58,6 +59,10 @@ SUPPORTED_AUTO_MODEL_NAMES = {
     "RMoK",
     "XLinear",
 }
+SUPPORTED_BS_PREFORCAST_MODELS = (
+    set(SUPPORTED_AUTO_MODEL_NAMES)
+    | {"Naive", "xgboost", "lightgbm", "AutoARIMA", "ES"}
+)
 SUPPORTED_RESIDUAL_MODELS = {"xgboost", "randomforest", "lightgbm"}
 DEFAULT_OPTUNA_NUM_TRIALS = 20
 DEFAULT_OPTUNA_STUDY_DIRECTION = "minimize"
@@ -135,6 +140,81 @@ class SearchSpaceContract:
     path: Path
     payload: dict[str, Any]
     sha256: str
+
+
+def _auto_default_param_specs(model_name: str) -> dict[str, SearchParamSpec] | None:
+    if model_name == "TFT":
+        return {
+            "hidden_size": {"type": "categorical", "choices": [64, 128, 256]},
+            "dropout": {"type": "categorical", "choices": [0.0, 0.1, 0.2, 0.3, 0.5]},
+            "n_head": {"type": "categorical", "choices": [4, 8]},
+            "learning_rate": {"type": "float", "low": 1e-4, "high": 1e-1, "log": True},
+            "scaler_type": {"type": "categorical", "choices": [None, "robust", "standard"]},
+            "batch_size": {"type": "categorical", "choices": [32, 64, 128, 256]},
+            "windows_batch_size": {"type": "categorical", "choices": [128, 256, 512, 1024]},
+            "input_size_multiplier": {"type": "categorical", "choices": [1, 2, 3, 4, 5]},
+        }
+    try:
+        import neuralforecast.auto as nf_auto
+    except Exception:
+        return None
+    auto_name = f"Auto{model_name}"
+    auto_cls = getattr(nf_auto, auto_name, None)
+    default_config = getattr(auto_cls, "default_config", None)
+    if not isinstance(default_config, dict):
+        return None
+
+    specs: dict[str, SearchParamSpec] = {}
+    for key, value in default_config.items():
+        if key in {
+            "h",
+            "loss",
+            "valid_loss",
+            "random_seed",
+            "max_steps",
+            "val_check_steps",
+            "early_stop_patience_steps",
+            "callbacks",
+            "cpus",
+            "gpus",
+            "verbose",
+            "alias",
+        }:
+            continue
+        if value is None:
+            specs[str(key)] = {"type": "categorical", "choices": [None]}
+            continue
+        if isinstance(value, list) and value:
+            specs[str(key)] = {"type": "categorical", "choices": deepcopy(value)}
+            continue
+        categories = getattr(value, "categories", None)
+        if categories is not None:
+            specs[str(key)] = {
+                "type": "categorical",
+                "choices": deepcopy(list(categories)),
+            }
+            continue
+        lower = getattr(value, "lower", None)
+        upper = getattr(value, "upper", None)
+        if isinstance(lower, int) and isinstance(upper, int):
+            specs[str(key)] = {
+                "type": "int",
+                "low": int(lower),
+                "high": int(upper),
+                "step": int(getattr(value, "q", 1) or 1),
+            }
+            continue
+        if isinstance(lower, (int, float)) and isinstance(upper, (int, float)):
+            sampler_name = type(getattr(value, "sampler", None)).__name__.lower()
+            spec: SearchParamSpec = {
+                "type": "float",
+                "low": float(lower),
+                "high": float(upper),
+            }
+            if "log" in sampler_name:
+                spec["log"] = True
+            specs[str(key)] = spec
+    return specs or None
 
 def _hash_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -219,6 +299,7 @@ MODEL_PARAM_REGISTRY: dict[str, dict[str, SearchParamSpec]]
 TRAINING_PARAM_REGISTRY: dict[str, SearchParamSpec]
 TRAINING_PARAM_REGISTRY_BY_MODEL: dict[str, dict[str, SearchParamSpec]]
 RESIDUAL_PARAM_REGISTRY: dict[str, dict[str, SearchParamSpec]]
+BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY: dict[str, dict[str, SearchParamSpec]]
 
 
 def _coerce_legacy_param_name_list(value: Any, *, section: str, owner: str) -> tuple[str, ...]:
@@ -230,6 +311,27 @@ def _coerce_legacy_param_name_list(value: Any, *, section: str, owner: str) -> t
     if any(not item.strip() for item in out):
         raise ValueError(f"search_space.{section}.{owner} contains an empty parameter name")
     return out
+
+
+def _known_model_param_names(model_name: str) -> set[str]:
+    stage_only = globals().get("BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY") or {}
+    if model_name in stage_only:
+        return set(stage_only[model_name])
+    try:
+        import neuralforecast.models as nf_models
+    except Exception:
+        return set()
+    model_cls = getattr(nf_models, model_name, None)
+    if model_cls is None:
+        return set()
+    try:
+        return {
+            name
+            for name in inspect.signature(model_cls.__init__).parameters
+            if name != "self"
+        }
+    except (TypeError, ValueError):
+        return set()
 
 
 def _normalize_selector_specs(
@@ -247,10 +349,17 @@ def _normalize_selector_specs(
             )
         missing = sorted(set(names).difference(fallback_specs))
         if missing:
-            raise ValueError(
-                f"search_space.{section}.{owner} contains unknown parameter(s): {', '.join(missing)}"
-            )
-        return {name: deepcopy(fallback_specs[name]) for name in names}
+            known_params = _known_model_param_names(owner)
+            truly_unknown = sorted(set(missing).difference(known_params))
+            if truly_unknown:
+                raise ValueError(
+                    f"search_space.{section}.{owner} contains unknown parameter(s): {', '.join(truly_unknown)}"
+                )
+        resolved_specs = {
+            name: deepcopy(fallback_specs.get(name, {"type": "categorical", "choices": [None]}))
+            for name in names
+        }
+        return resolved_specs
     if not isinstance(value, dict):
         raise ValueError(
             f"search_space.{section}.{owner} must be a mapping of parameter specs"
@@ -259,6 +368,148 @@ def _normalize_selector_specs(
         str(name): _normalize_param_spec(spec, section=section, owner=owner, name=str(name))
         for name, spec in value.items()
     }
+
+
+def _normalize_model_section(
+    payload: Any,
+    *,
+    section: str,
+    allowed_models: set[str] | None = None,
+) -> dict[str, dict[str, SearchParamSpec]]:
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        raise ValueError(f"search_space.{section} must be a mapping")
+    model_fallback = globals().get("MODEL_PARAM_REGISTRY")
+    residual_fallback = globals().get("RESIDUAL_PARAM_REGISTRY")
+    stage_only_fallback = globals().get("BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY")
+    models = {
+        str(model_name): _normalize_selector_specs(
+            model_specs,
+            section=section,
+            owner=str(model_name),
+            fallback_specs=(
+                (
+                    None
+                    if model_fallback is None
+                    else model_fallback.get(str(model_name))
+                )
+                or (
+                    residual_fallback.get(str(model_name))
+                    if section == "bs_preforcast_models"
+                    and residual_fallback is not None
+                    else None
+                )
+                or (
+                    stage_only_fallback.get(str(model_name))
+                    if section == "bs_preforcast_models"
+                    and stage_only_fallback is not None
+                    else None
+                )
+                or _auto_default_param_specs(str(model_name))
+            ),
+        )
+        for model_name, model_specs in payload.items()
+    }
+    supported = SUPPORTED_AUTO_MODEL_NAMES if allowed_models is None else allowed_models
+    unknown_models = sorted(set(models).difference(supported))
+    if unknown_models:
+        raise ValueError(
+            f"search_space.{section} contains unsupported learned model(s): "
+            + ", ".join(unknown_models)
+        )
+    return models
+
+
+def _normalize_training_section(
+    payload: Any,
+    *,
+    section: str,
+    allowed_models: set[str] | None = None,
+) -> dict[str, dict[str, dict[str, SearchParamSpec]]]:
+    training_global_fallback = globals().get("TRAINING_PARAM_REGISTRY")
+    supported = SUPPORTED_AUTO_MODEL_NAMES if allowed_models is None else allowed_models
+    if payload is None:
+        training = {"global": {}, "per_model": {}}
+    elif isinstance(payload, list):
+        training = {
+            "global": _normalize_selector_specs(
+                payload,
+                section=section,
+                owner="global",
+                fallback_specs=training_global_fallback,
+            ),
+            "per_model": {},
+        }
+    elif isinstance(payload, dict):
+        if "global" in payload or "per_model" in payload:
+            global_payload = payload.get("global", {})
+            per_model_payload = payload.get("per_model", {})
+        else:
+            global_payload = payload
+            per_model_payload = {}
+        global_specs = _normalize_selector_specs(
+            global_payload,
+            section=section,
+            owner="global",
+            fallback_specs=training_global_fallback,
+        )
+        if not isinstance(per_model_payload, dict):
+            raise ValueError(f"search_space.{section}.per_model must be a mapping")
+        per_model_specs = {
+            str(model_name): _normalize_selector_specs(
+                spec_payload,
+                section=f"{section}.per_model",
+                owner=str(model_name),
+                fallback_specs=global_specs,
+            )
+            for model_name, spec_payload in per_model_payload.items()
+        }
+        training = {"global": global_specs, "per_model": per_model_specs}
+    else:
+        raise ValueError(f"search_space.{section} must be a mapping or legacy list")
+
+    fixed_training = sorted(set(training["global"]).intersection(FIXED_TRAINING_KEYS))
+    if fixed_training:
+        raise ValueError(
+            f"search_space.{section}.global contains fixed, non-tunable parameter(s): "
+            + ", ".join(fixed_training)
+        )
+    unknown_training = sorted(
+        set(training["global"]).difference({
+            key for key in (training_global_fallback or {})
+        })
+    )
+    if training_global_fallback is not None and unknown_training:
+        raise ValueError(
+            f"search_space.{section}.global contains unknown parameter(s): "
+            + ", ".join(unknown_training)
+        )
+    unknown_training_models = sorted(set(training["per_model"]).difference(supported))
+    if unknown_training_models:
+        raise ValueError(
+            f"search_space.{section}.per_model contains unsupported model(s): "
+            + ", ".join(unknown_training_models)
+        )
+    missing_training_models = sorted(set(supported).difference(training["per_model"]))
+    for model_name in missing_training_models:
+        training["per_model"][model_name] = deepcopy(training["global"])
+    for model_name, specs in training["per_model"].items():
+        spec_keys = set(specs)
+        global_keys = set(training["global"])
+        extra = sorted(spec_keys.difference(global_keys))
+        missing = sorted(global_keys.difference(spec_keys))
+        if extra:
+            raise ValueError(
+                f"search_space.{section}.per_model.{model_name} cannot introduce new parameter(s): {', '.join(extra)}"
+            )
+        if missing:
+            raise ValueError(
+                f"search_space.{section}.per_model.{model_name} must define every training selector explicitly; missing: {', '.join(missing)}"
+            )
+    if "learning_rate" in training["global"]:
+        return training
+    return training
 
 
 def normalize_search_space_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -270,28 +521,9 @@ def normalize_search_space_payload(payload: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(
             "search_space.yaml must contain top-level sections: models and residual"
         )
-    model_fallback = globals().get("MODEL_PARAM_REGISTRY")
     residual_fallback = globals().get("RESIDUAL_PARAM_REGISTRY")
-    training_global_fallback = globals().get("TRAINING_PARAM_REGISTRY")
 
-    models_payload = payload.get("models")
-    if not isinstance(models_payload, dict):
-        raise ValueError("search_space.models must be a mapping")
-    models = {
-        str(model_name): _normalize_selector_specs(
-            model_specs,
-            section="models",
-            owner=str(model_name),
-            fallback_specs=(None if model_fallback is None else model_fallback.get(str(model_name))),
-        )
-        for model_name, model_specs in models_payload.items()
-    }
-    unknown_models = sorted(set(models).difference(SUPPORTED_AUTO_MODEL_NAMES))
-    if unknown_models:
-        raise ValueError(
-            "search_space.models contains unsupported learned model(s): "
-            + ", ".join(unknown_models)
-        )
+    models = _normalize_model_section(payload.get("models"), section="models")
 
     residual_payload = payload.get("residual")
     if not isinstance(residual_payload, dict):
@@ -312,89 +544,7 @@ def normalize_search_space_payload(payload: dict[str, Any]) -> dict[str, Any]:
             + ", ".join(unknown_residual)
         )
 
-    training_payload = payload.get("training")
-    if training_payload is None:
-        training = {"global": {}, "per_model": {}}
-    elif isinstance(training_payload, list):
-        training = {
-            "global": _normalize_selector_specs(
-                training_payload,
-                section="training",
-                owner="global",
-                fallback_specs=training_global_fallback,
-            ),
-            "per_model": {},
-        }
-    elif isinstance(training_payload, dict):
-        if "global" in training_payload or "per_model" in training_payload:
-            global_payload = training_payload.get("global", {})
-            per_model_payload = training_payload.get("per_model", {})
-        else:
-            global_payload = training_payload
-            per_model_payload = {}
-        global_specs = _normalize_selector_specs(
-            global_payload,
-            section="training",
-            owner="global",
-            fallback_specs=training_global_fallback,
-        )
-        if not isinstance(per_model_payload, dict):
-            raise ValueError("search_space.training.per_model must be a mapping")
-        per_model_specs = {
-            str(model_name): _normalize_selector_specs(
-                spec_payload,
-                section="training.per_model",
-                owner=str(model_name),
-                fallback_specs=global_specs,
-            )
-            for model_name, spec_payload in per_model_payload.items()
-        }
-        training = {"global": global_specs, "per_model": per_model_specs}
-    else:
-        raise ValueError("search_space.training must be a mapping or legacy list")
-
-    fixed_training = sorted(set(training["global"]).intersection(FIXED_TRAINING_KEYS))
-    if fixed_training:
-        raise ValueError(
-            "search_space.training.global contains fixed, non-tunable parameter(s): "
-            + ", ".join(fixed_training)
-        )
-    unknown_training = sorted(
-        set(training["global"]).difference({
-            key for key in (training_global_fallback or {})
-        })
-    )
-    if training_global_fallback is not None and unknown_training:
-        raise ValueError(
-            "search_space.training.global contains unknown parameter(s): "
-            + ", ".join(unknown_training)
-        )
-    unknown_training_models = sorted(
-        set(training["per_model"]).difference(SUPPORTED_AUTO_MODEL_NAMES)
-    )
-    if unknown_training_models:
-        raise ValueError(
-            "search_space.training.per_model contains unsupported model(s): "
-            + ", ".join(unknown_training_models)
-        )
-    missing_training_models = sorted(
-        set(SUPPORTED_AUTO_MODEL_NAMES).difference(training["per_model"])
-    )
-    for model_name in missing_training_models:
-        training["per_model"][model_name] = deepcopy(training["global"])
-    for model_name, specs in training["per_model"].items():
-        spec_keys = set(specs)
-        global_keys = set(training["global"])
-        extra = sorted(spec_keys.difference(global_keys))
-        missing = sorted(global_keys.difference(spec_keys))
-        if extra:
-            raise ValueError(
-                f"search_space.training.per_model.{model_name} cannot introduce new parameter(s): {', '.join(extra)}"
-            )
-        if missing:
-            raise ValueError(
-                f"search_space.training.per_model.{model_name} must define every training selector explicitly; missing: {', '.join(missing)}"
-            )
+    training = _normalize_training_section(payload.get("training"), section="training")
     if "learning_rate" in training["global"]:
         overlaps = sorted(
             model_name for model_name, specs in models.items() if "learning_rate" in specs
@@ -405,10 +555,35 @@ def normalize_search_space_payload(payload: dict[str, Any]) -> dict[str, Any]:
                 + ", ".join(overlaps)
             )
 
+    bs_preforcast_models = _normalize_model_section(
+        payload.get("bs_preforcast_models"),
+        section="bs_preforcast_models",
+        allowed_models=SUPPORTED_BS_PREFORCAST_MODELS,
+    )
+    bs_preforcast_training = _normalize_training_section(
+        payload.get("bs_preforcast_training"),
+        section="bs_preforcast_training",
+        allowed_models=SUPPORTED_BS_PREFORCAST_MODELS,
+    )
+    if "learning_rate" in bs_preforcast_training["global"]:
+        overlaps = sorted(
+            model_name
+            for model_name, specs in bs_preforcast_models.items()
+            if "learning_rate" in specs
+            and model_name not in {"xgboost", "lightgbm", "AutoARIMA", "ES"}
+        )
+        if overlaps:
+            raise ValueError(
+                "search_space.bs_preforcast_training.global.learning_rate overlaps with model-level learning_rate selector(s): "
+                + ", ".join(overlaps)
+            )
+
     return {
         "models": models,
         "training": training,
         "residual": residual,
+        "bs_preforcast_models": bs_preforcast_models,
+        "bs_preforcast_training": bs_preforcast_training,
     }
 
 
@@ -437,27 +612,37 @@ RESIDUAL_PARAM_REGISTRY = {
     model_name: deepcopy(specs)
     for model_name, specs in _DEFAULT_CONTRACT.payload["residual"].items()
 }
+BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY = {
+    "AutoARIMA": {
+        "season_length": {"type": "categorical", "choices": [1, 4, 8, 12]},
+    },
+    "ES": {
+        "season_length": {"type": "categorical", "choices": [1, 4, 8, 12]},
+    },
+}
 
 
 def training_param_registry_for_model(
     model_name: str | None,
     *,
     search_space_payload: dict[str, Any] | None = None,
+    section: str = "training",
 ) -> dict[str, SearchParamSpec]:
     if search_space_payload is None:
         if model_name is None:
             return deepcopy(TRAINING_PARAM_REGISTRY)
         return deepcopy(TRAINING_PARAM_REGISTRY_BY_MODEL[model_name])
-    global_specs = search_space_payload["training"]["global"]
+    global_specs = search_space_payload[section]["global"]
     if model_name is None:
         return deepcopy(global_specs)
-    return deepcopy(search_space_payload["training"]["per_model"][model_name])
+    return deepcopy(search_space_payload[section]["per_model"][model_name])
 
 
 def training_range_source_for_model(
     model_name: str | None,
     *,
     search_space_payload: dict[str, Any] | None = None,
+    section: str = "training",
 ) -> str:
     if model_name is None:
         return GLOBAL_TRAINING_RANGE_SOURCE
@@ -465,7 +650,7 @@ def training_range_source_for_model(
         if model_name not in TRAINING_PARAM_REGISTRY_BY_MODEL:
             return GLOBAL_TRAINING_RANGE_SOURCE
         return f"model_override:{model_name}"
-    if model_name not in search_space_payload["training"]["per_model"]:
+    if model_name not in search_space_payload[section]["per_model"]:
         return GLOBAL_TRAINING_RANGE_SOURCE
     return f"model_override:{model_name}"
 

@@ -19,9 +19,8 @@ SCRIPT_ROOT = Path(__file__).resolve().parents[1]
 if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
 
-from residual.optuna_spaces import load_search_space_contract, suggest_model_params
 
-SEARCH_MODELS = ("TimeXer", "iTransformer", "LSTM")
+SEARCH_MODELS = ("iTransformer", "LSTM")
 CONTROL_MODEL = "Naive"
 EXPECTED_MODELS = SEARCH_MODELS + (CONTROL_MODEL,)
 FIXED_TRAINING: dict[str, Any] = {
@@ -43,6 +42,12 @@ FIXED_TRAINING: dict[str, Any] = {
 TRAINING_GATE_KEYS = tuple(FIXED_TRAINING)
 SUCCESS_TARGET_CASES = 4
 GENERATED_RUN_GUARD_NAME = "deep_dive_resume_guard.json"
+
+
+@dataclass(frozen=True)
+class SearchSpaceContract:
+    path: Path
+    payload: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -173,6 +178,55 @@ class BundleOutcome:
             "delta_case_mean_mape_learned_pp": self.delta_case_mean_mape_learned_pp,
             "in_target_band": self.in_target_band,
         }
+
+
+
+
+def _normalize_model_search_specs(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    models = payload.get("models")
+    if not isinstance(models, dict):
+        raise ValueError("search_space.yaml must contain a models mapping")
+    normalized: dict[str, dict[str, Any]] = {}
+    for model_name, specs in models.items():
+        if not isinstance(specs, dict):
+            raise ValueError(f"search_space.models.{model_name} must be a mapping")
+        normalized[str(model_name)] = {str(name): dict(spec) for name, spec in specs.items()}
+    return normalized
+
+
+def load_search_space_contract(repo_root: Path) -> SearchSpaceContract:
+    path = (repo_root / "search_space.yaml").resolve()
+    payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return SearchSpaceContract(path=path, payload={"models": _normalize_model_search_specs(payload)})
+
+
+def _suggest_from_spec(trial: optuna.Trial, name: str, spec: dict[str, Any]) -> Any:
+    spec_type = str(spec.get("type", "")).strip().lower()
+    if spec_type == "categorical":
+        return trial.suggest_categorical(name, list(spec["choices"]))
+    if spec_type == "int":
+        return trial.suggest_int(name, int(spec["low"]), int(spec["high"]), step=int(spec.get("step", 1)))
+    if spec_type == "float":
+        return trial.suggest_float(
+            name,
+            float(spec["low"]),
+            float(spec["high"]),
+            log=bool(spec.get("log", False)),
+        )
+    raise ValueError(f"Unsupported search-space spec type: {spec_type}")
+
+
+def suggest_model_params(
+    model_name: str,
+    selected_names: tuple[str, ...],
+    trial: optuna.Trial,
+    *,
+    param_specs: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        name: _suggest_from_spec(trial, name, param_specs[name])
+        for name in selected_names
+    }
 
 
 def repo_root_from_script(script_path: str | Path = __file__) -> Path:
