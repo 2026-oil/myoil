@@ -93,6 +93,12 @@ cd neuralforecast
 uv run python main.py --config config.yaml --jobs TFT --output-root runs/single-job-smoke
 ```
 
+`--output-root`를 생략한 단일 job 재실행은 기존 scheduler run을 재사용할 수 있습니다.
+같은 config source path와 같은 resolved config signature로 생성된 scheduler-backed run이 이미 있으면, runtime은 가장 최근 run의
+`scheduler/workers/<job>` 경로를 자동 재사용하고 해당 job의 기존 산출물을 지운 뒤 fresh rerun을 수행합니다.
+그 후 부모 run의 `summary/leaderboard.csv`, `summary/sample.md`, `summary/last_fold_*.png`도 다시 생성합니다.
+매칭되는 scheduler run이 없으면 현재처럼 기본 single-job output root를 사용합니다.
+
 ### 멀티 job scheduler 실행
 
 ```bash

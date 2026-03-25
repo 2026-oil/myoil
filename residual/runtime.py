@@ -252,6 +252,111 @@ def _default_output_root(repo_root: Path, loaded: LoadedConfig) -> Path:
     return repo_root / "runs" / (safe_name or "validation")
 
 
+def _matching_scheduler_run_job_names(manifest: dict[str, Any]) -> set[str]:
+    jobs_payload = manifest.get("jobs")
+    if not isinstance(jobs_payload, list):
+        return set()
+    names: set[str] = set()
+    for item in jobs_payload:
+        if not isinstance(item, dict):
+            continue
+        model_name = item.get("model")
+        if isinstance(model_name, str) and model_name.strip():
+            names.add(model_name)
+    return names
+
+
+def _find_latest_matching_scheduler_run(
+    repo_root: Path,
+    loaded: LoadedConfig,
+    *,
+    job_name: str,
+) -> Path | None:
+    runs_root = repo_root / "runs"
+    if not runs_root.exists():
+        return None
+    target_config_path = loaded.source_path.resolve(strict=False)
+    resolved_runs_root = runs_root.resolve(strict=False)
+    candidates: list[tuple[float, str, Path]] = []
+    for manifest_path in runs_root.glob("*/manifest/run_manifest.json"):
+        run_root = manifest_path.parents[1]
+        workers_root = run_root / "scheduler" / "workers"
+        if run_root.is_symlink() or workers_root.is_symlink():
+            continue
+        if not workers_root.exists():
+            continue
+        resolved_run_root = run_root.resolve(strict=False)
+        if (
+            resolved_run_root != resolved_runs_root
+            and resolved_runs_root not in resolved_run_root.parents
+        ):
+            continue
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        config_source = manifest.get("config_source_path")
+        if not isinstance(config_source, str) or not config_source.strip():
+            continue
+        if Path(config_source).resolve(strict=False) != target_config_path:
+            continue
+        if manifest.get("config_resolved_sha256") != loaded.resolved_hash:
+            continue
+        if job_name not in _matching_scheduler_run_job_names(manifest):
+            continue
+        candidate_mtime = max(
+            run_root.stat().st_mtime,
+            manifest_path.stat().st_mtime,
+            workers_root.stat().st_mtime,
+        )
+        candidates.append((candidate_mtime, str(run_root), run_root))
+    if not candidates:
+        return None
+    candidates.sort()
+    return candidates[-1][2]
+
+
+def _resolve_single_job_run_roots(
+    repo_root: Path,
+    loaded: LoadedConfig,
+    selected_jobs: Sequence[JobConfig],
+    *,
+    output_root: str | None,
+    internal_stage: str,
+    validate_only: bool = False,
+) -> dict[str, Any]:
+    if output_root is not None:
+        explicit_root = Path(output_root)
+        return {
+            "run_root": explicit_root,
+            "summary_root": explicit_root,
+            "force_prune": False,
+        }
+    default_root = _default_output_root(repo_root, loaded)
+    if validate_only or internal_stage != "full" or len(selected_jobs) != 1:
+        return {
+            "run_root": default_root,
+            "summary_root": default_root,
+            "force_prune": False,
+        }
+    matched_run_root = _find_latest_matching_scheduler_run(
+        repo_root,
+        loaded,
+        job_name=selected_jobs[0].model,
+    )
+    if matched_run_root is None:
+        return {
+            "run_root": default_root,
+            "summary_root": default_root,
+            "force_prune": False,
+        }
+    return {
+        "run_root": matched_run_root / "scheduler" / "workers" / selected_jobs[0].model,
+        "summary_root": matched_run_root,
+        "force_prune": True,
+    }
+
+
 def _remove_existing_artifact(path: Path) -> None:
     if not path.exists():
         return
@@ -2882,11 +2987,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     loaded = load_app_config(
         repo_root, config_path=config_path, config_toml_path=args.config_toml
     )
-    output_root = (
-        Path(args.output_root) if args.output_root else _default_output_root(repo_root, loaded)
-    )
-    paths = _build_resolved_artifacts(repo_root, loaded, output_root)
     selected_jobs = _selected_jobs(loaded, args.jobs)
+    resolved_roots = _resolve_single_job_run_roots(
+        repo_root,
+        loaded,
+        selected_jobs,
+        output_root=args.output_root,
+        internal_stage=args.internal_stage,
+        validate_only=args.validate_only,
+    )
+    paths = _build_resolved_artifacts(repo_root, loaded, resolved_roots["run_root"])
     _validate_jobs(loaded, selected_jobs, paths["capability_path"])
     _validate_adapters(loaded, selected_jobs)
     if args.validate_only:
@@ -2905,7 +3015,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 manifest_path=paths["manifest_path"],
             )
         else:
-            if _should_prune_model_run_artifacts(
+            if resolved_roots["force_prune"] or _should_prune_model_run_artifacts(
                 selected_jobs[0], main_stage=args.internal_stage
             ):
                 _prune_model_run_artifacts(paths["run_root"], selected_jobs[0].model)
@@ -2918,7 +3028,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             worker_results = []
         summary_artifacts = (
-            _build_summary_artifacts(paths["run_root"])
+            _build_summary_artifacts(resolved_roots["summary_root"])
             if args.internal_stage != "tune-main-only"
             and _should_build_summary_artifacts()
             else {}

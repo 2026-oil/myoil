@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import io
+import os
 from pathlib import Path
 import json
 from types import SimpleNamespace
@@ -213,6 +214,30 @@ params = { hidden_size = 32, n_heads = 4, e_layers = 2, d_ff = 64 }
     else:
         path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     return path
+
+
+def _write_scheduler_run_manifest(
+    run_root: Path,
+    *,
+    config_source_path: Path,
+    job_names: list[str],
+    resolved_hash: str | None = None,
+) -> Path:
+    manifest_path = run_root / "manifest" / "run_manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    (run_root / "scheduler" / "workers").mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "config_source_path": str(config_source_path.resolve()),
+                "config_resolved_sha256": resolved_hash,
+                "jobs": [{"model": name} for name in job_names],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return manifest_path
 
 
 def _payload() -> dict:
@@ -2144,6 +2169,241 @@ def test_default_output_root_for_feature_set_hpt_n100_residual_wti_case3_config(
     )
 
 
+def test_resolve_single_job_run_roots_prefers_latest_matching_scheduler_run(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["task"] = {"name": "pytest_task_scheduler_reuse"}
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_dir = tmp_path / "yaml"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_path = config_dir / "case.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    run_old = tmp_path / "runs" / "old_run"
+    run_new = tmp_path / "runs" / "new_run"
+    _write_scheduler_run_manifest(
+        run_old,
+        config_source_path=config_path,
+        job_names=["DummyUnivariate"],
+        resolved_hash=loaded.resolved_hash,
+    )
+    _write_scheduler_run_manifest(
+        run_new,
+        config_source_path=config_path,
+        job_names=["DummyUnivariate"],
+        resolved_hash=loaded.resolved_hash,
+    )
+    os.utime(run_old, (100, 100))
+    os.utime(run_old / "manifest" / "run_manifest.json", (100, 100))
+    os.utime(run_old / "scheduler" / "workers", (100, 100))
+    os.utime(run_new, (200, 200))
+    os.utime(run_new / "manifest" / "run_manifest.json", (200, 200))
+    os.utime(run_new / "scheduler" / "workers", (200, 200))
+
+    from residual import runtime
+
+    selected_jobs = runtime._selected_jobs(loaded, ["DummyUnivariate"])
+    resolved = runtime._resolve_single_job_run_roots(
+        tmp_path,
+        loaded,
+        selected_jobs,
+        output_root=None,
+        internal_stage="full",
+    )
+
+    assert resolved["run_root"] == (
+        run_new / "scheduler" / "workers" / "DummyUnivariate"
+    )
+    assert resolved["summary_root"] == run_new
+    assert resolved["force_prune"] is True
+
+
+def test_resolve_single_job_run_roots_falls_back_to_default_without_match(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["task"] = {"name": "pytest_task_scheduler_reuse_fallback"}
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_dir = tmp_path / "yaml"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_path = config_dir / "case.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    unmatched_run = tmp_path / "runs" / "other_run"
+    _write_scheduler_run_manifest(
+        unmatched_run,
+        config_source_path=tmp_path / "yaml" / "other.yaml",
+        job_names=["DummyUnivariate"],
+    )
+
+    from residual import runtime
+
+    selected_jobs = runtime._selected_jobs(loaded, ["DummyUnivariate"])
+    resolved = runtime._resolve_single_job_run_roots(
+        tmp_path,
+        loaded,
+        selected_jobs,
+        output_root=None,
+        internal_stage="full",
+    )
+
+    expected_root = runtime._default_output_root(tmp_path, loaded)
+    assert resolved["run_root"] == expected_root
+    assert resolved["summary_root"] == expected_root
+    assert resolved["force_prune"] is False
+
+
+def test_resolve_single_job_run_roots_preserves_explicit_output_root(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["task"] = {"name": "pytest_task_scheduler_reuse_explicit"}
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_dir = tmp_path / "yaml"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_path = config_dir / "case.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    matched_run = tmp_path / "runs" / "matched_run"
+    _write_scheduler_run_manifest(
+        matched_run,
+        config_source_path=config_path,
+        job_names=["DummyUnivariate"],
+    )
+
+    from residual import runtime
+
+    explicit_root = tmp_path / "custom_output_root"
+    selected_jobs = runtime._selected_jobs(loaded, ["DummyUnivariate"])
+    resolved = runtime._resolve_single_job_run_roots(
+        tmp_path,
+        loaded,
+        selected_jobs,
+        output_root=str(explicit_root),
+        internal_stage="full",
+    )
+
+    assert resolved["run_root"] == explicit_root
+    assert resolved["summary_root"] == explicit_root
+    assert resolved["force_prune"] is False
+
+
+def test_resolve_single_job_run_roots_does_not_reuse_scheduler_run_for_validate_only(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["task"] = {"name": "pytest_task_scheduler_reuse_validate_only"}
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_dir = tmp_path / "yaml"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_path = config_dir / "case.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    matched_run = tmp_path / "runs" / "matched_run"
+    _write_scheduler_run_manifest(
+        matched_run,
+        config_source_path=config_path,
+        job_names=["DummyUnivariate"],
+    )
+
+    from residual import runtime
+
+    selected_jobs = runtime._selected_jobs(loaded, ["DummyUnivariate"])
+    resolved = runtime._resolve_single_job_run_roots(
+        tmp_path,
+        loaded,
+        selected_jobs,
+        output_root=None,
+        internal_stage="full",
+        validate_only=True,
+    )
+
+    expected_root = runtime._default_output_root(tmp_path, loaded)
+    assert resolved["run_root"] == expected_root
+    assert resolved["summary_root"] == expected_root
+    assert resolved["force_prune"] is False
+
+
+def test_resolve_single_job_run_roots_ignores_symlinked_scheduler_run(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["task"] = {"name": "pytest_task_scheduler_symlink_guard"}
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_dir = tmp_path / "yaml"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_path = config_dir / "case.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    external_run = tmp_path / "external_run"
+    _write_scheduler_run_manifest(
+        external_run,
+        config_source_path=config_path,
+        job_names=["DummyUnivariate"],
+        resolved_hash=loaded.resolved_hash,
+    )
+    runs_root = tmp_path / "runs"
+    runs_root.mkdir(parents=True, exist_ok=True)
+    (runs_root / "linked_run").symlink_to(external_run, target_is_directory=True)
+
+    from residual import runtime
+
+    selected_jobs = runtime._selected_jobs(loaded, ["DummyUnivariate"])
+    resolved = runtime._resolve_single_job_run_roots(
+        tmp_path,
+        loaded,
+        selected_jobs,
+        output_root=None,
+        internal_stage="full",
+    )
+
+    expected_root = runtime._default_output_root(tmp_path, loaded)
+    assert resolved["run_root"] == expected_root
+    assert resolved["summary_root"] == expected_root
+    assert resolved["force_prune"] is False
+
+
 def test_runtime_infers_freq_when_omitted(tmp_path: Path):
     payload = _payload()
     payload["dataset"].pop("freq", None)
@@ -3318,6 +3578,17 @@ def test_load_app_config_accepts_batch_training_search_space_param(tmp_path: Pat
     assert "batch_size" in loaded.config.training_search.selected_search_params
 
 
+def test_repo_optuna_fixture_excludes_batch_window_training_selectors():
+    loaded = load_app_config(
+        REPO_ROOT,
+        config_path=REPO_ROOT / "tests" / "fixtures" / "optuna_learned_auto.yaml",
+    )
+
+    assert set(EXCLUDED_REPO_TRAINING_SELECTORS).isdisjoint(
+        loaded.config.training_search.selected_search_params
+    )
+
+
 def test_suggest_training_params_supports_batch_size_selector():
     class _Trial:
         def suggest_categorical(self, _name, options):
@@ -3665,6 +3936,80 @@ def test_runtime_main_does_not_recurse_parallel_tuning_inside_worker(
 
     assert code == 0
     assert called["count"] == 0
+
+
+def test_runtime_main_reuses_scheduler_worker_root_and_parent_summary_for_auto_job(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    payload = _payload()
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {"models": {"TFT": ["hidden_size"]}, "training": [], "residual": {}},
+    )
+
+    from residual import runtime
+
+    worker_root = tmp_path / "matched_run" / "scheduler" / "workers" / "TFT"
+    summary_root = tmp_path / "matched_run"
+    called: dict[str, Any] = {"summary_roots": [], "prunes": []}
+
+    def _fake_summary(run_root: Path) -> dict[str, str]:
+        called["summary_roots"].append(run_root)
+        return {"leaderboard": str(run_root / "summary" / "leaderboard.csv")}
+
+    monkeypatch.setattr(
+        runtime,
+        "load_app_config",
+        lambda _repo_root, **kwargs: load_app_config(tmp_path, **kwargs),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_resolve_single_job_run_roots",
+        lambda *_args, **_kwargs: {
+            "run_root": worker_root,
+            "summary_root": summary_root,
+            "force_prune": True,
+        },
+    )
+    monkeypatch.setattr(runtime, "_should_parallelize_single_job_tuning", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        runtime,
+        "_prune_model_run_artifacts",
+        lambda run_root, model_name: called["prunes"].append((run_root, model_name)),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_run_single_job",
+        lambda loaded, job, run_root, *, manifest_path, main_stage="full": called.update(
+            {
+                "run_root": run_root,
+                "manifest_path": manifest_path,
+                "job_name": job.model,
+                "main_stage": main_stage,
+            }
+        ),
+    )
+    monkeypatch.setattr(runtime, "_build_summary_artifacts", _fake_summary)
+
+    code = runtime.main(["--config", str(config_path), "--jobs", "TFT"])
+
+    assert code == 0
+    assert called["run_root"] == worker_root
+    assert called["manifest_path"] == worker_root / "manifest" / "run_manifest.json"
+    assert called["job_name"] == "TFT"
+    assert called["main_stage"] == "full"
+    assert called["prunes"] == [(worker_root, "TFT")]
+    assert called["summary_roots"] == [summary_root]
 
 
 def test_runtime_auto_mode_can_prune_from_first_fold(
@@ -4298,16 +4643,16 @@ def test_supported_auto_model_matrix_matches_registry_and_yaml():
     learned_registry_models = set(MODEL_PARAM_REGISTRY)
     assert "HINT" not in SUPPORTED_AUTO_MODEL_NAMES
     assert SUPPORTED_AUTO_MODEL_NAMES == learned_model_classes
-    assert SUPPORTED_AUTO_MODEL_NAMES == learned_registry_models
-    assert SUPPORTED_AUTO_MODEL_NAMES == set(search_space["models"])
+    assert learned_registry_models == set(EXPECTED_REPO_AUTO_MODELS)
+    assert set(search_space["models"]) == set(EXPECTED_REPO_AUTO_MODELS)
     assert set(TRAINING_PARAM_REGISTRY_BY_MODEL) == SUPPORTED_AUTO_MODEL_NAMES
-    assert set(search_space["training"]["per_model"]) == SUPPORTED_AUTO_MODEL_NAMES
+    assert set(search_space["training"]["per_model"]) == set(EXPECTED_REPO_AUTO_MODELS)
     assert all(
         set(TRAINING_PARAM_REGISTRY_BY_MODEL[model_name])
         == set(search_space["training"]["per_model"][model_name])
         == set(TRAINING_PARAM_REGISTRY)
         == set(search_space["training"]["global"])
-        for model_name in SUPPORTED_AUTO_MODEL_NAMES
+        for model_name in EXPECTED_REPO_AUTO_MODELS
     )
     assert tuple(search_space["training"]["global"]) == tuple(TRAINING_PARAM_REGISTRY)
     assert set(search_space["residual"]) == {"xgboost", "randomforest", "lightgbm"}
@@ -4315,7 +4660,8 @@ def test_supported_auto_model_matrix_matches_registry_and_yaml():
         isinstance(search_space["models"][model], dict)
         for model in search_space["models"]
     )
-    assert "learning_rate" not in search_space["models"]["NLinear"]
+    assert "PatchTST" not in search_space["models"]
+    assert "TFT" not in search_space["models"]
     assert training_range_source_for_model("PatchTST") == "model_override:PatchTST"
     assert training_range_source_for_model("TFT") == "model_override:TFT"
     assert training_range_source_for_model(None) == "global_fallback"
@@ -4357,7 +4703,7 @@ def test_narrowed_model_param_ranges_are_explicit_for_selected_auto_models():
         },
         "TSMixerx": {
             "categorical": {
-                "n_block": (2, 4, 8),
+                "n_block": (4, 8),
                 "ff_dim": (128, 256, 512, 1024),
                 "dropout": (0.0, 0.1, 0.2, 0.3),
                 "revin": (True, False),
@@ -4368,7 +4714,7 @@ def test_narrowed_model_param_ranges_are_explicit_for_selected_auto_models():
                 "patch_len": (8, 16, 32),
                 "hidden_size": (256, 512, 768),
                 "n_heads": (8, 16, 32),
-                "e_layers": (2, 4, 6),
+                "e_layers": (4, 8),
                 "d_ff": (512, 1024, 2048),
                 "factor": (2, 4, 8),
                 "dropout": (0.0, 0.1, 0.2, 0.3),
@@ -4379,9 +4725,9 @@ def test_narrowed_model_param_ranges_are_explicit_for_selected_auto_models():
             "categorical": {
                 "hidden_size": (256, 512, 768),
                 "n_heads": (8, 16, 32),
-                "e_layers": (2, 4, 6),
+                "e_layers": (2, 4, 8),
                 "d_ff": (512, 1024, 2048),
-                "d_layers": (2, 4),
+                "d_layers": (2, 4, 8),
                 "factor": (2, 4, 8),
                 "dropout": (0.0, 0.1, 0.2, 0.3),
                 "use_norm": (True, False),
@@ -4395,7 +4741,6 @@ def test_narrowed_model_param_ranges_are_explicit_for_selected_auto_models():
                 "encoder_dropout": (0.0, 0.1, 0.2, 0.3),
                 "decoder_hidden_size": (128, 256, 512),
                 "decoder_layers": (2, 4),
-                "context_size": (8, 16, 32, 64),
             },
         },
     }
@@ -4429,51 +4774,39 @@ def test_priority_models_have_narrowed_training_range_overrides():
     cases = {
         "PatchTST": {
             "categorical": {
-                "input_size": (36,),
+                "input_size": (48, 64, 96),
                 "batch_size": (16,),
-                "valid_batch_size": (32,),
-                "windows_batch_size": (256, 1024),
-                "inference_windows_batch_size": (256, 512),
                 "scaler_type": (None, "robust"),
                 "model_step_size": (1, 12),
             },
-            "floating": {"learning_rate": (3e-4, 1.5e-2, True)},
+            "floating": {"learning_rate": (3e-4, 8e-3, True)},
         },
         "TSMixerx": {
             "categorical": {
-                "input_size": (64,),
+                "input_size": (48, 64, 72),
                 "batch_size": (16,),
-                "valid_batch_size": (128,),
-                "windows_batch_size": (512,),
-                "inference_windows_batch_size": (512,),
-                "scaler_type": ("robust",),
-                "model_step_size": (1,),
+                "scaler_type": ("robust", "standard"),
+                "model_step_size": (1, 4),
             },
-            "floating": {"learning_rate": (4e-4, 1e-3, True)},
+            "floating": {"learning_rate": (3e-4, 2e-3, True)},
         },
         "iTransformer": {
             "categorical": {
-                "input_size": (72,),
+                "input_size": (48, 64, 96),
                 "batch_size": (16,),
-                "valid_batch_size": (16, 32),
-                "windows_batch_size": (512,),
-                "inference_windows_batch_size": (512,),
-                "scaler_type": (None,),
-                "model_step_size": (4,),
+                "scaler_type": (None, "robust"),
+                "model_step_size": (1, 4),
             },
             "floating": {"learning_rate": (4e-4, 7e-3, True)},
         },
         "LSTM": {
             "categorical": {
-                "input_size": (48,),
-                "batch_size": (32,),
-                "valid_batch_size": (16,),
-                "windows_batch_size": (1024,),
-                "inference_windows_batch_size": (1024,),
-                "scaler_type": ("identity",),
-                "model_step_size": (8,),
+                "input_size": (24, 48, 96),
+                "batch_size": (32, 64),
+                "scaler_type": ("robust", "standard", "identity"),
+                "model_step_size": (1, 4, 8),
             },
-            "floating": {"learning_rate": (1e-3, 1e-2, True)},
+            "floating": {"learning_rate": (5e-4, 1e-2, True)},
         },
     }
 
@@ -5255,47 +5588,14 @@ SEARCH_SPACE_RESIDUAL = {
     for model_name, specs in SEARCH_SPACE_RESIDUAL_RAW.items()
 }
 
+EXPECTED_REPO_AUTO_MODELS = [
+    "LSTM",
+    "iTransformer",
+    "TimeXer",
+    "TSMixerx",
+]
+
 EXPECTED_REPO_AUTO_SELECTORS = {
-    "LSTM": [
-        "encoder_hidden_size",
-        "encoder_n_layers",
-        "inference_input_size",
-        "encoder_dropout",
-        "decoder_hidden_size",
-        "decoder_layers",
-        "context_size",
-    ],
-    "NHITS": [
-        "n_pool_kernel_size",
-        "n_freq_downsample",
-        "n_blocks",
-        "mlp_units",
-        "dropout_prob_theta",
-        "activation",
-    ],
-    "DLinear": ["moving_avg_window"],
-    "Autoformer": [
-        "hidden_size",
-        "n_head",
-        "encoder_layers",
-        "decoder_layers",
-        "factor",
-        "MovingAvg_window",
-        "conv_hidden_size",
-        "dropout",
-    ],
-    "PatchTST": [
-        "hidden_size",
-        "n_heads",
-        "encoder_layers",
-        "linear_hidden_size",
-        "patch_len",
-        "stride",
-        "dropout",
-        "fc_dropout",
-        "attn_dropout",
-        "revin",
-    ],
     "iTransformer": [
         "hidden_size",
         "n_heads",
@@ -5322,16 +5622,27 @@ EXPECTED_REPO_AUTO_SELECTORS = {
         "dropout",
         "revin",
     ],
+    "LSTM": [
+        "encoder_hidden_size",
+        "encoder_n_layers",
+        "inference_input_size",
+        "encoder_dropout",
+        "decoder_hidden_size",
+        "decoder_layers",
+    ],
 }
 EXPECTED_REPO_TRAINING_SELECTORS = [
     "input_size",
     "batch_size",
-    "valid_batch_size",
-    "windows_batch_size",
-    "inference_windows_batch_size",
     "learning_rate",
     "scaler_type",
     "model_step_size",
+]
+
+EXCLUDED_REPO_TRAINING_SELECTORS = [
+    "valid_batch_size",
+    "windows_batch_size",
+    "inference_windows_batch_size",
 ]
 
 EXPECTED_FIXED_TRAINING_VALUES = {
@@ -5860,22 +6171,19 @@ def test_feature_set_hpt_case12_normalizes_to_auto_training_and_learned_jobs(
 
 
 def test_repo_search_space_updates_requested_auto_selectors_only():
+    assert list(SEARCH_SPACE_MODELS) == EXPECTED_REPO_AUTO_MODELS
     for model_name, expected in EXPECTED_REPO_AUTO_SELECTORS.items():
         assert SEARCH_SPACE_MODELS[model_name] == expected
 
     assert SEARCH_SPACE_TRAINING == EXPECTED_REPO_TRAINING_SELECTORS
-    assert set(SEARCH_SPACE_TRAINING_PER_MODEL) == SUPPORTED_AUTO_MODEL_NAMES
+    assert set(EXCLUDED_REPO_TRAINING_SELECTORS).isdisjoint(SEARCH_SPACE_TRAINING)
+    assert set(SEARCH_SPACE_TRAINING_PER_MODEL) == set(EXPECTED_REPO_AUTO_MODELS)
     assert set(FIXED_TRAINING_KEYS).isdisjoint(SEARCH_SPACE_TRAINING)
     assert "step_size" not in SEARCH_SPACE_TRAINING
     assert "early_stop_patience_steps" not in SEARCH_SPACE_TRAINING
-    assert "context_size" in SEARCH_SPACE_MODELS["LSTM"]
-    assert SEARCH_SPACE_MODELS["GRU"] == [
-        "encoder_hidden_size",
-        "encoder_n_layers",
-        "context_size",
-        "decoder_hidden_size",
-    ]
-    assert SEARCH_SPACE_MODELS["TFT"] == ["hidden_size", "dropout", "n_head"]
+    assert "context_size" not in SEARCH_SPACE_MODELS["LSTM"]
+    assert "GRU" not in SEARCH_SPACE_MODELS
+    assert "TFT" not in SEARCH_SPACE_MODELS
 
 
 def _residual_target_panel(rows: list[dict[str, object]]) -> pd.DataFrame:
