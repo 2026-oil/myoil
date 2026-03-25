@@ -36,5 +36,5 @@ residual:
   model: randomforest
   params: {}
 jobs:
-  - model: TFT
+  - model: LSTM
     params: {}

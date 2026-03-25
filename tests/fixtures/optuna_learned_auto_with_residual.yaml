@@ -36,5 +36,5 @@ residual:
   model: xgboost
   params: {}
 jobs:
-  - model: TFT
+  - model: LSTM
     params: {}

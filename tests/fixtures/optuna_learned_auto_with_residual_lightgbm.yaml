@@ -36,5 +36,5 @@ residual:
   model: lightgbm
   params: {}
 jobs:
-  - model: TFT
+  - model: LSTM
     params: {}

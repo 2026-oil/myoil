@@ -170,7 +170,7 @@ static_exog_cols = []
 input_size = 64
 season_length = 52
 batch_size = 32
-valid_batch_size = 32
+valid_batch_size = 64
 windows_batch_size = 1024
 inference_windows_batch_size = 1024
 learning_rate = 0.001
@@ -255,7 +255,7 @@ def _payload() -> dict:
             "input_size": 64,
             "season_length": 52,
             "batch_size": 32,
-            "valid_batch_size": 32,
+            "valid_batch_size": 64,
             "windows_batch_size": 1024,
             "inference_windows_batch_size": 1024,
             "learning_rate": 0.001,
@@ -4687,60 +4687,47 @@ def test_narrowed_model_param_ranges_are_explicit_for_selected_auto_models():
             return low
 
     expectations = {
-        "PatchTST": {
-            "categorical": {
-                "hidden_size": (64, 128),
-                "n_heads": (4, 8),
-                "encoder_layers": (4, 8),
-                "linear_hidden_size": (128, 256, 512),
-                "patch_len": (4, 8, 16),
-                "stride": (8, 16),
-                "dropout": (0.1, 0.3),
-                "fc_dropout": (0.1, 0.3),
-                "attn_dropout": (0.1, 0.3),
-                "revin": (True, False),
-            },
-        },
         "TSMixerx": {
             "categorical": {
                 "n_block": (4, 8),
-                "ff_dim": (128, 256, 512, 1024),
-                "dropout": (0.0, 0.1, 0.2, 0.3),
+                "ff_dim": (256, 512, 1024),
+                "dropout": (0.1, 0.2, 0.3),
                 "revin": (True, False),
             },
         },
         "TimeXer": {
             "categorical": {
-                "patch_len": (8, 16, 32),
+                "patch_len": (8, 16),
                 "hidden_size": (256, 512, 768),
-                "n_heads": (8, 16, 32),
+                "n_heads": (16, 32),
                 "e_layers": (4, 8),
-                "d_ff": (512, 1024, 2048),
-                "factor": (2, 4, 8),
-                "dropout": (0.0, 0.1, 0.2, 0.3),
-                "use_norm": (True, False),
+                "d_ff": (512, 1024),
+                "factor": (4, 8),
+                "dropout": (0.1, 0.2, 0.3),
+                "use_norm": (True,),
             },
         },
         "iTransformer": {
             "categorical": {
                 "hidden_size": (256, 512, 768),
-                "n_heads": (8, 16, 32),
-                "e_layers": (2, 4, 8),
-                "d_ff": (512, 1024, 2048),
-                "d_layers": (2, 4, 8),
-                "factor": (2, 4, 8),
-                "dropout": (0.0, 0.1, 0.2, 0.3),
+                "n_heads": (16, 32),
+                "e_layers": (4, 8),
+                "d_ff": (1024, 2048),
+                "d_layers": (4, 8),
+                "factor": (4, 8),
+                "dropout": (0.0, 0.1, 0.2),
                 "use_norm": (True, False),
             },
         },
         "LSTM": {
             "categorical": {
-                "encoder_hidden_size": (128, 256, 512),
-                "encoder_n_layers": (2, 4, 6),
+                "encoder_hidden_size": (256, 512, 768),
+                "encoder_n_layers": (4, 6, 8),
                 "inference_input_size": (32, 64, 128),
                 "encoder_dropout": (0.0, 0.1, 0.2, 0.3),
-                "decoder_hidden_size": (128, 256, 512),
+                "decoder_hidden_size": (256, 512, 768),
                 "decoder_layers": (2, 4),
+                "context_size": (16, 32, 64),
             },
         },
     }
@@ -4775,18 +4762,18 @@ def test_priority_models_have_narrowed_training_range_overrides():
         "PatchTST": {
             "categorical": {
                 "input_size": (48, 64, 96),
-                "batch_size": (16,),
-                "scaler_type": (None, "robust"),
-                "model_step_size": (1, 12),
+                "batch_size": (16, 32, 64, 128),
+                "scaler_type": (None,),
+                "model_step_size": (4, 8),
             },
-            "floating": {"learning_rate": (3e-4, 8e-3, True)},
+            "floating": {"learning_rate": (3e-4, 1e-2, True)},
         },
         "TSMixerx": {
             "categorical": {
                 "input_size": (48, 64, 72),
                 "batch_size": (16,),
-                "scaler_type": ("robust", "standard"),
-                "model_step_size": (1, 4),
+                "scaler_type": (None,),
+                "model_step_size": (4, 8),
             },
             "floating": {"learning_rate": (3e-4, 2e-3, True)},
         },
@@ -4794,8 +4781,8 @@ def test_priority_models_have_narrowed_training_range_overrides():
             "categorical": {
                 "input_size": (48, 64, 96),
                 "batch_size": (16,),
-                "scaler_type": (None, "robust"),
-                "model_step_size": (1, 4),
+                "scaler_type": (None,),
+                "model_step_size": (4, 8),
             },
             "floating": {"learning_rate": (4e-4, 7e-3, True)},
         },
@@ -4803,8 +4790,8 @@ def test_priority_models_have_narrowed_training_range_overrides():
             "categorical": {
                 "input_size": (24, 48, 96),
                 "batch_size": (32, 64),
-                "scaler_type": ("robust", "standard", "identity"),
-                "model_step_size": (1, 4, 8),
+                "scaler_type": (None,),
+                "model_step_size": (4, 8),
             },
             "floating": {"learning_rate": (5e-4, 1e-2, True)},
         },
@@ -5481,7 +5468,7 @@ EXPECTED_CASE_TRAINING = {
     "input_size": 64,
     "season_length": 52,
     "batch_size": 32,
-    "valid_batch_size": 32,
+    "valid_batch_size": 64,
     "windows_batch_size": 1024,
     "inference_windows_batch_size": 1024,
     "learning_rate": 0.001,
@@ -5536,7 +5523,7 @@ EXPECTED_HPT_CASE12_TRAINING = {
     "train_protocol": "expanding_window_tscv",
     "season_length": 52,
     "batch_size": 32,
-    "valid_batch_size": 32,
+    "valid_batch_size": 64,
     "windows_batch_size": 1024,
     "inference_windows_batch_size": 1024,
     "max_steps": 1000,
@@ -5591,8 +5578,8 @@ SEARCH_SPACE_RESIDUAL = {
 EXPECTED_REPO_AUTO_MODELS = [
     "LSTM",
     "iTransformer",
-    "TimeXer",
     "TSMixerx",
+    "TimeXer",
 ]
 
 EXPECTED_REPO_AUTO_SELECTORS = {
@@ -5629,6 +5616,7 @@ EXPECTED_REPO_AUTO_SELECTORS = {
         "encoder_dropout",
         "decoder_hidden_size",
         "decoder_layers",
+        "context_size",
     ],
 }
 EXPECTED_REPO_TRAINING_SELECTORS = [
@@ -5648,7 +5636,7 @@ EXCLUDED_REPO_TRAINING_SELECTORS = [
 EXPECTED_FIXED_TRAINING_VALUES = {
     "season_length": 52,
     "batch_size": 32,
-    "valid_batch_size": 32,
+    "valid_batch_size": 64,
     "windows_batch_size": 1024,
     "inference_windows_batch_size": 1024,
     "max_steps": 1000,
@@ -6181,7 +6169,7 @@ def test_repo_search_space_updates_requested_auto_selectors_only():
     assert set(FIXED_TRAINING_KEYS).isdisjoint(SEARCH_SPACE_TRAINING)
     assert "step_size" not in SEARCH_SPACE_TRAINING
     assert "early_stop_patience_steps" not in SEARCH_SPACE_TRAINING
-    assert "context_size" not in SEARCH_SPACE_MODELS["LSTM"]
+    assert "context_size" in SEARCH_SPACE_MODELS["LSTM"]
     assert "GRU" not in SEARCH_SPACE_MODELS
     assert "TFT" not in SEARCH_SPACE_MODELS
 
