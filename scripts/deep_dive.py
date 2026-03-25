@@ -20,7 +20,7 @@ if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
 
 
-SEARCH_MODELS = ("iTransformer", "LSTM")
+SEARCH_MODELS = ("TSMixerx", "iTransformer", "LSTM")
 CONTROL_MODEL = "Naive"
 EXPECTED_MODELS = SEARCH_MODELS + (CONTROL_MODEL,)
 FIXED_TRAINING: dict[str, Any] = {

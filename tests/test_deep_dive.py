@@ -272,10 +272,10 @@ def test_candidate_generation_uses_canonical_search_space_contract(temp_repo: Pa
     assert set(specs) == {"patch_len", "hidden_size", "n_heads", "e_layers", "dropout"}
 
 
-def test_search_models_exclude_tsmixerx() -> None:
-    assert "TSMixerx" not in DEEP_DIVE.SEARCH_MODELS
+def test_search_models_exclude_timexer() -> None:
     assert "TimeXer" not in DEEP_DIVE.SEARCH_MODELS
-    assert set(DEEP_DIVE.EXPECTED_MODELS) == {"iTransformer", "LSTM", "Naive"}
+    assert "TSMixerx" in DEEP_DIVE.SEARCH_MODELS
+    assert set(DEEP_DIVE.EXPECTED_MODELS) == {"TSMixerx", "iTransformer", "LSTM", "Naive"}
     assert DEEP_DIVE.SUCCESS_TARGET_CASES == 4
 
 
@@ -379,7 +379,8 @@ def test_rebuilds_noncomparable_reference(monkeypatch: pytest.MonkeyPatch, temp_
     assert not decision.reused
     resolved = json.loads((run_root / "config" / "config.resolved.json").read_text(encoding="utf-8"))
     assert {job["model"] for job in resolved["jobs"]} == set(DEEP_DIVE.EXPECTED_MODELS)
-    assert "TSMixerx" not in {job["model"] for job in resolved["jobs"]}
+    assert "TimeXer" not in {job["model"] for job in resolved["jobs"]}
+    assert "TSMixerx" in {job["model"] for job in resolved["jobs"]}
 
 
 def test_resolved_config_training_gate(temp_repo: Path, tmp_path: Path) -> None:
