@@ -41,6 +41,7 @@ FIXED_TRAINING: dict[str, Any] = {
 }
 TRAINING_GATE_KEYS = tuple(FIXED_TRAINING)
 SUCCESS_TARGET_CASES = 4
+ALL_SEARCH_MODELS = ("TimeXer", "TSMixerx", "iTransformer", "LSTM")
 GENERATED_RUN_GUARD_NAME = "deep_dive_resume_guard.json"
 
 
@@ -1027,6 +1028,24 @@ def run_deep_dive(repo_root: Path, *, output_root: Path, controls: Controls) -> 
 
 
 
+
+def configure_search_models(requested_models: Iterable[str] | None = None) -> tuple[str, ...]:
+    global SEARCH_MODELS, EXPECTED_MODELS
+    if requested_models is None:
+        requested = SEARCH_MODELS
+    else:
+        requested = tuple(dict.fromkeys(str(item) for item in requested_models))
+        invalid = sorted(set(requested).difference(ALL_SEARCH_MODELS))
+        if invalid:
+            raise ValueError(
+                "Unsupported --models value(s): " + ", ".join(invalid)
+            )
+        if not requested:
+            raise ValueError("--models must include at least one learned model")
+    SEARCH_MODELS = tuple(requested)
+    EXPECTED_MODELS = SEARCH_MODELS + (CONTROL_MODEL,)
+    return SEARCH_MODELS
+
 def latest_deep_dive_run(repo_root: Path) -> Path | None:
     runs_root = repo_root / "runs"
     candidates = sorted(
@@ -1045,6 +1064,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--continue", dest="continue_run", action="store_true")
+    parser.add_argument("--models", nargs="+", default=None)
     return parser
 
 
@@ -1053,6 +1073,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     repo_root = args.repo_root.resolve()
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    configure_search_models(args.models)
     continue_run = bool(getattr(args, "continue_run", False))
     if continue_run and args.output_root is None:
         latest_run = latest_deep_dive_run(repo_root)
