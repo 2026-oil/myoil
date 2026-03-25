@@ -3563,6 +3563,98 @@ def test_load_app_config_normalizes_bs_preforcast_selection(tmp_path: Path):
     )
 
 
+def test_load_app_config_accepts_independent_bs_preforcast_config_path(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    payload["bs_preforcast"] = {
+        "enabled": True,
+        "config_path": "bs_preforcast.yaml",
+        "using_futr_exog": True,
+        "target_columns": ["bs_a", "bs_b"],
+        "task": {"multivariable": True},
+    }
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,bs_a,bs_b\n"
+        "2020-01-01,1,2,10,20\n"
+        "2020-01-08,2,3,11,21\n"
+        "2020-01-15,3,4,12,22\n",
+        encoding="utf-8",
+    )
+    bs_preforcast_payload = {
+        "common": {
+            "dataset": {
+                "path": "data.csv",
+                "dt_col": "dt",
+                "hist_exog_cols": [],
+                "futr_exog_cols": [],
+                "static_exog_cols": [],
+            },
+            "runtime": {"random_seed": 1},
+            "training": {
+                "input_size": 64,
+                "season_length": 52,
+                "batch_size": 32,
+                "valid_batch_size": 64,
+                "windows_batch_size": 1024,
+                "inference_windows_batch_size": 1024,
+                "learning_rate": 0.001,
+                "max_steps": 50,
+                "loss": "mse",
+            },
+            "cv": {
+                "horizon": 12,
+                "step_size": 4,
+                "n_windows": 24,
+                "gap": 0,
+                "overlap_eval_policy": "by_cutoff_mean",
+            },
+            "scheduler": {
+                "gpu_ids": [0, 1],
+                "max_concurrent_jobs": 2,
+                "worker_devices": 1,
+                "parallelize_single_job_tuning": False,
+            },
+            "residual": {"enabled": False, "model": "xgboost", "params": {}},
+        },
+        "univariable": {
+            "dataset": {"target_col": "bs_a"},
+            "jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
+        },
+        "multivariable": {
+            "dataset": {"target_col": "bs_a", "hist_exog_cols": ["bs_b"]},
+            "jobs": [{"model": "DummyMultivariate", "params": {"start_padding_enabled": True}}],
+        },
+    }
+    (tmp_path / "bs_preforcast.yaml").write_text(
+        yaml.safe_dump(bs_preforcast_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+            "bs_preforcast_models": {},
+            "bs_preforcast_training": [],
+        },
+    )
+
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    assert loaded.config.bs_preforcast.config_path == "bs_preforcast.yaml"
+    assert loaded.config.bs_preforcast.routing.selected_config_path == "bs_preforcast.yaml"
+    assert loaded.bs_preforcast_stage1 is not None
+    assert loaded.bs_preforcast_stage1.source_path == (tmp_path / "bs_preforcast.yaml").resolve()
+    assert loaded.bs_preforcast_stage1.config.jobs[0].model == "DummyMultivariate"
+    assert loaded.bs_preforcast_stage1.config.dataset.target_col == "bs_a"
+    assert loaded.bs_preforcast_stage1.config.dataset.hist_exog_cols == ("bs_b",)
+
+
 def test_load_app_config_rejects_bs_preforcast_without_target_columns(tmp_path: Path):
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}

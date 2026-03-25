@@ -69,6 +69,7 @@ RESIDUAL_LAG_FEATURE_KEYS = {"enabled", "sources", "steps", "transforms"}
 RESIDUAL_EXOG_SOURCE_KEYS = {"hist", "futr", "static"}
 BS_PREFORCAST_KEYS = {
     "enabled",
+    "config_path",
     "using_futr_exog",
     "target_columns",
     "task",
@@ -133,6 +134,7 @@ class BsPreforcastRoutingConfig:
 @dataclass(frozen=True)
 class BsPreforcastConfig:
     enabled: bool = False
+    config_path: str | None = None
     using_futr_exog: bool = False
     target_columns: tuple[str, ...] = field(default_factory=tuple)
     task: BsPreforcastTaskConfig = field(default_factory=BsPreforcastTaskConfig)
@@ -705,6 +707,10 @@ def _normalize_bs_preforcast_config(value: Any) -> BsPreforcastConfig:
         field_name="bs_preforcast.using_futr_exog",
         default=False,
     )
+    config_path = _coerce_optional_path_string(
+        payload.get("config_path"),
+        field_name="bs_preforcast.config_path",
+    )
     target_columns = _coerce_name_tuple(
         payload.get("target_columns"),
         field_name="bs_preforcast.target_columns",
@@ -724,7 +730,7 @@ def _normalize_bs_preforcast_config(value: Any) -> BsPreforcastConfig:
             field_name="bs_preforcast.routing.multivariable_config",
         ),
     )
-    selected_config_path = (
+    selected_config_path = config_path or (
         routing.multivariable_config if multivariable else routing.univariable_config
     )
     if enabled:
@@ -733,14 +739,12 @@ def _normalize_bs_preforcast_config(value: Any) -> BsPreforcastConfig:
                 "bs_preforcast.target_columns must be non-empty when bs_preforcast.enabled is true"
             )
         if selected_config_path is None:
-            route_key = (
-                "bs_preforcast.routing.multivariable_config"
-                if multivariable
-                else "bs_preforcast.routing.univariable_config"
+            raise ValueError(
+                "bs_preforcast.config_path or a matching bs_preforcast.routing.* path is required when bs_preforcast.enabled is true"
             )
-            raise ValueError(f"{route_key} is required when bs_preforcast.enabled is true")
     return BsPreforcastConfig(
         enabled=enabled,
+        config_path=config_path,
         using_futr_exog=using_futr_exog,
         target_columns=target_columns,
         task=BsPreforcastTaskConfig(multivariable=multivariable),
@@ -1244,6 +1248,37 @@ def _rewrite_bs_preforcast_search_space_error(message: str) -> str:
     )
 
 
+def _merge_bs_preforcast_stage_payload(
+    stage_payload: dict[str, Any],
+    *,
+    multivariable: bool,
+) -> dict[str, Any]:
+    if not any(key in stage_payload for key in ("common", "univariable", "multivariable")):
+        return stage_payload
+    common_payload = stage_payload.get("common", {})
+    if common_payload is None:
+        common_payload = {}
+    if not isinstance(common_payload, dict):
+        raise ValueError("bs_preforcast.common must be a mapping")
+    variant_key = "multivariable" if multivariable else "univariable"
+    variant_payload = stage_payload.get(variant_key, {})
+    if variant_payload is None:
+        variant_payload = {}
+    if not isinstance(variant_payload, dict):
+        raise ValueError(f"bs_preforcast.{variant_key} must be a mapping")
+    merged = json.loads(json.dumps(common_payload))
+    for key, value in variant_payload.items():
+        if (
+            key in merged
+            and isinstance(merged[key], dict)
+            and isinstance(value, dict)
+        ):
+            merged[key] = {**merged[key], **value}
+        else:
+            merged[key] = value
+    return merged
+
+
 def _load_bs_preforcast_stage1(
     repo_root: Path,
     *,
@@ -1270,7 +1305,11 @@ def _load_bs_preforcast_stage1(
     elif stage_source_path.suffix.lower() in {".yaml", ".yml"}:
         stage_source_type = "yaml"
     stage_raw_text = stage_source_path.read_text(encoding="utf-8")
-    stage_payload = _load_document(stage_source_path, stage_source_type)
+    raw_stage_payload = _load_document(stage_source_path, stage_source_type)
+    stage_payload = _merge_bs_preforcast_stage_payload(
+        raw_stage_payload,
+        multivariable=bs_preforcast.task.multivariable,
+    )
     if stage_payload.get("bs_preforcast") not in (None, {}):
         raise ValueError("bs_preforcast routed YAML must not define its own bs_preforcast block")
     stage_search_space = _bs_preforcast_stage_search_space(

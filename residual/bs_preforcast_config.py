@@ -53,6 +53,7 @@ def stage1_route_metadata(loaded: LoadedConfig) -> dict[str, object]:
     routing: BsPreforcastRoutingConfig = loaded.config.bs_preforcast.routing
     return {
         "enabled": loaded.config.bs_preforcast.enabled,
+        "config_path": loaded.config.bs_preforcast.config_path,
         "using_futr_exog": loaded.config.bs_preforcast.using_futr_exog,
         "target_columns": list(loaded.config.bs_preforcast.target_columns),
         "multivariable": loaded.config.bs_preforcast.task.multivariable,

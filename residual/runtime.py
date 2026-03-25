@@ -472,6 +472,7 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
     }
     payload["bs_preforcast"] = {
         "enabled": loaded.config.bs_preforcast.enabled,
+        "config_path": loaded.config.bs_preforcast.config_path,
         "using_futr_exog": loaded.config.bs_preforcast.using_futr_exog,
         "target_columns": list(loaded.config.bs_preforcast.target_columns),
         "multivariable": loaded.config.bs_preforcast.task.multivariable,
