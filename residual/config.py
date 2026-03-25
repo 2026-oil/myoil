@@ -877,6 +877,7 @@ def _normalize_payload(
     allow_missing_search_space: bool = False,
     model_search_space_key: str = "models",
     training_search_space_key: str = "training",
+    stage_scope: str | None = None,
 ) -> AppConfig:
     task = dict(payload.get("task", {}))
     dataset = dict(payload.get("dataset", {}))
@@ -1114,6 +1115,17 @@ def _normalize_payload(
         raise ValueError("jobs.model values must be unique")
     for job in jobs:
         duplicated = CENTRALIZED_TRAINING_KEYS.intersection(job.params)
+        if (
+            (
+                stage_scope == "bs_preforcast"
+                or (
+                    search_space is not None
+                    and search_space.get("__scope__") == "bs_preforcast"
+                )
+            )
+            and job.model in {"AutoARIMA", "ES"}
+        ):
+            duplicated = duplicated.difference({"season_length"})
         if duplicated:
             duplicated_keys = ", ".join(sorted(duplicated))
             raise ValueError(
@@ -1200,6 +1212,7 @@ def _bs_preforcast_stage_search_space(
         "bs_preforcast_training", {"global": {}, "per_model": {}}
     )
     return {
+        "__scope__": "bs_preforcast",
         "models": model_payload,
         "training": training_payload,
         "bs_preforcast_models": model_payload,
@@ -1281,7 +1294,8 @@ def _load_bs_preforcast_stage1(
             search_space=None,
             allow_missing_search_space=True,
             model_search_space_key="bs_preforcast_models",
-            training_search_space_key="training",
+            training_search_space_key="bs_preforcast_training",
+            stage_scope="bs_preforcast",
         )
         stage_config = (
             _normalize_payload(
@@ -1289,7 +1303,8 @@ def _load_bs_preforcast_stage1(
                 stage_base_dir,
                 search_space=stage_search_space,
                 model_search_space_key="bs_preforcast_models",
-                training_search_space_key="training",
+                training_search_space_key="bs_preforcast_training",
+                stage_scope="bs_preforcast",
             )
             if stage_search_space is not None
             else stage_base_config

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 from typing import Any, Iterable
 
+import optuna
 import pandas as pd
 import yaml
 from neuralforecast import NeuralForecast
@@ -15,7 +17,8 @@ import numpy as np
 from .adapters import build_multivariate_inputs, build_univariate_inputs
 from .config import JobConfig, LoadedConfig
 from .manifest import build_manifest, write_manifest
-from .models import BASELINE_MODEL_NAMES, build_model, validate_job
+from .models import BASELINE_MODEL_NAMES, MODEL_CLASSES, build_model, validate_job
+from .optuna_spaces import optuna_num_trials, suggest_model_params, suggest_training_params
 
 
 def _repo_root() -> Path:
@@ -222,11 +225,158 @@ def _single_stage_job(loaded: LoadedConfig) -> JobConfig:
     job = jobs[0]
     if job.model in BASELINE_MODEL_NAMES:
         raise ValueError("bs_preforcast stage does not support baseline-only jobs")
-    if job.validated_mode == "learned_auto":
-        raise NotImplementedError(
-            "bs_preforcast fold injection does not support learned_auto stage jobs yet"
-        )
     return job
+
+
+def _stage_run_roots_from_loaded(loaded: LoadedConfig) -> list[Path]:
+    payload = loaded.normalized_payload.get("bs_preforcast", {})
+    roots = payload.get("stage1_run_roots", [])
+    if not isinstance(roots, list):
+        return []
+    return [Path(str(item)) for item in roots]
+
+
+def _load_stage_best_params(
+    loaded: LoadedConfig,
+    *,
+    model_name: str,
+    variant_slug: str,
+) -> dict[str, Any]:
+    for run_root in _stage_run_roots_from_loaded(loaded):
+        if run_root.name != variant_slug:
+            continue
+        best_params_path = run_root / "models" / model_name / "best_params.json"
+        if not best_params_path.exists():
+            continue
+        payload = _load_json(best_params_path)
+        if "stage_season_length" in payload and "season_length" not in payload:
+            payload["season_length"] = payload.pop("stage_season_length")
+        return payload
+    raise NotImplementedError(
+        "bs_preforcast learned_auto stage job requires materialized best_params artifact before fold injection"
+    )
+
+
+def _resolved_stage_job(
+    loaded: LoadedConfig,
+    stage_loaded: LoadedConfig,
+    *,
+    variant_slug: str,
+) -> JobConfig:
+    job = _single_stage_job(stage_loaded)
+    if job.validated_mode != "learned_auto":
+        return job
+    best_params = _load_stage_best_params(
+        loaded,
+        model_name=job.model,
+        variant_slug=variant_slug,
+    )
+    return replace(
+        job,
+        params=best_params,
+        requested_mode="learned_fixed",
+        validated_mode="learned_fixed",
+        selected_search_params=(),
+    )
+
+
+def _load_stage_training_best_params(
+    loaded: LoadedConfig,
+    *,
+    model_name: str,
+    variant_slug: str,
+) -> dict[str, Any]:
+    for run_root in _stage_run_roots_from_loaded(loaded):
+        if run_root.name != variant_slug:
+            continue
+        best_params_path = run_root / "models" / model_name / "training_best_params.json"
+        if not best_params_path.exists():
+            continue
+        return _load_json(best_params_path)
+    return {}
+
+
+def _stage_training_specs(
+    stage_loaded: LoadedConfig,
+    *,
+    model_name: str,
+) -> dict[str, Any]:
+    payload = stage_loaded.search_space_payload or {}
+    training_payload = payload.get("bs_preforcast_training", {})
+    per_model = training_payload.get("per_model", {})
+    if model_name in per_model:
+        return dict(per_model[model_name])
+    return dict(training_payload.get("global", {}))
+
+
+def _stage_loaded_with_job_and_training(
+    stage_loaded: LoadedConfig,
+    *,
+    job: JobConfig,
+    training_overrides: dict[str, Any] | None = None,
+) -> LoadedConfig:
+    training = stage_loaded.config.training
+    if training_overrides:
+        training = replace(training, **training_overrides)
+    return replace(
+        stage_loaded,
+        config=replace(stage_loaded.config, jobs=(job,), training=training),
+    )
+
+
+def _resolved_stage_loaded(
+    loaded: LoadedConfig,
+    stage_loaded: LoadedConfig,
+    *,
+    variant_slug: str,
+) -> LoadedConfig:
+    resolved_job = _resolved_stage_job(
+        loaded,
+        stage_loaded,
+        variant_slug=variant_slug,
+    )
+    training_overrides = {}
+    if stage_loaded.config.training_search.validated_mode == "training_auto":
+        training_overrides = _load_stage_training_best_params(
+            loaded,
+            model_name=resolved_job.model,
+            variant_slug=variant_slug,
+        )
+    return _stage_loaded_with_job_and_training(
+        stage_loaded,
+        job=resolved_job,
+        training_overrides=training_overrides,
+    )
+
+
+def _mean_mape(actual: pd.Series, forecast: list[float]) -> float:
+    actual_series = actual.reset_index(drop=True).astype(float)
+    pred_series = pd.Series(forecast, dtype=float)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        value = (actual_series.sub(pred_series).abs() / actual_series.abs()).mean()
+    return float(value)
+
+
+def _optuna_study_summary(
+    study: optuna.Study,
+    *,
+    best_params: dict[str, Any],
+    best_training_params: dict[str, Any],
+) -> dict[str, Any]:
+    state_counts: dict[str, int] = {}
+    for trial in study.trials:
+        state = trial.state.name.lower()
+        state_counts[state] = state_counts.get(state, 0) + 1
+    return {
+        "direction": study.direction.name.lower(),
+        "trial_count": len(study.trials),
+        "finished_trial_count": sum(1 for trial in study.trials if trial.state.is_finished()),
+        "state_counts": state_counts,
+        "best_value": float(study.best_value),
+        "best_trial_number": int(study.best_trial.number),
+        "best_params": best_params,
+        "best_training_params": best_training_params,
+    }
 
 
 def _stage_fit_loaded(
@@ -255,16 +405,23 @@ def _stage_fit_loaded(
 
 
 def _predict_stage_univariate(
+    loaded: LoadedConfig,
     stage_loaded: LoadedConfig,
     *,
     target_column: str,
     train_df: pd.DataFrame,
     future_df: pd.DataFrame,
 ) -> list[float]:
+    stage_loaded = _resolved_stage_loaded(
+        loaded,
+        stage_loaded,
+        variant_slug=target_column,
+    )
     job = _single_stage_job(stage_loaded)
     if job.model == "AutoARIMA":
         return _predict_stage_univariate_autoarima(
             stage_loaded,
+            job,
             target_column=target_column,
             train_df=train_df,
             future_df=future_df,
@@ -272,6 +429,7 @@ def _predict_stage_univariate(
     if job.model == "ES":
         return _predict_stage_univariate_es(
             stage_loaded,
+            job,
             target_column=target_column,
             train_df=train_df,
             future_df=future_df,
@@ -279,6 +437,7 @@ def _predict_stage_univariate(
     if job.model in {"xgboost", "lightgbm"}:
         return _predict_stage_univariate_tree(
             stage_loaded,
+            job,
             target_column=target_column,
             train_df=train_df,
             future_df=future_df,
@@ -300,17 +459,25 @@ def _predict_stage_univariate(
     )
     model = build_model(stage_loaded.config, job)
     nf = NeuralForecast(models=[model], freq=stage_loaded.config.dataset.freq or "W")
-    nf.fit(
-        adapter_inputs.fit_df,
-        static_df=adapter_inputs.static_df,
-        val_size=stage_loaded.config.training.val_size,
-    )
-    predict_kwargs: dict[str, Any] = {}
-    if adapter_inputs.futr_df is not None:
-        predict_kwargs["futr_df"] = adapter_inputs.futr_df
-    if adapter_inputs.static_df is not None:
-        predict_kwargs["static_df"] = adapter_inputs.static_df
-    predictions = nf.predict(**predict_kwargs)
+    original_cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES")
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+    try:
+        nf.fit(
+            adapter_inputs.fit_df,
+            static_df=adapter_inputs.static_df,
+            val_size=stage_loaded.config.training.val_size,
+        )
+        predict_kwargs: dict[str, Any] = {}
+        if adapter_inputs.futr_df is not None:
+            predict_kwargs["futr_df"] = adapter_inputs.futr_df
+        if adapter_inputs.static_df is not None:
+            predict_kwargs["static_df"] = adapter_inputs.static_df
+        predictions = nf.predict(**predict_kwargs)
+    finally:
+        if original_cuda_visible_devices is None:
+            os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+        else:
+            os.environ["CUDA_VISIBLE_DEVICES"] = original_cuda_visible_devices
     pred_col = _stage_prediction_column(predictions, job.model)
     selected = predictions[predictions["unique_id"] == target_column][pred_col].reset_index(drop=True)
     return [float(value) for value in selected.tolist()]
@@ -325,6 +492,7 @@ def _stage_infer_freq(stage_loaded: LoadedConfig, train_df: pd.DataFrame) -> str
 
 def _predict_stage_univariate_autoarima(
     stage_loaded: LoadedConfig,
+    job: JobConfig,
     *,
     target_column: str,
     train_df: pd.DataFrame,
@@ -340,7 +508,15 @@ def _predict_stage_univariate_autoarima(
     fit_df.insert(0, "unique_id", target_column)
     season_length = max(
         1,
-        int(_single_stage_job(stage_loaded).params.get("season_length", stage_loaded.config.training.season_length)),
+        int(
+            job.params.get(
+                "season_length",
+                job.params.get(
+                    "stage_season_length",
+                    stage_loaded.config.training.season_length,
+                ),
+            )
+        ),
     )
     model = AutoARIMA(season_length=season_length)
     sf = StatsForecast(models=[model], freq=_stage_infer_freq(stage_loaded, train_df))
@@ -354,6 +530,7 @@ def _predict_stage_univariate_autoarima(
 
 def _predict_stage_univariate_es(
     stage_loaded: LoadedConfig,
+    job: JobConfig,
     *,
     target_column: str,
     train_df: pd.DataFrame,
@@ -363,8 +540,12 @@ def _predict_stage_univariate_es(
 
     series = train_df[target_column].astype(float)
     season_length = int(
-        _single_stage_job(stage_loaded).params.get(
-            "season_length", stage_loaded.config.training.season_length
+        job.params.get(
+            "season_length",
+            job.params.get(
+                "stage_season_length",
+                stage_loaded.config.training.season_length,
+            ),
         )
     )
     kwargs: dict[str, Any] = {
@@ -385,6 +566,7 @@ def _predict_stage_univariate_es(
 
 def _predict_stage_univariate_tree(
     stage_loaded: LoadedConfig,
+    job: JobConfig,
     *,
     target_column: str,
     train_df: pd.DataFrame,
@@ -400,7 +582,7 @@ def _predict_stage_univariate_tree(
     for idx in range(max_lag, len(series)):
         X.append(series[idx - max_lag : idx])
         y.append(series[idx])
-    params = dict(_single_stage_job(stage_loaded).params)
+    params = dict(job.params)
     if model_name == "xgboost":
         from xgboost import XGBRegressor
 
@@ -435,12 +617,18 @@ def _predict_stage_univariate_tree(
 
 
 def _predict_stage_multivariate(
+    loaded: LoadedConfig,
     stage_loaded: LoadedConfig,
     *,
     target_columns: list[str],
     train_df: pd.DataFrame,
     future_df: pd.DataFrame,
 ) -> dict[str, list[float]]:
+    stage_loaded = _resolved_stage_loaded(
+        loaded,
+        stage_loaded,
+        variant_slug="multivariable",
+    )
     job = _single_stage_job(stage_loaded)
     if job.model in {"AutoARIMA", "ES", "xgboost", "lightgbm"}:
         raise ValueError(
@@ -477,17 +665,25 @@ def _predict_stage_multivariate(
         n_series=adapter_inputs.metadata.get("n_series"),
     )
     nf = NeuralForecast(models=[model], freq=stage_loaded.config.dataset.freq or "W")
-    nf.fit(
-        adapter_inputs.fit_df,
-        static_df=adapter_inputs.static_df,
-        val_size=stage_loaded.config.training.val_size,
-    )
-    predict_kwargs: dict[str, Any] = {}
-    if adapter_inputs.futr_df is not None:
-        predict_kwargs["futr_df"] = adapter_inputs.futr_df
-    if adapter_inputs.static_df is not None:
-        predict_kwargs["static_df"] = adapter_inputs.static_df
-    predictions = nf.predict(**predict_kwargs)
+    original_cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES")
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+    try:
+        nf.fit(
+            adapter_inputs.fit_df,
+            static_df=adapter_inputs.static_df,
+            val_size=stage_loaded.config.training.val_size,
+        )
+        predict_kwargs: dict[str, Any] = {}
+        if adapter_inputs.futr_df is not None:
+            predict_kwargs["futr_df"] = adapter_inputs.futr_df
+        if adapter_inputs.static_df is not None:
+            predict_kwargs["static_df"] = adapter_inputs.static_df
+        predictions = nf.predict(**predict_kwargs)
+    finally:
+        if original_cuda_visible_devices is None:
+            os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+        else:
+            os.environ["CUDA_VISIBLE_DEVICES"] = original_cuda_visible_devices
     pred_col = _stage_prediction_column(predictions, job.model)
     out: dict[str, list[float]] = {}
     for column in target_columns:
@@ -506,6 +702,7 @@ def compute_bs_preforcast_fold_forecasts(
     target_columns = list(loaded.config.bs_preforcast.target_columns)
     if loaded.config.bs_preforcast.task.multivariable:
         return _predict_stage_multivariate(
+            loaded,
             stage_loaded,
             target_columns=target_columns,
             train_df=train_df,
@@ -513,6 +710,7 @@ def compute_bs_preforcast_fold_forecasts(
         )
     return {
         column: _predict_stage_univariate(
+            loaded,
             stage_loaded,
             target_column=column,
             train_df=train_df,
@@ -538,14 +736,11 @@ def prepare_bs_preforcast_fold_inputs(
     horizon = len(future_df)
     train_frame = train_df.copy()
     future_frame = future_df.copy()
-    try:
-        forecasts_by_column = compute_bs_preforcast_fold_forecasts(
-            loaded,
-            train_df=train_df,
-            future_df=future_df,
-        )
-    except Exception:
-        forecasts_by_column = {}
+    forecasts_by_column = compute_bs_preforcast_fold_forecasts(
+        loaded,
+        train_df=train_df,
+        future_df=future_df,
+    )
     futr_columns = list(loaded.config.dataset.futr_exog_cols)
     hist_columns = list(loaded.config.dataset.hist_exog_cols)
 
@@ -563,17 +758,17 @@ def prepare_bs_preforcast_fold_inputs(
             future_frame[forecast_column] = forecast_values
             if forecast_column not in futr_columns:
                 futr_columns.append(forecast_column)
-        else:
-            train_frame[forecast_column] = train_frame[column].astype(float)
-            overwrite_count = min(len(train_frame), len(forecast_values))
-            if overwrite_count:
-                train_frame.loc[
-                    len(train_frame) - overwrite_count :,
-                    forecast_column,
-                ] = forecast_values[:overwrite_count]
-            future_frame[forecast_column] = forecast_values
-            if forecast_column not in hist_columns:
-                hist_columns.append(forecast_column)
+            continue
+        train_frame[forecast_column] = train_frame[column].astype(float)
+        overwrite_count = min(len(train_frame), len(forecast_values))
+        if overwrite_count:
+            train_frame.loc[
+                len(train_frame) - overwrite_count :,
+                forecast_column,
+            ] = forecast_values[:overwrite_count]
+        future_frame[forecast_column] = forecast_values
+        if forecast_column not in hist_columns:
+            hist_columns.append(forecast_column)
 
     updated_dataset = replace(
         loaded.config.dataset,
@@ -629,12 +824,211 @@ def _stage_variant_payloads(stage_loaded: LoadedConfig) -> list[tuple[str, dict[
     return variants
 
 
+def _load_stage_variant_frames(
+    payload: dict[str, Any],
+    *,
+    config_path: Path,
+) -> tuple[pd.DataFrame, pd.DataFrame, str]:
+    dataset = payload.get("dataset", {})
+    data_path = Path(str(dataset.get("path", "")))
+    if not data_path.is_absolute():
+        data_path = (config_path.parent / data_path).resolve()
+    frame = pd.read_csv(data_path)
+    dt_col = str(dataset.get("dt_col", "dt"))
+    horizon = int(payload.get("cv", {}).get("horizon", 1))
+    frame = frame.sort_values(dt_col).reset_index(drop=True)
+    if len(frame) <= horizon:
+        raise ValueError("bs_preforcast stage direct run needs more than horizon rows")
+    train_df = frame.iloc[:-horizon].reset_index(drop=True)
+    future_df = frame.iloc[-horizon:].reset_index(drop=True)
+    return train_df, future_df, str(dataset.get("target_col"))
+
+
+def _write_direct_stage_artifacts(
+    stage_run_root: Path,
+    *,
+    model_name: str,
+    target_column: str,
+    forecasts: list[float],
+    future_df: pd.DataFrame,
+    dt_col: str,
+    best_params: dict[str, Any] | None = None,
+    best_training_params: dict[str, Any] | None = None,
+    study_summary: dict[str, Any] | None = None,
+) -> None:
+    (stage_run_root / "summary").mkdir(parents=True, exist_ok=True)
+    (stage_run_root / "artifacts").mkdir(parents=True, exist_ok=True)
+    (stage_run_root / "cv").mkdir(parents=True, exist_ok=True)
+    models_dir = stage_run_root / "models" / model_name
+    models_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "target_column": [target_column] * len(forecasts),
+            "horizon_step": list(range(1, len(forecasts) + 1)),
+            "forecast": forecasts,
+        }
+    ).to_csv(stage_run_root / "artifacts" / "forecasts.csv", index=False)
+    pd.DataFrame(
+        {
+            "unique_id": [target_column] * len(forecasts),
+            "ds": pd.to_datetime(future_df[dt_col]).astype(str).tolist(),
+            "horizon_step": list(range(1, len(forecasts) + 1)),
+            "y_hat": forecasts,
+        }
+    ).to_csv(stage_run_root / "cv" / f"{model_name}_forecasts.csv", index=False)
+    pd.DataFrame(
+        [{"model": model_name, "target_column": target_column}]
+    ).to_csv(stage_run_root / "summary" / "leaderboard.csv", index=False)
+    (stage_run_root / "summary" / "sample.md").write_text(
+        f"# bs_preforcast stage run\n\n- model: {model_name}\n- target_column: {target_column}\n",
+        encoding="utf-8",
+    )
+    if best_params is not None:
+        (models_dir / "best_params.json").write_text(
+            json.dumps(best_params, indent=2),
+            encoding="utf-8",
+        )
+    if best_training_params is not None:
+        (models_dir / "training_best_params.json").write_text(
+            json.dumps(best_training_params, indent=2),
+            encoding="utf-8",
+        )
+    if study_summary is not None:
+        (models_dir / "optuna_study_summary.json").write_text(
+            json.dumps(study_summary, indent=2),
+            encoding="utf-8",
+        )
+        (models_dir / "training_optuna_study_summary.json").write_text(
+            json.dumps(study_summary, indent=2),
+            encoding="utf-8",
+        )
+
+
+def _run_direct_stage_variant(
+    stage_loaded: LoadedConfig,
+    *,
+    variant_slug: str,
+    payload: dict[str, Any],
+    config_path: Path,
+    stage_run_root: Path,
+) -> None:
+    if stage_loaded.config.bs_preforcast.task.multivariable:
+        raise ValueError("bs_preforcast direct stage execution does not support multivariable stage-only models")
+    stage_job = _single_stage_job(stage_loaded)
+    train_df, future_df, target_column = _load_stage_variant_frames(
+        payload,
+        config_path=config_path,
+    )
+    dt_col = str(payload.get("dataset", {}).get("dt_col", "dt"))
+    best_job = stage_job
+    best_training_params: dict[str, Any] = {}
+    best_forecasts: list[float] | None = None
+    study_summary: dict[str, Any] | None = None
+
+    if stage_job.validated_mode == "learned_auto":
+        model_specs = (
+            (stage_loaded.search_space_payload or {})
+            .get("bs_preforcast_models", {})
+            .get(stage_job.model, {})
+        )
+        training_specs = _stage_training_specs(
+            stage_loaded,
+            model_name=stage_job.model,
+        )
+        selected_training = tuple(stage_loaded.config.training_search.selected_search_params)
+        study = optuna.create_study(
+            direction="minimize",
+            sampler=optuna.samplers.TPESampler(seed=stage_loaded.config.runtime.random_seed),
+        )
+        trial_total = optuna_num_trials(stage_loaded.config.runtime.opt_n_trial)
+        best_score: float | None = None
+        for _ in range(trial_total):
+            trial = study.ask()
+            candidate_params = suggest_model_params(
+                stage_job.model,
+                tuple(stage_job.selected_search_params),
+                trial,
+                param_specs=model_specs,
+                name_prefix="stage_model_",
+            )
+            candidate_training = (
+                suggest_training_params(
+                    selected_training,
+                    trial,
+                    param_specs=training_specs,
+                    name_prefix="stage_training_",
+                )
+                if selected_training
+                else {}
+            )
+            candidate_job = replace(
+                stage_job,
+                params=candidate_params,
+                requested_mode="learned_fixed",
+                validated_mode="learned_fixed",
+                selected_search_params=(),
+            )
+            candidate_loaded = _stage_loaded_with_job_and_training(
+                stage_loaded,
+                job=candidate_job,
+                training_overrides=candidate_training,
+            )
+            forecasts = _predict_stage_univariate(
+                candidate_loaded,
+                candidate_loaded,
+                target_column=target_column,
+                train_df=train_df,
+                future_df=future_df,
+            )
+            score = _mean_mape(future_df[target_column], forecasts)
+            study.tell(trial, score)
+            if best_score is None or score < best_score:
+                best_score = score
+                best_job = candidate_job
+                best_training_params = candidate_training
+                best_forecasts = forecasts
+        study_summary = _optuna_study_summary(
+            study,
+            best_params=best_job.params,
+            best_training_params=best_training_params,
+        )
+    if best_forecasts is None:
+        direct_loaded = _stage_loaded_with_job_and_training(
+            stage_loaded,
+            job=best_job,
+            training_overrides=best_training_params,
+        )
+        best_forecasts = _predict_stage_univariate(
+            direct_loaded,
+            direct_loaded,
+            target_column=target_column,
+            train_df=train_df,
+            future_df=future_df,
+        )
+    _write_direct_stage_artifacts(
+        stage_run_root,
+        model_name=best_job.model,
+        target_column=target_column,
+        forecasts=best_forecasts,
+        future_df=future_df,
+        dt_col=dt_col,
+        best_params=(best_job.params if stage_job.validated_mode == "learned_auto" else None),
+        best_training_params=(
+            best_training_params
+            if stage_job.validated_mode == "learned_auto"
+            else None
+        ),
+        study_summary=study_summary,
+    )
+
+
 def _run_stage_variants(stage_loaded: LoadedConfig, *, run_root: Path) -> list[Path]:
     repo_root = _repo_root()
     stage_root = _stage_root(run_root)
     temp_dir = stage_root / "temp_configs"
     temp_dir.mkdir(parents=True, exist_ok=True)
     run_roots: list[Path] = []
+    stage_job = _single_stage_job(stage_loaded)
     for slug, payload in _stage_variant_payloads(stage_loaded):
         config_path = temp_dir / f"{slug}.yaml"
         config_path.write_text(
@@ -642,18 +1036,27 @@ def _run_stage_variants(stage_loaded: LoadedConfig, *, run_root: Path) -> list[P
             encoding="utf-8",
         )
         stage_run_root = stage_root / "runs" / slug
-        subprocess.run(
-            [
-                sys.executable,
-                str(repo_root / "main.py"),
-                "--config",
-                str(config_path),
-                "--output-root",
-                str(stage_run_root),
-            ],
-            cwd=repo_root,
-            check=True,
-        )
+        if stage_job.model in MODEL_CLASSES or stage_job.model in BASELINE_MODEL_NAMES:
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(repo_root / "main.py"),
+                    "--config",
+                    str(config_path),
+                    "--output-root",
+                    str(stage_run_root),
+                ],
+                cwd=repo_root,
+                check=True,
+            )
+        else:
+            _run_direct_stage_variant(
+                stage_loaded,
+                variant_slug=slug,
+                payload=payload,
+                config_path=config_path,
+                stage_run_root=stage_run_root,
+            )
         run_roots.append(stage_run_root)
     return run_roots
 
@@ -712,6 +1115,7 @@ def materialize_bs_preforcast_stage(
             "stage1_run_roots": [str(path) for path in stage_run_roots],
         }
     )
+    loaded.normalized_payload.setdefault("bs_preforcast", {}).update(metadata)
     for path in (main_resolved_path, main_capability_path, main_manifest_path):
         payload = _load_json(path)
         payload.setdefault("bs_preforcast", {})

@@ -378,7 +378,7 @@ residual:
       high: 1.0
 bs_preforcast_models:
   AutoARIMA:
-    season_length:
+    stage_season_length:
       type: categorical
       choices:
       - 1
@@ -386,7 +386,7 @@ bs_preforcast_models:
       - 8
       - 12
   ES:
-    season_length:
+    stage_season_length:
       type: categorical
       choices:
       - 1
