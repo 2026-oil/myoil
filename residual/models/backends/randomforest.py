@@ -3,52 +3,48 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+import pickle
 
-import joblib
 import pandas as pd
-from lightgbm import LGBMRegressor
+from sklearn.ensemble import RandomForestRegressor
 
 from residual.features import ResidualFeatureConfig, build_residual_feature_frame
-from residual.optuna_spaces import DEFAULT_RESIDUAL_PARAMS_BY_MODEL
+from residual.optuna_spaces import RESIDUAL_DEFAULTS
 from residual.plugins_base import ResidualContext, ResidualPlugin
 
 
 @dataclass(frozen=True)
-class _LightGBMConfig:
-    n_estimators: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["n_estimators"]
-    max_depth: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["max_depth"]
-    learning_rate: float = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["learning_rate"]
-    num_leaves: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["num_leaves"]
-    min_child_samples: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["min_child_samples"]
-    feature_fraction: float = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["feature_fraction"]
+class _RandomForestConfig:
+    n_estimators: int = int(RESIDUAL_DEFAULTS["randomforest"]["n_estimators"])
+    max_depth: int = int(RESIDUAL_DEFAULTS["randomforest"]["max_depth"])
+    min_samples_leaf: int = int(RESIDUAL_DEFAULTS["randomforest"]["min_samples_leaf"])
+    max_features: str = str(RESIDUAL_DEFAULTS["randomforest"]["max_features"])
     cpu_threads: int | None = None
 
 
-class LightGBMResidualPlugin(ResidualPlugin):
-    name = "lightgbm"
+class RandomForestResidualPlugin(ResidualPlugin):
+    name = "randomforest"
 
     def __init__(
         self,
         *,
-        n_estimators: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["n_estimators"],
-        max_depth: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["max_depth"],
-        learning_rate: float = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["learning_rate"],
-        num_leaves: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["num_leaves"],
-        min_child_samples: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["min_child_samples"],
-        feature_fraction: float = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["feature_fraction"],
+        n_estimators: int = int(RESIDUAL_DEFAULTS["randomforest"]["n_estimators"]),
+        max_depth: int = int(RESIDUAL_DEFAULTS["randomforest"]["max_depth"]),
+        min_samples_leaf: int = int(
+            RESIDUAL_DEFAULTS["randomforest"]["min_samples_leaf"]
+        ),
+        max_features: str = str(RESIDUAL_DEFAULTS["randomforest"]["max_features"]),
         cpu_threads: int | None = None,
         feature_config: Any = None,
     ):
-        self.config = _LightGBMConfig(
+        self.config = _RandomForestConfig(
             n_estimators=n_estimators,
             max_depth=max_depth,
-            learning_rate=learning_rate,
-            num_leaves=num_leaves,
-            min_child_samples=min_child_samples,
-            feature_fraction=feature_fraction,
+            min_samples_leaf=min_samples_leaf,
+            max_features=max_features,
             cpu_threads=cpu_threads,
         )
-        self.model: LGBMRegressor | None = None
+        self.model: RandomForestRegressor | None = None
         self._trained = False
         self._fallback_value = 0.0
         self._checkpoint_path: Path | None = None
@@ -93,19 +89,17 @@ class LightGBMResidualPlugin(ResidualPlugin):
         self._resolved_feature_config = feature_frame.resolved_config
         self._feature_columns = feature_frame.columns
         features = feature_frame.frame
-        self.model = LGBMRegressor(
+        self.model = RandomForestRegressor(
             n_estimators=self.config.n_estimators,
             max_depth=self.config.max_depth,
-            learning_rate=self.config.learning_rate,
-            num_leaves=self.config.num_leaves,
-            min_child_samples=self.config.min_child_samples,
-            feature_fraction=self.config.feature_fraction,
+            min_samples_leaf=self.config.min_samples_leaf,
+            max_features=self.config.max_features,
             random_state=0,
             n_jobs=self.config.cpu_threads,
-            verbosity=-1,
         )
         self.model.fit(features, target)
-        joblib.dump(self.model, self._checkpoint_path)
+        with self._checkpoint_path.open("wb") as handle:
+            pickle.dump(self.model, handle)
         self._trained = True
 
     def predict(self, panel_df: pd.DataFrame) -> pd.DataFrame:
@@ -125,10 +119,10 @@ class LightGBMResidualPlugin(ResidualPlugin):
             "plugin": self.name,
             "n_estimators": self.config.n_estimators,
             "max_depth": self.config.max_depth,
-            "learning_rate": self.config.learning_rate,
-            "num_leaves": self.config.num_leaves,
-            "min_child_samples": self.config.min_child_samples,
-            "feature_fraction": self.config.feature_fraction,
+            "min_samples_leaf": self.config.min_samples_leaf,
+            "max_features": self.config.max_features,
             "cpu_threads": self.config.cpu_threads,
-            "checkpoint_path": str(self._checkpoint_path) if self._checkpoint_path else None,
+            "checkpoint_path": str(self._checkpoint_path)
+            if self._checkpoint_path
+            else None,
         }
