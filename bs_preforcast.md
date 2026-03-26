@@ -61,6 +61,7 @@ bs_preforcast:
 - `routing.univariable_config`, `routing.multivariable_config`
   - 이전 방식과의 호환을 위한 legacy fallback입니다.
   - 새 설정에서는 `config_path` 사용을 권장합니다.
+  - 현재 구현은 routing 사용 시 `DeprecationWarning`을 냅니다.
 
 ---
 

@@ -425,7 +425,7 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
     selected_bs_config_path = (
         str(loaded.bs_preforcast_stage1.source_path)
         if loaded.bs_preforcast_stage1 is not None
-        else loaded.config.bs_preforcast.routing.selected_config_path
+        else loaded.config.bs_preforcast.config_path
     )
     payload = {}
     for job in selected_jobs:
@@ -477,8 +477,6 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
         "target_columns": list(loaded.config.bs_preforcast.target_columns),
         "multivariable": loaded.config.bs_preforcast.task.multivariable,
         "selected_config_path": selected_bs_config_path,
-        "univariable_config": loaded.config.bs_preforcast.routing.univariable_config,
-        "multivariable_config": loaded.config.bs_preforcast.routing.multivariable_config,
     }
     capability_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 

@@ -5,7 +5,6 @@ from pathlib import Path
 
 from .config import (
     BsPreforcastConfig,
-    BsPreforcastRoutingConfig,
     LoadedConfig,
     load_app_config,
 )
@@ -19,9 +18,9 @@ def resolve_bs_preforcast_route_path(
     repo_root: Path,
     bs_preforcast: BsPreforcastConfig,
 ) -> Path:
-    selected = bs_preforcast.routing.selected_config_path
+    selected = bs_preforcast.config_path
     if not selected:
-        raise ValueError("bs_preforcast routing did not resolve a selected config path")
+        raise ValueError("bs_preforcast config_path did not resolve a selected config path")
     route_path = Path(selected)
     if not route_path.is_absolute():
         route_path = (repo_root / route_path).resolve()
@@ -50,14 +49,11 @@ def load_bs_preforcast_stage1_config(
 
 
 def stage1_route_metadata(loaded: LoadedConfig) -> dict[str, object]:
-    routing: BsPreforcastRoutingConfig = loaded.config.bs_preforcast.routing
     return {
         "enabled": loaded.config.bs_preforcast.enabled,
         "config_path": loaded.config.bs_preforcast.config_path,
         "using_futr_exog": loaded.config.bs_preforcast.using_futr_exog,
         "target_columns": list(loaded.config.bs_preforcast.target_columns),
         "multivariable": loaded.config.bs_preforcast.task.multivariable,
-        "selected_config_path": routing.selected_config_path,
-        "univariable_config": routing.univariable_config,
-        "multivariable_config": routing.multivariable_config,
+        "selected_config_path": loaded.config.bs_preforcast.config_path,
     }

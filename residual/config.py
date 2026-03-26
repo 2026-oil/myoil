@@ -73,10 +73,8 @@ BS_PREFORCAST_KEYS = {
     "using_futr_exog",
     "target_columns",
     "task",
-    "routing",
 }
 BS_PREFORCAST_TASK_KEYS = {"multivariable"}
-BS_PREFORCAST_ROUTING_KEYS = {"univariable_config", "multivariable_config"}
 SUPPORTED_RESIDUAL_LAG_TRANSFORMS = {"raw"}
 SUPPORTED_TRAINER_ACCELERATORS = {"auto", "cpu", "gpu"}
 SUPPORTED_DATALOADER_KWARGS = {
@@ -125,20 +123,12 @@ class BsPreforcastTaskConfig:
 
 
 @dataclass(frozen=True)
-class BsPreforcastRoutingConfig:
-    univariable_config: str | None = None
-    multivariable_config: str | None = None
-    selected_config_path: str | None = None
-
-
-@dataclass(frozen=True)
 class BsPreforcastConfig:
     enabled: bool = False
     config_path: str | None = None
     using_futr_exog: bool = False
     target_columns: tuple[str, ...] = field(default_factory=tuple)
     task: BsPreforcastTaskConfig = field(default_factory=BsPreforcastTaskConfig)
-    routing: BsPreforcastRoutingConfig = field(default_factory=BsPreforcastRoutingConfig)
 
 
 
@@ -681,20 +671,12 @@ def _normalize_bs_preforcast_config(value: Any) -> BsPreforcastConfig:
     _unknown_keys(payload, allowed=BS_PREFORCAST_KEYS, section="bs_preforcast")
 
     task_payload = dict(payload.get("task") or {})
-    routing_payload = dict(payload.get("routing") or {})
     if not isinstance(payload.get("task", {}), (dict, type(None))):
         raise ValueError("bs_preforcast.task must be a mapping")
-    if not isinstance(payload.get("routing", {}), (dict, type(None))):
-        raise ValueError("bs_preforcast.routing must be a mapping")
     _unknown_keys(
         task_payload,
         allowed=BS_PREFORCAST_TASK_KEYS,
         section="bs_preforcast.task",
-    )
-    _unknown_keys(
-        routing_payload,
-        allowed=BS_PREFORCAST_ROUTING_KEYS,
-        section="bs_preforcast.routing",
     )
 
     enabled = _coerce_bool(
@@ -720,27 +702,14 @@ def _normalize_bs_preforcast_config(value: Any) -> BsPreforcastConfig:
         field_name="bs_preforcast.task.multivariable",
         default=False,
     )
-    routing = BsPreforcastRoutingConfig(
-        univariable_config=_coerce_optional_path_string(
-            routing_payload.get("univariable_config"),
-            field_name="bs_preforcast.routing.univariable_config",
-        ),
-        multivariable_config=_coerce_optional_path_string(
-            routing_payload.get("multivariable_config"),
-            field_name="bs_preforcast.routing.multivariable_config",
-        ),
-    )
-    selected_config_path = config_path or (
-        routing.multivariable_config if multivariable else routing.univariable_config
-    )
     if enabled:
         if not target_columns:
             raise ValueError(
                 "bs_preforcast.target_columns must be non-empty when bs_preforcast.enabled is true"
             )
-        if selected_config_path is None:
+        if config_path is None:
             raise ValueError(
-                "bs_preforcast.config_path or a matching bs_preforcast.routing.* path is required when bs_preforcast.enabled is true"
+                "bs_preforcast.config_path is required when bs_preforcast.enabled is true"
             )
     return BsPreforcastConfig(
         enabled=enabled,
@@ -748,11 +717,6 @@ def _normalize_bs_preforcast_config(value: Any) -> BsPreforcastConfig:
         using_futr_exog=using_futr_exog,
         target_columns=target_columns,
         task=BsPreforcastTaskConfig(multivariable=multivariable),
-        routing=BsPreforcastRoutingConfig(
-            univariable_config=routing.univariable_config,
-            multivariable_config=routing.multivariable_config,
-            selected_config_path=selected_config_path if enabled else None,
-        ),
     )
 
 
@@ -1287,9 +1251,9 @@ def _load_bs_preforcast_stage1(
     bs_preforcast: BsPreforcastConfig,
     search_space_contract: SearchSpaceContract | None,
 ) -> BsPreforcastStageLoadedConfig:
-    selected_config_path = bs_preforcast.routing.selected_config_path
+    selected_config_path = bs_preforcast.config_path
     if not bs_preforcast.enabled or selected_config_path is None:
-        raise ValueError("bs_preforcast stage1 loading requires an enabled selected route")
+        raise ValueError("bs_preforcast stage1 loading requires an enabled config_path")
     stage_source_path = _resolve_relative_config_reference(
         repo_root,
         source_path,
@@ -1353,12 +1317,11 @@ def _load_bs_preforcast_stage1(
     stage_normalized_payload = stage_config.to_dict()
     stage_normalized_payload["bs_preforcast"] = {
         "enabled": True,
+        "config_path": bs_preforcast.config_path,
         "using_futr_exog": bs_preforcast.using_futr_exog,
         "target_columns": list(bs_preforcast.target_columns),
         "task": {"multivariable": bs_preforcast.task.multivariable},
-        "routing": {
-            "selected_config_path": str(stage_source_path),
-        },
+        "selected_config_path": str(stage_source_path),
     }
     if search_space_contract is not None:
         stage_normalized_payload["search_space_path"] = str(search_space_contract.path)
@@ -1398,9 +1361,9 @@ def load_app_config(
     stage_source_path: Path | None = None
     stage_payload_probe: dict[str, Any] | None = None
     if raw_bs_preforcast.enabled:
-        selected_config_path = raw_bs_preforcast.routing.selected_config_path
+        selected_config_path = raw_bs_preforcast.config_path
         if selected_config_path is None:
-            raise ValueError("bs_preforcast enabled but selected route was not resolved")
+            raise ValueError("bs_preforcast enabled but config_path was not resolved")
         stage_source_path = _resolve_relative_config_reference(
             repo_root,
             source_path,
@@ -1472,11 +1435,11 @@ def load_app_config(
     )
     normalized_payload = config.to_dict()
     bs_preforcast_stage1 = None
-    if config.bs_preforcast.enabled and config.bs_preforcast.routing.selected_config_path:
+    if config.bs_preforcast.enabled and config.bs_preforcast.config_path:
         stage_source_path = _resolve_relative_config_reference(
             repo_root,
             source_path,
-            config.bs_preforcast.routing.selected_config_path,
+            config.bs_preforcast.config_path,
         )
         if stage_source_path.exists():
             stage_search_space_contract = search_space_contract
@@ -1506,7 +1469,7 @@ def load_app_config(
             }
             if search_space_contract is None:
                 search_space_contract = stage_search_space_contract
-        elif Path(config.bs_preforcast.routing.selected_config_path).is_absolute():
+        elif Path(config.bs_preforcast.config_path).is_absolute():
             raise FileNotFoundError(
                 f"bs_preforcast selected route does not exist: {stage_source_path}"
             )

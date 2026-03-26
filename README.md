@@ -142,6 +142,28 @@ top-level section:
 - `residual`
 - `jobs`
 
+### `bs_preforcast`
+
+`bs_preforcast`는 main stage 전에 별도 stage1을 실행해 `bs_*` 계열 컬럼을 먼저 예측한 뒤, 그 결과를 main 입력에 주입하는 기능입니다.
+
+권장 방식은 main YAML에서 독립 config 파일을 가리키는 구조입니다.
+
+```yaml
+bs_preforcast:
+  enabled: true
+  config_path: bs_preforcast.yaml
+  using_futr_exog: true
+  target_columns:
+    - bs_a
+    - bs_b
+  task:
+    multivariable: false
+```
+
+상세 설정/동작/아티팩트 설명은 별도 문서를 보세요:
+
+- `bs_preforcast.md`
+
 ---
 
 ## 3.5 Excel 템플릿으로 YAML 만들기

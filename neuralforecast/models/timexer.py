@@ -183,7 +183,7 @@ class TimeXer(BaseModel):
     """
 
     # Class attributes
-    EXOGENOUS_FUTR = False
+    EXOGENOUS_FUTR = True
     EXOGENOUS_HIST = True
     EXOGENOUS_STAT = True
     MULTIVARIATE = True  # If the model produces multivariate forecasts (True) or univariate (False)
@@ -286,6 +286,11 @@ class TimeXer(BaseModel):
         self.ex_embedding = DataEmbedding_inverted(
             input_size, self.hidden_size, self.dropout
         )
+        self.futr_exog_embedding = (
+            nn.Linear(input_size + h, self.hidden_size)
+            if self.futr_exog_size > 0
+            else None
+        )
 
         self.encoder = Encoder(
             [
@@ -327,7 +332,7 @@ class TimeXer(BaseModel):
             head_dropout=self.dropout,
         )
 
-    def forecast(self, x_enc, x_mark_enc):
+    def forecast(self, x_enc, cross_embed=None):
         if self.use_norm:
             # Normalization from Non-stationary Transformer
             means = x_enc.mean(1, keepdim=True).detach()
@@ -340,9 +345,10 @@ class TimeXer(BaseModel):
         _, _, N = x_enc.shape
 
         en_embed, n_vars = self.en_embedding(x_enc.permute(0, 2, 1))
-        ex_embed = self.ex_embedding(x_enc, x_mark_enc)
+        if cross_embed is None:
+            cross_embed = self.ex_embedding(x_enc, None)
 
-        enc_out = self.encoder(en_embed, ex_embed)
+        enc_out = self.encoder(en_embed, cross_embed)
         enc_out = torch.reshape(
             enc_out, (-1, n_vars, enc_out.shape[-2], enc_out.shape[-1])
         )
@@ -370,6 +376,7 @@ class TimeXer(BaseModel):
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]  # [B, L, N]
         hist_exog = windows_batch["hist_exog"]    # [B, X, L, N]
+        futr_exog = windows_batch["futr_exog"]    # [B, F, L+h, N]
         stat_exog = windows_batch["stat_exog"]    # [N, S]
 
         B, L, _ = insample_y.shape
@@ -401,6 +408,14 @@ class TimeXer(BaseModel):
             stat_exog_expanded = stat_exog.reshape(-1).unsqueeze(0).unsqueeze(0)
             x_mark_enc = stat_exog_expanded.repeat(B, L, 1)
 
-        y_pred = self.forecast(insample_y, x_mark_enc)
+        ex_embed = self.ex_embedding(insample_y, x_mark_enc)
+        if self.futr_exog_size > 0:
+            futr_exog_tokens = futr_exog.permute(0, 3, 1, 2).reshape(
+                B, -1, self.input_size + self.h
+            )
+            futr_exog_tokens = self.futr_exog_embedding(futr_exog_tokens)
+            ex_embed = torch.cat([ex_embed, futr_exog_tokens], dim=1)
+
+        y_pred = self.forecast(insample_y, ex_embed)
         y_pred = y_pred.reshape(B, self.h, -1)
         return y_pred
