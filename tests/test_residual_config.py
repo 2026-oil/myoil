@@ -3509,40 +3509,74 @@ def test_load_app_config_normalizes_bs_preforcast_selection(tmp_path: Path):
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     payload["bs_preforcast"] = {
         "enabled": True,
+        "config_path": "bs_preforcast.yaml",
         "using_futr_exog": True,
         "target_columns": ["bs_a", "bs_b"],
         "task": {"multivariable": True},
-        "routing": {
-            "univariable_config": "yaml/bs-preforcast_univariable.yaml",
-            "multivariable_config": "yaml/bs-preforcast_multivariable.yaml",
-        },
     }
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a,bs_b\n"
         "2020-01-01,1,2,10,20\n"
-        "2020-01-08,2,3,11,21\n",
+        "2020-01-08,2,3,11,21\n"
+        "2020-01-15,3,4,12,22\n",
         encoding="utf-8",
     )
-    stage_payload = _payload()
-    stage_payload["dataset"] = {
-        "path": "data.csv",
-        "target_col": "bs_a",
-        "dt_col": "dt",
-        "hist_exog_cols": ["bs_b"],
-        "futr_exog_cols": [],
-        "static_exog_cols": [],
-    }
-    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_payload["jobs"] = [{"model": "TFT", "params": {"hidden_size": 32}}]
-    route_dir = tmp_path / "yaml"
-    route_dir.mkdir(parents=True, exist_ok=True)
-    (route_dir / "bs-preforcast_univariable.yaml").write_text(
-        yaml.safe_dump(stage_payload, sort_keys=False),
+    (tmp_path / "bs_preforcast.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "common": {
+                    "dataset": {
+                        "path": "data.csv",
+                        "dt_col": "dt",
+                        "hist_exog_cols": [],
+                        "futr_exog_cols": [],
+                        "static_exog_cols": [],
+                    },
+                    "runtime": {"random_seed": 1},
+                    "training": {
+                        "input_size": 64,
+                        "season_length": 52,
+                        "batch_size": 32,
+                        "valid_batch_size": 64,
+                        "windows_batch_size": 1024,
+                        "inference_windows_batch_size": 1024,
+                        "learning_rate": 0.001,
+                        "max_steps": 50,
+                        "loss": "mse",
+                    },
+                    "cv": {
+                        "horizon": 12,
+                        "step_size": 4,
+                        "n_windows": 24,
+                        "gap": 0,
+                        "overlap_eval_policy": "by_cutoff_mean",
+                    },
+                    "scheduler": {
+                        "gpu_ids": [0, 1],
+                        "max_concurrent_jobs": 2,
+                        "worker_devices": 1,
+                        "parallelize_single_job_tuning": False,
+                    },
+                    "residual": {"enabled": False, "model": "xgboost", "params": {}},
+                },
+                "multivariable": {
+                    "dataset": {"target_col": "bs_a", "hist_exog_cols": ["bs_b"]},
+                    "jobs": [{"model": "TFT", "params": {"hidden_size": 32}}],
+                },
+            },
+            sort_keys=False,
+        ),
         encoding="utf-8",
     )
-    (route_dir / "bs-preforcast_multivariable.yaml").write_text(
-        yaml.safe_dump(stage_payload, sort_keys=False),
-        encoding="utf-8",
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+            "bs_preforcast_models": {},
+            "bs_preforcast_training": [],
+        },
     )
 
     loaded = load_app_config(
@@ -3553,15 +3587,8 @@ def test_load_app_config_normalizes_bs_preforcast_selection(tmp_path: Path):
     assert loaded.config.bs_preforcast.using_futr_exog is True
     assert loaded.config.bs_preforcast.task.multivariable is True
     assert loaded.config.bs_preforcast.target_columns == ("bs_a", "bs_b")
-    assert (
-        loaded.config.bs_preforcast.routing.selected_config_path
-        == "yaml/bs-preforcast_multivariable.yaml"
-    )
-    assert (
-        loaded.normalized_payload["bs_preforcast"]["routing"]["selected_config_path"]
-        == "yaml/bs-preforcast_multivariable.yaml"
-    )
-
+    assert loaded.config.bs_preforcast.config_path == "bs_preforcast.yaml"
+    assert loaded.normalized_payload["bs_preforcast"]["config_path"] == "bs_preforcast.yaml"
 
 def test_load_app_config_accepts_independent_bs_preforcast_config_path(
     tmp_path: Path,
@@ -3647,7 +3674,6 @@ def test_load_app_config_accepts_independent_bs_preforcast_config_path(
     )
 
     assert loaded.config.bs_preforcast.config_path == "bs_preforcast.yaml"
-    assert loaded.config.bs_preforcast.routing.selected_config_path == "bs_preforcast.yaml"
     assert loaded.bs_preforcast_stage1 is not None
     assert loaded.bs_preforcast_stage1.source_path == (tmp_path / "bs_preforcast.yaml").resolve()
     assert loaded.bs_preforcast_stage1.config.jobs[0].model == "DummyMultivariate"
@@ -3655,7 +3681,7 @@ def test_load_app_config_accepts_independent_bs_preforcast_config_path(
     assert loaded.bs_preforcast_stage1.config.dataset.hist_exog_cols == ("bs_b",)
 
 
-def test_load_app_config_bs_preforcast_prefers_config_path_over_routing(
+def test_load_app_config_rejects_legacy_bs_preforcast_routing_keys(
     tmp_path: Path,
 ):
     payload = _payload()
@@ -3678,143 +3704,34 @@ def test_load_app_config_bs_preforcast_prefers_config_path_over_routing(
         "2020-01-15,3,4,12\n",
         encoding="utf-8",
     )
-    independent_payload = {
-        "common": {
-            "dataset": {
-                "path": "data.csv",
-                "dt_col": "dt",
-                "hist_exog_cols": [],
-                "futr_exog_cols": [],
-                "static_exog_cols": [],
-            },
-            "runtime": {"random_seed": 1},
-            "training": {
-                "input_size": 64,
-                "season_length": 52,
-                "batch_size": 32,
-                "valid_batch_size": 64,
-                "windows_batch_size": 1024,
-                "inference_windows_batch_size": 1024,
-                "learning_rate": 0.001,
-                "max_steps": 50,
-                "loss": "mse",
-            },
-            "cv": {
-                "horizon": 12,
-                "step_size": 4,
-                "n_windows": 24,
-                "gap": 0,
-                "overlap_eval_policy": "by_cutoff_mean",
-            },
-            "scheduler": {
-                "gpu_ids": [0, 1],
-                "max_concurrent_jobs": 2,
-                "worker_devices": 1,
-                "parallelize_single_job_tuning": False,
-            },
-            "residual": {"enabled": False, "model": "xgboost", "params": {}},
-        },
-        "univariable": {
-            "dataset": {"target_col": "bs_a"},
-            "jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
-        },
-    }
-    (tmp_path / "bs_preforcast.yaml").write_text(
-        yaml.safe_dump(independent_payload, sort_keys=False),
-        encoding="utf-8",
-    )
-    _write_search_space(
-        tmp_path,
-        {
-            "models": {},
-            "training": [],
-            "residual": {"xgboost": ["n_estimators"]},
-            "bs_preforcast_models": {},
-            "bs_preforcast_training": [],
-        },
-    )
 
-    loaded = load_app_config(
-        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
-    )
+    with pytest.raises(ValueError, match="unsupported key\(s\): routing"):
+        load_app_config(
+            tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+        )
 
-    assert loaded.config.bs_preforcast.config_path == "bs_preforcast.yaml"
-    assert loaded.config.bs_preforcast.routing.selected_config_path == "bs_preforcast.yaml"
-    assert loaded.bs_preforcast_stage1 is not None
-    assert loaded.bs_preforcast_stage1.source_path == (tmp_path / "bs_preforcast.yaml").resolve()
-
-
-def test_load_app_config_bs_preforcast_routing_emits_deprecation_warning(
+def test_load_app_config_rejects_bs_preforcast_without_target_columns_with_route_config(
     tmp_path: Path,
 ):
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     payload["bs_preforcast"] = {
         "enabled": True,
+        "config_path": "bs_preforcast.yaml",
         "using_futr_exog": False,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-        "routing": {
-            "univariable_config": "yaml/bs-preforcast_univariable.yaml",
-        },
+        "target_columns": [],
     }
     (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a,bs_a\n"
-        "2020-01-01,1,2,10\n"
-        "2020-01-08,2,3,11\n"
-        "2020-01-15,3,4,12\n",
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
         encoding="utf-8",
     )
-    route_dir = tmp_path / "yaml"
-    route_dir.mkdir(parents=True, exist_ok=True)
-    route_payload = _payload()
-    route_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
-    route_payload["dataset"]["target_col"] = "bs_a"
-    route_payload["dataset"]["hist_exog_cols"] = []
-    route_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    route_payload["jobs"] = [
-        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
-    ]
-    (route_dir / "bs-preforcast_univariable.yaml").write_text(
-        yaml.safe_dump(route_payload, sort_keys=False),
+    (tmp_path / "bs_preforcast.yaml").write_text(
+        yaml.safe_dump({"common": {}, "univariable": {}}, sort_keys=False),
         encoding="utf-8",
-    )
-    _write_search_space(
-        tmp_path,
-        {
-            "models": {},
-            "training": [],
-            "residual": {"xgboost": ["n_estimators"]},
-            "bs_preforcast_models": {},
-            "bs_preforcast_training": [],
-        },
     )
 
-    with pytest.warns(
-        DeprecationWarning,
-        match="bs_preforcast.routing.\\* is deprecated",
-    ):
+    with pytest.raises(ValueError, match="bs_preforcast.target_columns must be non-empty"):
         load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
-
-
-def test_load_app_config_bs_preforcast_config_path_missing_file_fails(tmp_path: Path):
-    payload = _payload()
-    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "config_path": "missing-bs-preforcast.yaml",
-        "using_futr_exog": False,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-    }
-    (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a,bs_a\n2020-01-01,1,2,10\n2020-01-08,2,3,11\n",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(FileNotFoundError, match="selected route does not exist"):
-        load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
-
 
 def test_load_app_config_rejects_bs_preforcast_without_target_columns(tmp_path: Path):
     payload = _payload()
@@ -3823,10 +3740,7 @@ def test_load_app_config_rejects_bs_preforcast_without_target_columns(tmp_path: 
         "enabled": True,
         "using_futr_exog": False,
         "target_columns": [],
-        "routing": {
-            "univariable_config": "yaml/bs-preforcast_univariable.yaml",
-            "multivariable_config": "yaml/bs-preforcast_multivariable.yaml",
-        },
+        "config_path": "bs_preforcast.yaml",
     }
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
@@ -3851,7 +3765,7 @@ def test_load_app_config_bs_preforcast_loads_stage1_route_and_authoritative_targ
         "using_futr_exog": True,
         "target_columns": ["bs_a", "bs_b"],
         "task": {"multivariable": False},
-        "routing": {},
+
     }
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a,bs_b\n"
@@ -3871,7 +3785,7 @@ def test_load_app_config_bs_preforcast_loads_stage1_route_and_authoritative_targ
     stage_root = tmp_path / "stage_uni"
     stage_root.mkdir(parents=True, exist_ok=True)
     stage_path = _write_config(stage_root, stage_payload, ".yaml")
-    payload["bs_preforcast"]["routing"]["univariable_config"] = str(stage_path)
+    payload["bs_preforcast"]["config_path"] = str(stage_path)
 
     loaded = load_app_config(
         tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
@@ -3921,7 +3835,7 @@ def test_load_app_config_bs_preforcast_stage1_auto_uses_dedicated_search_space(
         "using_futr_exog": False,
         "target_columns": ["bs_a"],
         "task": {"multivariable": False},
-        "routing": {},
+
     }
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
@@ -3939,7 +3853,7 @@ def test_load_app_config_bs_preforcast_stage1_auto_uses_dedicated_search_space(
     stage_root = tmp_path / "stage_auto"
     stage_root.mkdir(parents=True, exist_ok=True)
     stage_path = _write_config(stage_root, stage_payload, ".yaml")
-    payload["bs_preforcast"]["routing"]["univariable_config"] = str(stage_path)
+    payload["bs_preforcast"]["config_path"] = str(stage_path)
     _write_search_space(
         tmp_path,
         {
@@ -3974,7 +3888,7 @@ def test_load_app_config_bs_preforcast_stage1_auto_supports_autoarima(
         "using_futr_exog": False,
         "target_columns": ["bs_a"],
         "task": {"multivariable": False},
-        "routing": {},
+
     }
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
@@ -3994,7 +3908,7 @@ def test_load_app_config_bs_preforcast_stage1_auto_supports_autoarima(
     stage_root = tmp_path / "stage_autoarima"
     stage_root.mkdir(parents=True, exist_ok=True)
     stage_path = _write_config(stage_root, stage_payload, ".yaml")
-    payload["bs_preforcast"]["routing"]["univariable_config"] = str(stage_path)
+    payload["bs_preforcast"]["config_path"] = str(stage_path)
     _write_search_space(
         tmp_path,
         {
@@ -4038,7 +3952,7 @@ def test_bs_preforcast_resolved_stage_job_uses_materialized_best_params(
         "using_futr_exog": False,
         "target_columns": ["bs_a"],
         "task": {"multivariable": False},
-        "routing": {},
+
     }
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
@@ -4056,7 +3970,7 @@ def test_bs_preforcast_resolved_stage_job_uses_materialized_best_params(
     stage_root = tmp_path / "stage_timexer_auto"
     stage_root.mkdir(parents=True, exist_ok=True)
     stage_path = _write_config(stage_root, stage_payload, ".yaml")
-    payload["bs_preforcast"]["routing"]["univariable_config"] = str(stage_path)
+    payload["bs_preforcast"]["config_path"] = str(stage_path)
     _write_search_space(
         tmp_path,
         {
@@ -4122,7 +4036,7 @@ def test_bs_preforcast_resolved_stage_job_maps_stage_season_length_to_season_len
         "using_futr_exog": False,
         "target_columns": ["bs_a"],
         "task": {"multivariable": False},
-        "routing": {},
+
     }
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
@@ -4142,7 +4056,7 @@ def test_bs_preforcast_resolved_stage_job_maps_stage_season_length_to_season_len
     stage_root = tmp_path / "stage_autoarima_auto"
     stage_root.mkdir(parents=True, exist_ok=True)
     stage_path = _write_config(stage_root, stage_payload, ".yaml")
-    payload["bs_preforcast"]["routing"]["univariable_config"] = str(stage_path)
+    payload["bs_preforcast"]["config_path"] = str(stage_path)
     _write_search_space(
         tmp_path,
         {
@@ -4202,7 +4116,7 @@ def test_bs_preforcast_direct_stage_variant_rejects_short_dataset_for_horizon(
         "using_futr_exog": False,
         "target_columns": ["bs_a"],
         "task": {"multivariable": False},
-        "routing": {},
+
     }
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
@@ -4221,7 +4135,7 @@ def test_bs_preforcast_direct_stage_variant_rejects_short_dataset_for_horizon(
     stage_root = tmp_path / "stage_autoarima_direct"
     stage_root.mkdir(parents=True, exist_ok=True)
     stage_path = _write_config(stage_root, stage_payload, ".yaml")
-    payload["bs_preforcast"]["routing"]["univariable_config"] = str(stage_path)
+    payload["bs_preforcast"]["config_path"] = str(stage_path)
     _write_search_space(
         tmp_path,
         {
@@ -4305,7 +4219,7 @@ def test_load_app_config_bs_preforcast_stage1_auto_missing_mapping_fails(
         "using_futr_exog": False,
         "target_columns": ["bs_a"],
         "task": {"multivariable": False},
-        "routing": {},
+
     }
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
@@ -4322,7 +4236,7 @@ def test_load_app_config_bs_preforcast_stage1_auto_missing_mapping_fails(
     stage_root = tmp_path / "stage_auto_missing"
     stage_root.mkdir(parents=True, exist_ok=True)
     stage_path = _write_config(stage_root, stage_payload, ".yaml")
-    payload["bs_preforcast"]["routing"]["univariable_config"] = str(stage_path)
+    payload["bs_preforcast"]["config_path"] = str(stage_path)
     _write_search_space(
         tmp_path,
         {
@@ -4349,10 +4263,7 @@ def test_load_app_config_loads_bs_preforcast_stage1_with_dedicated_search_space(
         "using_futr_exog": False,
         "target_columns": ["bs_a", "bs_b"],
         "task": {"multivariable": False},
-        "routing": {
-            "univariable_config": "yaml/bs-preforcast_univariable.yaml",
-            "multivariable_config": "yaml/bs-preforcast_multivariable.yaml",
-        },
+        "config_path": "bs_preforcast.yaml",
     }
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n2020-01-15,3,4\n",
@@ -4400,10 +4311,7 @@ def test_load_app_config_rejects_bs_preforcast_stage1_nested_block(tmp_path: Pat
         "enabled": True,
         "using_futr_exog": False,
         "target_columns": ["bs_a"],
-        "routing": {
-            "univariable_config": "yaml/bs-preforcast_univariable.yaml",
-            "multivariable_config": "yaml/bs-preforcast_multivariable.yaml",
-        },
+        "config_path": "bs_preforcast.yaml",
     }
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n2020-01-15,3,4\n",
@@ -4795,10 +4703,7 @@ def test_runtime_validate_only_records_bs_preforcast_metadata(
         "using_futr_exog": True,
         "target_columns": ["bs_a", "bs_b"],
         "task": {"multivariable": False},
-        "routing": {
-            "univariable_config": "yaml/bs-preforcast_univariable.yaml",
-            "multivariable_config": "yaml/bs-preforcast_multivariable.yaml",
-        },
+        "config_path": "bs_preforcast.yaml",
     }
     stage_payload = _payload()
     stage_payload["dataset"] = {
@@ -4855,16 +4760,16 @@ def test_runtime_validate_only_records_bs_preforcast_metadata(
     assert resolved["bs_preforcast"]["enabled"] is True
     assert resolved["bs_preforcast"]["target_columns"] == ["bs_a", "bs_b"]
     assert (
-        resolved["bs_preforcast"]["routing"]["selected_config_path"]
+        resolved["bs_preforcast"]["config_path"]
         == "yaml/bs-preforcast_univariable.yaml"
     )
     assert capability["bs_preforcast"]["enabled"] is True
     assert capability["bs_preforcast"]["multivariable"] is False
     assert capability["bs_preforcast"]["selected_config_path"] == (
-        str((tmp_path / "yaml" / "bs-preforcast_univariable.yaml").resolve())
+        str((tmp_path / "bs_preforcast.yaml").resolve())
     )
     assert manifest["bs_preforcast"]["target_columns"] == ["bs_a", "bs_b"]
-    assert manifest["bs_preforcast"]["routing"]["selected_config_path"] == (
+    assert manifest["bs_preforcast"]["config_path"] == (
         "yaml/bs-preforcast_univariable.yaml"
     )
     assert (output_root / "bs_preforcast" / "config" / "config.resolved.json").exists()
@@ -4889,9 +4794,7 @@ def test_runtime_validate_only_bs_preforcast_falls_back_to_lag_derived_for_naive
         "using_futr_exog": True,
         "target_columns": ["bs_a"],
         "task": {"multivariable": False},
-        "routing": {
-            "univariable_config": "yaml/bs-preforcast_univariable.yaml",
-        },
+        "config_path": "bs_preforcast.yaml",
     }
     stage_payload = _payload()
     stage_payload["dataset"] = {
@@ -4960,9 +4863,7 @@ def test_prepare_bs_preforcast_fold_inputs_adds_preforcast_futr_columns(
         "using_futr_exog": True,
         "target_columns": ["bs_a"],
         "task": {"multivariable": False},
-        "routing": {
-            "univariable_config": "yaml/bs-preforcast_univariable.yaml",
-        },
+        "config_path": "bs_preforcast.yaml",
     }
     stage_payload = _payload()
     stage_payload["dataset"] = {
@@ -5038,9 +4939,7 @@ def test_prepare_bs_preforcast_fold_inputs_supports_lag_derived_for_non_futr_mod
         "using_futr_exog": True,
         "target_columns": ["bs_a"],
         "task": {"multivariable": False},
-        "routing": {
-            "univariable_config": "yaml/bs-preforcast_univariable.yaml",
-        },
+        "config_path": "bs_preforcast.yaml",
     }
     stage_payload = _payload()
     stage_payload["dataset"] = {

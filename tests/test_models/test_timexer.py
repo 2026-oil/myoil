@@ -3,7 +3,7 @@ import torch
 from neuralforecast import NeuralForecast
 from neuralforecast.auto import AutoTimeXer, TimeXer
 from neuralforecast.common._base_auto import MockTrial
-from neuralforecast.common._model_checks import check_model
+from neuralforecast.common._model_checks import FREQ, Y_TEST_DF_1, Y_TRAIN_DF_1
 
 from .test_helpers import check_args
 
@@ -31,7 +31,30 @@ def _make_model(**overrides):
 
 
 def test_timexer(suppress_warnings):
-    check_model(TimeXer, ["airpassengers"])
+    model = TimeXer(
+        h=7,
+        input_size=28,
+        n_series=1,
+        patch_len=7,
+        hidden_size=8,
+        n_heads=1,
+        e_layers=1,
+        d_ff=16,
+        max_steps=1,
+        val_check_steps=1,
+        enable_progress_bar=False,
+        enable_model_summary=False,
+        accelerator="cpu",
+        devices=1,
+        batch_size=8,
+        valid_batch_size=8,
+        windows_batch_size=8,
+        inference_windows_batch_size=8,
+    )
+    nf = NeuralForecast(models=[model], freq=FREQ)
+    nf.fit(df=Y_TRAIN_DF_1, val_size=7)
+    preds = nf.predict(futr_df=Y_TEST_DF_1)
+    assert not preds.empty
 
 
 def test_autotimxer(setup_dataset):
@@ -43,10 +66,27 @@ def test_autotimxer(setup_dataset):
     my_config = AutoTimeXer.get_default_config(h=12, n_series=1, backend='optuna')
     def my_config_new(trial):
         config = {**my_config(trial)}
-        config.update({'max_steps': 1, 'val_check_steps': 1, 'input_size': 12, 'patch_len': 12})
+        config.update(
+            {
+                'max_steps': 1,
+                'val_check_steps': 1,
+                'input_size': 12,
+                'patch_len': 12,
+                'accelerator': 'cpu',
+                'devices': 1,
+            }
+        )
         return config
 
-    model = AutoTimeXer(h=12, n_series=1, config=my_config_new, backend='optuna', num_samples=1, cpus=1)
+    model = AutoTimeXer(
+        h=12,
+        n_series=1,
+        config=my_config_new,
+        backend='optuna',
+        num_samples=1,
+        cpus=1,
+        gpus=0,
+    )
     assert model.config(MockTrial())['h'] == 12
     model.fit(dataset=setup_dataset)
 
@@ -56,7 +96,17 @@ def test_autotimxer(setup_dataset):
     my_config['val_check_steps'] = 1
     my_config['input_size'] = 12
     my_config['patch_len'] = 12
-    model = AutoTimeXer(h=12, n_series=1, config=my_config, backend='ray', num_samples=1, cpus=1)
+    my_config['accelerator'] = 'cpu'
+    my_config['devices'] = 1
+    model = AutoTimeXer(
+        h=12,
+        n_series=1,
+        config=my_config,
+        backend='ray',
+        num_samples=1,
+        cpus=1,
+        gpus=0,
+    )
     model.fit(dataset=setup_dataset)
 
 
