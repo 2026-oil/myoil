@@ -91,6 +91,19 @@ def test_load_app_config_materializes_bs_preforcast_stage_with_top_level_config_
         "target_columns": ["bs_a"],
         "task": {"multivariable": False},
     }
+    (tmp_path / "search_space.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "models": {},
+                "training": [],
+                "residual": {"xgboost": ["n_estimators"]},
+                "bs_preforcast_models": {},
+                "bs_preforcast_training": [],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.safe_dump(main_payload, sort_keys=False), encoding="utf-8")
 

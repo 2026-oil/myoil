@@ -13,7 +13,6 @@ import yaml
 from bs_preforcast.config import (
     BsPreforcastConfig,
     BsPreforcastStageLoadedConfig,
-    BsPreforcastTaskConfig,
     load_bs_preforcast_stage1,
     merge_stage_payload,
     normalize_bs_preforcast_config,

@@ -11,11 +11,7 @@ from typing import Any, Literal
 import optuna
 import yaml
 
-from bs_preforcast.search_space import (
-    BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY,
-    SUPPORTED_BS_PREFORCAST_MODELS,
-    normalize_bs_preforcast_sections,
-)
+import bs_preforcast.search_space as bs_preforcast_search_space
 
 SEARCH_SPACE_FILENAME = "search_space.yaml"
 BASELINE_MODEL_NAMES = {"Naive", "SeasonalNaive", "HistoricAverage"}
@@ -120,6 +116,10 @@ FIXED_TRAINING_VALUES = {
 }
 FIXED_TRAINING_KEYS = tuple(FIXED_TRAINING_VALUES)
 GLOBAL_TRAINING_RANGE_SOURCE = "global_fallback"
+SUPPORTED_BS_PREFORCAST_MODELS = bs_preforcast_search_space.SUPPORTED_BS_PREFORCAST_MODELS
+BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY = (
+    bs_preforcast_search_space.BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY
+)
 
 ExecutionMode = Literal[
     "baseline_fixed",
@@ -556,7 +556,7 @@ def normalize_search_space_payload(payload: dict[str, Any]) -> dict[str, Any]:
                 + ", ".join(overlaps)
             )
 
-    bs_preforcast_models, bs_preforcast_training = normalize_bs_preforcast_sections(
+    bs_preforcast_models, bs_preforcast_training = bs_preforcast_search_space.normalize_bs_preforcast_sections(
         payload,
         normalize_model_section=_normalize_model_section,
         normalize_training_section=_normalize_training_section,
