@@ -2571,8 +2571,8 @@ def _configure_loss_curve_axis(axis: Any, curve_frame: pd.DataFrame) -> None:
     from matplotlib.ticker import LogFormatterMathtext, LogLocator
 
     loss_values = curve_frame[["train_loss", "val_loss"]].to_numpy(dtype=float).ravel()
-    finite_positive = loss_values[np.isfinite(loss_values) & (loss_values > 0)]
-    if finite_positive.size == 0:
+    positive_finite_mask = np.isfinite(loss_values) & (loss_values > 0)
+    if not positive_finite_mask.any():
         return
 
     axis.set_yscale("log", base=10)
