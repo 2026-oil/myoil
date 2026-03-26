@@ -3705,7 +3705,7 @@ def test_load_app_config_rejects_legacy_bs_preforcast_routing_keys(
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="unsupported key\(s\): routing"):
+    with pytest.raises(ValueError, match=r"unsupported key\(s\): routing"):
         load_app_config(
             tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
         )
@@ -4805,6 +4805,16 @@ def test_runtime_validate_only_records_bs_preforcast_metadata(
         ),
         encoding="utf-8",
     )
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+            "bs_preforcast_models": {},
+            "bs_preforcast_training": [],
+        },
+    )
     config_path = _write_config(tmp_path, payload, ".yaml")
 
     from residual import runtime
@@ -4931,6 +4941,16 @@ def test_runtime_validate_only_bs_preforcast_falls_back_to_lag_derived_for_naive
             sort_keys=False,
         ),
         encoding="utf-8",
+    )
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+            "bs_preforcast_models": {},
+            "bs_preforcast_training": [],
+        },
     )
     config_path = _write_config(tmp_path, payload, ".yaml")
 
