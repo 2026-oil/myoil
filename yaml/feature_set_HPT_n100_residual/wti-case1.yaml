@@ -98,14 +98,4 @@ residual:
       - Bonds_CHN_Spread_10Y_5Y
       futr: []
       static: []
-jobs:
-- model: TimeXer
-  params: {}
-- model: TSMixerx
-  params: {}
-- model: Naive
-  params: {}
-- model: iTransformer
-  params: {}
-- model: LSTM
-  params: {}
+jobs: yaml/jobs_tune.yaml

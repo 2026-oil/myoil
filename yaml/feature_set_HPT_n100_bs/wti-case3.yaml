@@ -56,14 +56,4 @@ scheduler:
   parallelize_single_job_tuning: true
 residual:
   enabled: false
-jobs:
-- model: TimeXer
-  params: {}
-- model: TSMixerx
-  params: {}
-- model: Naive
-  params: {}
-- model: iTransformer
-  params: {}
-- model: LSTM
-  params: {}
+jobs: yaml/jobs_tune.yaml

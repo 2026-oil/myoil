@@ -47,35 +47,4 @@ scheduler:
   worker_devices: 1
 residual:
   enabled: false
-jobs:
-- model: TimeXer
-  params:
-    patch_len: 16
-    hidden_size: 768
-    n_heads: 16
-    e_layers: 4
-    d_ff: 1024
-    factor: 8
-    dropout: 0.2
-    use_norm: true
-- model: TSMixerx
-  params:
-    n_block: 2
-    ff_dim: 64
-    dropout: 0.1
-    revin: true
-- model: Naive
-  params: {}
-- model: iTransformer
-  params:
-    hidden_size: 64
-    n_heads: 4
-    e_layers: 2
-    d_ff: 256
-    dropout: 0.0
-- model: LSTM
-  params:
-    encoder_hidden_size: 64
-    decoder_hidden_size: 64
-    encoder_n_layers: 4
-    context_size: 10
+jobs: yaml/jobs_default.yaml

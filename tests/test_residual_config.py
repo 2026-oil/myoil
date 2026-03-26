@@ -307,6 +307,7 @@ def _residual_defaults_map() -> dict[str, dict[str, Any]]:
         if value is not None:
             return cast(dict[str, dict[str, Any]], value)
     pytest.fail("residual.optuna_spaces must expose a per-model defaults map")
+    raise AssertionError("unreachable")
 
 
 def _import_build_residual_plugin():
@@ -7404,8 +7405,35 @@ EXPECTED_CASE_METADATA = {
 }
 
 
-def _load_case_yaml(path: Path) -> dict[str, Any]:
+def _load_case_yaml_raw(path: Path) -> dict[str, Any]:
     return cast(dict[str, Any], yaml.safe_load(path.read_text(encoding="utf-8")))
+
+
+def _resolve_case_jobs(path: Path, jobs: Any) -> list[dict[str, Any]]:
+    if isinstance(jobs, list):
+        return jobs
+    if isinstance(jobs, dict):
+        resolved_jobs = jobs.get("jobs")
+        if not isinstance(resolved_jobs, list):
+            raise TypeError(f"Unsupported jobs mapping for {path}: {jobs!r}")
+        return cast(list[dict[str, Any]], resolved_jobs)
+    if isinstance(jobs, str):
+        repo_candidate = (REPO_ROOT / jobs).resolve()
+        local_candidate = (path.parent / jobs).resolve()
+        jobs_path = local_candidate if local_candidate.exists() else repo_candidate
+        loaded = yaml.safe_load(jobs_path.read_text(encoding="utf-8"))
+        if isinstance(loaded, list):
+            resolved_jobs = loaded
+        else:
+            resolved_jobs = loaded.get("jobs")
+        return cast(list[dict[str, Any]], resolved_jobs)
+    raise TypeError(f"Unsupported jobs payload for {path}: {type(jobs)!r}")
+
+
+def _load_case_yaml(path: Path) -> dict[str, Any]:
+    payload = _load_case_yaml_raw(path)
+    payload["jobs"] = _resolve_case_jobs(path, payload.get("jobs", []))
+    return payload
 
 
 def _case_jobs_by_model(path: Path) -> dict[str, dict[str, Any]]:
@@ -7421,6 +7449,120 @@ def _normalized_payload_without_task_and_residual(payload: dict[str, Any]) -> di
     normalized["task"]["name"] = "__SOURCE_TASK__"
     normalized.pop("residual", None)
     return normalized
+
+
+@pytest.mark.parametrize(
+    "relative_path, expected_jobs_ref",
+    [
+        ("yaml/feature_set/brentoil-case1.yaml", "yaml/jobs_default.yaml"),
+        ("yaml/feature_set_bs/brentoil-case1.yaml", "yaml/jobs_default.yaml"),
+        ("yaml/feature_set_bs_diff/brentoil-case1.yaml", "yaml/jobs_default.yaml"),
+        ("yaml/feature_set_bs_exloss/brentoil-case1.yaml", "yaml/jobs_default.yaml"),
+        ("yaml/feature_set_residual/brentoil-case1.yaml", "yaml/jobs_default.yaml"),
+        ("yaml/feature_set_residual_bs/brentoil-case1.yaml", "yaml/jobs_default.yaml"),
+        ("yaml/feature_set_residual_params/brentoil-case3.yaml", "yaml/jobs_default.yaml"),
+        ("yaml/feature_set_HPT_n100_bs/brentoil-case1.yaml", "yaml/jobs_tune.yaml"),
+        ("yaml/feature_set_HPT_n100_residual/brentoil-case1.yaml", "yaml/jobs_tune.yaml"),
+        ("yaml/feature_set_residual_bs_HPT/brentoil-case1.yaml", "yaml/jobs_tune.yaml"),
+    ],
+)
+def test_case_yaml_files_reference_shared_jobs_paths(
+    relative_path: str, expected_jobs_ref: str
+) -> None:
+    payload = _load_case_yaml_raw(REPO_ROOT / relative_path)
+    assert payload["jobs"] == expected_jobs_ref
+
+
+def test_shared_jobs_yaml_files_match_expected_contract() -> None:
+    default_jobs = _resolve_case_jobs(
+        REPO_ROOT / "yaml" / "jobs_default.yaml",
+        yaml.safe_load((REPO_ROOT / "yaml" / "jobs_default.yaml").read_text(encoding="utf-8")),
+    )
+    tune_jobs = _resolve_case_jobs(
+        REPO_ROOT / "yaml" / "jobs_tune.yaml",
+        yaml.safe_load((REPO_ROOT / "yaml" / "jobs_tune.yaml").read_text(encoding="utf-8")),
+    )
+
+    assert [job["model"] for job in default_jobs] == EXPECTED_CASE_MODEL_LIST
+    assert {job["model"]: job["params"] for job in default_jobs} == EXPECTED_CASE_MODEL_PARAMS
+    assert [job["model"] for job in tune_jobs] == EXPECTED_HPT_N100_MODELS
+    assert all(job["params"] == {} for job in tune_jobs)
+
+
+def test_jobs_path_loading_keeps_inline_compatibility_and_supports_shared_files(
+    tmp_path: Path,
+) -> None:
+    dataset_path = tmp_path / "df.csv"
+    dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
+
+    inline_path = tmp_path / "inline.yaml"
+    inline_path.write_text(
+        yaml.safe_dump(
+                {
+                    "task": {"name": "inline_case"},
+                    "dataset": {"path": str(dataset_path), "target_col": "y"},
+                    "training": {"max_steps": 1},
+                    "cv": {"n_windows": 1, "step_size": 1},
+                    "residual": {"enabled": False},
+                    "jobs": [{"model": "Naive", "params": {}}],
+                },
+                sort_keys=False,
+            ),
+        encoding="utf-8",
+    )
+    shared_path = tmp_path / "shared.yaml"
+    shared_path.write_text(
+        yaml.safe_dump(
+                {
+                    "task": {"name": "shared_case"},
+                    "dataset": {"path": str(dataset_path), "target_col": "y"},
+                    "training": {"max_steps": 1},
+                    "cv": {"n_windows": 1, "step_size": 1},
+                    "residual": {"enabled": False},
+                    "jobs": "yaml/jobs_default.yaml",
+                },
+                sort_keys=False,
+            ),
+        encoding="utf-8",
+    )
+
+    inline_loaded = load_app_config(tmp_path, config_path=inline_path)
+    shared_loaded = load_app_config(REPO_ROOT, config_path=shared_path)
+
+    assert [job.model for job in inline_loaded.config.jobs] == ["Naive"]
+    assert [job.model for job in shared_loaded.config.jobs] == EXPECTED_CASE_MODEL_LIST
+    assert next(job for job in shared_loaded.config.jobs if job.model == "TimeXer").params == (
+        EXPECTED_CASE_MODEL_PARAMS["TimeXer"]
+    )
+
+
+def test_jobs_path_loading_rejects_missing_or_malformed_shared_files(tmp_path: Path) -> None:
+    dataset_path = tmp_path / "df.csv"
+    dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
+    malformed_jobs = tmp_path / "bad_jobs.yaml"
+    malformed_jobs.write_text("jobs: wrong\n", encoding="utf-8")
+
+    for name, jobs_ref, expected_error in [
+        ("missing.yaml", "yaml/does-not-exist.yaml", "jobs route does not exist"),
+        ("malformed.yaml", str(malformed_jobs), "jobs route must resolve to a list"),
+    ]:
+        config_path = tmp_path / name
+        config_path.write_text(
+            yaml.safe_dump(
+                {
+                    "task": {"name": name.replace(".yaml", "")},
+                    "dataset": {"path": str(dataset_path), "target_col": "y"},
+                    "training": {"max_steps": 1},
+                    "cv": {"n_windows": 1, "step_size": 1},
+                    "residual": {"enabled": False},
+                    "jobs": jobs_ref,
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+        with pytest.raises((FileNotFoundError, ValueError), match=expected_error):
+            load_app_config(REPO_ROOT, config_path=config_path)
 
 
 def test_case_yaml_training_mapping_matches_expected_across_all_files():

@@ -106,14 +106,4 @@ residual:
       - Com_Gold
       futr: []
       static: []
-jobs:
-- model: TimeXer
-  params: {}
-- model: TSMixerx
-  params: {}
-- model: Naive
-  params: {}
-- model: iTransformer
-  params: {}
-- model: LSTM
-  params: {}
+jobs: yaml/jobs_tune.yaml

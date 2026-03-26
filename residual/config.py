@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 import hashlib
 import json
 import math
@@ -748,7 +748,7 @@ def resolve_config_path(
     raise FileNotFoundError("No config file found in repo root (config.yaml/yml/toml)")
 
 
-def _load_document(path: Path, source_type: str) -> dict[str, Any]:
+def _load_document(path: Path, source_type: str) -> Any:
     text = path.read_text(encoding="utf-8")
     if source_type == "toml":
         return tomllib.loads(text)
@@ -762,7 +762,9 @@ def _validate_search_space_payload(
     return normalize_search_space_payload(payload)
 
 
-def _requested_job_mode(model_name: str, params: dict[str, Any]) -> str:
+def _requested_job_mode(
+    model_name: str, params: dict[str, Any]
+) -> Literal["baseline_fixed", "learned_fixed", "learned_auto_requested"]:
     if model_name in BASELINE_MODEL_NAMES:
         return "baseline_fixed"
     if params:
@@ -793,6 +795,7 @@ def _normalize_job(
         else SUPPORTED_AUTO_MODEL_NAMES
     )
     requested_mode = _requested_job_mode(model_name, params)
+    validated_mode: Literal["baseline_fixed", "learned_fixed", "learned_auto"]
     selected: tuple[str, ...] = ()
     if requested_mode == "baseline_fixed":
         validated_mode = "baseline_fixed"
@@ -844,6 +847,8 @@ def _normalize_payload(
     model_search_space_key: str = "models",
     training_search_space_key: str = "training",
     stage_scope: str | None = None,
+    repo_root: Path | None = None,
+    source_path: Path | None = None,
 ) -> AppConfig:
     task = dict(payload.get("task", {}))
     dataset = dict(payload.get("dataset", {}))
@@ -1035,11 +1040,18 @@ def _normalize_payload(
     else:
         residual_validated_mode = residual_requested_mode
 
-    jobs_payload = []
-    for raw_job in payload.get("jobs", []):
-        normalized_job = dict(raw_job)
-        normalized_job["params"] = dict(raw_job.get("params", {}))
-        jobs_payload.append(normalized_job)
+    if repo_root is None or source_path is None:
+        jobs_payload = _resolve_jobs_reference(
+            base_dir,
+            source_path=base_dir,
+            jobs_value=payload.get("jobs", []),
+        )
+    else:
+        jobs_payload = _resolve_jobs_reference(
+            repo_root,
+            source_path=source_path,
+            jobs_value=payload.get("jobs", []),
+        )
 
     for selector in LEGACY_SHARED_JOB_TRAINING_KEYS:
         field_name = LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD.get(selector, selector)
@@ -1065,7 +1077,7 @@ def _normalize_payload(
         for job in jobs_payload:
             job["params"].pop(selector, None)
 
-    jobs = tuple(
+    jobs: tuple[JobConfig, ...] = tuple(
         _normalize_job(
             job,
             search_space=search_space,
@@ -1079,8 +1091,9 @@ def _normalize_payload(
     models = [job.model for job in jobs]
     if len(models) != len(set(models)):
         raise ValueError("jobs.model values must be unique")
-    for job in jobs:
-        duplicated = CENTRALIZED_TRAINING_KEYS.intersection(job.params)
+    normalized_jobs = cast(tuple[JobConfig, ...], jobs)
+    for normalized_job in normalized_jobs:
+        duplicated = CENTRALIZED_TRAINING_KEYS.intersection(normalized_job.params)
         if (
             (
                 stage_scope == "bs_preforcast"
@@ -1089,13 +1102,13 @@ def _normalize_payload(
                     and search_space.get("__scope__") == "bs_preforcast"
                 )
             )
-            and job.model in {"AutoARIMA", "ES"}
+            and normalized_job.model in {"AutoARIMA", "ES"}
         ):
             duplicated = duplicated.difference({"season_length"})
         if duplicated:
             duplicated_keys = ", ".join(sorted(duplicated))
             raise ValueError(
-                f"jobs[{job.model}] repeats centralized training key(s): {duplicated_keys}. "
+                f"jobs[{normalized_job.model}] repeats centralized training key(s): {duplicated_keys}. "
                 "Move these settings under training."
             )
     training_selected = ()
@@ -1113,10 +1126,12 @@ def _normalize_payload(
             if training_search_payload is not None
             else ()
         )
-    training_requested_mode = (
+    training_requested_mode = cast(
+        Literal["training_fixed", "training_auto_requested"],
         "training_auto_requested" if training_selected else "training_fixed"
     )
-    training_validated_mode = (
+    training_validated_mode = cast(
+        Literal["training_fixed", "training_auto"],
         "training_auto" if training_selected else "training_fixed"
     )
 
@@ -1168,6 +1183,50 @@ def _resolve_relative_config_reference(
     return repo_candidate
 
 
+def _resolve_jobs_reference(
+    repo_root: Path,
+    *,
+    source_path: Path,
+    jobs_value: Any,
+) -> list[dict[str, Any]]:
+    if isinstance(jobs_value, list):
+        return jobs_value
+    if jobs_value is None:
+        return []
+    if isinstance(jobs_value, str):
+        jobs_path = _resolve_relative_config_reference(
+            repo_root,
+            source_path,
+            jobs_value,
+        )
+        if not jobs_path.exists():
+            raise FileNotFoundError(f"jobs route does not exist: {jobs_path}")
+        suffix = jobs_path.suffix.lower()
+        if suffix == ".toml":
+            jobs_source_type = "toml"
+        elif suffix in {".yaml", ".yml"}:
+            jobs_source_type = "yaml"
+        else:
+            raise ValueError(
+                "jobs route must reference a yaml, yml, or toml file: "
+                f"{jobs_path}"
+            )
+        jobs_payload = _load_document(jobs_path, jobs_source_type)
+        resolved_jobs: Any
+        if isinstance(jobs_payload, list):
+            resolved_jobs = jobs_payload
+        elif isinstance(jobs_payload, dict):
+            resolved_jobs = jobs_payload.get("jobs")
+        else:
+            resolved_jobs = None
+        if not isinstance(resolved_jobs, list):
+            raise ValueError(
+                f"jobs route must resolve to a list or a mapping with 'jobs': {jobs_path}"
+            )
+        return resolved_jobs
+    raise ValueError("jobs must be a list or a repo-relative yaml path string")
+
+
 def _bs_preforcast_stage_search_space(
     search_space_payload: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
@@ -1187,8 +1246,17 @@ def _bs_preforcast_stage_search_space(
     }
 
 
-def _stage_payload_requests_search_space(stage_payload: dict[str, Any]) -> bool:
-    for job in stage_payload.get("jobs", []):
+def _stage_payload_requests_search_space(
+    repo_root: Path,
+    *,
+    source_path: Path,
+    stage_payload: dict[str, Any],
+) -> bool:
+    for job in _resolve_jobs_reference(
+        repo_root,
+        source_path=source_path,
+        jobs_value=stage_payload.get("jobs", []),
+    ):
         if str(job.get("model")) not in BASELINE_MODEL_NAMES and not dict(
             job.get("params", {})
         ):
@@ -1276,6 +1344,12 @@ def _load_bs_preforcast_stage1(
         raise ValueError("bs_preforcast routed YAML must not define its own bs_preforcast block")
     stage_search_space = _bs_preforcast_stage_search_space(
         search_space_contract.payload if search_space_contract else None
+    )
+    stage_payload = dict(stage_payload)
+    stage_payload["jobs"] = _resolve_jobs_reference(
+        repo_root,
+        source_path=stage_source_path,
+        jobs_value=stage_payload.get("jobs", []),
     )
     stage_dataset_path = Path(stage_payload.get("dataset", {}).get("path", "df.csv"))
     if stage_dataset_path.is_absolute():
@@ -1379,9 +1453,21 @@ def load_app_config(
             raise ValueError(
                 "bs_preforcast routed YAML must not define its own bs_preforcast block"
             )
+        stage_payload_probe = dict(stage_payload_probe)
+        stage_payload_probe["jobs"] = _resolve_jobs_reference(
+            repo_root,
+            source_path=stage_source_path,
+            jobs_value=stage_payload_probe.get("jobs", []),
+        )
     search_space_contract: SearchSpaceContract | None = None
     requested_search_space = False
-    jobs_payload = payload.get("jobs", [])
+    payload = dict(payload)
+    payload["jobs"] = _resolve_jobs_reference(
+        repo_root,
+        source_path=source_path,
+        jobs_value=payload.get("jobs", []),
+    )
+    jobs_payload = payload["jobs"]
     for job in jobs_payload:
         if str(job.get("model")) not in BASELINE_MODEL_NAMES and not dict(job.get("params", {})):
             requested_search_space = True
@@ -1392,10 +1478,14 @@ def load_app_config(
         and not dict(residual_payload.get("params", {}))
     ):
         requested_search_space = True
-    if stage_payload_probe is not None and _stage_payload_requests_search_space(
-        stage_payload_probe
-    ):
-        requested_search_space = True
+    if stage_payload_probe is not None:
+        assert stage_source_path is not None
+        if _stage_payload_requests_search_space(
+            repo_root,
+            source_path=stage_source_path,
+            stage_payload=stage_payload_probe,
+        ):
+            requested_search_space = True
     if requested_search_space:
         search_space_contract = load_search_space_contract(repo_root)
     search_space = (
