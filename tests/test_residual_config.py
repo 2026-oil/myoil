@@ -5302,6 +5302,230 @@ def test_prepare_bs_preforcast_fold_inputs_uses_futr_path_for_timexer_native_fut
     )
 
 
+def test_bs_preforcast_inline_learned_stage_surfaces_multi_gpu_resolution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    import residual.bs_preforcast_runtime as bs_runtime
+
+    payload = _payload()
+    payload["bs_preforcast"] = {
+        "enabled": True,
+        "config_path": "bs_preforcast.yaml",
+        "using_futr_exog": False,
+        "target_columns": ["bs_a"],
+        "task": {"multivariable": False},
+    }
+    stage_payload = {
+        "common": {
+            "dataset": {
+                "path": str((tmp_path / "data.csv").resolve()),
+                "dt_col": "dt",
+                "hist_exog_cols": [],
+                "futr_exog_cols": [],
+                "static_exog_cols": [],
+            },
+            "runtime": {"random_seed": 1},
+            "training": {
+                "input_size": 2,
+                "season_length": 52,
+                "batch_size": 32,
+                "valid_batch_size": 64,
+                "windows_batch_size": 1024,
+                "inference_windows_batch_size": 1024,
+                "learning_rate": 0.001,
+                "max_steps": 1,
+                "val_size": 1,
+                "loss": "mse",
+            },
+            "cv": {
+                "horizon": 1,
+                "step_size": 1,
+                "n_windows": 1,
+                "gap": 0,
+                "overlap_eval_policy": "by_cutoff_mean",
+            },
+            "scheduler": {
+                "gpu_ids": [0, 1],
+                "max_concurrent_jobs": 1,
+                "worker_devices": 2,
+                "parallelize_single_job_tuning": False,
+            },
+            "residual": {"enabled": False, "model": "xgboost", "params": {}},
+        },
+        "univariable": {
+            "dataset": {"target_col": "bs_a"},
+            "jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
+        },
+    }
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,bs_a\n"
+        "2020-01-01,1,2,10\n"
+        "2020-01-08,2,3,11\n"
+        "2020-01-15,3,4,12\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "bs_preforcast.yaml").write_text(
+        yaml.safe_dump(stage_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+            "bs_preforcast_models": {},
+            "bs_preforcast_training": [],
+        },
+    )
+    loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+    source_df = pd.read_csv(tmp_path / "data.csv")
+    run_root = tmp_path / "run_inline_multi_gpu"
+    captured: dict[str, Any] = {}
+
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "0,1")
+    monkeypatch.setenv("NEURALFORECAST_ASSIGNED_GPU_IDS", "0,1")
+    monkeypatch.setenv("NEURALFORECAST_WORKER_DEVICES", "2")
+
+    class FakeNeuralForecast:
+        def __init__(self, *, models, freq):
+            self.models = models
+            self.freq = freq
+            self._fit_unique_id: str | None = None
+
+        def fit(self, fit_df, static_df=None, val_size=0):
+            captured["fit_cuda_visible_devices"] = os.environ.get("CUDA_VISIBLE_DEVICES")
+            captured["fit_val_size"] = val_size
+            self._fit_unique_id = str(fit_df["unique_id"].iloc[0])
+
+        def predict(self, **kwargs):
+            captured["predict_cuda_visible_devices"] = os.environ.get(
+                "CUDA_VISIBLE_DEVICES"
+            )
+            futr_df = kwargs.get("futr_df")
+            if futr_df is not None and self._fit_unique_id is not None:
+                horizon = len(futr_df[futr_df["unique_id"] == self._fit_unique_id])
+            else:
+                horizon = 1
+            return pd.DataFrame(
+                {
+                    "unique_id": [self._fit_unique_id or "bs_a"] * horizon,
+                    "DummyUnivariate": [11.0] * horizon,
+                }
+            )
+
+    monkeypatch.setattr(bs_runtime, "NeuralForecast", FakeNeuralForecast)
+
+    prepare_bs_preforcast_fold_inputs(
+        loaded,
+        loaded.config.jobs[0],
+        source_df.iloc[:2].reset_index(drop=True),
+        source_df.iloc[2:].reset_index(drop=True),
+        run_root=run_root,
+    )
+
+    inline_summary = json.loads(
+        (
+            run_root
+            / "bs_preforcast"
+            / "artifacts"
+            / "inline_fit_summary.json"
+        ).read_text()
+    )
+    assert inline_summary["devices"] == 2
+    assert inline_summary["strategy"] in {"ddp-gloo-auto", "ddp"}
+    assert inline_summary["assigned_gpu_ids"] == [0, 1]
+    assert captured["fit_cuda_visible_devices"] == "0,1"
+    assert captured["predict_cuda_visible_devices"] == "0,1"
+
+
+def test_bs_preforcast_stage_baseline_job_stays_rejected(tmp_path: Path):
+    payload = _payload()
+    payload["bs_preforcast"] = {
+        "enabled": True,
+        "config_path": "bs_preforcast.yaml",
+        "using_futr_exog": False,
+        "target_columns": ["bs_a"],
+        "task": {"multivariable": False},
+    }
+    stage_payload = {
+        "common": {
+            "dataset": {
+                "path": str((tmp_path / "data.csv").resolve()),
+                "dt_col": "dt",
+                "hist_exog_cols": [],
+                "futr_exog_cols": [],
+                "static_exog_cols": [],
+            },
+            "runtime": {"random_seed": 1},
+            "training": {
+                "input_size": 2,
+                "season_length": 52,
+                "batch_size": 32,
+                "valid_batch_size": 64,
+                "windows_batch_size": 1024,
+                "inference_windows_batch_size": 1024,
+                "learning_rate": 0.001,
+                "max_steps": 1,
+                "val_size": 1,
+                "loss": "mse",
+            },
+            "cv": {
+                "horizon": 1,
+                "step_size": 1,
+                "n_windows": 1,
+                "gap": 0,
+                "overlap_eval_policy": "by_cutoff_mean",
+            },
+            "scheduler": {
+                "gpu_ids": [0, 1],
+                "max_concurrent_jobs": 1,
+                "worker_devices": 2,
+                "parallelize_single_job_tuning": False,
+            },
+            "residual": {"enabled": False, "model": "xgboost", "params": {}},
+        },
+        "univariable": {
+            "dataset": {"target_col": "bs_a"},
+            "jobs": [{"model": "Naive", "params": {}}],
+        },
+    }
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,bs_a\n"
+        "2020-01-01,1,2,10\n"
+        "2020-01-08,2,3,11\n"
+        "2020-01-15,3,4,12\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "bs_preforcast.yaml").write_text(
+        yaml.safe_dump(stage_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+            "bs_preforcast_models": {},
+            "bs_preforcast_training": [],
+        },
+    )
+    loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+    source_df = pd.read_csv(tmp_path / "data.csv")
+
+    with pytest.raises(
+        ValueError, match="bs_preforcast stage does not support baseline-only jobs"
+    ):
+        prepare_bs_preforcast_fold_inputs(
+            loaded,
+            loaded.config.jobs[0],
+            source_df.iloc[:2].reset_index(drop=True),
+            source_df.iloc[2:].reset_index(drop=True),
+            run_root=tmp_path / "run_baseline_rejected",
+        )
+
+
 def test_runtime_auto_mode_prefers_yaml_opt_n_trial_over_env(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):

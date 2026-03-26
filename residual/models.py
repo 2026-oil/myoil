@@ -153,7 +153,7 @@ def validate_job(job: JobConfig) -> ModelCapabilities:
     return capabilities_for(job.model)
 
 
-def _resolved_devices(config: AppConfig) -> int | None:
+def resolved_devices(config: AppConfig) -> int | None:
     worker_devices = os.environ.get("NEURALFORECAST_WORKER_DEVICES")
     if config.training.devices is not None:
         if worker_devices:
@@ -164,11 +164,20 @@ def _resolved_devices(config: AppConfig) -> int | None:
     return int(config.scheduler.worker_devices)
 
 
-def _resolved_strategy(config: AppConfig, devices: int | None) -> Any:
+def resolved_strategy_name(config: AppConfig, devices: int | None) -> str | None:
     if config.training.strategy is not None:
         return config.training.strategy
     if devices is None or devices <= 1:
         return None
+    return "ddp-gloo-auto"
+
+
+def resolved_strategy(config: AppConfig, devices: int | None) -> Any:
+    strategy_name = resolved_strategy_name(config, devices)
+    if strategy_name is None:
+        return None
+    if config.training.strategy is not None:
+        return strategy_name
     try:
         from pytorch_lightning.strategies import DDPStrategy
 
@@ -231,14 +240,14 @@ def build_model(
             caps.supports_stat_exog, config.dataset.static_exog_cols
         ),
     }
-    resolved_devices = _resolved_devices(config)
-    resolved_strategy = _resolved_strategy(config, resolved_devices)
+    resolved_device_count = resolved_devices(config)
+    resolved_strategy_value = resolved_strategy(config, resolved_device_count)
     if config.training.accelerator is not None:
         shared_kwargs['accelerator'] = config.training.accelerator
-    if resolved_devices is not None:
-        shared_kwargs['devices'] = resolved_devices
-    if resolved_strategy is not None:
-        shared_kwargs['strategy'] = resolved_strategy
+    if resolved_device_count is not None:
+        shared_kwargs['devices'] = resolved_device_count
+    if resolved_strategy_value is not None:
+        shared_kwargs['strategy'] = resolved_strategy_value
     if config.training.precision is not None:
         shared_kwargs['precision'] = config.training.precision
     if caps.requires_n_series:

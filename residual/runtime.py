@@ -752,6 +752,7 @@ def _fit_and_predict_fold(
     loaded: LoadedConfig,
     job: JobConfig,
     *,
+    run_root: Path | None = None,
     source_df: pd.DataFrame,
     freq: str,
     train_idx: list[int],
@@ -770,6 +771,7 @@ def _fit_and_predict_fold(
             job,
             train_df,
             future_df,
+            run_root=run_root,
         )
     effective_config = _effective_config(effective_loaded, training_override)
     diff_context = _build_fold_diff_context(effective_loaded, train_df)
@@ -1167,6 +1169,7 @@ def _main_job_objective(
                 ) = _fit_and_predict_fold(
                     loaded,
                     job,
+                    run_root=None,
                     source_df=source_df,
                     freq=freq,
                     train_idx=train_idx,
@@ -2835,6 +2838,7 @@ def _run_single_job(
                     _fit_and_predict_fold(
                         loaded,
                         effective_job,
+                        run_root=run_root,
                         source_df=source_df,
                         freq=freq,
                         train_idx=train_idx,

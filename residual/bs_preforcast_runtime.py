@@ -17,7 +17,14 @@ import numpy as np
 from .adapters import build_multivariate_inputs, build_univariate_inputs
 from .config import JobConfig, LoadedConfig
 from .manifest import build_manifest, write_manifest
-from .models import BASELINE_MODEL_NAMES, MODEL_CLASSES, build_model, validate_job
+from .models import (
+    BASELINE_MODEL_NAMES,
+    MODEL_CLASSES,
+    build_model,
+    resolved_devices,
+    resolved_strategy_name,
+    validate_job,
+)
 from .optuna_spaces import optuna_num_trials, suggest_model_params, suggest_training_params
 
 
@@ -36,6 +43,39 @@ def _load_json(path: Path) -> dict[str, Any]:
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _assigned_gpu_ids(loaded: LoadedConfig, devices: int | None) -> list[int]:
+    explicit_ids = os.environ.get("NEURALFORECAST_ASSIGNED_GPU_IDS", "").strip()
+    if explicit_ids:
+        return [int(part.strip()) for part in explicit_ids.split(",") if part.strip()]
+    visible_ids = os.environ.get("CUDA_VISIBLE_DEVICES", "").strip()
+    if visible_ids:
+        return [int(part.strip()) for part in visible_ids.split(",") if part.strip()]
+    if devices is None:
+        return []
+    return list(loaded.config.scheduler.gpu_ids[:devices])
+
+
+def _write_inline_fit_summary(
+    loaded: LoadedConfig,
+    *,
+    run_root: Path | None,
+    model_name: str,
+) -> None:
+    if run_root is None:
+        return
+    devices = resolved_devices(loaded.config)
+    payload = {
+        "model": model_name,
+        "devices": devices,
+        "strategy": resolved_strategy_name(loaded.config, devices),
+        "assigned_gpu_ids": _assigned_gpu_ids(loaded, devices),
+    }
+    _write_json(
+        _stage_root(run_root) / "artifacts" / "inline_fit_summary.json",
+        payload,
+    )
 
 
 def resolve_bs_preforcast_injection_mode(
@@ -397,9 +437,6 @@ def _stage_fit_loaded(
         stage_loaded.config.training,
         input_size=adjusted_input_size,
         val_size=0,
-        accelerator="cpu",
-        devices=1,
-        strategy=None,
     )
     adjusted_cv = replace(stage_loaded.config.cv, horizon=horizon)
     return replace(
@@ -415,6 +452,7 @@ def _predict_stage_univariate(
     target_column: str,
     train_df: pd.DataFrame,
     future_df: pd.DataFrame,
+    run_root: Path | None = None,
 ) -> list[float]:
     stage_loaded = _resolved_stage_loaded(
         loaded,
@@ -462,26 +500,19 @@ def _predict_stage_univariate(
         future_df=future_df,
     )
     model = build_model(stage_loaded.config, job)
+    _write_inline_fit_summary(stage_loaded, run_root=run_root, model_name=job.model)
     nf = NeuralForecast(models=[model], freq=stage_loaded.config.dataset.freq or "W")
-    original_cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES")
-    os.environ["CUDA_VISIBLE_DEVICES"] = ""
-    try:
-        nf.fit(
-            adapter_inputs.fit_df,
-            static_df=adapter_inputs.static_df,
-            val_size=stage_loaded.config.training.val_size,
-        )
-        predict_kwargs: dict[str, Any] = {}
-        if adapter_inputs.futr_df is not None:
-            predict_kwargs["futr_df"] = adapter_inputs.futr_df
-        if adapter_inputs.static_df is not None:
-            predict_kwargs["static_df"] = adapter_inputs.static_df
-        predictions = nf.predict(**predict_kwargs)
-    finally:
-        if original_cuda_visible_devices is None:
-            os.environ.pop("CUDA_VISIBLE_DEVICES", None)
-        else:
-            os.environ["CUDA_VISIBLE_DEVICES"] = original_cuda_visible_devices
+    nf.fit(
+        adapter_inputs.fit_df,
+        static_df=adapter_inputs.static_df,
+        val_size=stage_loaded.config.training.val_size,
+    )
+    predict_kwargs: dict[str, Any] = {}
+    if adapter_inputs.futr_df is not None:
+        predict_kwargs["futr_df"] = adapter_inputs.futr_df
+    if adapter_inputs.static_df is not None:
+        predict_kwargs["static_df"] = adapter_inputs.static_df
+    predictions = nf.predict(**predict_kwargs)
     pred_col = _stage_prediction_column(predictions, job.model)
     selected = predictions[predictions["unique_id"] == target_column][pred_col].reset_index(drop=True)
     return [float(value) for value in selected.tolist()]
@@ -627,6 +658,7 @@ def _predict_stage_multivariate(
     target_columns: list[str],
     train_df: pd.DataFrame,
     future_df: pd.DataFrame,
+    run_root: Path | None = None,
 ) -> dict[str, list[float]]:
     stage_loaded = _resolved_stage_loaded(
         loaded,
@@ -668,26 +700,19 @@ def _predict_stage_multivariate(
         job,
         n_series=adapter_inputs.metadata.get("n_series"),
     )
+    _write_inline_fit_summary(stage_loaded, run_root=run_root, model_name=job.model)
     nf = NeuralForecast(models=[model], freq=stage_loaded.config.dataset.freq or "W")
-    original_cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES")
-    os.environ["CUDA_VISIBLE_DEVICES"] = ""
-    try:
-        nf.fit(
-            adapter_inputs.fit_df,
-            static_df=adapter_inputs.static_df,
-            val_size=stage_loaded.config.training.val_size,
-        )
-        predict_kwargs: dict[str, Any] = {}
-        if adapter_inputs.futr_df is not None:
-            predict_kwargs["futr_df"] = adapter_inputs.futr_df
-        if adapter_inputs.static_df is not None:
-            predict_kwargs["static_df"] = adapter_inputs.static_df
-        predictions = nf.predict(**predict_kwargs)
-    finally:
-        if original_cuda_visible_devices is None:
-            os.environ.pop("CUDA_VISIBLE_DEVICES", None)
-        else:
-            os.environ["CUDA_VISIBLE_DEVICES"] = original_cuda_visible_devices
+    nf.fit(
+        adapter_inputs.fit_df,
+        static_df=adapter_inputs.static_df,
+        val_size=stage_loaded.config.training.val_size,
+    )
+    predict_kwargs: dict[str, Any] = {}
+    if adapter_inputs.futr_df is not None:
+        predict_kwargs["futr_df"] = adapter_inputs.futr_df
+    if adapter_inputs.static_df is not None:
+        predict_kwargs["static_df"] = adapter_inputs.static_df
+    predictions = nf.predict(**predict_kwargs)
     pred_col = _stage_prediction_column(predictions, job.model)
     out: dict[str, list[float]] = {}
     for column in target_columns:
@@ -701,6 +726,7 @@ def compute_bs_preforcast_fold_forecasts(
     *,
     train_df: pd.DataFrame,
     future_df: pd.DataFrame,
+    run_root: Path | None = None,
 ) -> dict[str, list[float]]:
     stage_loaded = _stage_execution_loaded(loaded)
     target_columns = list(loaded.config.bs_preforcast.target_columns)
@@ -711,6 +737,7 @@ def compute_bs_preforcast_fold_forecasts(
             target_columns=target_columns,
             train_df=train_df,
             future_df=future_df,
+            run_root=run_root,
         )
     return {
         column: _predict_stage_univariate(
@@ -719,6 +746,7 @@ def compute_bs_preforcast_fold_forecasts(
             target_column=column,
             train_df=train_df,
             future_df=future_df,
+            run_root=run_root,
         )
         for column in target_columns
     }
@@ -729,6 +757,8 @@ def prepare_bs_preforcast_fold_inputs(
     job: JobConfig,
     train_df: pd.DataFrame,
     future_df: pd.DataFrame,
+    *,
+    run_root: Path | None = None,
 ) -> tuple[LoadedConfig, pd.DataFrame, pd.DataFrame, str]:
     injection_mode = resolve_bs_preforcast_injection_mode(
         loaded,
@@ -744,6 +774,7 @@ def prepare_bs_preforcast_fold_inputs(
         loaded,
         train_df=train_df,
         future_df=future_df,
+        run_root=run_root,
     )
     futr_columns = list(loaded.config.dataset.futr_exog_cols)
     hist_columns = list(loaded.config.dataset.hist_exog_cols)
