@@ -30,8 +30,21 @@ def _needs_reexec() -> bool:
         return True
 
 
+def _reject_removed_args(args: Sequence[str]) -> None:
+    for idx, arg in enumerate(args):
+        if arg == '--output-root':
+            raise SystemExit(
+                '--output-root is no longer supported; main.py now derives run roots automatically from task.name and jobs route suffixes.'
+            )
+        if arg.startswith('--output-root='):
+            raise SystemExit(
+                '--output-root is no longer supported; main.py now derives run roots automatically from task.name and jobs route suffixes.'
+            )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
+    _reject_removed_args(args)
     if _needs_reexec():
         env = _build_env()
         env[_BOOTSTRAP_ENV] = '1'

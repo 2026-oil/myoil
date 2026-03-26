@@ -59,4 +59,8 @@ scheduler:
   worker_devices: 1
 residual:
   enabled: false
-jobs: yaml/jobs_default.yaml
+jobs:
+- yaml/jobs_1.yaml
+- yaml/jobs_2.yaml
+- yaml/jobs_3.yaml
+- yaml/jobs_4.yaml

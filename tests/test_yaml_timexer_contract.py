@@ -11,7 +11,21 @@ YAML_ROOT = REPO_ROOT / "yaml"
 
 def _resolve_jobs(path: Path, jobs: object) -> list[dict]:
     if isinstance(jobs, list):
-        return jobs
+        if all(isinstance(item, dict) for item in jobs):
+            return jobs
+        if all(isinstance(item, str) for item in jobs):
+            merged: list[dict] = []
+            for job_ref in jobs:
+                repo_candidate = (REPO_ROOT / job_ref).resolve()
+                local_candidate = (path.parent / job_ref).resolve()
+                jobs_path = local_candidate if local_candidate.exists() else repo_candidate
+                loaded = yaml.safe_load(jobs_path.read_text(encoding="utf-8"))
+                if isinstance(loaded, list):
+                    merged.extend(loaded)
+                else:
+                    merged.extend(loaded["jobs"])
+            return merged
+        return []
     if isinstance(jobs, str):
         repo_candidate = (REPO_ROOT / jobs).resolve()
         local_candidate = (path.parent / jobs).resolve()

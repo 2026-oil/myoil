@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal, cast
 import hashlib
@@ -293,6 +293,16 @@ class LoadedConfig:
     search_space_hash: str | None
     search_space_payload: dict[str, Any] | None
     bs_preforcast_stage1: BsPreforcastStageLoadedConfig | None = None
+    jobs_fanout_specs: tuple["JobsFanoutSpec", ...] = field(default_factory=tuple)
+    active_jobs_route_slug: str | None = None
+
+
+@dataclass(frozen=True)
+class JobsFanoutSpec:
+    reference: str
+    resolved_path: Path
+    route_slug: str
+    jobs_payload: tuple[dict[str, Any], ...]
 
 
 def _hash_text(text: str) -> str:
@@ -1102,6 +1112,91 @@ def _resolve_relative_config_reference(
     return repo_candidate
 
 
+def _load_jobs_from_path(jobs_path: Path) -> list[dict[str, Any]]:
+    suffix = jobs_path.suffix.lower()
+    if suffix == ".toml":
+        jobs_source_type = "toml"
+    elif suffix in {".yaml", ".yml"}:
+        jobs_source_type = "yaml"
+    else:
+        raise ValueError(
+            "jobs route must reference a yaml, yml, or toml file: "
+            f"{jobs_path}"
+        )
+    jobs_payload = _load_document(jobs_path, jobs_source_type)
+    resolved_jobs: Any
+    if isinstance(jobs_payload, list):
+        resolved_jobs = jobs_payload
+    elif isinstance(jobs_payload, dict):
+        resolved_jobs = jobs_payload.get("jobs")
+    else:
+        resolved_jobs = None
+    if not isinstance(resolved_jobs, list):
+        raise ValueError(
+            f"jobs route must resolve to a list or a mapping with 'jobs': {jobs_path}"
+        )
+    return resolved_jobs
+
+
+def _resolve_jobs_path_reference(
+    repo_root: Path,
+    *,
+    source_path: Path,
+    jobs_value: str,
+) -> tuple[Path, list[dict[str, Any]]]:
+    jobs_path = _resolve_relative_config_reference(
+        repo_root,
+        source_path,
+        jobs_value,
+    )
+    if not jobs_path.exists():
+        raise FileNotFoundError(f"jobs route does not exist: {jobs_path}")
+    return jobs_path, _load_jobs_from_path(jobs_path)
+
+
+def _resolve_jobs_fanout_specs(
+    repo_root: Path,
+    *,
+    source_path: Path,
+    jobs_value: Any,
+) -> tuple[JobsFanoutSpec, ...]:
+    if not isinstance(jobs_value, list):
+        return ()
+    if not jobs_value:
+        return ()
+    if all(isinstance(item, dict) for item in jobs_value):
+        return ()
+    if not all(isinstance(item, str) for item in jobs_value):
+        raise ValueError(
+            "jobs list must contain either inline job mappings or repo-relative path strings"
+        )
+    specs: list[JobsFanoutSpec] = []
+    seen_route_slugs: set[str] = set()
+    for reference in jobs_value:
+        assert isinstance(reference, str)
+        resolved_path, jobs_payload = _resolve_jobs_path_reference(
+            repo_root,
+            source_path=source_path,
+            jobs_value=reference,
+        )
+        route_slug = resolved_path.stem
+        if route_slug in seen_route_slugs:
+            raise ValueError(
+                "jobs path list must produce unique filename stems; "
+                f"duplicate stem: {route_slug}"
+            )
+        seen_route_slugs.add(route_slug)
+        specs.append(
+            JobsFanoutSpec(
+                reference=reference,
+                resolved_path=resolved_path,
+                route_slug=route_slug,
+                jobs_payload=tuple(dict(job) for job in jobs_payload),
+            )
+        )
+    return tuple(specs)
+
+
 def _resolve_jobs_reference(
     repo_root: Path,
     *,
@@ -1109,41 +1204,32 @@ def _resolve_jobs_reference(
     jobs_value: Any,
 ) -> list[dict[str, Any]]:
     if isinstance(jobs_value, list):
-        return jobs_value
+        if not jobs_value:
+            return []
+        if all(isinstance(item, dict) for item in jobs_value):
+            return jobs_value
+        if all(isinstance(item, str) for item in jobs_value):
+            _, resolved_jobs = _resolve_jobs_path_reference(
+                repo_root,
+                source_path=source_path,
+                jobs_value=jobs_value[0],
+            )
+            return resolved_jobs
+        raise ValueError(
+            "jobs list must contain either inline job mappings or repo-relative path strings"
+        )
     if jobs_value is None:
         return []
     if isinstance(jobs_value, str):
-        jobs_path = _resolve_relative_config_reference(
+        _, resolved_jobs = _resolve_jobs_path_reference(
             repo_root,
-            source_path,
-            jobs_value,
+            source_path=source_path,
+            jobs_value=jobs_value,
         )
-        if not jobs_path.exists():
-            raise FileNotFoundError(f"jobs route does not exist: {jobs_path}")
-        suffix = jobs_path.suffix.lower()
-        if suffix == ".toml":
-            jobs_source_type = "toml"
-        elif suffix in {".yaml", ".yml"}:
-            jobs_source_type = "yaml"
-        else:
-            raise ValueError(
-                "jobs route must reference a yaml, yml, or toml file: "
-                f"{jobs_path}"
-            )
-        jobs_payload = _load_document(jobs_path, jobs_source_type)
-        resolved_jobs: Any
-        if isinstance(jobs_payload, list):
-            resolved_jobs = jobs_payload
-        elif isinstance(jobs_payload, dict):
-            resolved_jobs = jobs_payload.get("jobs")
-        else:
-            resolved_jobs = None
-        if not isinstance(resolved_jobs, list):
-            raise ValueError(
-                f"jobs route must resolve to a list or a mapping with 'jobs': {jobs_path}"
-            )
         return resolved_jobs
-    raise ValueError("jobs must be a list or a repo-relative yaml path string")
+    raise ValueError(
+        "jobs must be an inline list, a repo-relative yaml path string, or a list of repo-relative yaml path strings"
+    )
 
 
 def _stage_payload_requests_search_space(
@@ -1169,6 +1255,24 @@ def _stage_payload_requests_search_space(
     return False
 
 
+def _resolve_dataset_base_dir(
+    repo_root: Path,
+    *,
+    source_path: Path,
+    payload: dict[str, Any],
+) -> Path:
+    dataset_path = Path(payload.get("dataset", {}).get("path", "df.csv"))
+    if dataset_path.is_absolute():
+        return source_path.parent
+    repo_candidate = (repo_root / dataset_path).resolve()
+    local_candidate = (source_path.parent / dataset_path).resolve()
+    return (
+        repo_root
+        if repo_candidate.exists() or not local_candidate.exists()
+        else source_path.parent
+    )
+
+
 def load_app_config(
     repo_root: Path,
     *,
@@ -1184,6 +1288,11 @@ def load_app_config(
     )
     raw_text = source_path.read_text(encoding="utf-8")
     payload = _load_document(source_path, source_type)
+    jobs_fanout_specs = _resolve_jobs_fanout_specs(
+        repo_root,
+        source_path=source_path,
+        jobs_value=payload.get("jobs", []),
+    )
     raw_bs_preforcast = bs_preforcast_config.normalize_bs_preforcast_config(
         payload.get("bs_preforcast"),
         unknown_keys=_unknown_keys,
@@ -1223,15 +1332,24 @@ def load_app_config(
     search_space_contract: SearchSpaceContract | None = None
     requested_search_space = False
     payload = dict(payload)
-    payload["jobs"] = _resolve_jobs_reference(
-        repo_root,
-        source_path=source_path,
-        jobs_value=payload.get("jobs", []),
-    )
-    jobs_payload = payload["jobs"]
-    for job in jobs_payload:
-        if str(job.get("model")) not in BASELINE_MODEL_NAMES and not dict(job.get("params", {})):
-            requested_search_space = True
+    if jobs_fanout_specs:
+        payload["jobs"] = [dict(job) for job in jobs_fanout_specs[0].jobs_payload]
+        jobs_payload_candidates = [
+            [dict(job) for job in spec.jobs_payload] for spec in jobs_fanout_specs
+        ]
+    else:
+        payload["jobs"] = _resolve_jobs_reference(
+            repo_root,
+            source_path=source_path,
+            jobs_value=payload.get("jobs", []),
+        )
+        jobs_payload_candidates = [payload["jobs"]]
+    for jobs_candidate in jobs_payload_candidates:
+        for job in jobs_candidate:
+            if str(job.get("model")) not in BASELINE_MODEL_NAMES and not dict(job.get("params", {})):
+                requested_search_space = True
+                break
+        if requested_search_space:
             break
     residual_payload = dict(payload.get("residual", {}))
     if (
@@ -1254,15 +1372,11 @@ def load_app_config(
         if search_space_contract is not None
         else None
     )
-    dataset_path = Path(payload.get("dataset", {}).get("path", "df.csv"))
-    if dataset_path.is_absolute():
-        dataset_base_dir = source_path.parent
-    else:
-        repo_candidate = (repo_root / dataset_path).resolve()
-        local_candidate = (source_path.parent / dataset_path).resolve()
-        dataset_base_dir = (
-            repo_root if repo_candidate.exists() or not local_candidate.exists() else source_path.parent
-        )
+    dataset_base_dir = _resolve_dataset_base_dir(
+        repo_root,
+        source_path=source_path,
+        payload=payload,
+    )
     base_config = _normalize_payload(
         payload,
         dataset_base_dir,
@@ -1340,4 +1454,50 @@ def load_app_config(
         search_space_hash=search_space_contract.sha256 if search_space_contract else None,
         search_space_payload=search_space_contract.payload if search_space_contract else None,
         bs_preforcast_stage1=bs_preforcast_stage1,
+        jobs_fanout_specs=jobs_fanout_specs,
+    )
+
+
+def loaded_config_for_jobs_fanout(
+    repo_root: Path,
+    loaded: LoadedConfig,
+    spec: JobsFanoutSpec,
+    *,
+    model_search_space_key: str = "models",
+    training_search_space_key: str = "training",
+) -> LoadedConfig:
+    payload = _load_document(loaded.source_path, loaded.source_type)
+    payload = dict(payload)
+    payload["jobs"] = [dict(job) for job in spec.jobs_payload]
+    dataset_base_dir = _resolve_dataset_base_dir(
+        repo_root,
+        source_path=loaded.source_path,
+        payload=payload,
+    )
+    config = _normalize_payload(
+        payload,
+        dataset_base_dir,
+        search_space=loaded.search_space_payload,
+        model_search_space_key=model_search_space_key,
+        training_search_space_key=training_search_space_key,
+        repo_root=repo_root,
+        source_path=loaded.source_path,
+    )
+    normalized_payload = config.to_dict()
+    if loaded.bs_preforcast_stage1 is not None:
+        normalized_payload.setdefault("bs_preforcast", {})["stage1"] = (
+            loaded.normalized_payload.get("bs_preforcast", {}).get("stage1")
+        )
+    normalized_payload["search_space_path"] = (
+        str(loaded.search_space_path) if loaded.search_space_path else None
+    )
+    normalized_payload["search_space_sha256"] = loaded.search_space_hash
+    resolved_text = json.dumps(normalized_payload, sort_keys=True, ensure_ascii=False)
+    return replace(
+        loaded,
+        config=config,
+        normalized_payload=normalized_payload,
+        resolved_hash=_hash_text(resolved_text),
+        jobs_fanout_specs=(),
+        active_jobs_route_slug=spec.route_slug,
     )

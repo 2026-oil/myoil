@@ -97,3 +97,15 @@ def test_needs_reexec_falls_back_to_true_when_sys_executable_resolution_fails(
     monkeypatch.setattr(bootstrap_main, 'Path', fake_path)
 
     assert bootstrap_main._needs_reexec() is True
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--output-root", "runs/custom"],
+        ["--output-root=runs/custom"],
+    ],
+)
+def test_main_rejects_removed_output_root_flag(argv: list[str]) -> None:
+    with pytest.raises(SystemExit, match="--output-root is no longer supported"):
+        bootstrap_main.main(argv)

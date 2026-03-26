@@ -7678,8 +7678,24 @@ def _normalized_payload_without_task_and_residual(payload: dict[str, Any]) -> di
 @pytest.mark.parametrize(
     "relative_path, expected_jobs_ref",
     [
-        ("yaml/feature_set/brentoil-case1.yaml", "yaml/jobs_default.yaml"),
-        ("yaml/feature_set_bs/brentoil-case1.yaml", "yaml/jobs_default.yaml"),
+        (
+            "yaml/feature_set/brentoil-case1.yaml",
+            [
+                "yaml/jobs_1.yaml",
+                "yaml/jobs_2.yaml",
+                "yaml/jobs_3.yaml",
+                "yaml/jobs_4.yaml",
+            ],
+        ),
+        (
+            "yaml/feature_set_bs/brentoil-case1.yaml",
+            [
+                "yaml/jobs_1.yaml",
+                "yaml/jobs_2.yaml",
+                "yaml/jobs_3.yaml",
+                "yaml/jobs_4.yaml",
+            ],
+        ),
         ("yaml/feature_set_bs_diff/brentoil-case1.yaml", "yaml/jobs_default.yaml"),
         ("yaml/feature_set_bs_exloss/brentoil-case1.yaml", "yaml/jobs_default.yaml"),
         ("yaml/feature_set_residual/brentoil-case1.yaml", "yaml/jobs_default.yaml"),
@@ -7691,7 +7707,7 @@ def _normalized_payload_without_task_and_residual(payload: dict[str, Any]) -> di
     ],
 )
 def test_case_yaml_files_reference_shared_jobs_paths(
-    relative_path: str, expected_jobs_ref: str
+    relative_path: str, expected_jobs_ref: object
 ) -> None:
     payload = _load_case_yaml_raw(REPO_ROOT / relative_path)
     assert payload["jobs"] == expected_jobs_ref
@@ -7787,6 +7803,366 @@ def test_jobs_path_loading_rejects_missing_or_malformed_shared_files(tmp_path: P
         )
         with pytest.raises((FileNotFoundError, ValueError), match=expected_error):
             load_app_config(REPO_ROOT, config_path=config_path)
+
+
+def test_jobs_path_list_loading_builds_fanout_specs(tmp_path: Path) -> None:
+    from residual.config import loaded_config_for_jobs_fanout
+
+    dataset_path = tmp_path / "df.csv"
+    dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
+    jobs_one = tmp_path / "jobs_1.yaml"
+    jobs_two = tmp_path / "jobs_2.yaml"
+    jobs_one.write_text(
+        yaml.safe_dump({"jobs": [{"model": "Naive", "params": {}}]}, sort_keys=False),
+        encoding="utf-8",
+    )
+    jobs_two.write_text(
+        yaml.safe_dump(
+            {"jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}]},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "fanout.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "task": {"name": "fanout_case"},
+                "dataset": {"path": str(dataset_path), "target_col": "y"},
+                "training": {"max_steps": 1},
+                "cv": {"n_windows": 1, "step_size": 1},
+                "residual": {"enabled": False},
+                "jobs": [str(jobs_one), str(jobs_two)],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    assert tuple(spec.route_slug for spec in loaded.jobs_fanout_specs) == (
+        "jobs_1",
+        "jobs_2",
+    )
+    first_variant = loaded_config_for_jobs_fanout(
+        tmp_path, loaded, loaded.jobs_fanout_specs[0]
+    )
+    second_variant = loaded_config_for_jobs_fanout(
+        tmp_path, loaded, loaded.jobs_fanout_specs[1]
+    )
+
+    assert [job.model for job in first_variant.config.jobs] == ["Naive"]
+    assert [job.model for job in second_variant.config.jobs] == ["DummyUnivariate"]
+    assert second_variant.active_jobs_route_slug == "jobs_2"
+
+
+def test_jobs_path_list_rejects_duplicate_route_stems(tmp_path: Path) -> None:
+    dataset_path = tmp_path / "df.csv"
+    dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
+    jobs_dir_a = tmp_path / "a"
+    jobs_dir_b = tmp_path / "b"
+    jobs_dir_a.mkdir()
+    jobs_dir_b.mkdir()
+    first_jobs = jobs_dir_a / "jobs.yaml"
+    second_jobs = jobs_dir_b / "jobs.yaml"
+    first_jobs.write_text(
+        yaml.safe_dump({"jobs": [{"model": "Naive", "params": {}}]}, sort_keys=False),
+        encoding="utf-8",
+    )
+    second_jobs.write_text(
+        yaml.safe_dump(
+            {"jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}]},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "fanout.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "task": {"name": "fanout_case"},
+                "dataset": {"path": str(dataset_path), "target_col": "y"},
+                "training": {"max_steps": 1},
+                "cv": {"n_windows": 1, "step_size": 1},
+                "residual": {"enabled": False},
+                "jobs": [str(first_jobs), str(second_jobs)],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="duplicate stem: jobs"):
+        load_app_config(tmp_path, config_path=config_path)
+
+
+def test_default_output_root_appends_jobs_fanout_slug(tmp_path: Path) -> None:
+    from residual.config import loaded_config_for_jobs_fanout
+    from residual.runtime import _default_output_root
+
+    dataset_path = tmp_path / "df.csv"
+    dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
+    jobs_one = tmp_path / "jobs_1.yaml"
+    jobs_two = tmp_path / "jobs_2.yaml"
+    jobs_one.write_text(
+        yaml.safe_dump({"jobs": [{"model": "Naive", "params": {}}]}, sort_keys=False),
+        encoding="utf-8",
+    )
+    jobs_two.write_text(
+        yaml.safe_dump({"jobs": [{"model": "Naive", "params": {}}]}, sort_keys=False),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "fanout.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "task": {"name": "fanout_case"},
+                "dataset": {"path": str(dataset_path), "target_col": "y"},
+                "training": {"max_steps": 1},
+                "cv": {"n_windows": 1, "step_size": 1},
+                "residual": {"enabled": False},
+                "jobs": [str(jobs_one), str(jobs_two)],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+    variant = loaded_config_for_jobs_fanout(tmp_path, loaded, loaded.jobs_fanout_specs[1])
+
+    assert _default_output_root(tmp_path, variant) == (
+        tmp_path / "runs" / f"{tmp_path.name}_fanout_case_jobs_2"
+    )
+
+
+def test_jobs_fanout_variant_preserves_repo_relative_dataset_resolution(
+    tmp_path: Path,
+) -> None:
+    from residual.config import loaded_config_for_jobs_fanout
+
+    dataset_dir = tmp_path / "data"
+    dataset_dir.mkdir(parents=True, exist_ok=True)
+    (dataset_dir / "df.csv").write_text(
+        "unique_id,dt,y\nA,2024-01-01,1\n",
+        encoding="utf-8",
+    )
+    config_dir = tmp_path / "yaml"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    jobs_one = tmp_path / "jobs_1.yaml"
+    jobs_two = tmp_path / "jobs_2.yaml"
+    jobs_one.write_text(
+        yaml.safe_dump({"jobs": [{"model": "Naive", "params": {}}]}, sort_keys=False),
+        encoding="utf-8",
+    )
+    jobs_two.write_text(
+        yaml.safe_dump(
+            {"jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}]},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    config_path = config_dir / "fanout.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "task": {"name": "fanout_case"},
+                "dataset": {"path": "data/df.csv", "target_col": "y"},
+                "training": {"max_steps": 1},
+                "cv": {"n_windows": 1, "step_size": 1},
+                "residual": {"enabled": False},
+                "jobs": [str(jobs_one), str(jobs_two)],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+    variant = loaded_config_for_jobs_fanout(tmp_path, loaded, loaded.jobs_fanout_specs[1])
+
+    assert variant.config.dataset.path == dataset_dir / "df.csv"
+
+
+def test_runtime_validate_only_fans_out_jobs_path_list(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from residual import runtime
+
+    dataset_path = tmp_path / "df.csv"
+    dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
+    jobs_one = tmp_path / "jobs_1.yaml"
+    jobs_two = tmp_path / "jobs_2.yaml"
+    jobs_one.write_text(
+        yaml.safe_dump({"jobs": [{"model": "Naive", "params": {}}]}, sort_keys=False),
+        encoding="utf-8",
+    )
+    jobs_two.write_text(
+        yaml.safe_dump(
+            {"jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}]},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "fanout.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "task": {"name": "fanout_case"},
+                "dataset": {"path": str(dataset_path), "target_col": "y"},
+                "training": {"max_steps": 1},
+                "cv": {"n_windows": 1, "step_size": 1},
+                "residual": {"enabled": False},
+                "jobs": [str(jobs_one), str(jobs_two)],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(runtime, "__file__", str(tmp_path / "residual" / "runtime.py"))
+
+    assert runtime.main(["--config", str(config_path), "--validate-only"]) == 0
+
+    result = json.loads(capsys.readouterr().out)
+    run_roots = [Path(item["run_root"]) for item in result["fanout_runs"]]
+    assert [item["jobs_route"] for item in result["fanout_runs"]] == ["jobs_1", "jobs_2"]
+    assert [item["jobs"] for item in result["fanout_runs"]] == [
+        ["Naive"],
+        ["DummyUnivariate"],
+    ]
+    assert run_roots == [
+        tmp_path / "runs" / f"{tmp_path.name}_fanout_case_jobs_1",
+        tmp_path / "runs" / f"{tmp_path.name}_fanout_case_jobs_2",
+    ]
+    assert (run_roots[0] / "config" / "config.resolved.json").exists()
+    assert (run_roots[1] / "config" / "config.resolved.json").exists()
+
+
+def test_runtime_rejects_output_root_for_jobs_path_list(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from residual import runtime
+
+    dataset_path = tmp_path / "df.csv"
+    dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
+    jobs_one = tmp_path / "jobs_1.yaml"
+    jobs_two = tmp_path / "jobs_2.yaml"
+    jobs_one.write_text(
+        yaml.safe_dump({"jobs": [{"model": "Naive", "params": {}}]}, sort_keys=False),
+        encoding="utf-8",
+    )
+    jobs_two.write_text(
+        yaml.safe_dump(
+            {"jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}]},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "fanout.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "task": {"name": "fanout_case"},
+                "dataset": {"path": str(dataset_path), "target_col": "y"},
+                "training": {"max_steps": 1},
+                "cv": {"n_windows": 1, "step_size": 1},
+                "residual": {"enabled": False},
+                "jobs": [str(jobs_one), str(jobs_two)],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(runtime, "__file__", str(tmp_path / "residual" / "runtime.py"))
+
+    with pytest.raises(SystemExit):
+        runtime.main(
+            [
+                "--config",
+                str(config_path),
+                "--validate-only",
+                "--output-root",
+                str(tmp_path / "custom-root"),
+            ]
+        )
+
+    assert (
+        "--output-root is not supported when jobs is a list of job-file paths"
+        in capsys.readouterr().err
+    )
+
+
+def test_runtime_execution_fans_out_jobs_path_list(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from residual import runtime
+
+    dataset_path = tmp_path / "df.csv"
+    dataset_path.write_text(
+        "\n".join(
+            ["unique_id,dt,y"]
+            + [
+                f"A,2024-01-{day:02d},{day}"
+                for day in range(1, 21)
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    jobs_one = tmp_path / "jobs_1.yaml"
+    jobs_two = tmp_path / "jobs_2.yaml"
+    jobs_one.write_text(
+        yaml.safe_dump({"jobs": [{"model": "Naive", "params": {}}]}, sort_keys=False),
+        encoding="utf-8",
+    )
+    jobs_two.write_text(
+        yaml.safe_dump(
+            {"jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}]},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "fanout_exec.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "task": {"name": "fanout_exec_case"},
+                "dataset": {"path": str(dataset_path), "target_col": "y"},
+                "training": {
+                    "input_size": 2,
+                    "season_length": 1,
+                    "batch_size": 1,
+                    "valid_batch_size": 1,
+                    "windows_batch_size": 8,
+                    "inference_windows_batch_size": 8,
+                    "max_steps": 1,
+                    "learning_rate": 0.001,
+                },
+                "cv": {"horizon": 1, "n_windows": 1, "step_size": 1},
+                "residual": {"enabled": False},
+                "jobs": [str(jobs_one), str(jobs_two)],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(runtime, "__file__", str(tmp_path / "residual" / "runtime.py"))
+
+    assert runtime.main(["--config", str(config_path)]) == 0
+
+    captured = capsys.readouterr().out.strip().splitlines()
+    results = [json.loads(line) for line in captured if line.lstrip().startswith("{")]
+    assert len(results) == 2
+    run_roots = [
+        tmp_path / "runs" / f"{tmp_path.name}_fanout_exec_case_jobs_1",
+        tmp_path / "runs" / f"{tmp_path.name}_fanout_exec_case_jobs_2",
+    ]
+    assert (run_roots[0] / "cv" / "Naive_forecasts.csv").exists()
+    assert (run_roots[1] / "cv" / "DummyUnivariate_forecasts.csv").exists()
 
 
 def test_case_yaml_training_mapping_matches_expected_across_all_files():

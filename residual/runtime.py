@@ -23,7 +23,12 @@ from bs_preforcast.runtime import (
     prepare_bs_preforcast_fold_inputs,
 )
 from .adapters import build_multivariate_inputs, build_univariate_inputs
-from .config import JobConfig, LoadedConfig, load_app_config
+from .config import (
+    JobConfig,
+    LoadedConfig,
+    load_app_config,
+    loaded_config_for_jobs_fanout,
+)
 from .features import build_residual_feature_frame, hist_exog_lag_feature_name
 from .manifest import (
     build_manifest,
@@ -211,7 +216,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config-toml", default=None)
     parser.add_argument("--validate-only", action="store_true")
     parser.add_argument("--jobs", nargs="+", default=None)
-    parser.add_argument("--output-root", default=None)
+    parser.add_argument("--output-root", default=None, help=argparse.SUPPRESS)
     parser.add_argument(
         "--internal-stage",
         choices=("full", "tune-main-only", "replay-only"),
@@ -249,6 +254,7 @@ def _default_output_root(repo_root: Path, loaded: LoadedConfig) -> Path:
         for part in (
             _safe_output_root_part(parent_name),
             _safe_output_root_part(task_name),
+            _safe_output_root_part(loaded.active_jobs_route_slug or ""),
         )
         if part
     ]
@@ -942,11 +948,16 @@ def _build_study_name(
 ) -> str:
     task_name = loaded.config.task.name or loaded.source_path.stem or "run"
     parts = [
-        "neuralforecast",
-        task_name,
-        job_name,
-        stage,
-        loaded.input_hash[:12],
+        part
+        for part in (
+            "neuralforecast",
+            task_name,
+            loaded.active_jobs_route_slug or "",
+            job_name,
+            stage,
+            loaded.input_hash[:12],
+        )
+        if part
     ]
     if suffix:
         parts.append(suffix)
@@ -3059,14 +3070,11 @@ def _run_single_job_with_parallel_tuning(
     return results
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(list(argv) if argv is not None else None)
-    repo_root = Path(__file__).resolve().parents[1]
-    config_path = args.config or args.config_path
-    loaded = load_app_config(
-        repo_root, config_path=config_path, config_toml_path=args.config_toml
-    )
+def _run_loaded_config(
+    repo_root: Path,
+    loaded: LoadedConfig,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
     selected_jobs = _selected_jobs(loaded, args.jobs)
     resolved_roots = _resolve_single_job_run_roots(
         repo_root,
@@ -3091,8 +3099,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             validate_only=args.validate_only,
         )
     if args.validate_only:
-        print(json.dumps({"ok": True, "jobs": [job.model for job in selected_jobs]}))
-        return 0
+        return {
+            "ok": True,
+            "jobs": [job.model for job in selected_jobs],
+            "run_root": str(paths["run_root"]),
+            "jobs_route": loaded.active_jobs_route_slug,
+        }
     if len(selected_jobs) == 1:
         if (
             args.internal_stage == "full"
@@ -3134,7 +3146,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 }
             )
         )
-        return 0
+        return {
+            "ok": True,
+            "executed_jobs": [selected_jobs[0].model],
+            "worker_results": worker_results,
+            "summary_artifacts": summary_artifacts,
+            "run_root": str(paths["run_root"]),
+            "jobs_route": loaded.active_jobs_route_slug,
+        }
     launches = build_launch_plan(loaded.config, selected_jobs)
     scheduler_dir = paths["run_root"] / "scheduler"
     scheduler_dir.mkdir(parents=True, exist_ok=True)
@@ -3163,4 +3182,42 @@ def main(argv: Sequence[str] | None = None) -> int:
             }
         )
     )
+    return {
+        "ok": True,
+        "scheduled_jobs": [launch.__dict__ for launch in launches],
+        "worker_results": results,
+        "summary_artifacts": summary_artifacts,
+        "run_root": str(paths["run_root"]),
+        "jobs_route": loaded.active_jobs_route_slug,
+    }
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(list(argv) if argv is not None else None)
+    repo_root = Path(__file__).resolve().parents[1]
+    config_path = args.config or args.config_path
+    loaded = load_app_config(
+        repo_root, config_path=config_path, config_toml_path=args.config_toml
+    )
+    if loaded.jobs_fanout_specs:
+        if args.output_root is not None:
+            parser.error(
+                "--output-root is not supported when jobs is a list of job-file paths"
+            )
+        fanout_results = []
+        for spec in loaded.jobs_fanout_specs:
+            variant = loaded_config_for_jobs_fanout(repo_root, loaded, spec)
+            fanout_results.append(_run_loaded_config(repo_root, variant, args))
+        if args.validate_only:
+            print(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "fanout_runs": fanout_results,
+                    }
+                )
+            )
+        return 0
+    _run_loaded_config(repo_root, loaded, args)
     return 0
