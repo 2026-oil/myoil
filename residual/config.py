@@ -9,19 +9,8 @@ import math
 import tomllib
 
 import yaml
-
-from bs_preforcast.config import (
-    BsPreforcastConfig,
-    BsPreforcastStageLoadedConfig,
-    load_bs_preforcast_stage1,
-    merge_stage_payload,
-    normalize_bs_preforcast_config,
-)
-from bs_preforcast.search_space import (
-    SUPPORTED_BS_PREFORCAST_MODELS,
-    rewrite_search_space_error,
-    stage_search_space_payload,
-)
+import bs_preforcast.config as bs_preforcast_config
+import bs_preforcast.search_space as bs_preforcast_search_space
 from .optuna_spaces import (
     BASELINE_MODEL_NAMES,
     DEFAULT_TRAINING_PARAMS,
@@ -94,6 +83,12 @@ FORBIDDEN_RESIDUAL_LAG_SOURCES = {
 }
 ResidualTargetMode = Literal["level", "delta"]
 RuntimeTransformationMode = Literal["diff"]
+
+BsPreforcastConfig = bs_preforcast_config.BsPreforcastConfig
+BsPreforcastStageLoadedConfig = bs_preforcast_config.BsPreforcastStageLoadedConfig
+SUPPORTED_BS_PREFORCAST_MODELS = (
+    bs_preforcast_search_space.SUPPORTED_BS_PREFORCAST_MODELS
+)
 
 
 @dataclass(frozen=True)
@@ -636,17 +631,6 @@ def _normalize_residual_feature_config(
         ),
     )
 
-
-def _normalize_bs_preforcast_config(value: Any) -> BsPreforcastConfig:
-    return normalize_bs_preforcast_config(
-        value,
-        unknown_keys=_unknown_keys,
-        coerce_bool=_coerce_bool,
-        coerce_optional_path_string=_coerce_optional_path_string,
-        coerce_name_tuple=_coerce_name_tuple,
-    )
-
-
 def resolve_config_path(
     repo_root: Path,
     config_path: str | Path | None = None,
@@ -1156,12 +1140,6 @@ def _resolve_jobs_reference(
     raise ValueError("jobs must be a list or a repo-relative yaml path string")
 
 
-def _bs_preforcast_stage_search_space(
-    search_space_payload: dict[str, Any] | None,
-) -> dict[str, Any] | None:
-    return stage_search_space_payload(search_space_payload)
-
-
 def _stage_payload_requests_search_space(
     repo_root: Path,
     *,
@@ -1185,35 +1163,6 @@ def _stage_payload_requests_search_space(
     return False
 
 
-def _rewrite_bs_preforcast_search_space_error(message: str) -> str:
-    return rewrite_search_space_error(message)
-
-
-def _merge_bs_preforcast_stage_payload(
-    stage_payload: dict[str, Any],
-    *,
-    multivariable: bool,
-) -> dict[str, Any]:
-    return merge_stage_payload(stage_payload, multivariable=multivariable)
-
-
-def _load_bs_preforcast_stage1(
-    repo_root: Path,
-    *,
-    source_path: Path,
-    source_type: str,
-    bs_preforcast: BsPreforcastConfig,
-    search_space_contract: SearchSpaceContract | None,
-) -> BsPreforcastStageLoadedConfig:
-    return load_bs_preforcast_stage1(
-        repo_root,
-        source_path=source_path,
-        source_type=source_type,
-        bs_preforcast=bs_preforcast,
-        search_space_contract=search_space_contract,
-    )
-
-
 def load_app_config(
     repo_root: Path,
     *,
@@ -1229,7 +1178,13 @@ def load_app_config(
     )
     raw_text = source_path.read_text(encoding="utf-8")
     payload = _load_document(source_path, source_type)
-    raw_bs_preforcast = _normalize_bs_preforcast_config(payload.get("bs_preforcast"))
+    raw_bs_preforcast = bs_preforcast_config.normalize_bs_preforcast_config(
+        payload.get("bs_preforcast"),
+        unknown_keys=_unknown_keys,
+        coerce_bool=_coerce_bool,
+        coerce_optional_path_string=_coerce_optional_path_string,
+        coerce_name_tuple=_coerce_name_tuple,
+    )
     stage_source_path: Path | None = None
     stage_payload_probe: dict[str, Any] | None = None
     if raw_bs_preforcast.enabled:
@@ -1335,7 +1290,7 @@ def load_app_config(
                 candidate = (repo_root / "search_space.yaml").resolve()
                 if candidate.exists():
                     stage_search_space_contract = load_search_space_contract(repo_root)
-            bs_preforcast_stage1 = _load_bs_preforcast_stage1(
+            bs_preforcast_stage1 = bs_preforcast_config.load_bs_preforcast_stage1(
                 repo_root,
                 source_path=source_path,
                 source_type=source_type,
