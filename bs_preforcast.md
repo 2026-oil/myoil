@@ -58,10 +58,8 @@ bs_preforcast:
   - 독립 `bs_preforcast` 설정 파일 경로입니다.
   - 권장값은 repo root의 `bs_preforcast.yaml`입니다.
 
-- `routing.univariable_config`, `routing.multivariable_config`
-  - 이전 방식과의 호환을 위한 legacy fallback입니다.
-  - 새 설정에서는 `config_path` 사용을 권장합니다.
-  - 현재 구현은 routing 사용 시 `DeprecationWarning`을 냅니다.
+- `config_path`만 지원합니다.
+  - 이전 `routing.univariable_config`, `routing.multivariable_config` 방식은 제거되었습니다.
 
 ---
 
@@ -148,7 +146,7 @@ multivariable:
 
 ---
 
-## 4. 실제 route 선택 규칙
+## 4. 독립 config 파일 내부 section 선택 규칙
 
 ### `task.multivariable: false`
 

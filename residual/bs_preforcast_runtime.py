@@ -71,6 +71,9 @@ def _stage_capability_payload(stage_loaded: LoadedConfig) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "bs_preforcast": {
             "enabled": True,
+            "config_path": stage_loaded.normalized_payload["bs_preforcast"].get(
+                "config_path"
+            ),
             "using_futr_exog": bool(
                 stage_loaded.normalized_payload["bs_preforcast"]["using_futr_exog"]
             ),
@@ -82,9 +85,10 @@ def _stage_capability_payload(stage_loaded: LoadedConfig) -> dict[str, Any]:
                     "multivariable"
                 ]
             ),
-            "selected_config_path": stage_loaded.normalized_payload["bs_preforcast"][
-                "routing"
-            ]["selected_config_path"],
+            "selected_config_path": stage_loaded.normalized_payload["bs_preforcast"].get(
+                "selected_config_path",
+                stage_loaded.normalized_payload["bs_preforcast"].get("config_path"),
+            ),
         }
     }
     for job in stage_loaded.config.jobs:

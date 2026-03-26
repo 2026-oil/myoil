@@ -107,21 +107,14 @@ def build_manifest(
         },
         'bs_preforcast': {
             'enabled': loaded.config.bs_preforcast.enabled,
+            'config_path': loaded.config.bs_preforcast.config_path,
             'using_futr_exog': loaded.config.bs_preforcast.using_futr_exog,
             'target_columns': list(loaded.config.bs_preforcast.target_columns),
             'multivariable': loaded.config.bs_preforcast.task.multivariable,
-            'routing': {
-                'univariable_config': loaded.config.bs_preforcast.routing.univariable_config,
-                'multivariable_config': loaded.config.bs_preforcast.routing.multivariable_config,
-                'selected_config_path': (
-                    loaded.normalized_payload.get('bs_preforcast', {})
-                    .get('routing', {})
-                    .get(
-                        'selected_config_path',
-                        loaded.config.bs_preforcast.routing.selected_config_path,
-                    )
-                ),
-            },
+            'selected_config_path': (
+                loaded.normalized_payload.get('bs_preforcast', {})
+                .get('selected_config_path', loaded.config.bs_preforcast.config_path)
+            ),
             'stage1': (
                 {
                     'source_path': str(loaded.bs_preforcast_stage1.source_path),
