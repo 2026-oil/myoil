@@ -13,18 +13,15 @@ from ..forecast_models import (
 )
 from .registry import (
     BACKEND_PLUGIN_CATEGORY,
-    BS_PREFORCAST_PLUGIN_CATEGORY,
     PLUGIN_EXTENSION_RULES,
     available_plugins,
     build_residual_plugin,
-    get_bs_preforcast_plugin,
     plugin_registry,
 )
 
 __all__ = [
     "BACKEND_PLUGIN_CATEGORY",
     "BASELINE_MODEL_NAMES",
-    "BS_PREFORCAST_PLUGIN_CATEGORY",
     "MODEL_CLASSES",
     "ModelCapabilities",
     "PLUGIN_EXTENSION_RULES",
@@ -32,7 +29,6 @@ __all__ = [
     "build_model",
     "build_residual_plugin",
     "capabilities_for",
-    "get_bs_preforcast_plugin",
     "plugin_registry",
     "resolve_loss",
     "resolved_devices",
