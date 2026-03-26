@@ -5,7 +5,6 @@ from typing import Any
 
 from residual.optuna_spaces import DEFAULT_RESIDUAL_PARAMS_BY_MODEL
 from residual.plugins_base import (
-    BsPreforcastPlugin,
     PluginDefinition,
     PluginRegistry,
     ResidualPlugin,
@@ -16,14 +15,11 @@ from .backends import (
     RandomForestResidualPlugin,
     XGBoostResidualPlugin,
 )
-from .bs_preforcast import DefaultBsPreforcastPlugin
 
 BACKEND_PLUGIN_CATEGORY = "backend"
-BS_PREFORCAST_PLUGIN_CATEGORY = "bs_preforcast"
 PLUGIN_EXTENSION_RULES = (
     "Add residual backends under residual/models/backends/ and register them here.",
-    "Add bs_preforcast implementations under residual/models/ and register them here.",
-    "Keep the plugin categories limited to backend and bs_preforcast for this modularization.",
+    "Residual registry is backend-only; bs_preforcast has its own top-level registry.",
 )
 
 _PLUGIN_REGISTRY = PluginRegistry(
@@ -45,12 +41,6 @@ _PLUGIN_REGISTRY = PluginRegistry(
             name="lightgbm",
             factory=LightGBMResidualPlugin,
             description="Residual correction backend implemented with lightgbm.",
-        ),
-        PluginDefinition(
-            category=BS_PREFORCAST_PLUGIN_CATEGORY,
-            name="default",
-            factory=DefaultBsPreforcastPlugin,
-            description="Bs-preforcast stage/materialization plugin.",
         ),
     )
 )
@@ -78,12 +68,3 @@ def build_residual_plugin(config: Any) -> ResidualPlugin:
         cpu_threads=(None if cpu_threads is None else int(cpu_threads)),
         **params,
     )
-
-
-def get_bs_preforcast_plugin(name: str = "default") -> BsPreforcastPlugin:
-    plugin = _PLUGIN_REGISTRY.create(BS_PREFORCAST_PLUGIN_CATEGORY, name)
-    if not isinstance(plugin, BsPreforcastPlugin):  # pragma: no cover - defensive
-        raise TypeError(
-            f"Registered bs_preforcast plugin {name!r} does not implement BsPreforcastPlugin"
-        )
-    return plugin

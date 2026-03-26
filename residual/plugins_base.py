@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import pandas as pd
 
@@ -33,54 +33,9 @@ class ResidualPlugin(ABC):
         raise NotImplementedError
 
 
-class BsPreforcastPlugin(ABC):
-    name: str
-
-    @abstractmethod
-    def resolve_injection_mode(
-        self,
-        loaded: Any,
-        *,
-        selected_jobs: Iterable[Any],
-    ) -> str:
-        raise NotImplementedError
-
-    @abstractmethod
-    def prepare_fold_inputs(
-        self,
-        loaded: Any,
-        job: Any,
-        train_df: pd.DataFrame,
-        future_df: pd.DataFrame,
-    ) -> tuple[Any, pd.DataFrame, pd.DataFrame, dict[str, Any]]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def materialize_stage(
-        self,
-        *,
-        loaded: Any,
-        selected_jobs: Iterable[Any],
-        run_root: Path,
-        main_resolved_path: Path,
-        main_capability_path: Path,
-        main_manifest_path: Path,
-        entrypoint_version: str,
-        validate_only: bool,
-    ) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    def load_stage_config(self, repo_root: Path, loaded: Any) -> Any:
-        raise NotImplementedError
-
-
-PluginCategory = Literal["backend", "bs_preforcast"]
-
-
 @dataclass(frozen=True)
 class PluginDefinition:
-    category: PluginCategory
+    category: str
     name: str
     factory: Callable[..., Any]
     description: str = ""
