@@ -19,10 +19,6 @@ from neuralforecast import NeuralForecast
 from optuna.trial import TrialState
 
 from .adapters import build_multivariate_inputs, build_univariate_inputs
-from .bs_preforcast_runtime import (
-    materialize_bs_preforcast_stage,
-    prepare_bs_preforcast_fold_inputs,
-)
 from .config import JobConfig, LoadedConfig, load_app_config
 from .features import build_residual_feature_frame, hist_exog_lag_feature_name
 from .manifest import (
@@ -31,7 +27,8 @@ from .manifest import (
     residual_feature_policy_payload,
     write_manifest,
 )
-from .models import BASELINE_MODEL_NAMES, build_model, validate_job
+from .forecast_models import BASELINE_MODEL_NAMES, build_model, validate_job
+from .models import build_residual_plugin, get_bs_preforcast_plugin
 from .optuna_spaces import (
     DEFAULT_RESIDUAL_PARAMS_BY_MODEL,
     DEFAULT_OPTUNA_STUDY_DIRECTION,
@@ -54,7 +51,6 @@ from .progress import (
     ModelProgressState,
     emit_progress_event,
 )
-from .registry import build_residual_plugin
 from .scheduler import (
     build_device_groups,
     build_launch_plan,
@@ -766,7 +762,7 @@ def _fit_and_predict_fold(
     train_df = source_df.iloc[train_idx].reset_index(drop=True)
     future_df = source_df.iloc[test_idx].reset_index(drop=True)
     if loaded.config.bs_preforcast.enabled:
-        effective_loaded, train_df, future_df, _ = prepare_bs_preforcast_fold_inputs(
+        effective_loaded, train_df, future_df, _ = get_bs_preforcast_plugin().prepare_fold_inputs(
             loaded,
             job,
             train_df,
@@ -3072,7 +3068,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     _validate_jobs(loaded, selected_jobs, paths["capability_path"])
     _validate_adapters(loaded, selected_jobs)
     if loaded.config.bs_preforcast.enabled:
-        materialize_bs_preforcast_stage(
+        get_bs_preforcast_plugin().materialize_stage(
             loaded=loaded,
             selected_jobs=selected_jobs,
             run_root=paths["run_root"],

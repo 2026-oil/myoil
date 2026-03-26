@@ -17,7 +17,7 @@ import numpy as np
 from .adapters import build_multivariate_inputs, build_univariate_inputs
 from .config import JobConfig, LoadedConfig
 from .manifest import build_manifest, write_manifest
-from .models import (
+from .forecast_models import (
     BASELINE_MODEL_NAMES,
     MODEL_CLASSES,
     build_model,
