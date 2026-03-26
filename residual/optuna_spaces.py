@@ -11,6 +11,12 @@ from typing import Any, Literal
 import optuna
 import yaml
 
+from bs_preforcast.search_space import (
+    BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY,
+    SUPPORTED_BS_PREFORCAST_MODELS,
+    normalize_bs_preforcast_sections,
+)
+
 SEARCH_SPACE_FILENAME = "search_space.yaml"
 BASELINE_MODEL_NAMES = {"Naive", "SeasonalNaive", "HistoricAverage"}
 EXCLUDED_AUTO_MODEL_NAMES = {"HINT"}
@@ -59,10 +65,6 @@ SUPPORTED_AUTO_MODEL_NAMES = {
     "RMoK",
     "XLinear",
 }
-SUPPORTED_BS_PREFORCAST_MODELS = (
-    set(SUPPORTED_AUTO_MODEL_NAMES)
-    | {"Naive", "xgboost", "lightgbm", "AutoARIMA", "ES"}
-)
 SUPPORTED_RESIDUAL_MODELS = {"xgboost", "randomforest", "lightgbm"}
 DEFAULT_OPTUNA_NUM_TRIALS = 20
 DEFAULT_OPTUNA_STUDY_DIRECTION = "minimize"
@@ -299,7 +301,6 @@ MODEL_PARAM_REGISTRY: dict[str, dict[str, SearchParamSpec]]
 TRAINING_PARAM_REGISTRY: dict[str, SearchParamSpec]
 TRAINING_PARAM_REGISTRY_BY_MODEL: dict[str, dict[str, SearchParamSpec]]
 RESIDUAL_PARAM_REGISTRY: dict[str, dict[str, SearchParamSpec]]
-BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY: dict[str, dict[str, SearchParamSpec]]
 
 
 def _coerce_legacy_param_name_list(value: Any, *, section: str, owner: str) -> tuple[str, ...]:
@@ -555,28 +556,11 @@ def normalize_search_space_payload(payload: dict[str, Any]) -> dict[str, Any]:
                 + ", ".join(overlaps)
             )
 
-    bs_preforcast_models = _normalize_model_section(
-        payload.get("bs_preforcast_models"),
-        section="bs_preforcast_models",
-        allowed_models=SUPPORTED_BS_PREFORCAST_MODELS,
+    bs_preforcast_models, bs_preforcast_training = normalize_bs_preforcast_sections(
+        payload,
+        normalize_model_section=_normalize_model_section,
+        normalize_training_section=_normalize_training_section,
     )
-    bs_preforcast_training = _normalize_training_section(
-        payload.get("bs_preforcast_training"),
-        section="bs_preforcast_training",
-        allowed_models=SUPPORTED_BS_PREFORCAST_MODELS,
-    )
-    if "learning_rate" in bs_preforcast_training["global"]:
-        overlaps = sorted(
-            model_name
-            for model_name, specs in bs_preforcast_models.items()
-            if "learning_rate" in specs
-            and model_name not in {"xgboost", "lightgbm", "AutoARIMA", "ES"}
-        )
-        if overlaps:
-            raise ValueError(
-                "search_space.bs_preforcast_training.global.learning_rate overlaps with model-level learning_rate selector(s): "
-                + ", ".join(overlaps)
-            )
 
     return {
         "models": models,
@@ -611,14 +595,6 @@ TRAINING_PARAM_REGISTRY_BY_MODEL = {
 RESIDUAL_PARAM_REGISTRY = {
     model_name: deepcopy(specs)
     for model_name, specs in _DEFAULT_CONTRACT.payload["residual"].items()
-}
-BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY = {
-    "AutoARIMA": {
-        "season_length": {"type": "categorical", "choices": [1, 4, 8, 12]},
-    },
-    "ES": {
-        "season_length": {"type": "categorical", "choices": [1, 4, 8, 12]},
-    },
 }
 
 

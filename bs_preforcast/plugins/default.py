@@ -6,18 +6,9 @@ from typing import Any, Iterable
 import pandas as pd
 
 from residual.config import JobConfig, LoadedConfig
-from residual.plugins_base import BsPreforcastPlugin
 
 
-class DefaultBsPreforcastPlugin(BsPreforcastPlugin):
-    """Default bs_preforcast plugin surface.
-
-    Extension rules:
-    - Keep bs_preforcast implementations under `residual/models/`.
-    - Register new implementations through `residual.models.registry`.
-    - Do not add a third plugin category without updating the modularization spec/tests.
-    """
-
+class DefaultBsPreforcastPlugin:
     name = "default"
 
     def resolve_injection_mode(
@@ -26,7 +17,7 @@ class DefaultBsPreforcastPlugin(BsPreforcastPlugin):
         *,
         selected_jobs: Iterable[Any],
     ) -> str:
-        from residual.bs_preforcast_runtime import resolve_bs_preforcast_injection_mode
+        from bs_preforcast.runtime import resolve_bs_preforcast_injection_mode
 
         return resolve_bs_preforcast_injection_mode(loaded, selected_jobs=selected_jobs)
 
@@ -36,10 +27,18 @@ class DefaultBsPreforcastPlugin(BsPreforcastPlugin):
         job: JobConfig,
         train_df: pd.DataFrame,
         future_df: pd.DataFrame,
-    ) -> tuple[LoadedConfig, pd.DataFrame, pd.DataFrame, dict[str, Any]]:
-        from residual.bs_preforcast_runtime import prepare_bs_preforcast_fold_inputs
+        *,
+        run_root: Path | None = None,
+    ) -> tuple[LoadedConfig, pd.DataFrame, pd.DataFrame, str]:
+        from bs_preforcast.runtime import prepare_bs_preforcast_fold_inputs
 
-        return prepare_bs_preforcast_fold_inputs(loaded, job, train_df, future_df)
+        return prepare_bs_preforcast_fold_inputs(
+            loaded,
+            job,
+            train_df,
+            future_df,
+            run_root=run_root,
+        )
 
     def materialize_stage(
         self,
@@ -53,7 +52,7 @@ class DefaultBsPreforcastPlugin(BsPreforcastPlugin):
         entrypoint_version: str,
         validate_only: bool,
     ) -> None:
-        from residual.bs_preforcast_runtime import materialize_bs_preforcast_stage
+        from bs_preforcast.runtime import materialize_bs_preforcast_stage
 
         materialize_bs_preforcast_stage(
             loaded=loaded,
@@ -70,7 +69,7 @@ class DefaultBsPreforcastPlugin(BsPreforcastPlugin):
         self,
         repo_root: Path,
         loaded: LoadedConfig,
-    ) -> LoadedConfig:
-        from residual.bs_preforcast_runtime import load_bs_preforcast_stage_config
+    ) -> LoadedConfig | None:
+        from bs_preforcast.runtime import load_bs_preforcast_stage_config
 
         return load_bs_preforcast_stage_config(repo_root, loaded)

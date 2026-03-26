@@ -14,10 +14,10 @@ import yaml
 from neuralforecast import NeuralForecast
 import numpy as np
 
-from .adapters import build_multivariate_inputs, build_univariate_inputs
-from .config import JobConfig, LoadedConfig
-from .manifest import build_manifest, write_manifest
-from .forecast_models import (
+from residual.adapters import build_multivariate_inputs, build_univariate_inputs
+from residual.config import JobConfig, LoadedConfig
+from residual.manifest import build_manifest, write_manifest
+from residual.forecast_models import (
     BASELINE_MODEL_NAMES,
     MODEL_CLASSES,
     build_model,
@@ -25,7 +25,11 @@ from .forecast_models import (
     resolved_strategy_name,
     validate_job,
 )
-from .optuna_spaces import optuna_num_trials, suggest_model_params, suggest_training_params
+from residual.optuna_spaces import (
+    optuna_num_trials,
+    suggest_model_params,
+    suggest_training_params,
+)
 
 
 def _repo_root() -> Path:

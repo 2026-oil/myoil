@@ -1,59 +1,13 @@
-from __future__ import annotations
-
-from dataclasses import replace
-from pathlib import Path
-
-from .config import (
-    BsPreforcastConfig,
-    LoadedConfig,
-    load_app_config,
+from bs_preforcast.config import (
+    is_bs_preforcast_enabled,
+    load_bs_preforcast_stage1_config,
+    resolve_bs_preforcast_route_path,
+    stage1_route_metadata,
 )
 
-
-def is_bs_preforcast_enabled(loaded: LoadedConfig) -> bool:
-    return bool(loaded.config.bs_preforcast.enabled)
-
-
-def resolve_bs_preforcast_route_path(
-    repo_root: Path,
-    bs_preforcast: BsPreforcastConfig,
-) -> Path:
-    selected = bs_preforcast.config_path
-    if not selected:
-        raise ValueError("bs_preforcast config_path did not resolve a selected config path")
-    route_path = Path(selected)
-    if not route_path.is_absolute():
-        route_path = (repo_root / route_path).resolve()
-    if not route_path.exists():
-        raise FileNotFoundError(f"bs_preforcast selected config not found: {route_path}")
-    return route_path
-
-
-def load_bs_preforcast_stage1_config(
-    repo_root: Path,
-    loaded: LoadedConfig,
-) -> LoadedConfig:
-    route_path = resolve_bs_preforcast_route_path(repo_root, loaded.config.bs_preforcast)
-    stage1_loaded = load_app_config(
-        repo_root,
-        config_path=route_path,
-        model_search_space_key="bs_preforcast_models",
-        training_search_space_key="bs_preforcast_training",
-    )
-    normalized = dict(stage1_loaded.normalized_payload)
-    normalized["bs_preforcast_parent_config_path"] = str(loaded.source_path.resolve())
-    normalized["bs_preforcast_target_columns"] = list(
-        loaded.config.bs_preforcast.target_columns
-    )
-    return replace(stage1_loaded, normalized_payload=normalized)
-
-
-def stage1_route_metadata(loaded: LoadedConfig) -> dict[str, object]:
-    return {
-        "enabled": loaded.config.bs_preforcast.enabled,
-        "config_path": loaded.config.bs_preforcast.config_path,
-        "using_futr_exog": loaded.config.bs_preforcast.using_futr_exog,
-        "target_columns": list(loaded.config.bs_preforcast.target_columns),
-        "multivariable": loaded.config.bs_preforcast.task.multivariable,
-        "selected_config_path": loaded.config.bs_preforcast.config_path,
-    }
+__all__ = [
+    "is_bs_preforcast_enabled",
+    "load_bs_preforcast_stage1_config",
+    "resolve_bs_preforcast_route_path",
+    "stage1_route_metadata",
+]
