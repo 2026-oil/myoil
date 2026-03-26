@@ -2551,6 +2551,35 @@ def _trajectory_frame(nf: NeuralForecast) -> pd.DataFrame:
     )
 
 
+def _loss_curve_series(
+    curve_frame: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    train_series = (
+        curve_frame[["global_step", "train_loss"]]
+        .dropna(subset=["train_loss"])
+        .reset_index(drop=True)
+    )
+    val_series = (
+        curve_frame[["global_step", "val_loss"]]
+        .dropna(subset=["val_loss"])
+        .reset_index(drop=True)
+    )
+    return train_series, val_series
+
+
+def _configure_loss_curve_axis(axis: Any, curve_frame: pd.DataFrame) -> None:
+    from matplotlib.ticker import LogFormatterMathtext, LogLocator
+
+    loss_values = curve_frame[["train_loss", "val_loss"]].to_numpy(dtype=float).ravel()
+    finite_positive = loss_values[np.isfinite(loss_values) & (loss_values > 0)]
+    if finite_positive.size == 0:
+        return
+
+    axis.set_yscale("log", base=10)
+    axis.yaxis.set_major_locator(LogLocator(base=10))
+    axis.yaxis.set_major_formatter(LogFormatterMathtext(base=10))
+
+
 def _write_loss_curve_artifact(
     run_root: Path,
     model_name: str,
@@ -2570,22 +2599,27 @@ def _write_loss_curve_artifact(
     fold_root = _learned_fold_artifact_dir(run_root, model_name, fold_idx)
     fold_root.mkdir(parents=True, exist_ok=True)
     figure_path = fold_root / "loss_curve.png"
+    train_series, val_series = _loss_curve_series(curve_frame)
     figure, axis = plt.subplots(figsize=(10, 5))
     axis.plot(
-        curve_frame["global_step"],
-        curve_frame["train_loss"],
+        train_series["global_step"],
+        train_series["train_loss"],
         label="train_loss",
         linewidth=1.8,
     )
     axis.plot(
-        curve_frame["global_step"],
-        curve_frame["val_loss"],
+        val_series["global_step"],
+        val_series["val_loss"],
         label="val_loss",
         linewidth=1.8,
+        marker="o",
+        markersize=3.5,
+        zorder=3,
     )
     axis.set_title(f"{model_name} fold {fold_idx:03d} loss curve")
     axis.set_xlabel("global_step")
     axis.set_ylabel("loss")
+    _configure_loss_curve_axis(axis, curve_frame)
     axis.legend(loc="best")
     figure.tight_layout()
     figure.savefig(figure_path, dpi=150)

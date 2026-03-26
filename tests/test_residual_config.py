@@ -8,6 +8,7 @@ import json
 from types import SimpleNamespace
 from typing import Any, TypedDict, cast
 
+import numpy as np
 import optuna
 import pandas as pd
 import pytest
@@ -2018,6 +2019,57 @@ def test_trajectory_frame_contains_train_and_val_series():
         {"global_step": 1, "train_loss": 0.9, "val_loss": 1.1},
         {"global_step": 2, "train_loss": 0.7, "val_loss": 0.8},
     ]
+
+
+def test_loss_curve_series_drop_sparse_validation_gaps():
+    from residual import runtime
+
+    curve_frame = pd.DataFrame(
+        [
+            {"global_step": 1, "train_loss": 10.0, "val_loss": 12.0},
+            {"global_step": 2, "train_loss": 8.0, "val_loss": np.nan},
+            {"global_step": 3, "train_loss": 6.0, "val_loss": np.nan},
+            {"global_step": 4, "train_loss": 4.0, "val_loss": 5.0},
+        ]
+    )
+
+    train_series, val_series = runtime._loss_curve_series(curve_frame)
+
+    assert train_series.to_dict(orient="records") == [
+        {"global_step": 1, "train_loss": 10.0},
+        {"global_step": 2, "train_loss": 8.0},
+        {"global_step": 3, "train_loss": 6.0},
+        {"global_step": 4, "train_loss": 4.0},
+    ]
+    assert val_series.to_dict(orient="records") == [
+        {"global_step": 1, "val_loss": 12.0},
+        {"global_step": 4, "val_loss": 5.0},
+    ]
+
+
+def test_configure_loss_curve_axis_uses_log_base10_ticks():
+    from residual import runtime
+
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import LogFormatterMathtext, LogLocator
+
+    curve_frame = pd.DataFrame(
+        [
+            {"global_step": 1, "train_loss": 100.0, "val_loss": 120.0},
+            {"global_step": 2, "train_loss": 10.0, "val_loss": np.nan},
+            {"global_step": 3, "train_loss": 1.0, "val_loss": 5.0},
+        ]
+    )
+
+    figure, axis = plt.subplots()
+    runtime._configure_loss_curve_axis(axis, curve_frame)
+
+    assert axis.get_yscale() == "log"
+    assert isinstance(axis.yaxis.get_major_locator(), LogLocator)
+    assert isinstance(axis.yaxis.get_major_formatter(), LogFormatterMathtext)
+    plt.close(figure)
 
 
 def test_build_tscv_splits_uses_configured_step_size(tmp_path: Path):
