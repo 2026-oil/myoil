@@ -782,7 +782,13 @@ def _normalize_payload(
 
     scheduler = dict(payload.get("scheduler", {}))
     residual = dict(payload.get("residual", {}))
-    bs_preforcast = _normalize_bs_preforcast_config(payload.get("bs_preforcast"))
+    bs_preforcast = bs_preforcast_config.normalize_bs_preforcast_config(
+        payload.get("bs_preforcast"),
+        unknown_keys=_unknown_keys,
+        coerce_bool=_coerce_bool,
+        coerce_optional_path_string=_coerce_optional_path_string,
+        coerce_name_tuple=_coerce_name_tuple,
+    )
 
     target_col = str(dataset.get("target_col", "")).strip()
     if not target_col:
