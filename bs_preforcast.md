@@ -1,32 +1,31 @@
 # bs_preforcast
 
-이 문서는 현재 저장소에서 구현된 `bs_preforcast` 설정과 실제 동작 방식을 설명합니다.
+이 문서는 현재 저장소에서 구현된 `bs_preforcast` 설정과 동작 방식을 설명합니다.
 
-> 주의: 이름은 현재 코드/설정과 동일하게 `bs_preforcast`로 유지합니다.
+> 이름은 코드/설정과 동일하게 `bs_preforcast`로 유지합니다.
 
 ---
 
 ## 1. 목적
 
-`bs_preforcast`는 **main 예측 전에 별도 stage1을 먼저 실행**해서, 지정한 `bs_*` 계열 컬럼을 horizon 기준으로 예측한 뒤 그 결과를 main stage 입력에 주입하는 기능입니다.
+`bs_preforcast`는 **main 예측 전에 별도 stage1을 먼저 실행**해서, 지정한 `bs_*` 계열 컬럼을 먼저 예측한 뒤 그 결과를 main stage 입력에 주입하는 기능입니다.
 
-현재 목적은 다음과 같습니다.
+주요 목적:
 
-- `bs_*` 컬럼을 main 모델이 직접 원본 값만 보지 않게 하기
-- stage1 결과를 main stage에 연결하기
-- uni / multi route를 별도 YAML로 관리하기
-- stage1도 별도 artifact / provenance / search-space를 가지게 하기
+- `bs_*` 계열 입력을 main stage 앞단에서 별도 모델로 예측
+- 예측 결과를 main stage에 연결
+- stage1을 독립 설정 파일로 관리
+- stage1 전용 artifact / provenance / search-space 유지
 
 ---
 
-## 2. 메인 config에서 쓰는 설정
+## 2. 메인 YAML에서 쓰는 설정
 
-메인 YAML에 아래 top-level block을 둡니다.
+메인 YAML에서는 아래 top-level block만 두면 됩니다.
 
 ```yaml
 bs_preforcast:
   enabled: true
-  config_path: bs_preforcast.yaml
   using_futr_exog: true
   target_columns:
     - bs_a
@@ -38,36 +37,58 @@ bs_preforcast:
 ### 필드 설명
 
 - `enabled`
-  - `true`면 stage1을 활성화합니다.
-  - `false`면 기존 main 실행만 수행합니다.
+  - `true`면 stage1 활성화
+  - `false`면 기존 main stage만 실행
 
 - `using_futr_exog`
-  - `true`면 **가능할 때** main 모델의 `futr_exog` 입력면을 사용합니다.
-  - `false`면 `lag_derived` 경로를 사용합니다.
+  - `true`면 가능한 경우 `futr_exog` 경로 사용
+  - `false`면 `lag_derived` 경로 사용
 
 - `target_columns`
-  - stage1이 예측할 대상 컬럼 목록입니다.
-  - **자동 탐색하지 않습니다.**
-  - main YAML이 이 목록의 **최종 소유자**입니다.
+  - stage1이 예측할 대상 컬럼 목록
+  - 자동 탐색하지 않음
+  - **main YAML이 이 목록의 최종 소유자**
 
 - `task.multivariable`
-  - `false`: `target_columns`의 각 컬럼을 **독립 단변량 stage1 실행**
-  - `true`: `target_columns` 전체를 **공동 다변량 stage1 실행**
+  - `false`: 각 target을 **독립 단변량 stage1 실행**
+  - `true`: 전체 target을 **공동 다변량 stage1 실행**
 
-- `config_path`
-  - 독립 `bs_preforcast` 설정 파일 경로입니다.
-  - 권장값은 repo root의 `bs_preforcast.yaml`입니다.
+### `config_path`에 대해
 
-- `config_path`만 지원합니다.
-  - 이전 `routing.univariable_config`, `routing.multivariable_config` 방식은 제거되었습니다.
+현재 구현은 `config_path`를 **생략하면 기본값으로 repo root의 `bs_preforcast.yaml`**을 사용합니다.
+
+즉 보통은 메인 YAML에 `config_path`를 따로 쓸 필요가 없습니다.
+
+다른 파일을 쓰고 싶을 때만 명시합니다.
+
+예:
+
+```yaml
+bs_preforcast:
+  enabled: true
+  config_path: custom_bs_preforcast.yaml
+  using_futr_exog: true
+  target_columns:
+    - bs_a
+```
+
+### 제거된 방식
+
+이전 `routing.univariable_config`, `routing.multivariable_config` 방식은 제거되었습니다.
 
 ---
 
-## 3. 독립 `bs_preforcast.yaml`의 역할
+## 3. 독립 파일 `bs_preforcast.yaml`
 
-권장 방식은 repo root의 `bs_preforcast.yaml`처럼 **독립 파일**을 두는 것입니다.
+권장 방식은 repo root의 `bs_preforcast.yaml`를 두는 것입니다.
 
-메인 YAML은 `config_path`로 이 파일을 가리키고, stage1 실행은 이 파일 안의 `common + (univariable|multivariable)` section merge 결과를 사용합니다.
+메인 YAML은 이 파일을 자동으로 읽고, stage1 실행 시 이 파일 안의
+
+- `common`
+- `univariable`
+- `multivariable`
+
+section을 merge해서 사용합니다.
 
 예:
 
@@ -82,10 +103,15 @@ common:
   runtime:
     random_seed: 1
   training:
+    train_protocol: expanding_window_tscv
     input_size: 64
     season_length: 52
     batch_size: 32
+    valid_batch_size: 64
+    windows_batch_size: 1024
+    inference_windows_batch_size: 1024
     learning_rate: 0.001
+    model_step_size: 8
     max_steps: 200
     val_size: 8
     val_check_steps: 50
@@ -127,7 +153,7 @@ multivariable:
       params: {}
 ```
 
-### 독립 `bs_preforcast.yaml`이 소유하는 것
+### 독립 파일이 소유하는 것
 
 - `dataset`
 - `runtime`
@@ -136,43 +162,44 @@ multivariable:
 - `scheduler`
 - `jobs`
 
-### 독립 `bs_preforcast.yaml`이 소유하지 않는 것
+### 독립 파일이 소유하지 않는 것
 
 - `bs_preforcast.target_columns`
 
-즉, `bs_preforcast.yaml`은 stage1 실행 설정만 정의하고, **실제 어떤 `bs_*` 컬럼을 돌릴지는 main YAML이 결정**합니다.
+즉 실제 어떤 `bs_*` 컬럼을 돌릴지는 항상 main YAML이 결정합니다.
 
-또한 독립 config 파일 안에 다시 top-level `bs_preforcast:` block을 넣으면 오류가 납니다.
+또한 `bs_preforcast.yaml` 안에 다시 top-level `bs_preforcast:` block을 넣으면 오류가 납니다.
 
 ---
 
-## 4. 독립 config 파일 내부 section 선택 규칙
+## 4. section 선택 규칙
 
 ### `task.multivariable: false`
 
-- `config_path`로 지정한 독립 파일에서 `univariable` section을 선택
-- `target_columns` 각각에 대해
-  - temp config 생성
-  - 개별 stage run 수행
+- `common + univariable`를 merge
+- `target_columns` 각각에 대해 개별 stage run 수행
 
-즉:
+예:
 
-- `bs_a`
-- `bs_b`
+```yaml
+target_columns:
+  - bs_a
+  - bs_b
+```
 
-두 개가 있으면 stage1 run도 2개 생깁니다.
+이면 stage1 run은 2개 생깁니다.
 
 ### `task.multivariable: true`
 
-- `config_path`로 지정한 독립 파일에서 `multivariable` section을 선택
-- `target_columns` 전체를 하나의 stage run으로 처리합니다.
+- `common + multivariable`를 merge
+- `target_columns` 전체를 하나의 stage run으로 처리
 
-이때 stage payload에서는:
+이때 내부 stage payload는:
 
-- 첫 번째 컬럼이 `dataset.target_col`
-- 나머지가 `dataset.hist_exog_cols`
+- 첫 번째 target → `dataset.target_col`
+- 나머지 target → `dataset.hist_exog_cols`
 
-형태로 변환됩니다.
+로 구성됩니다.
 
 ---
 
@@ -189,25 +216,25 @@ multivariable:
 
 동작:
 
-- `bs_preforcast_futr__<column>` 형태의 새 컬럼 생성
-- 이 컬럼을 `futr_exog_cols`로 주입
+- `bs_preforcast_futr__<column>` 컬럼 생성
+- 이를 `futr_exog_cols`로 주입
 
 예:
 
-- `bs_a` → `bs_preforcast_futr__bs_a`
+- `bs_a` -> `bs_preforcast_futr__bs_a`
 
 ### B. `lag_derived`
 
 조건:
 
 - `using_futr_exog: false`
-- 또는 main 모델이 `futr_exog`를 지원하지 않음
+- 또는 main 모델이 `futr_exog` 미지원
 
 동작:
 
 - stage1 예측값을 새 컬럼으로 생성
 - 이 컬럼을 `hist_exog_cols` 쪽으로 붙임
-- 즉 main 모델은 이 값을 future exog가 아니라 **lag/history feature처럼** 보게 됩니다
+- 즉 main 모델은 이를 future exog가 아니라 **lag/history feature처럼** 보게 됨
 
 현재 컬럼 이름은 futr 경로와 동일하게:
 
@@ -224,7 +251,7 @@ multivariable:
 
 ## 6. stage1 모델 후보군
 
-현재 `SUPPORTED_BS_PREFORCAST_MODELS`에는 다음 범주가 포함됩니다.
+현재 `SUPPORTED_BS_PREFORCAST_MODELS` 범위:
 
 ### 통계
 
@@ -242,19 +269,19 @@ multivariable:
 - `TSMixerx`
 - `TimeXer`
 - `TFT`
-- 기타 `SUPPORTED_AUTO_MODEL_NAMES`에 포함된 NF 모델들
+- 기타 `SUPPORTED_AUTO_MODEL_NAMES`에 포함된 NF 모델
 
 ### 주의
 
-- stage1 actual execution에서는 **baseline-only job (`Naive`, `SeasonalNaive`, `HistoricAverage`)는 지원하지 않습니다.**
-- statistical / tree model은 direct-run fallback 경로를 탑니다.
-- NF-native 모델은 기존 `main.py` runtime subprocess 경로를 재사용합니다.
+- baseline-only job (`Naive`, `SeasonalNaive`, `HistoricAverage`)는 stage1 actual execution에서 지원하지 않음
+- statistical / tree model은 direct-run fallback 경로
+- NF-native 모델은 기존 `main.py` runtime subprocess 경로 재사용
 
 ---
 
 ## 7. stage1 search-space
 
-repo root `search_space.yaml`에 아래 두 section이 추가되었습니다.
+repo root `search_space.yaml`에 아래 section이 추가됩니다.
 
 ```yaml
 bs_preforcast_models:
@@ -272,34 +299,32 @@ bs_preforcast_training:
 
 ### 규칙
 
-- stage1 auto mode는 `bs_preforcast_models` / `bs_preforcast_training`만 봅니다.
-- main `models` / `training` section과 분리되어 있습니다.
-- route YAML의 `jobs[*].params`가 비어 있으면 stage1 auto mode가 됩니다.
-- tuned params는 **run artifact에만 기록**되고 source YAML은 rewrite하지 않습니다.
+- stage1 auto mode는 `bs_preforcast_models` / `bs_preforcast_training`만 참조
+- main `models` / `training` section과 분리
+- stage1 `jobs[*].params`가 비어 있으면 auto mode
+- tuned params는 run artifact에만 저장되고 source YAML은 rewrite하지 않음
 
 ---
 
 ## 8. `AutoARIMA`, `ES` 파라미터
 
-현재 statistical stage model은 stage 전용 selector인 `stage_season_length`를 지원합니다.
+현재 statistical stage model은 `season_length` selector를 지원합니다.
 
 예:
 
 ```yaml
 bs_preforcast_models:
   AutoARIMA:
-    stage_season_length:
+    season_length:
       type: categorical
       choices: [1, 4, 8, 12]
   ES:
-    stage_season_length:
+    season_length:
       type: categorical
       choices: [1, 4, 8, 12]
 ```
 
-실행 시에는 이 selector가 stage predictor 쪽 `season_length`로 매핑됩니다.
-즉 search-space 이름은 main/runtime training knob와 충돌하지 않도록 분리되고,
-실제 statistical model 실행 시점에만 `season_length`로 해석됩니다.
+실행 시 이 값은 direct predictor의 `season_length`로 사용됩니다.
 
 ---
 
@@ -324,35 +349,36 @@ runs/<task>/bs_preforcast/
     <target-or-multivariable>/
 ```
 
-main artifact에도 아래 정보가 기록됩니다.
+main artifact에는 아래가 기록됩니다.
 
-- selected route path
+- `config_path`
+- selected stage config path
 - injection mode (`futr_exog` / `lag_derived`)
 - target columns
 - stage1 artifact paths
 - stage1 run roots
-- stage1 best params artifact 소비 경로
+- stage1 best params 소비 경로
 
 ---
 
 ## 10. validate-only 동작
 
-`--validate-only`일 때도 아래는 확인/기록됩니다.
+`--validate-only`일 때도 아래를 확인/기록합니다.
 
 - main `bs_preforcast` config normalize
-- route YAML 존재 여부
+- `bs_preforcast.yaml` 존재 여부
 - stage1 config normalize
 - stage1 dedicated search-space
 - main/stage1 provenance
 - dashboard / forecast artifact 경로
 
-즉 실제 full training 없이도 구조 검증이 가능합니다.
+즉 full training 없이도 구조 검증이 가능합니다.
 
 ---
 
-## 11. direct stage variant의 fail-fast 규칙
+## 11. direct stage variant fail-fast 규칙
 
-`bs_preforcast` direct stage variant는
+direct stage variant는
 
 - 데이터 길이 `<= horizon`
 
@@ -375,10 +401,12 @@ bs_preforcast stage direct run needs more than horizon rows
 
 ## 12. dependency
 
-stage statistical model 지원을 위해 다음 dependency가 추가되었습니다.
+stage statistical model 지원을 위해:
 
 - `statsforecast`
 - `statsmodels`
+
+를 사용합니다.
 
 또한 stage ML model을 위해:
 
@@ -411,7 +439,7 @@ uv run python main.py --config path/to/main.yaml --jobs DLinear --output-root ru
 
 ### 기대 효과
 
-- stage1 route 실행
+- stage1 실행
 - stage1 artifact 생성
 - main stage에 futr 또는 lag-derived 형태로 주입
 
@@ -420,26 +448,10 @@ uv run python main.py --config path/to/main.yaml --jobs DLinear --output-root ru
 ## 14. 현재 구현 기준 요약
 
 - `bs_preforcast`는 main 앞단 stage1
-- route YAML은 stage1 실행 설정
+- `bs_preforcast.yaml` 독립 파일 기반
 - main YAML이 `target_columns`를 소유
 - `futr_exog` 지원 모델이면 future exog 주입
 - 그렇지 않으면 lag/history 쪽으로 주입
 - statistical / tree / NF-native stage model 모두 지원 경로 존재
 - learned-auto stage job은 materialized `best_params.json`을 fold-time injection에서 재사용
 - 짧은 데이터 + 큰 horizon direct stage는 fail-fast
-
-## 15. 현재 남아 있는 제한
-
-현재 구현 기준으로는 다음이 남아 있습니다.
-
-- `AutoARIMA` / `ES`의 **learned_auto non-validate runtime path**는 validate-only/selector 수준보다 더 넓은 실증이 아직 부족합니다.
-
-즉,
-
-- config normalization
-- validate-only artifact 생성
-- fold-time `best_params.json` 소비
-
-까지는 검증되어 있지만,
-
-- full non-validate 장기 실행 경로는 후속 검증 여지가 있습니다.

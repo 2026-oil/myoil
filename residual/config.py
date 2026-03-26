@@ -703,13 +703,11 @@ def _normalize_bs_preforcast_config(value: Any) -> BsPreforcastConfig:
         default=False,
     )
     if enabled:
+        if config_path is None:
+            config_path = "bs_preforcast.yaml"
         if not target_columns:
             raise ValueError(
                 "bs_preforcast.target_columns must be non-empty when bs_preforcast.enabled is true"
-            )
-        if config_path is None:
-            raise ValueError(
-                "bs_preforcast.config_path is required when bs_preforcast.enabled is true"
             )
     return BsPreforcastConfig(
         enabled=enabled,

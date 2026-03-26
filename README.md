@@ -151,7 +151,6 @@ top-level section:
 ```yaml
 bs_preforcast:
   enabled: true
-  config_path: bs_preforcast.yaml
   using_futr_exog: true
   target_columns:
     - bs_a

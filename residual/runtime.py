@@ -583,14 +583,23 @@ def _should_use_multivariate(loaded: LoadedConfig, job: JobConfig) -> bool:
 def _validate_adapters(loaded: LoadedConfig, selected_jobs) -> None:
     source_df = pd.read_csv(loaded.config.dataset.path)
     dt_col = loaded.config.dataset.dt_col
+    future_df = source_df if loaded.config.dataset.futr_exog_cols else None
     for job in selected_jobs:
         if _should_use_multivariate(loaded, job):
             build_multivariate_inputs(
-                source_df, job, dataset=loaded.config.dataset, dt_col=dt_col
+                source_df,
+                job,
+                dataset=loaded.config.dataset,
+                dt_col=dt_col,
+                future_df=future_df,
             )
         else:
             build_univariate_inputs(
-                source_df, job, dataset=loaded.config.dataset, dt_col=dt_col
+                source_df,
+                job,
+                dataset=loaded.config.dataset,
+                dt_col=dt_col,
+                future_df=future_df,
             )
 
 def _resolve_freq(loaded: LoadedConfig, source_df: pd.DataFrame) -> str:
