@@ -1,1 +1,5 @@
-from bs_preforcast.runtime import *  # noqa: F401,F403
+import sys
+
+from bs_preforcast import runtime as _runtime
+
+sys.modules[__name__] = _runtime

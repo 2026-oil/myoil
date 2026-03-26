@@ -1160,6 +1160,16 @@ def _main_job_objective(
                     fold_idx, total_folds=len(splits), phase=phase
                 )
             try:
+                fit_kwargs: dict[str, Any] = {
+                    "source_df": source_df,
+                    "freq": freq,
+                    "train_idx": train_idx,
+                    "test_idx": test_idx,
+                    "params_override": candidate_params,
+                    "training_override": candidate_training_params,
+                }
+                if loaded.config.bs_preforcast.enabled:
+                    fit_kwargs["run_root"] = None
                 (
                     target_predictions,
                     target_actuals,
@@ -1169,13 +1179,7 @@ def _main_job_objective(
                 ) = _fit_and_predict_fold(
                     loaded,
                     job,
-                    run_root=None,
-                    source_df=source_df,
-                    freq=freq,
-                    train_idx=train_idx,
-                    test_idx=test_idx,
-                    params_override=candidate_params,
-                    training_override=candidate_training_params,
+                    **fit_kwargs,
                 )
                 if candidate_residual_params is None:
                     metric = _compute_metrics(
@@ -2834,16 +2838,20 @@ def _run_single_job(
         for fold_idx, (train_idx, test_idx) in enumerate(splits):
             progress.fold_started(fold_idx, total_folds=len(splits), phase="replay")
             try:
+                fit_kwargs: dict[str, Any] = {
+                    "source_df": source_df,
+                    "freq": freq,
+                    "train_idx": train_idx,
+                    "test_idx": test_idx,
+                    "training_override": effective_training_params,
+                }
+                if loaded.config.bs_preforcast.enabled:
+                    fit_kwargs["run_root"] = run_root
                 target_predictions, target_actuals, train_end_ds, train_df, nf = (
                     _fit_and_predict_fold(
                         loaded,
                         effective_job,
-                        run_root=run_root,
-                        source_df=source_df,
-                        freq=freq,
-                        train_idx=train_idx,
-                        test_idx=test_idx,
-                        training_override=effective_training_params,
+                        **fit_kwargs,
                     )
                 )
             except Exception as exc:
