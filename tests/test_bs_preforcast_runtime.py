@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from pathlib import Path
 
 import bs_preforcast.runtime as bs_runtime
+import pytest
 import residual.runtime as residual_runtime
 
 
@@ -89,3 +90,63 @@ def test_run_stage_variants_marks_output_root_as_internal(
     env = captured["env"]
     assert isinstance(env, dict)
     assert env[bs_runtime._ALLOW_INTERNAL_OUTPUT_ROOT_ENV] == "1"
+
+
+def test_materialize_stage_fails_before_stage_side_effects_for_unsupported_futr_exog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+    loaded = SimpleNamespace(
+        config=SimpleNamespace(bs_preforcast=SimpleNamespace(enabled=True)),
+        normalized_payload={},
+    )
+    stage_loaded = SimpleNamespace(normalized_payload={"demo": True})
+
+    monkeypatch.setattr(
+        bs_runtime,
+        "load_bs_preforcast_stage_config",
+        lambda *_args, **_kwargs: stage_loaded,
+    )
+
+    def fail_fast(*_args, **_kwargs):
+        raise ValueError("unsupported futr_exog main job")
+
+    monkeypatch.setattr(
+        bs_runtime,
+        "resolve_bs_preforcast_injection_mode",
+        fail_fast,
+    )
+    monkeypatch.setattr(
+        bs_runtime,
+        "_write_json",
+        lambda *_args, **_kwargs: calls.append("write_json"),
+    )
+    monkeypatch.setattr(
+        bs_runtime,
+        "write_manifest",
+        lambda *_args, **_kwargs: calls.append("write_manifest"),
+    )
+    monkeypatch.setattr(
+        bs_runtime,
+        "_run_stage_variants",
+        lambda *_args, **_kwargs: calls.append("run_stage_variants"),
+    )
+    monkeypatch.setattr(
+        bs_runtime,
+        "attach_bs_preforcast_stage_metadata",
+        lambda *_args, **_kwargs: calls.append("attach_metadata"),
+    )
+
+    with pytest.raises(ValueError, match="unsupported futr_exog main job"):
+        bs_runtime.materialize_bs_preforcast_stage(
+            loaded=loaded,
+            selected_jobs=[SimpleNamespace(model="Naive")],
+            run_root=tmp_path / "run-root",
+            main_resolved_path=tmp_path / "main.resolved.json",
+            main_capability_path=tmp_path / "main.capability.json",
+            main_manifest_path=tmp_path / "main.manifest.json",
+            entrypoint_version="test",
+            validate_only=False,
+        )
+
+    assert calls == []

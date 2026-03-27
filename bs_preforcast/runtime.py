@@ -1144,6 +1144,10 @@ def materialize_bs_preforcast_stage(
     stage_loaded = load_bs_preforcast_stage_config(_repo_root(), loaded)
     if stage_loaded is None:
         return {}
+    injection_mode = resolve_bs_preforcast_injection_mode(
+        loaded,
+        selected_jobs=selected_jobs,
+    )
 
     stage_root = _stage_root(run_root)
     resolved_path = stage_root / "config" / "config.resolved.json"
@@ -1173,6 +1177,7 @@ def materialize_bs_preforcast_stage(
         validate_only=validate_only,
         stage_loaded=stage_loaded,
         stage_run_roots=stage_run_roots,
+        injection_mode=injection_mode,
     )
     metadata.update(
         {
@@ -1241,13 +1246,14 @@ def attach_bs_preforcast_stage_metadata(
     validate_only: bool,
     stage_loaded: LoadedConfig | None = None,
     stage_run_roots: list[Path] | None = None,
+    injection_mode: str | None = None,
 ) -> dict[str, Any]:
     if not loaded.config.bs_preforcast.enabled:
         return {}
     stage_loaded = stage_loaded or load_bs_preforcast_stage_config(_repo_root(), loaded)
     if stage_loaded is None:
         return {}
-    injection_mode = resolve_bs_preforcast_injection_mode(
+    injection_mode = injection_mode or resolve_bs_preforcast_injection_mode(
         loaded,
         selected_jobs=selected_jobs,
     )
