@@ -294,6 +294,32 @@ def _payload() -> dict:
     }
 
 
+def _main_bs_preforcast(
+    *,
+    enabled: bool = True,
+    config_path: str | None = "bs_preforcast.yaml",
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {"enabled": enabled}
+    if config_path is not None:
+        payload["config_path"] = config_path
+    return payload
+
+
+def _linked_bs_preforcast(
+    *,
+    using_futr_exog: bool = False,
+    target_columns: tuple[str, ...] = ("bs_a",),
+    multivariable: bool = False,
+) -> dict[str, Any]:
+    return {
+        "bs_preforcast": {
+            "using_futr_exog": using_futr_exog,
+            "target_columns": list(target_columns),
+            "task": {"multivariable": multivariable},
+        }
+    }
+
+
 def _residual_defaults_map() -> dict[str, dict[str, Any]]:
     from residual import optuna_spaces as residual_spaces
 
@@ -3492,13 +3518,7 @@ def test_load_app_config_marks_auto_requested_and_validated_modes(tmp_path: Path
 def test_load_app_config_normalizes_bs_preforcast_selection(tmp_path: Path):
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "config_path": "bs_preforcast.yaml",
-        "using_futr_exog": True,
-        "target_columns": ["bs_a", "bs_b"],
-        "task": {"multivariable": True},
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a,bs_b\n"
         "2020-01-01,1,2,10,20\n"
@@ -3509,6 +3529,11 @@ def test_load_app_config_normalizes_bs_preforcast_selection(tmp_path: Path):
     (tmp_path / "bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             {
+                **_linked_bs_preforcast(
+                    using_futr_exog=True,
+                    target_columns=("bs_a", "bs_b"),
+                    multivariable=True,
+                ),
                 "common": {
                     "dataset": {
                         "path": "data.csv",
@@ -3581,12 +3606,7 @@ def test_load_app_config_defaults_bs_preforcast_config_path_when_enabled(
 ):
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "using_futr_exog": True,
-        "target_columns": ["bs_a", "bs_b"],
-        "task": {"multivariable": False},
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a,bs_b\n"
         "2020-01-01,1,2,10,20\n"
@@ -3595,6 +3615,11 @@ def test_load_app_config_defaults_bs_preforcast_config_path_when_enabled(
         encoding="utf-8",
     )
     bs_preforcast_payload = {
+        **_linked_bs_preforcast(
+            using_futr_exog=True,
+            target_columns=("bs_a", "bs_b"),
+            multivariable=False,
+        ),
         "common": {
             "dataset": {
                 "path": "data.csv",
@@ -3670,13 +3695,7 @@ def test_load_app_config_accepts_independent_bs_preforcast_config_path(
 ):
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "config_path": "bs_preforcast.yaml",
-        "using_futr_exog": True,
-        "target_columns": ["bs_a", "bs_b"],
-        "task": {"multivariable": True},
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a,bs_b\n"
         "2020-01-01,1,2,10,20\n"
@@ -3685,6 +3704,11 @@ def test_load_app_config_accepts_independent_bs_preforcast_config_path(
         encoding="utf-8",
     )
     bs_preforcast_payload = {
+        **_linked_bs_preforcast(
+            using_futr_exog=True,
+            target_columns=("bs_a", "bs_b"),
+            multivariable=True,
+        ),
         "common": {
             "dataset": {
                 "path": "data.csv",
@@ -3764,9 +3788,6 @@ def test_load_app_config_rejects_legacy_bs_preforcast_routing_keys(
     payload["bs_preforcast"] = {
         "enabled": True,
         "config_path": "bs_preforcast.yaml",
-        "using_futr_exog": False,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
         "routing": {
             "univariable_config": "yaml/legacy-univariable.yaml",
             "multivariable_config": "yaml/legacy-multivariable.yaml",
@@ -3785,7 +3806,8 @@ def test_load_app_config_rejects_legacy_bs_preforcast_routing_keys(
             tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
         )
 
-def test_load_app_config_rejects_bs_preforcast_without_target_columns_with_route_config(
+
+def test_load_app_config_rejects_inline_bs_preforcast_owner_fields(
     tmp_path: Path,
 ):
     payload = _payload()
@@ -3793,42 +3815,80 @@ def test_load_app_config_rejects_bs_preforcast_without_target_columns_with_route
     payload["bs_preforcast"] = {
         "enabled": True,
         "config_path": "bs_preforcast.yaml",
-        "using_futr_exog": False,
-        "target_columns": [],
+        "using_futr_exog": True,
+        "target_columns": ["bs_a"],
+        "task": {"multivariable": False},
     }
     (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
-        encoding="utf-8",
-    )
-    (tmp_path / "bs_preforcast.yaml").write_text(
-        yaml.safe_dump({"common": {}, "univariable": {}}, sort_keys=False),
-        encoding="utf-8",
-    )
-
-    with pytest.raises(ValueError, match="bs_preforcast.target_columns must be non-empty"):
-        load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
-
-def test_load_app_config_rejects_bs_preforcast_without_target_columns(tmp_path: Path):
-    payload = _payload()
-    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "using_futr_exog": False,
-        "target_columns": [],
-        "config_path": "bs_preforcast.yaml",
-    }
-    (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
-        encoding="utf-8",
-    )
-    (tmp_path / "bs_preforcast.yaml").write_text(
-        yaml.safe_dump({"common": {}, "univariable": {}}, sort_keys=False),
+        "dt,target,hist_a,bs_a\n"
+        "2020-01-01,1,2,10\n"
+        "2020-01-08,2,3,11\n",
         encoding="utf-8",
     )
 
     with pytest.raises(
         ValueError,
-        match="bs_preforcast.target_columns must be non-empty",
+        match=r"unsupported key\(s\): target_columns, task, using_futr_exog",
+    ):
+        load_app_config(
+            tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+        )
+
+def test_load_app_config_rejects_routed_bs_preforcast_without_target_columns(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    payload["bs_preforcast"] = _main_bs_preforcast()
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "bs_preforcast.yaml").write_text(
+        yaml.safe_dump(
+            {
+                **_linked_bs_preforcast(target_columns=()),
+                "common": {},
+                "univariable": {},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError, match="bs_preforcast.target_columns must be non-empty in routed"
+    ):
+        load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+
+def test_load_app_config_rejects_routed_bs_preforcast_without_owner_block(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    payload["bs_preforcast"] = _main_bs_preforcast()
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "bs_preforcast.yaml").write_text(
+        yaml.safe_dump({"common": {}, "univariable": {}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+            "bs_preforcast_models": {},
+            "bs_preforcast_training": [],
+        },
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="must define a top-level bs_preforcast block",
     ):
         load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
 
@@ -3838,13 +3898,7 @@ def test_load_app_config_bs_preforcast_loads_stage1_route_and_authoritative_targ
 ):
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "using_futr_exog": True,
-        "target_columns": ["bs_a", "bs_b"],
-        "task": {"multivariable": False},
-
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a,bs_b\n"
         "2020-01-01,1,2,10,20\n"
@@ -3853,6 +3907,14 @@ def test_load_app_config_bs_preforcast_loads_stage1_route_and_authoritative_targ
         encoding="utf-8",
     )
     stage_payload = _payload()
+    stage_payload.update(_linked_bs_preforcast())
+    stage_payload.update(
+        _linked_bs_preforcast(
+            using_futr_exog=True,
+            target_columns=("bs_a", "bs_b"),
+            multivariable=False,
+        )
+    )
     stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
     stage_payload["dataset"]["target_col"] = "bs_a"
     stage_payload["dataset"]["hist_exog_cols"] = []
@@ -3885,13 +3947,7 @@ def test_load_app_config_bs_preforcast_loads_stage1_route_and_authoritative_targ
 def test_load_app_config_rejects_bs_preforcast_missing_config_file(tmp_path: Path):
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "config_path": "missing-bs-preforcast.yaml",
-        "using_futr_exog": False,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast(config_path='missing-bs-preforcast.yaml')
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n2020-01-01,1,2,10\n2020-01-08,2,3,11\n",
         encoding="utf-8",
@@ -3906,13 +3962,7 @@ def test_load_app_config_bs_preforcast_stage1_auto_uses_dedicated_search_space(
 ):
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "using_futr_exog": False,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
         "2020-01-01,1,2,10\n"
@@ -3921,6 +3971,7 @@ def test_load_app_config_bs_preforcast_stage1_auto_uses_dedicated_search_space(
         encoding="utf-8",
     )
     stage_payload = _payload()
+    stage_payload.update(_linked_bs_preforcast())
     stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
     stage_payload["dataset"]["target_col"] = "bs_a"
     stage_payload["dataset"]["hist_exog_cols"] = []
@@ -3959,13 +4010,7 @@ def test_load_app_config_bs_preforcast_stage1_auto_supports_autoarima(
 ):
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "using_futr_exog": False,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
         "2020-01-01,1,2,10\n"
@@ -3974,6 +4019,7 @@ def test_load_app_config_bs_preforcast_stage1_auto_supports_autoarima(
         encoding="utf-8",
     )
     stage_payload = _payload()
+    stage_payload.update(_linked_bs_preforcast())
     stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
     stage_payload["dataset"]["target_col"] = "bs_a"
     stage_payload["dataset"]["hist_exog_cols"] = []
@@ -4023,13 +4069,7 @@ def test_bs_preforcast_resolved_stage_job_uses_materialized_best_params(
 
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "using_futr_exog": False,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
         "2020-01-01,1,2,10\n"
@@ -4038,6 +4078,7 @@ def test_bs_preforcast_resolved_stage_job_uses_materialized_best_params(
         encoding="utf-8",
     )
     stage_payload = _payload()
+    stage_payload.update(_linked_bs_preforcast())
     stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
     stage_payload["dataset"]["target_col"] = "bs_a"
     stage_payload["dataset"]["hist_exog_cols"] = []
@@ -4107,13 +4148,7 @@ def test_bs_preforcast_resolved_stage_job_maps_stage_season_length_to_season_len
 
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "using_futr_exog": False,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
         "2020-01-01,1,2,10\n"
@@ -4122,6 +4157,7 @@ def test_bs_preforcast_resolved_stage_job_maps_stage_season_length_to_season_len
         encoding="utf-8",
     )
     stage_payload = _payload()
+    stage_payload.update(_linked_bs_preforcast())
     stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
     stage_payload["dataset"]["target_col"] = "bs_a"
     stage_payload["dataset"]["hist_exog_cols"] = []
@@ -4187,13 +4223,7 @@ def test_bs_preforcast_direct_stage_variant_rejects_short_dataset_for_horizon(
 
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "using_futr_exog": False,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
         "2020-01-01,1,2,10\n"
@@ -4202,6 +4232,7 @@ def test_bs_preforcast_direct_stage_variant_rejects_short_dataset_for_horizon(
         encoding="utf-8",
     )
     stage_payload = _payload()
+    stage_payload.update(_linked_bs_preforcast())
     stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
     stage_payload["dataset"]["target_col"] = "bs_a"
     stage_payload["dataset"]["hist_exog_cols"] = []
@@ -4261,18 +4292,14 @@ def test_bs_preforcast_tree_stage_short_history_fails_fast(
 
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "using_futr_exog": False,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
         "2020-01-01,1,2,10\n",
         encoding="utf-8",
     )
     stage_payload = _payload()
+    stage_payload.update(_linked_bs_preforcast())
     stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
     stage_payload["dataset"]["target_col"] = "bs_a"
     stage_payload["dataset"]["hist_exog_cols"] = []
@@ -4358,13 +4385,7 @@ def test_load_app_config_bs_preforcast_stage1_auto_missing_mapping_fails(
 ):
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "using_futr_exog": False,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
         "2020-01-01,1,2,10\n"
@@ -4373,6 +4394,7 @@ def test_load_app_config_bs_preforcast_stage1_auto_missing_mapping_fails(
         encoding="utf-8",
     )
     stage_payload = _payload()
+    stage_payload.update(_linked_bs_preforcast(target_columns=("bs_a", "bs_b")))
     stage_payload["dataset"]["target_col"] = "bs_a"
     stage_payload["dataset"]["hist_exog_cols"] = []
     stage_payload["jobs"] = [{"model": "TFT", "params": {}}]
@@ -4402,18 +4424,13 @@ def test_load_app_config_loads_bs_preforcast_stage1_with_dedicated_search_space(
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     payload["jobs"] = [{"model": "TFT", "params": {"hidden_size": 32}}]
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "config_path": "bs_preforcast.yaml",
-        "using_futr_exog": False,
-        "target_columns": ["bs_a", "bs_b"],
-        "task": {"multivariable": False},
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n2020-01-15,3,4\n",
         encoding="utf-8",
     )
     bs_preforcast_payload = {
+        **_linked_bs_preforcast(target_columns=("bs_a", "bs_b")),
         "common": {
             "dataset": {
                 "path": "data.csv",
@@ -4485,15 +4502,10 @@ def test_load_app_config_loads_bs_preforcast_stage1_with_dedicated_search_space(
     ] == ["bs_a", "bs_b"]
 
 
-def test_load_app_config_rejects_bs_preforcast_stage1_nested_block(tmp_path: Path):
+def test_load_app_config_rejects_invalid_linked_bs_preforcast_owner_keys(tmp_path: Path):
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "config_path": "bs_preforcast.yaml",
-        "using_futr_exog": False,
-        "target_columns": ["bs_a"],
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n2020-01-15,3,4\n",
         encoding="utf-8",
@@ -4510,9 +4522,7 @@ def test_load_app_config_rejects_bs_preforcast_stage1_nested_block(tmp_path: Pat
         encoding="utf-8",
     )
 
-    with pytest.raises(
-        ValueError, match="routed YAML must not define its own bs_preforcast block"
-    ):
+    with pytest.raises(ValueError, match="unsupported key\\(s\\): enabled"):
         load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
 
 
@@ -4877,14 +4887,9 @@ def test_runtime_validate_only_records_bs_preforcast_metadata(
         {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
     ]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "config_path": "bs_preforcast.yaml",
-        "using_futr_exog": True,
-        "target_columns": ["bs_a", "bs_b"],
-        "task": {"multivariable": False},
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     stage_payload = _payload()
+    stage_payload.update(_linked_bs_preforcast())
     stage_payload["dataset"] = {
         "path": "data.csv",
         "target_col": "bs_a",
@@ -4907,6 +4912,10 @@ def test_runtime_validate_only_records_bs_preforcast_metadata(
     (tmp_path / "bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             {
+                **_linked_bs_preforcast(
+                    using_futr_exog=True,
+                    target_columns=("bs_a", "bs_b"),
+                ),
                 "common": {
                     "dataset": {
                         "path": "data.csv",
@@ -5019,14 +5028,9 @@ def test_runtime_validate_only_bs_preforcast_fails_for_unsupported_futr_exog_mai
     payload = _payload()
     payload["jobs"] = [{"model": "Naive", "params": {}}]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "config_path": "bs_preforcast.yaml",
-        "using_futr_exog": True,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     stage_payload = _payload()
+    stage_payload.update(_linked_bs_preforcast(using_futr_exog=True))
     stage_payload["dataset"] = {
         "path": "data.csv",
         "target_col": "bs_a",
@@ -5049,6 +5053,7 @@ def test_runtime_validate_only_bs_preforcast_fails_for_unsupported_futr_exog_mai
     (tmp_path / "bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             {
+                **_linked_bs_preforcast(using_futr_exog=True),
                 "common": {
                     "dataset": {
                         "path": "data.csv",
@@ -5134,14 +5139,9 @@ def test_prepare_bs_preforcast_fold_inputs_adds_preforcast_futr_columns(
         {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
     ]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "config_path": "bs_preforcast.yaml",
-        "using_futr_exog": True,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     stage_payload = _payload()
+    stage_payload.update(_linked_bs_preforcast(using_futr_exog=True))
     stage_payload["dataset"] = {
         "path": str((tmp_path / "data.csv").resolve()),
         "target_col": "bs_a",
@@ -5166,6 +5166,7 @@ def test_prepare_bs_preforcast_fold_inputs_adds_preforcast_futr_columns(
     (tmp_path / "bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             {
+                **_linked_bs_preforcast(using_futr_exog=True),
                 "common": {
                     "dataset": {
                         "path": str((tmp_path / "data.csv").resolve()),
@@ -5256,13 +5257,7 @@ def test_prepare_bs_preforcast_fold_inputs_missing_forecasts_fail_fast(
         {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
     ]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "config_path": "bs_preforcast.yaml",
-        "using_futr_exog": True,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
         "2020-01-01,1,2,10\n"
@@ -5273,6 +5268,7 @@ def test_prepare_bs_preforcast_fold_inputs_missing_forecasts_fail_fast(
     (tmp_path / "bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             {
+                **_linked_bs_preforcast(using_futr_exog=True),
                 "common": {
                     "dataset": {
                         "path": str((tmp_path / "data.csv").resolve()),
@@ -5376,14 +5372,9 @@ def test_prepare_bs_preforcast_fold_inputs_uses_futr_path_for_timexer_native_fut
         }
     ]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "config_path": "bs_preforcast.yaml",
-        "using_futr_exog": True,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     stage_payload = _payload()
+    stage_payload.update(_linked_bs_preforcast(using_futr_exog=True))
     stage_payload["dataset"] = {
         "path": str((tmp_path / "data.csv").resolve()),
         "target_col": "bs_a",
@@ -5408,6 +5399,7 @@ def test_prepare_bs_preforcast_fold_inputs_uses_futr_path_for_timexer_native_fut
     (tmp_path / "bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             {
+                **_linked_bs_preforcast(using_futr_exog=True),
                 "common": {
                     "dataset": {
                         "path": str((tmp_path / "data.csv").resolve()),
@@ -5490,14 +5482,9 @@ def test_bs_preforcast_inline_learned_stage_surfaces_multi_gpu_resolution(
     import residual.bs_preforcast_runtime as bs_runtime
 
     payload = _payload()
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "config_path": "bs_preforcast.yaml",
-        "using_futr_exog": False,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     stage_payload = {
+        **_linked_bs_preforcast(),
         "common": {
             "dataset": {
                 "path": str((tmp_path / "data.csv").resolve()),
@@ -5623,14 +5610,9 @@ def test_bs_preforcast_inline_learned_stage_surfaces_multi_gpu_resolution(
 
 def test_bs_preforcast_stage_baseline_job_stays_rejected(tmp_path: Path):
     payload = _payload()
-    payload["bs_preforcast"] = {
-        "enabled": True,
-        "config_path": "bs_preforcast.yaml",
-        "using_futr_exog": False,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
-    }
+    payload["bs_preforcast"] = _main_bs_preforcast()
     stage_payload = {
+        **_linked_bs_preforcast(),
         "common": {
             "dataset": {
                 "path": str((tmp_path / "data.csv").resolve()),

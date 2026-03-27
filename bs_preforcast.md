@@ -21,17 +21,12 @@
 
 ## 2. 메인 YAML에서 쓰는 설정
 
-메인 YAML에서는 아래 top-level block만 두면 됩니다.
+메인 YAML에서는 아래 top-level block만 둡니다.
 
 ```yaml
 bs_preforcast:
   enabled: true
-  using_futr_exog: true
-  target_columns:
-    - bs_a
-    - bs_b
-  task:
-    multivariable: false
+  config_path: bs_preforcast.yaml
 ```
 
 ### 필드 설명
@@ -40,26 +35,15 @@ bs_preforcast:
   - `true`면 stage1 활성화
   - `false`면 기존 main stage만 실행
 
-- `using_futr_exog`
-  - `true`면 `futr_exog` 경로를 **강제**하고, main 모델이 이를 지원하지 않으면 즉시 실패
-  - `false`면 명시적으로 `lag_derived` 경로 사용
-
-- `target_columns`
-  - stage1이 예측할 대상 컬럼 목록
-  - 자동 탐색하지 않음
-  - **main YAML이 이 목록의 최종 소유자**
-
-- `task.multivariable`
-  - `false`: 각 target을 **독립 단변량 stage1 실행**
-  - `true`: 전체 target을 **공동 다변량 stage1 실행**
+- `config_path`
+  - 독립 `bs_preforcast` 설정 YAML 경로
+  - 생략하면 repo root의 `bs_preforcast.yaml` 사용
 
 ### `config_path`에 대해
 
 현재 구현은 `config_path`를 **생략하면 기본값으로 repo root의 `bs_preforcast.yaml`**을 사용합니다.
 
-즉 보통은 메인 YAML에 `config_path`를 따로 쓸 필요가 없습니다.
-
-다른 파일을 쓰고 싶을 때만 명시합니다.
+즉 보통은 메인 YAML에 `enabled`만 두고, 다른 파일을 쓰고 싶을 때만 `config_path`를 명시합니다.
 
 예:
 
@@ -67,14 +51,12 @@ bs_preforcast:
 bs_preforcast:
   enabled: true
   config_path: custom_bs_preforcast.yaml
-  using_futr_exog: true
-  target_columns:
-    - bs_a
 ```
 
 ### 제거된 방식
 
 이전 `routing.univariable_config`, `routing.multivariable_config` 방식은 제거되었습니다.
+또한 main YAML에 `using_futr_exog`, `target_columns`, `task`를 직접 쓰는 방식도 허용되지 않습니다.
 
 ---
 
@@ -84,6 +66,7 @@ bs_preforcast:
 
 메인 YAML은 이 파일을 자동으로 읽고, stage1 실행 시 이 파일 안의
 
+- top-level `bs_preforcast`
 - `common`
 - `univariable`
 - `multivariable`
@@ -93,6 +76,14 @@ section을 merge해서 사용합니다.
 예:
 
 ```yaml
+bs_preforcast:
+  using_futr_exog: true
+  target_columns:
+    - bs_a
+    - bs_b
+  task:
+    multivariable: false
+
 common:
   dataset:
     path: data/df.csv
@@ -155,6 +146,9 @@ multivariable:
 
 ### 독립 파일이 소유하는 것
 
+- `bs_preforcast.using_futr_exog`
+- `bs_preforcast.target_columns`
+- `bs_preforcast.task.multivariable`
 - `dataset`
 - `runtime`
 - `training`
@@ -162,13 +156,7 @@ multivariable:
 - `scheduler`
 - `jobs`
 
-### 독립 파일이 소유하지 않는 것
-
-- `bs_preforcast.target_columns`
-
-즉 실제 어떤 `bs_*` 컬럼을 돌릴지는 항상 main YAML이 결정합니다.
-
-또한 `bs_preforcast.yaml` 안에 다시 top-level `bs_preforcast:` block을 넣으면 오류가 납니다.
+즉 실제 어떤 `bs_*` 컬럼을 돌릴지와 `futr_exog`/`multivariable` 의도까지 모두 linked YAML이 결정합니다.
 
 ---
 
@@ -454,7 +442,8 @@ uv run python main.py --config path/to/main.yaml --jobs DLinear --output-root ru
 
 - `bs_preforcast`는 main 앞단 stage1
 - `bs_preforcast.yaml` 독립 파일 기반
-- main YAML이 `target_columns`를 소유
+- main YAML은 `enabled`, `config_path`만 소유
+- linked YAML의 top-level `bs_preforcast`가 `using_futr_exog`, `target_columns`, `task.multivariable`를 소유
 - `futr_exog` 지원 모델이면 future exog 주입
 - `using_futr_exog: true`인데 지원하지 않으면 fail-fast
 - `using_futr_exog: false`일 때만 lag/history 쪽으로 주입

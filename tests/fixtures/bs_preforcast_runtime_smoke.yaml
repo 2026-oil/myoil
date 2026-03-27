@@ -8,10 +8,6 @@ dataset:
 bs_preforcast:
   enabled: true
   config_path: bs_preforcast_stage_smoke.yaml
-  using_futr_exog: false
-  target_columns: [bs_a]
-  task:
-    multivariable: false
 runtime:
   random_seed: 7
 training:

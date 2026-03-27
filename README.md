@@ -151,12 +151,7 @@ top-level section:
 ```yaml
 bs_preforcast:
   enabled: true
-  using_futr_exog: true
-  target_columns:
-    - bs_a
-    - bs_b
-  task:
-    multivariable: false
+  config_path: bs_preforcast.yaml
 ```
 
 상세 설정/동작/아티팩트 설명은 별도 문서를 보세요:

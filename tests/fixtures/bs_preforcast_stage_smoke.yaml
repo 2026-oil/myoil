@@ -1,3 +1,9 @@
+bs_preforcast:
+  using_futr_exog: false
+  target_columns: [bs_a]
+  task:
+    multivariable: false
+
 common:
   dataset:
     path: tests/fixtures/bs_preforcast_smoke_data.csv

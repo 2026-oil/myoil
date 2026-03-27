@@ -53,6 +53,41 @@ def _base_payload(data_path: Path) -> dict[str, object]:
     }
 
 
+def _main_bs_preforcast(*, config_path: str) -> dict[str, object]:
+    return {"enabled": True, "config_path": config_path}
+
+
+def _with_linked_bs_preforcast(
+    payload: dict[str, object],
+    *,
+    using_futr_exog: bool = False,
+    target_columns: tuple[str, ...] = ("bs_a",),
+    multivariable: bool = False,
+) -> dict[str, object]:
+    linked = dict(payload)
+    linked["bs_preforcast"] = {
+        "using_futr_exog": using_futr_exog,
+        "target_columns": list(target_columns),
+        "task": {"multivariable": multivariable},
+    }
+    return linked
+
+
+def _linked_bs_preforcast(
+    *,
+    using_futr_exog: bool = False,
+    target_columns: tuple[str, ...] = ("bs_a",),
+    multivariable: bool = False,
+) -> dict[str, object]:
+    return {
+        "bs_preforcast": {
+            "using_futr_exog": using_futr_exog,
+            "target_columns": list(target_columns),
+            "task": {"multivariable": multivariable},
+        }
+    }
+
+
 def test_residual_config_uses_bs_preforcast_authoritative_types() -> None:
     assert residual_config.BsPreforcastConfig is BsPreforcastConfig
     assert residual_config.BsPreforcastStageLoadedConfig is BsPreforcastStageLoadedConfig
@@ -73,6 +108,7 @@ def test_load_app_config_materializes_bs_preforcast_stage_with_top_level_config_
     stage_path.write_text(
         yaml.safe_dump(
             {
+                **_linked_bs_preforcast(),
                 "common": _base_payload(data_path),
                 "univariable": {
                     "dataset": {"target_col": "bs_a", "hist_exog_cols": []},
@@ -87,9 +123,6 @@ def test_load_app_config_materializes_bs_preforcast_stage_with_top_level_config_
     main_payload["bs_preforcast"] = {
         "enabled": True,
         "config_path": str(stage_path),
-        "using_futr_exog": False,
-        "target_columns": ["bs_a"],
-        "task": {"multivariable": False},
     }
     (tmp_path / "search_space.yaml").write_text(
         yaml.safe_dump(
@@ -113,3 +146,5 @@ def test_load_app_config_materializes_bs_preforcast_stage_with_top_level_config_
     assert isinstance(loaded.bs_preforcast_stage1, BsPreforcastStageLoadedConfig)
     assert loaded.bs_preforcast_stage1 is not None
     assert loaded.bs_preforcast_stage1.source_path == stage_path.resolve()
+    assert loaded.config.bs_preforcast.using_futr_exog is False
+    assert loaded.config.bs_preforcast.target_columns == ("bs_a",)

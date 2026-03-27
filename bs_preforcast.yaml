@@ -1,3 +1,11 @@
+bs_preforcast:
+  using_futr_exog: true
+  target_columns:
+    - BS_Core_Index_A
+    - BS_Core_Index_B
+  task:
+    multivariable: false
+
 common:
   dataset:
     path: data/df.csv
