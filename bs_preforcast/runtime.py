@@ -31,6 +31,8 @@ from residual.optuna_spaces import (
     suggest_training_params,
 )
 
+_ALLOW_INTERNAL_OUTPUT_ROOT_ENV = "NEURALFORECAST_ALLOW_INTERNAL_OUTPUT_ROOT"
+
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
@@ -1109,6 +1111,10 @@ def _run_stage_variants(stage_loaded: LoadedConfig, *, run_root: Path) -> list[P
                 ],
                 cwd=repo_root,
                 check=True,
+                env={
+                    **os.environ,
+                    _ALLOW_INTERNAL_OUTPUT_ROOT_ENV: "1",
+                },
             )
         else:
             _run_direct_stage_variant(
