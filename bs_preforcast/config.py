@@ -15,7 +15,6 @@ BS_PREFORCAST_MAIN_KEYS = {
     "config_path",
 }
 BS_PREFORCAST_LINKED_KEYS = {
-    "using_futr_exog",
     "target_columns",
     "task",
 }
@@ -31,7 +30,6 @@ class BsPreforcastTaskConfig:
 class BsPreforcastConfig:
     enabled: bool = False
     config_path: str | None = None
-    using_futr_exog: bool = False
     target_columns: tuple[str, ...] = field(default_factory=tuple)
     task: BsPreforcastTaskConfig = field(default_factory=BsPreforcastTaskConfig)
 
@@ -106,11 +104,6 @@ def normalize_linked_bs_preforcast_config(
         section="bs_preforcast.task",
     )
 
-    using_futr_exog = coerce_bool(
-        payload.get("using_futr_exog"),
-        field_name="bs_preforcast.using_futr_exog",
-        default=False,
-    )
     target_columns = coerce_name_tuple(
         payload.get("target_columns"),
         field_name="bs_preforcast.target_columns",
@@ -126,7 +119,6 @@ def normalize_linked_bs_preforcast_config(
     )
     return BsPreforcastConfig(
         enabled=True,
-        using_futr_exog=using_futr_exog,
         target_columns=target_columns,
         task=BsPreforcastTaskConfig(multivariable=multivariable),
     )
@@ -331,7 +323,6 @@ def stage1_route_metadata(loaded: LoadedConfig) -> dict[str, object]:
     return {
         "enabled": loaded.config.bs_preforcast.enabled,
         "config_path": loaded.config.bs_preforcast.config_path,
-        "using_futr_exog": loaded.config.bs_preforcast.using_futr_exog,
         "target_columns": list(loaded.config.bs_preforcast.target_columns),
         "multivariable": loaded.config.bs_preforcast.task.multivariable,
         "selected_config_path": loaded.config.bs_preforcast.config_path,

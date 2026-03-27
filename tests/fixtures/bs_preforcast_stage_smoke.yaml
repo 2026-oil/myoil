@@ -1,5 +1,4 @@
 bs_preforcast:
-  using_futr_exog: false
   target_columns: [bs_a]
   task:
     multivariable: false

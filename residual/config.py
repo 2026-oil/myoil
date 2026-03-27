@@ -1464,7 +1464,6 @@ def load_app_config(
             ),
             "search_space_sha256": bs_preforcast_stage1.search_space_hash,
             "target_columns": list(config.bs_preforcast.target_columns),
-            "using_futr_exog": config.bs_preforcast.using_futr_exog,
             "multivariable": config.bs_preforcast.task.multivariable,
         }
     normalized_payload["search_space_path"] = (

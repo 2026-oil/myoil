@@ -93,25 +93,28 @@ def resolve_bs_preforcast_injection_mode(
 ) -> str:
     if not loaded.config.bs_preforcast.enabled:
         return "disabled"
-    if not loaded.config.bs_preforcast.using_futr_exog:
-        return "lag_derived"
     jobs = list(selected_jobs)
     if not jobs:
-        raise ValueError(
-            "bs_preforcast requested futr_exog injection but no selected main jobs were provided"
-        )
-    unsupported_jobs = [
-        str(job.model)
-        for job in jobs
-        if not validate_job(job).supports_futr_exog
+        raise ValueError("bs_preforcast injection mode requires at least one selected main job")
+    unique_modes = {_derived_injection_mode_for_job(job) for job in jobs}
+    if len(unique_modes) == 1:
+        return next(iter(unique_modes))
+    return "mixed"
+
+
+def _derived_injection_mode_for_job(job: Any) -> str:
+    return "futr_exog" if validate_job(job).supports_futr_exog else "lag_derived"
+
+
+def _derived_job_injection_results(selected_jobs: Iterable[Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "model": str(job.model),
+            "injection_mode": _derived_injection_mode_for_job(job),
+            "supports_futr_exog": bool(validate_job(job).supports_futr_exog),
+        }
+        for job in selected_jobs
     ]
-    if unsupported_jobs:
-        unsupported = ", ".join(unsupported_jobs)
-        raise ValueError(
-            "bs_preforcast requested futr_exog injection, but selected main job(s) do not support futr_exog: "
-            f"{unsupported}"
-        )
-    return "futr_exog"
 
 
 def _stage_capability_payload(stage_loaded: LoadedConfig) -> dict[str, Any]:
@@ -134,9 +137,6 @@ def _stage_capability_payload(stage_loaded: LoadedConfig) -> dict[str, Any]:
             "enabled": True,
             "config_path": stage_loaded.normalized_payload["bs_preforcast"].get(
                 "config_path"
-            ),
-            "using_futr_exog": bool(
-                stage_loaded.normalized_payload["bs_preforcast"]["using_futr_exog"]
             ),
             "target_columns": list(
                 stage_loaded.normalized_payload["bs_preforcast"]["target_columns"]
@@ -184,7 +184,7 @@ def _write_stage_dashboard(
     stage_root: Path,
     *,
     target_columns: list[str],
-    injection_mode: str,
+    job_injection_results: list[dict[str, Any]],
     stage_run_roots: list[str] | None = None,
 ) -> Path:
     path = stage_root / "summary" / "dashboard.md"
@@ -192,9 +192,14 @@ def _write_stage_dashboard(
     lines = [
         "# bs_preforcast dashboard",
         "",
-        f"- injection_mode: {injection_mode}",
         f"- target_columns: {', '.join(target_columns)}",
     ]
+    if job_injection_results:
+        lines.append("- job_injection_results:")
+        for item in job_injection_results:
+            lines.append(
+                f"  - {item['model']}: {item['injection_mode']} (supports_futr_exog={item['supports_futr_exog']})"
+            )
     if stage_run_roots:
         lines.append("- stage_run_roots:")
         lines.extend(f"  - {item}" for item in stage_run_roots)
@@ -1382,10 +1387,7 @@ def materialize_bs_preforcast_stage(
     stage_loaded = load_bs_preforcast_stage_config(_repo_root(), loaded)
     if stage_loaded is None:
         return {}
-    injection_mode = resolve_bs_preforcast_injection_mode(
-        loaded,
-        selected_jobs=selected_jobs,
-    )
+    job_injection_results = _derived_job_injection_results(selected_jobs)
 
     stage_root = _stage_root(run_root)
     resolved_path = stage_root / "config" / "config.resolved.json"
@@ -1415,7 +1417,7 @@ def materialize_bs_preforcast_stage(
         validate_only=validate_only,
         stage_loaded=stage_loaded,
         stage_run_roots=stage_run_roots,
-        injection_mode=injection_mode,
+        job_injection_results=job_injection_results,
     )
     metadata.update(
         {
@@ -1462,13 +1464,13 @@ def write_bs_preforcast_dashboard(
     stage_root: Path,
     *,
     target_columns: list[str],
-    injection_mode: str,
+    job_injection_results: list[dict[str, Any]],
     stage_run_roots: list[str] | None = None,
 ) -> Path:
     return _write_stage_dashboard(
         stage_root,
         target_columns=target_columns,
-        injection_mode=injection_mode,
+        job_injection_results=job_injection_results,
         stage_run_roots=stage_run_roots,
     )
 
@@ -1484,22 +1486,21 @@ def attach_bs_preforcast_stage_metadata(
     validate_only: bool,
     stage_loaded: LoadedConfig | None = None,
     stage_run_roots: list[Path] | None = None,
-    injection_mode: str | None = None,
+    job_injection_results: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     if not loaded.config.bs_preforcast.enabled:
         return {}
     stage_loaded = stage_loaded or load_bs_preforcast_stage_config(_repo_root(), loaded)
     if stage_loaded is None:
         return {}
-    injection_mode = injection_mode or resolve_bs_preforcast_injection_mode(
-        loaded,
-        selected_jobs=selected_jobs,
+    job_injection_results = job_injection_results or _derived_job_injection_results(
+        selected_jobs
     )
     stage_root = _stage_root(run_root)
     dashboard_path = write_bs_preforcast_dashboard(
         stage_root,
         target_columns=list(loaded.config.bs_preforcast.target_columns),
-        injection_mode=injection_mode,
+        job_injection_results=job_injection_results,
         stage_run_roots=[] if stage_run_roots is None else [str(path) for path in stage_run_roots],
     )
     selected_jobs_path = _selected_stage_jobs_artifact_path(stage_root)
@@ -1510,7 +1511,7 @@ def attach_bs_preforcast_stage_metadata(
     )
     metadata = {
         "selected_config_path": str(stage_loaded.source_path),
-        "injection_mode": injection_mode,
+        "job_injection_results": job_injection_results,
         "stage1_dashboard_path": str(dashboard_path),
         "stage1_forecast_artifact_path": str(forecast_path),
         "stage1_selected_jobs_path": (

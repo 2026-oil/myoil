@@ -118,7 +118,7 @@ def test_materialize_stage_fails_before_stage_side_effects_for_unsupported_futr_
         config=SimpleNamespace(bs_preforcast=SimpleNamespace(enabled=True)),
         normalized_payload={},
     )
-    stage_loaded = SimpleNamespace(normalized_payload={"demo": True})
+    stage_loaded = SimpleNamespace(normalized_payload={"bs_preforcast": {"config_path": "demo.yaml", "target_columns": ["bs_a"], "task": {"multivariable": False}}}, config=SimpleNamespace(jobs=()))
 
     monkeypatch.setattr(
         bs_runtime,
@@ -131,7 +131,7 @@ def test_materialize_stage_fails_before_stage_side_effects_for_unsupported_futr_
 
     monkeypatch.setattr(
         bs_runtime,
-        "resolve_bs_preforcast_injection_mode",
+        "_derived_job_injection_results",
         fail_fast,
     )
     monkeypatch.setattr(

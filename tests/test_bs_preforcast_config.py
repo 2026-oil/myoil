@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
+import pytest
 
 import residual.config as residual_config
 from bs_preforcast.config import BsPreforcastConfig, BsPreforcastStageLoadedConfig
@@ -60,32 +61,35 @@ def _main_bs_preforcast(*, config_path: str) -> dict[str, object]:
 def _with_linked_bs_preforcast(
     payload: dict[str, object],
     *,
-    using_futr_exog: bool = False,
     target_columns: tuple[str, ...] = ("bs_a",),
     multivariable: bool = False,
+    legacy_using_futr_exog: bool | None = None,
 ) -> dict[str, object]:
     linked = dict(payload)
     linked["bs_preforcast"] = {
-        "using_futr_exog": using_futr_exog,
         "target_columns": list(target_columns),
         "task": {"multivariable": multivariable},
     }
+    if legacy_using_futr_exog is not None:
+        linked["bs_preforcast"]["using_futr_exog"] = legacy_using_futr_exog
     return linked
 
 
 def _linked_bs_preforcast(
     *,
-    using_futr_exog: bool = False,
     target_columns: tuple[str, ...] = ("bs_a",),
     multivariable: bool = False,
+    legacy_using_futr_exog: bool | None = None,
 ) -> dict[str, object]:
-    return {
+    payload = {
         "bs_preforcast": {
-            "using_futr_exog": using_futr_exog,
             "target_columns": list(target_columns),
             "task": {"multivariable": multivariable},
         }
     }
+    if legacy_using_futr_exog is not None:
+        payload["bs_preforcast"]["using_futr_exog"] = legacy_using_futr_exog
+    return payload
 
 
 def test_residual_config_uses_bs_preforcast_authoritative_types() -> None:
@@ -146,8 +150,58 @@ def test_load_app_config_materializes_bs_preforcast_stage_with_top_level_config_
     assert isinstance(loaded.bs_preforcast_stage1, BsPreforcastStageLoadedConfig)
     assert loaded.bs_preforcast_stage1 is not None
     assert loaded.bs_preforcast_stage1.source_path == stage_path.resolve()
-    assert loaded.config.bs_preforcast.using_futr_exog is False
     assert loaded.config.bs_preforcast.target_columns == ("bs_a",)
+
+
+def test_load_app_config_rejects_legacy_using_futr_exog_in_linked_stage_yaml(
+    tmp_path: Path,
+) -> None:
+    data_path = tmp_path / "data.csv"
+    data_path.write_text(
+        "dt,target,hist_a,bs_a\n"
+        "2020-01-01,1,2,10\n"
+        "2020-01-08,2,3,11\n"
+        "2020-01-15,3,4,12\n",
+        encoding="utf-8",
+    )
+    stage_path = tmp_path / "bs_preforcast.yaml"
+    stage_path.write_text(
+        yaml.safe_dump(
+            {
+                **_linked_bs_preforcast(legacy_using_futr_exog=True),
+                "common": _base_payload(data_path),
+                "univariable": {
+                    "dataset": {"target_col": "bs_a", "hist_exog_cols": []},
+                    "jobs": [{"model": "Naive", "params": {}}],
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    main_payload = _base_payload(data_path)
+    main_payload["bs_preforcast"] = {
+        "enabled": True,
+        "config_path": str(stage_path),
+    }
+    (tmp_path / "search_space.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "models": {},
+                "training": [],
+                "residual": {"xgboost": ["n_estimators"]},
+                "bs_preforcast_models": {},
+                "bs_preforcast_training": [],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(main_payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"unsupported key\(s\): using_futr_exog"):
+        load_app_config(tmp_path, config_path=config_path)
 
 
 def test_repo_bs_preforcast_yaml_uses_shared_jobs_default_path() -> None:

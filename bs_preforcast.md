@@ -56,7 +56,7 @@ bs_preforcast:
 ### 제거된 방식
 
 이전 `routing.univariable_config`, `routing.multivariable_config` 방식은 제거되었습니다.
-또한 main YAML에 `using_futr_exog`, `target_columns`, `task`를 직접 쓰는 방식도 허용되지 않습니다.
+또한 main YAML에 `target_columns`, `task`를 직접 쓰는 방식도 허용되지 않습니다.
 
 ---
 
@@ -77,7 +77,6 @@ section을 merge해서 사용합니다.
 
 ```yaml
 bs_preforcast:
-  using_futr_exog: true
   target_columns:
     - bs_a
     - bs_b
@@ -146,7 +145,6 @@ multivariable:
 
 ### 독립 파일이 소유하는 것
 
-- `bs_preforcast.using_futr_exog`
 - `bs_preforcast.target_columns`
 - `bs_preforcast.task.multivariable`
 - `dataset`
@@ -156,7 +154,7 @@ multivariable:
 - `scheduler`
 - `jobs`
 
-즉 실제 어떤 `bs_*` 컬럼을 돌릴지와 `futr_exog`/`multivariable` 의도까지 모두 linked YAML이 결정합니다.
+즉 실제 어떤 `bs_*` 컬럼을 돌릴지와 `multivariable` 구성까지 모두 linked YAML이 결정합니다.
 
 ---
 
@@ -193,14 +191,13 @@ target_columns:
 
 ## 5. main stage 주입 방식
 
-주입 모드는 두 가지입니다.
+주입 모드는 main 모델 capability에 따라 자동 선택됩니다.
 
 ### A. `futr_exog`
 
 조건:
 
-- `using_futr_exog: true`
-- 그리고 main 모델이 `futr_exog` 지원
+- main 모델이 `futr_exog` 지원
 
 동작:
 
@@ -215,7 +212,7 @@ target_columns:
 
 조건:
 
-- `using_futr_exog: false`
+- main 모델이 `futr_exog` 미지원
 
 동작:
 
@@ -236,7 +233,6 @@ target_columns:
 
 ### fail-fast 규칙
 
-- `using_futr_exog: true`인데 main 모델이 `futr_exog`를 지원하지 않으면 `lag_derived`로 내리지 않고 즉시 실패합니다.
 - stage1 forecast 값이 없거나 비어 있으면 마지막 값 대체를 하지 않고 즉시 실패합니다.
 - tree direct stage가 예측에 필요한 최소 history를 못 가지면 마지막 값 대체 없이 즉시 실패합니다.
 
@@ -312,7 +308,7 @@ bs_preforcast_training:
 
 ## 8. `ARIMA`, `ES`, tree direct 파라미터
 
-현재 statistical stage model은 `season_length` selector를 지원하고, tree direct model은 명시적 `lags` list를 지원합니다.
+현재 statistical stage model은 capability에 따라 자동 injection mode를 선택하고, tree direct model은 명시적 `lags` list를 지원합니다.
 
 예:
 
@@ -367,7 +363,7 @@ main artifact에는 아래가 기록됩니다.
 
 - `config_path`
 - selected stage config path
-- injection mode (`futr_exog` / `lag_derived`)
+- job별 injection result (`futr_exog` / `lag_derived`)
 - target columns
 - stage1 artifact paths
 - stage1 run roots
@@ -464,10 +460,10 @@ uv run python main.py --config path/to/main.yaml --jobs DLinear --output-root ru
 - `bs_preforcast`는 main 앞단 stage1
 - `bs_preforcast.yaml` 독립 파일 기반
 - main YAML은 `enabled`, `config_path`만 소유
-- linked YAML의 top-level `bs_preforcast`가 `using_futr_exog`, `target_columns`, `task.multivariable`를 소유
+- linked YAML의 top-level `bs_preforcast`가 `target_columns`, `task.multivariable`를 소유
 - `futr_exog` 지원 모델이면 future exog 주입
-- `using_futr_exog: true`인데 지원하지 않으면 fail-fast
-- `using_futr_exog: false`일 때만 lag/history 쪽으로 주입
+- main 모델 capability에 따라 job별 injection mode를 자동 선택
+- futr 미지원 모델은 lag/history 쪽으로 주입
 - statistical / tree / NF-native stage model 모두 지원 경로 존재
 - learned-auto stage job은 materialized `best_params.json`을 fold-time injection에서 재사용
 - 짧은 데이터 + 큰 horizon direct stage는 fail-fast
