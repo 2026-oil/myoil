@@ -15,6 +15,8 @@ import time
 from .config import AppConfig, JobConfig, LoadedConfig
 from .progress import ConsoleProgressRenderer, ModelProgressState, parse_progress_event
 
+_ALLOW_INTERNAL_OUTPUT_ROOT_ENV = "NEURALFORECAST_ALLOW_INTERNAL_OUTPUT_ROOT"
+
 
 @dataclass(frozen=True)
 class WorkerLaunch:
@@ -85,6 +87,7 @@ def worker_env(gpu_ids: int | Sequence[int]) -> dict[str, str]:
     env["NEURALFORECAST_WORKER_DEVICES"] = str(len(assigned_gpu_ids))
     env["NEURALFORECAST_PROGRESS_MODE"] = "structured"
     env["NEURALFORECAST_SKIP_SUMMARY_ARTIFACTS"] = "1"
+    env[_ALLOW_INTERNAL_OUTPUT_ROOT_ENV] = "1"
     return env
 
 
@@ -111,6 +114,8 @@ def _worker_command(
         "--output-root",
         str(command_output_root),
     ]
+    if loaded.active_jobs_route_slug:
+        command.extend(["--internal-jobs-route", loaded.active_jobs_route_slug])
     if launch.phase != "full":
         command.extend(["--internal-stage", launch.phase])
     if loaded.source_type == "toml":

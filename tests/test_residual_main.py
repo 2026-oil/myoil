@@ -109,3 +109,22 @@ def test_needs_reexec_falls_back_to_true_when_sys_executable_resolution_fails(
 def test_main_rejects_removed_output_root_flag(argv: list[str]) -> None:
     with pytest.raises(SystemExit, match="--output-root is no longer supported"):
         bootstrap_main.main(argv)
+
+
+def test_main_allows_internal_output_root_bypass(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import residual.runtime as runtime
+
+    calls: dict[str, object] = {}
+    monkeypatch.setenv(bootstrap_main._BOOTSTRAP_ENV, '1')
+    monkeypatch.setenv(bootstrap_main._ALLOW_INTERNAL_OUTPUT_ROOT_ENV, '1')
+
+    def fake_runtime_main(args: list[str]) -> int:
+        calls['args'] = list(args)
+        return 0
+
+    monkeypatch.setattr(runtime, 'main', fake_runtime_main)
+
+    assert bootstrap_main.main(['--output-root', 'runs/internal']) == 0
+    assert calls['args'] == ['--output-root', 'runs/internal']

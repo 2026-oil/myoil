@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import itertools
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -478,7 +479,15 @@ def run_main(
     cmd = [sys.executable, str(repo_root / "main.py"), "--config", str(config_path), "--output-root", str(output_root)]
     if jobs:
         cmd.extend(["--jobs", *jobs])
-    subprocess.run(cmd, cwd=repo_root, check=True)
+    prior = os.environ.get("NEURALFORECAST_ALLOW_INTERNAL_OUTPUT_ROOT")
+    os.environ["NEURALFORECAST_ALLOW_INTERNAL_OUTPUT_ROOT"] = "1"
+    try:
+        subprocess.run(cmd, cwd=repo_root, check=True)
+    finally:
+        if prior is None:
+            os.environ.pop("NEURALFORECAST_ALLOW_INTERNAL_OUTPUT_ROOT", None)
+        else:
+            os.environ["NEURALFORECAST_ALLOW_INTERNAL_OUTPUT_ROOT"] = prior
     return output_root
 
 

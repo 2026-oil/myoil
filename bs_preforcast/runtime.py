@@ -92,9 +92,22 @@ def resolve_bs_preforcast_injection_mode(
     if not loaded.config.bs_preforcast.using_futr_exog:
         return "lag_derived"
     jobs = list(selected_jobs)
-    if jobs and all(validate_job(job).supports_futr_exog for job in jobs):
-        return "futr_exog"
-    return "lag_derived"
+    if not jobs:
+        raise ValueError(
+            "bs_preforcast requested futr_exog injection but no selected main jobs were provided"
+        )
+    unsupported_jobs = [
+        str(job.model)
+        for job in jobs
+        if not validate_job(job).supports_futr_exog
+    ]
+    if unsupported_jobs:
+        unsupported = ", ".join(unsupported_jobs)
+        raise ValueError(
+            "bs_preforcast requested futr_exog injection, but selected main job(s) do not support futr_exog: "
+            f"{unsupported}"
+        )
+    return "futr_exog"
 
 
 def _stage_capability_payload(stage_loaded: LoadedConfig) -> dict[str, Any]:
@@ -229,19 +242,27 @@ def _forecast_column_name(column: str) -> str:
     return f"bs_preforcast_futr__{column}"
 
 
-def _last_value_forecast(
-    train_df: pd.DataFrame,
+def _require_forecast_values(
+    forecasts_by_column: dict[str, list[float]],
     *,
     column: str,
     horizon: int,
 ) -> list[float]:
-    if column not in train_df.columns:
-        raise ValueError(f"bs_preforcast target column missing from dataset: {column}")
-    history = train_df[column].dropna()
-    if history.empty:
-        raise ValueError(f"bs_preforcast target column has no non-null history: {column}")
-    last_value = float(history.iloc[-1])
-    return [last_value] * horizon
+    if column not in forecasts_by_column:
+        raise ValueError(
+            f"bs_preforcast did not produce forecasts for target column: {column}"
+        )
+    forecast_values = forecasts_by_column[column]
+    if len(forecast_values) != horizon:
+        raise ValueError(
+            "bs_preforcast produced an unexpected forecast horizon for "
+            f"{column}: expected {horizon}, got {len(forecast_values)}"
+        )
+    if any(pd.isna(value) for value in forecast_values):
+        raise ValueError(
+            f"bs_preforcast produced missing forecast value(s) for target column: {column}"
+        )
+    return [float(value) for value in forecast_values]
 
 
 def _stage_prediction_column(predictions: pd.DataFrame, model_name: str) -> str:
@@ -615,7 +636,10 @@ def _predict_stage_univariate_tree(
     series = train_df[target_column].astype(float).tolist()
     max_lag = max(1, min(int(stage_loaded.config.training.input_size), len(series) - 1))
     if len(series) <= max_lag:
-        return _last_value_forecast(train_df, column=target_column, horizon=len(future_df))
+        raise ValueError(
+            "bs_preforcast tree stage requires more history before forecasting "
+            f"target column: {target_column}"
+        )
     X: list[list[float]] = []
     y: list[float] = []
     for idx in range(max_lag, len(series)):
@@ -784,13 +808,11 @@ def prepare_bs_preforcast_fold_inputs(
     hist_columns = list(loaded.config.dataset.hist_exog_cols)
 
     for column in target_columns:
-        forecast_values = forecasts_by_column.get(column)
-        if not forecast_values:
-            forecast_values = _last_value_forecast(
-                train_df,
-                column=column,
-                horizon=horizon,
-            )
+        forecast_values = _require_forecast_values(
+            forecasts_by_column,
+            column=column,
+            horizon=horizon,
+        )
         forecast_column = _forecast_column_name(column)
         if injection_mode == "futr_exog":
             train_frame[forecast_column] = train_frame[column].astype(float)

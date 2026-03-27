@@ -114,26 +114,30 @@ _config_worker_devices() {
   fi
 }
 
-yaml_list=(  
-  "yaml/feature_set/brentoil-case3.yaml"
-  "yaml/feature_set/wti-case3.yaml"
-  "yaml/feature_set/brentoil-case4.yaml"
-  "yaml/feature_set/wti-case4.yaml"
-  
-  "yaml/feature_set/brentoil-case2.yaml"
-  "yaml/feature_set/wti-case2.yaml"
-  "yaml/feature_set/brentoil-case1.yaml"
-  "yaml/feature_set/wti-case1.yaml"
+yaml_list=(
+  "yaml/feature_set_HPT_n100_bs/brentoil-case2.yaml"
+  "yaml/feature_set_HPT_n100_bs/wti-case2.yaml"
+  "yaml/feature_set_HPT_n100_bs/brentoil-case3.yaml"
+  "yaml/feature_set_HPT_n100_bs/wti-case3.yaml"
+  "yaml/feature_set_HPT_n100_bs/brentoil-case4.yaml"
+  "yaml/feature_set_HPT_n100_bs/wti-case4.yaml"
 
-  "yaml/feature_set_bs/brentoil-case3.yaml"
-  "yaml/feature_set_bs/wti-case3.yaml"
-  "yaml/feature_set_bs/brentoil-case4.yaml"
-  "yaml/feature_set_bs/wti-case4.yaml"
-  
-  "yaml/feature_set_bs/brentoil-case2.yaml"
-  "yaml/feature_set_bs/wti-case2.yaml"
-  "yaml/feature_set_bs/brentoil-case1.yaml"
-  "yaml/feature_set_bs/wti-case1.yaml"
+  "yaml/feature_set_residual_bs_HPT/brentoil-case2.yaml"
+  "yaml/feature_set_residual_bs_HPT/wti-case2.yaml"
+  "yaml/feature_set_residual_bs_HPT/brentoil-case3.yaml"
+  "yaml/feature_set_residual_bs_HPT/wti-case3.yaml"
+  "yaml/feature_set_residual_bs_HPT/brentoil-case4.yaml"
+  "yaml/feature_set_residual_bs_HPT/wti-case4.yaml"
+
+  "yaml/feature_set_residual/brentoil-case3.yaml"
+  "yaml/feature_set_residual/wti-case3.yaml"
+
+  "yaml/feature_set_residual_bs/brentoil-case2.yaml"
+  "yaml/feature_set_residual_bs/wti-case2.yaml"
+  "yaml/feature_set_residual_bs/brentoil-case3.yaml"
+  "yaml/feature_set_residual_bs/wti-case3.yaml"
+  "yaml/feature_set_residual_bs/brentoil-case4.yaml"
+  "yaml/feature_set_residual_bs/wti-case4.yaml"
 )
 
 if [[ -n "${NF_CASE_CONFIGS:-}" ]]; then
@@ -225,7 +229,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -324,11 +328,11 @@ with results_tsv_path.open("a", encoding="utf-8", newline="") as handle:
         config = str(entry["config"])
         worker_devices = int(entry["worker_devices"])
         cfg_path = Path(config)
-        cfg_start = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        cfg_start = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         log_path = log_dir / f"{cfg_path.stem}.log"
         if not cfg_path.is_file():
             print(f"[batch] missing config: {config}", flush=True)
-            writer.writerow([config, "missing", "missing", "", cfg_start, datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")])
+            writer.writerow([config, "missing", "missing", "", cfg_start, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")])
             return False
 
         estimate = duration_history.get(config, 0.0)
@@ -349,7 +353,7 @@ with results_tsv_path.open("a", encoding="utf-8", newline="") as handle:
                         "worker_devices",
                         str(log_path),
                         cfg_start,
-                        datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     ]
                 )
                 return False
@@ -416,7 +420,7 @@ with results_tsv_path.open("a", encoding="utf-8", newline="") as handle:
                 continue
             process.wait()
             item["log_handle"].close()
-            finished_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+            finished_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             config = str(item["config"])
             log_path = str(item["log_path"])
             slot_label = str(item["slot_label"])

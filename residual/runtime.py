@@ -217,6 +217,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--validate-only", action="store_true")
     parser.add_argument("--jobs", nargs="+", default=None)
     parser.add_argument("--output-root", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--internal-jobs-route", default=None, help=argparse.SUPPRESS)
     parser.add_argument(
         "--internal-stage",
         choices=("full", "tune-main-only", "replay-only"),
@@ -3200,6 +3201,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     loaded = load_app_config(
         repo_root, config_path=config_path, config_toml_path=args.config_toml
     )
+    if loaded.jobs_fanout_specs and args.internal_jobs_route is not None:
+        selected_spec = next(
+            (
+                spec
+                for spec in loaded.jobs_fanout_specs
+                if spec.route_slug == args.internal_jobs_route
+            ),
+            None,
+        )
+        if selected_spec is None:
+            parser.error(
+                f"--internal-jobs-route={args.internal_jobs_route} did not match any jobs route slug"
+            )
+        loaded = loaded_config_for_jobs_fanout(repo_root, loaded, selected_spec)
     if loaded.jobs_fanout_specs:
         if args.output_root is not None:
             parser.error(

@@ -8,6 +8,7 @@ from typing import Sequence
 WORKSPACE_ROOT = Path(__file__).resolve().parent
 VENV_PYTHON = WORKSPACE_ROOT / '.venv' / 'bin' / 'python'
 _BOOTSTRAP_ENV = 'NEURALFORECAST_RESIDUAL_BOOTSTRAPPED'
+_ALLOW_INTERNAL_OUTPUT_ROOT_ENV = 'NEURALFORECAST_ALLOW_INTERNAL_OUTPUT_ROOT'
 
 
 def _build_env() -> dict[str, str]:
@@ -31,6 +32,8 @@ def _needs_reexec() -> bool:
 
 
 def _reject_removed_args(args: Sequence[str]) -> None:
+    if os.environ.get(_ALLOW_INTERNAL_OUTPUT_ROOT_ENV) == '1':
+        return
     for idx, arg in enumerate(args):
         if arg == '--output-root':
             raise SystemExit(

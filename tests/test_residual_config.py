@@ -4250,6 +4250,74 @@ def test_bs_preforcast_direct_stage_variant_rejects_short_dataset_for_horizon(
         )
 
 
+def test_bs_preforcast_tree_stage_short_history_fails_fast(
+    tmp_path: Path,
+):
+    from residual.bs_preforcast_runtime import (
+        _predict_stage_univariate_tree,
+        _single_stage_job,
+        load_bs_preforcast_stage_config,
+    )
+
+    payload = _payload()
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    payload["bs_preforcast"] = {
+        "enabled": True,
+        "using_futr_exog": False,
+        "target_columns": ["bs_a"],
+        "task": {"multivariable": False},
+    }
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,bs_a\n"
+        "2020-01-01,1,2,10\n",
+        encoding="utf-8",
+    )
+    stage_payload = _payload()
+    stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
+    stage_payload["dataset"]["target_col"] = "bs_a"
+    stage_payload["dataset"]["hist_exog_cols"] = []
+    stage_payload["training"].update({"input_size": 8, "max_steps": 1, "val_size": 1})
+    stage_payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    stage_payload["jobs"] = [{"model": "xgboost", "params": {"n_estimators": 2}}]
+    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    stage_root = tmp_path / "stage_tree_direct"
+    stage_root.mkdir(parents=True, exist_ok=True)
+    stage_path = _write_config(stage_root, stage_payload, ".yaml")
+    payload["bs_preforcast"]["config_path"] = str(stage_path)
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+            "bs_preforcast_models": {"xgboost": ["n_estimators"]},
+            "bs_preforcast_training": [],
+        },
+    )
+
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+    stage_loaded = load_bs_preforcast_stage_config(tmp_path, loaded)
+    assert stage_loaded is not None
+
+    train_df = pd.read_csv(tmp_path / "data.csv")
+    future_df = train_df.copy()
+
+    with pytest.raises(
+        ValueError,
+        match="tree stage requires more history before forecasting target column: bs_a",
+    ):
+        _predict_stage_univariate_tree(
+            stage_loaded,
+            _single_stage_job(stage_loaded),
+            target_column="bs_a",
+            train_df=train_df,
+            future_df=future_df,
+            model_name="xgboost",
+        )
+
+
 def test_bs_preforcast_direct_stage_variant_writes_cv_forecasts_for_aggregate_artifact(
     tmp_path: Path,
 ):
@@ -4876,7 +4944,12 @@ def test_runtime_validate_only_records_bs_preforcast_metadata(
                 },
                 "univariable": {
                     "dataset": {"target_col": "bs_a"},
-                    "jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
+                    "jobs": [
+                        {
+                            "model": "DummyUnivariate",
+                            "params": {"start_padding_enabled": True},
+                        }
+                    ],
                 },
             },
             sort_keys=False,
@@ -4940,7 +5013,7 @@ def test_runtime_validate_only_records_bs_preforcast_metadata(
     assert manifest["bs_preforcast"]["injection_mode"] == "futr_exog"
 
 
-def test_runtime_validate_only_bs_preforcast_falls_back_to_lag_derived_for_naive(
+def test_runtime_validate_only_bs_preforcast_fails_for_unsupported_futr_exog_main_job(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     payload = _payload()
@@ -5037,23 +5110,18 @@ def test_runtime_validate_only_bs_preforcast_falls_back_to_lag_derived_for_naive
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
 
     output_root = tmp_path / "run_bs_preforcast_validate_lag"
-    code = runtime.main(
-        [
-            "--config",
-            str(config_path),
-            "--jobs",
-            "Naive",
-            "--output-root",
-            str(output_root),
-            "--validate-only",
-        ]
-    )
-
-    assert code == 0
-    resolved = json.loads((output_root / "config" / "config.resolved.json").read_text())
-    manifest = json.loads((output_root / "manifest" / "run_manifest.json").read_text())
-    assert resolved["bs_preforcast"]["injection_mode"] == "lag_derived"
-    assert manifest["bs_preforcast"]["injection_mode"] == "lag_derived"
+    with pytest.raises(ValueError, match="do not support futr_exog"):
+        runtime.main(
+            [
+                "--config",
+                str(config_path),
+                "--jobs",
+                "Naive",
+                "--output-root",
+                str(output_root),
+                "--validate-only",
+            ]
+        )
 
 
 def test_prepare_bs_preforcast_fold_inputs_adds_preforcast_futr_columns(
@@ -5153,7 +5221,10 @@ def test_prepare_bs_preforcast_fold_inputs_adds_preforcast_futr_columns(
             "bs_preforcast_training": [],
         },
     )
-    loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+    loaded = load_app_config(
+        tmp_path,
+        config_path=_write_config(tmp_path, payload, ".yaml"),
+    )
     job = loaded.config.jobs[0]
     source_df = pd.read_csv(tmp_path / "data.csv")
     train_df = source_df.iloc[:2].reset_index(drop=True)
@@ -5170,6 +5241,117 @@ def test_prepare_bs_preforcast_fold_inputs_adds_preforcast_futr_columns(
     assert transformed_future["bs_preforcast_futr__bs_a"].tolist() == pytest.approx(
         [11.0], abs=0.05
     )
+
+
+def test_prepare_bs_preforcast_fold_inputs_missing_forecasts_fail_fast(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import residual.bs_preforcast_runtime as bs_runtime
+
+    payload = _payload()
+    payload["training"].update({"input_size": 2, "max_steps": 1, "val_size": 1})
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    payload["bs_preforcast"] = {
+        "enabled": True,
+        "config_path": "bs_preforcast.yaml",
+        "using_futr_exog": True,
+        "target_columns": ["bs_a"],
+        "task": {"multivariable": False},
+    }
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,bs_a\n"
+        "2020-01-01,1,2,10\n"
+        "2020-01-08,2,3,11\n"
+        "2020-01-15,3,4,12\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "bs_preforcast.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "common": {
+                    "dataset": {
+                        "path": str((tmp_path / "data.csv").resolve()),
+                        "dt_col": "dt",
+                        "hist_exog_cols": [],
+                        "futr_exog_cols": [],
+                        "static_exog_cols": [],
+                    },
+                    "runtime": {"random_seed": 1},
+                    "training": {
+                        "input_size": 2,
+                        "season_length": 52,
+                        "batch_size": 32,
+                        "valid_batch_size": 64,
+                        "windows_batch_size": 1024,
+                        "inference_windows_batch_size": 1024,
+                        "learning_rate": 0.001,
+                        "max_steps": 1,
+                        "val_size": 1,
+                        "loss": "mse",
+                    },
+                    "cv": {
+                        "horizon": 1,
+                        "step_size": 1,
+                        "n_windows": 1,
+                        "gap": 0,
+                        "overlap_eval_policy": "by_cutoff_mean",
+                    },
+                    "scheduler": {
+                        "gpu_ids": [0, 1],
+                        "max_concurrent_jobs": 2,
+                        "worker_devices": 1,
+                        "parallelize_single_job_tuning": False,
+                    },
+                    "residual": {"enabled": False, "model": "xgboost", "params": {}},
+                },
+                "univariable": {
+                    "dataset": {"target_col": "bs_a"},
+                    "jobs": [
+                        {
+                            "model": "DummyUnivariate",
+                            "params": {"start_padding_enabled": True},
+                        }
+                    ],
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+            "bs_preforcast_models": {},
+            "bs_preforcast_training": [],
+        },
+    )
+    loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+    source_df = pd.read_csv(tmp_path / "data.csv")
+
+    monkeypatch.setattr(
+        bs_runtime,
+        "compute_bs_preforcast_fold_forecasts",
+        lambda *args, **kwargs: {},
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="did not produce forecasts for target column: bs_a",
+    ):
+        prepare_bs_preforcast_fold_inputs(
+            loaded,
+            loaded.config.jobs[0],
+            source_df.iloc[:2].reset_index(drop=True),
+            source_df.iloc[2:].reset_index(drop=True),
+        )
 
 
 def test_prepare_bs_preforcast_fold_inputs_uses_futr_path_for_timexer_native_future_exog(
@@ -8093,7 +8275,6 @@ def test_runtime_rejects_output_root_for_jobs_path_list(
         "--output-root is not supported when jobs is a list of job-file paths"
         in capsys.readouterr().err
     )
-
 
 def test_runtime_execution_fans_out_jobs_path_list(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

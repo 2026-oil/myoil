@@ -41,8 +41,8 @@ bs_preforcast:
   - `false`면 기존 main stage만 실행
 
 - `using_futr_exog`
-  - `true`면 가능한 경우 `futr_exog` 경로 사용
-  - `false`면 `lag_derived` 경로 사용
+  - `true`면 `futr_exog` 경로를 **강제**하고, main 모델이 이를 지원하지 않으면 즉시 실패
+  - `false`면 명시적으로 `lag_derived` 경로 사용
 
 - `target_columns`
   - stage1이 예측할 대상 컬럼 목록
@@ -228,7 +228,6 @@ target_columns:
 조건:
 
 - `using_futr_exog: false`
-- 또는 main 모델이 `futr_exog` 미지원
 
 동작:
 
@@ -246,6 +245,12 @@ target_columns:
 - lag-derived 모드에서는 `hist_exog_cols`
 
 로 연결됩니다.
+
+### fail-fast 규칙
+
+- `using_futr_exog: true`인데 main 모델이 `futr_exog`를 지원하지 않으면 `lag_derived`로 내리지 않고 즉시 실패합니다.
+- stage1 forecast 값이 없거나 비어 있으면 마지막 값 대체를 하지 않고 즉시 실패합니다.
+- tree direct stage가 예측에 필요한 최소 history를 못 가지면 마지막 값 대체 없이 즉시 실패합니다.
 
 ---
 
@@ -274,7 +279,7 @@ target_columns:
 ### 주의
 
 - baseline-only job (`Naive`, `SeasonalNaive`, `HistoricAverage`)는 stage1 actual execution에서 지원하지 않음
-- statistical / tree model은 direct-run fallback 경로
+- statistical / tree model은 direct-run execution 경로
 - NF-native 모델은 기존 `main.py` runtime subprocess 경로 재사용
 
 ---
@@ -451,7 +456,9 @@ uv run python main.py --config path/to/main.yaml --jobs DLinear --output-root ru
 - `bs_preforcast.yaml` 독립 파일 기반
 - main YAML이 `target_columns`를 소유
 - `futr_exog` 지원 모델이면 future exog 주입
-- 그렇지 않으면 lag/history 쪽으로 주입
+- `using_futr_exog: true`인데 지원하지 않으면 fail-fast
+- `using_futr_exog: false`일 때만 lag/history 쪽으로 주입
 - statistical / tree / NF-native stage model 모두 지원 경로 존재
 - learned-auto stage job은 materialized `best_params.json`을 fold-time injection에서 재사용
 - 짧은 데이터 + 큰 horizon direct stage는 fail-fast
+- tree direct stage short-history도 fail-fast
