@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from pathlib import Path
 
 import bs_preforcast.runtime as bs_runtime
@@ -40,3 +41,51 @@ def test_validate_only_bs_preforcast_smoke_fixture_materializes_stage_metadata(
     assert resolved["bs_preforcast"]["validate_only"] is True
     assert capability["bs_preforcast"]["enabled"] is True
     assert manifest["bs_preforcast"]["validate_only"] is True
+
+
+def test_run_stage_variants_marks_output_root_as_internal(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / "main.py").write_text("", encoding="utf-8")
+    captured: dict[str, object] = {}
+    stage_job_model = next(iter(bs_runtime.MODEL_CLASSES))
+
+    monkeypatch.setattr(bs_runtime, "_repo_root", lambda: repo_root)
+    monkeypatch.setattr(
+        bs_runtime,
+        "_single_stage_job",
+        lambda _loaded: SimpleNamespace(model=stage_job_model),
+    )
+    monkeypatch.setattr(
+        bs_runtime,
+        "_stage_variant_payloads",
+        lambda _loaded: [("demo", {"jobs": [{"model": stage_job_model, "params": {}}]})],
+    )
+
+    def fake_run(cmd, *, cwd, check, env):
+        captured["cmd"] = list(cmd)
+        captured["cwd"] = cwd
+        captured["check"] = check
+        captured["env"] = dict(env)
+
+    monkeypatch.setattr(bs_runtime.subprocess, "run", fake_run)
+
+    run_root = tmp_path / "run-root"
+    result = bs_runtime._run_stage_variants(object(), run_root=run_root)
+
+    assert result == [run_root / "bs_preforcast" / "runs" / "demo"]
+    assert captured["cmd"] == [
+        bs_runtime.sys.executable,
+        str(repo_root / "main.py"),
+        "--config",
+        str(run_root / "bs_preforcast" / "temp_configs" / "demo.yaml"),
+        "--output-root",
+        str(run_root / "bs_preforcast" / "runs" / "demo"),
+    ]
+    assert captured["cwd"] == repo_root
+    assert captured["check"] is True
+    env = captured["env"]
+    assert isinstance(env, dict)
+    assert env[bs_runtime._ALLOW_INTERNAL_OUTPUT_ROOT_ENV] == "1"
