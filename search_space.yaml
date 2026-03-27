@@ -377,23 +377,65 @@ residual:
       low: 0.6
       high: 1.0
 bs_preforcast_models:
-  AutoARIMA:
-    stage_season_length:
+  ARIMA:
+    order:
+      type: categorical
+      choices:
+      - "[1, 0, 0]"
+      - "[1, 1, 0]"
+      - "[2, 1, 0]"
+    seasonal_order:
+      type: categorical
+      choices:
+      - "[0, 0, 0]"
+      - "[1, 0, 0]"
+    season_length:
       type: categorical
       choices:
       - 1
       - 4
       - 8
       - 12
+    include_mean:
+      type: categorical
+      choices:
+      - true
+      - false
+    include_drift:
+      type: categorical
+      choices:
+      - false
+      - true
   ES:
-    stage_season_length:
+    season_length:
       type: categorical
       choices:
       - 1
       - 4
       - 8
       - 12
+    trend:
+      type: categorical
+      choices:
+      - null
+      - add
+    seasonal:
+      type: categorical
+      choices:
+      - null
+      - add
+    damped_trend:
+      type: categorical
+      choices:
+      - false
+      - true
   xgboost:
+    lags:
+      type: categorical
+      choices:
+      - "[1, 2, 3]"
+      - "[1, 2, 3, 6, 12]"
+      - "[1, 2, 3, 6, 12, 24]"
     n_estimators:
       type: categorical
       choices:
@@ -405,7 +447,17 @@ bs_preforcast_models:
       low: 2
       high: 6
       step: 1
+    learning_rate:
+      type: float
+      low: 0.01
+      high: 0.2
   lightgbm:
+    lags:
+      type: categorical
+      choices:
+      - "[1, 2, 3]"
+      - "[1, 2, 3, 6, 12]"
+      - "[1, 2, 3, 6, 12, 24]"
     n_estimators:
       type: categorical
       choices:
@@ -418,6 +470,10 @@ bs_preforcast_models:
       - 4
       - 6
       - -1
+    learning_rate:
+      type: float
+      low: 0.01
+      high: 0.2
     num_leaves:
       type: categorical
       choices:

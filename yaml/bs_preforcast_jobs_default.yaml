@@ -1,0 +1,29 @@
+- model: ARIMA
+  params:
+    order: [1, 1, 0]
+    seasonal_order: [0, 0, 0]
+    season_length: 12
+    include_mean: true
+    include_drift: false
+- model: ES
+  params:
+    trend: add
+    seasonal: null
+    damped_trend: false
+    season_length: 12
+- model: xgboost
+  params:
+    lags: [1, 2, 3, 6, 12]
+    n_estimators: 64
+    max_depth: 4
+    learning_rate: 0.05
+    subsample: 1.0
+    colsample_bytree: 1.0
+- model: lightgbm
+  params:
+    lags: [1, 2, 3, 6, 12]
+    n_estimators: 96
+    max_depth: 6
+    learning_rate: 0.05
+    num_leaves: 31
+    min_child_samples: 20

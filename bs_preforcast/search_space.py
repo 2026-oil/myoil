@@ -49,16 +49,50 @@ SUPPORTED_BS_PREFORCAST_MODELS = {
     "Naive",
     "xgboost",
     "lightgbm",
-    "AutoARIMA",
+    "ARIMA",
     "ES",
 }
 
 BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY: dict[str, dict[str, dict[str, Any]]] = {
-    "AutoARIMA": {
+    "ARIMA": {
+        "order": {
+            "type": "categorical",
+            "choices": ["[1, 0, 0]", "[1, 1, 0]", "[2, 1, 0]"],
+        },
+        "seasonal_order": {
+            "type": "categorical",
+            "choices": ["[0, 0, 0]", "[1, 0, 0]"],
+        },
         "season_length": {"type": "categorical", "choices": [1, 4, 8, 12]},
+        "include_mean": {"type": "categorical", "choices": [True, False]},
+        "include_drift": {"type": "categorical", "choices": [False, True]},
     },
     "ES": {
         "season_length": {"type": "categorical", "choices": [1, 4, 8, 12]},
+        "trend": {"type": "categorical", "choices": [None, "add"]},
+        "seasonal": {"type": "categorical", "choices": [None, "add"]},
+        "damped_trend": {"type": "categorical", "choices": [False, True]},
+    },
+    "xgboost": {
+        "lags": {
+            "type": "categorical",
+            "choices": ["[1, 2, 3]", "[1, 2, 3, 6, 12]"],
+        },
+        "n_estimators": {"type": "categorical", "choices": [16, 32, 64]},
+        "max_depth": {"type": "int", "low": 2, "high": 6, "step": 1},
+        "learning_rate": {"type": "float", "low": 0.01, "high": 0.2},
+    },
+    "lightgbm": {
+        "lags": {
+            "type": "categorical",
+            "choices": ["[1, 2, 3]", "[1, 2, 3, 6, 12]"],
+        },
+        "n_estimators": {"type": "categorical", "choices": [32, 64, 96]},
+        "max_depth": {"type": "categorical", "choices": [4, 6, -1]},
+        "learning_rate": {"type": "float", "low": 0.01, "high": 0.2},
+        "num_leaves": {"type": "categorical", "choices": [15, 31, 63]},
+        "min_child_samples": {"type": "categorical", "choices": [10, 20, 40]},
+        "feature_fraction": {"type": "float", "low": 0.6, "high": 1.0},
     },
 }
 
@@ -112,7 +146,7 @@ def normalize_bs_preforcast_sections(
             model_name
             for model_name, specs in bs_preforcast_models.items()
             if "learning_rate" in specs
-            and model_name not in {"xgboost", "lightgbm", "AutoARIMA", "ES"}
+            and model_name not in {"xgboost", "lightgbm", "ARIMA", "ES"}
         )
         if overlaps:
             raise ValueError(

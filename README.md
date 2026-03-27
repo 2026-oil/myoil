@@ -157,6 +157,7 @@ bs_preforcast:
 상세 설정/동작/아티팩트 설명은 별도 문서를 보세요:
 
 - `bs_preforcast.md`
+- `yaml/bs_preforcast_jobs_default.yaml` (univariable direct-model 기본 파라미터)
 
 ---
 

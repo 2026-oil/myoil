@@ -711,6 +711,10 @@ def _normalize_job(
     model_search_space_key: str = "models",
 ) -> JobConfig:
     model_name = str(job["model"])
+    if model_search_space_key == "bs_preforcast_models" and model_name == "AutoARIMA":
+        raise ValueError(
+            "bs_preforcast stage no longer supports AutoARIMA; use ARIMA instead"
+        )
     params = dict(job.get("params", {}))
     supported_auto_models = (
         SUPPORTED_BS_PREFORCAST_MODELS
@@ -1030,9 +1034,20 @@ def _normalize_payload(
                     and search_space.get("__scope__") == "bs_preforcast"
                 )
             )
-            and normalized_job.model in {"AutoARIMA", "ES"}
+            and normalized_job.model in {"ARIMA", "ES"}
         ):
             duplicated = duplicated.difference({"season_length"})
+        if (
+            (
+                stage_scope == "bs_preforcast"
+                or (
+                    search_space is not None
+                    and search_space.get("__scope__") == "bs_preforcast"
+                )
+            )
+            and normalized_job.model in {"xgboost", "lightgbm"}
+        ):
+            duplicated = duplicated.difference({"learning_rate"})
         if duplicated:
             duplicated_keys = ", ".join(sorted(duplicated))
             raise ValueError(

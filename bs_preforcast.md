@@ -248,7 +248,7 @@ target_columns:
 
 ### 통계
 
-- `AutoARIMA`
+- `ARIMA`
 - `ES`
 
 ### ML
@@ -266,6 +266,7 @@ target_columns:
 
 ### 주의
 
+- univariable direct-model 기본값은 `yaml/bs_preforcast_jobs_default.yaml`가 소유합니다.
 - baseline-only job (`Naive`, `SeasonalNaive`, `HistoricAverage`)는 stage1 actual execution에서 지원하지 않음
 - statistical / tree model은 direct-run execution 경로
 - NF-native 모델은 기존 `main.py` runtime subprocess 경로 재사용
@@ -278,10 +279,20 @@ repo root `search_space.yaml`에 아래 section이 추가됩니다.
 
 ```yaml
 bs_preforcast_models:
-  AutoARIMA:
+  ARIMA:
+    order:
+      type: categorical
+      choices: ["[1, 0, 0]", "[1, 1, 0]", "[2, 1, 0]"]
     season_length:
       type: categorical
       choices: [1, 4, 8, 12]
+  xgboost:
+    lags:
+      type: categorical
+      choices:
+        - "[1, 2, 3]"
+        - "[1, 2, 3, 6, 12]"
+        - "[1, 2, 3, 6, 12, 24]"
 
 bs_preforcast_training:
   global:
@@ -299,15 +310,18 @@ bs_preforcast_training:
 
 ---
 
-## 8. `AutoARIMA`, `ES` 파라미터
+## 8. `ARIMA`, `ES`, tree direct 파라미터
 
-현재 statistical stage model은 `season_length` selector를 지원합니다.
+현재 statistical stage model은 `season_length` selector를 지원하고, tree direct model은 명시적 `lags` list를 지원합니다.
 
 예:
 
 ```yaml
 bs_preforcast_models:
-  AutoARIMA:
+  ARIMA:
+    order:
+      type: categorical
+      choices: ["[1, 0, 0]", "[1, 1, 0]", "[2, 1, 0]"]
     season_length:
       type: categorical
       choices: [1, 4, 8, 12]
@@ -315,9 +329,16 @@ bs_preforcast_models:
     season_length:
       type: categorical
       choices: [1, 4, 8, 12]
+  xgboost:
+    lags:
+      type: categorical
+      choices:
+        - "[1, 2, 3]"
+        - "[1, 2, 3, 6, 12]"
 ```
 
-실행 시 이 값은 direct predictor의 `season_length`로 사용됩니다.
+실행 시 statistical model은 direct predictor의 `season_length`를 사용하고,
+`xgboost` / `lightgbm`는 `skforecast.direct.ForecasterDirect`에 `lags`를 그대로 전달합니다.
 
 ---
 

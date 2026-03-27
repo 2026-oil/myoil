@@ -47,6 +47,4 @@ univariable:
     name: bs_preforcast_fixture_stage
   dataset:
     target_col: bs_a
-  jobs:
-    - model: Naive
-      params: {}
+  jobs: yaml/bs_preforcast_jobs_default.yaml

@@ -148,3 +148,28 @@ def test_load_app_config_materializes_bs_preforcast_stage_with_top_level_config_
     assert loaded.bs_preforcast_stage1.source_path == stage_path.resolve()
     assert loaded.config.bs_preforcast.using_futr_exog is False
     assert loaded.config.bs_preforcast.target_columns == ("bs_a",)
+
+
+def test_repo_bs_preforcast_yaml_uses_shared_jobs_default_path() -> None:
+    payload = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / "bs_preforcast.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert payload["univariable"]["jobs"] == "yaml/bs_preforcast_jobs_default.yaml"
+
+
+def test_repo_bs_preforcast_jobs_default_yaml_contains_direct_models() -> None:
+    payload = yaml.safe_load(
+        (
+            Path(__file__).resolve().parents[1]
+            / "yaml"
+            / "bs_preforcast_jobs_default.yaml"
+        ).read_text(encoding="utf-8")
+    )
+    jobs = payload if isinstance(payload, list) else payload["jobs"]
+
+    assert [job["model"] for job in jobs] == ["ARIMA", "ES", "xgboost", "lightgbm"]
+    assert jobs[0]["params"]["season_length"] == 12
+    assert jobs[2]["params"]["lags"] == [1, 2, 3, 6, 12]

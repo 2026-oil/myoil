@@ -4005,7 +4005,7 @@ def test_load_app_config_bs_preforcast_stage1_auto_uses_dedicated_search_space(
     )
 
 
-def test_load_app_config_bs_preforcast_stage1_auto_supports_autoarima(
+def test_load_app_config_bs_preforcast_stage1_auto_supports_arima(
     tmp_path: Path,
 ):
     payload = _payload()
@@ -4025,9 +4025,9 @@ def test_load_app_config_bs_preforcast_stage1_auto_supports_autoarima(
     stage_payload["dataset"]["hist_exog_cols"] = []
     stage_payload["training"].update({"input_size": 2, "max_steps": 1, "val_size": 1})
     stage_payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
-    stage_payload["jobs"] = [{"model": "AutoARIMA", "params": {}}]
+    stage_payload["jobs"] = [{"model": "ARIMA", "params": {}}]
     stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_root = tmp_path / "stage_autoarima"
+    stage_root = tmp_path / "stage_arima"
     stage_root.mkdir(parents=True, exist_ok=True)
     stage_path = _write_config(stage_root, stage_payload, ".yaml")
     payload["bs_preforcast"]["config_path"] = str(stage_path)
@@ -4038,8 +4038,8 @@ def test_load_app_config_bs_preforcast_stage1_auto_supports_autoarima(
             "training": [],
             "residual": {"xgboost": ["n_estimators"]},
             "bs_preforcast_models": {
-                "AutoARIMA": {
-                    "stage_season_length": {
+                "ARIMA": {
+                    "season_length": {
                         "type": "categorical",
                         "choices": [1, 4],
                     }
@@ -4054,12 +4054,54 @@ def test_load_app_config_bs_preforcast_stage1_auto_supports_autoarima(
     )
 
     assert loaded.bs_preforcast_stage1 is not None
-    assert loaded.bs_preforcast_stage1.config.jobs[0].model == "AutoARIMA"
+    assert loaded.bs_preforcast_stage1.config.jobs[0].model == "ARIMA"
     assert loaded.bs_preforcast_stage1.config.jobs[0].requested_mode == "learned_auto_requested"
     assert loaded.bs_preforcast_stage1.config.jobs[0].validated_mode == "learned_auto"
     assert list(loaded.bs_preforcast_stage1.config.jobs[0].selected_search_params) == [
-        "stage_season_length"
+        "season_length"
     ]
+
+
+def test_load_app_config_rejects_bs_preforcast_autoarima_stage_job(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    payload["bs_preforcast"] = _main_bs_preforcast()
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,bs_a\n"
+        "2020-01-01,1,2,10\n"
+        "2020-01-08,2,3,11\n"
+        "2020-01-15,3,4,12\n",
+        encoding="utf-8",
+    )
+    stage_payload = _payload()
+    stage_payload.update(_linked_bs_preforcast())
+    stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
+    stage_payload["dataset"]["target_col"] = "bs_a"
+    stage_payload["dataset"]["hist_exog_cols"] = []
+    stage_payload["jobs"] = [{"model": "AutoARIMA", "params": {}}]
+    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    stage_root = tmp_path / "stage_autoarima_removed"
+    stage_root.mkdir(parents=True, exist_ok=True)
+    stage_path = _write_config(stage_root, stage_payload, ".yaml")
+    payload["bs_preforcast"]["config_path"] = str(stage_path)
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"]},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+            "bs_preforcast_models": {},
+            "bs_preforcast_training": [],
+        },
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="no longer supports AutoARIMA; use ARIMA instead",
+    ):
+        load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
 
 
 def test_bs_preforcast_resolved_stage_job_uses_materialized_best_params(
@@ -4141,7 +4183,7 @@ def test_bs_preforcast_resolved_stage_job_uses_materialized_best_params(
     assert resolved.params == best_params
 
 
-def test_bs_preforcast_resolved_stage_job_maps_stage_season_length_to_season_length(
+def test_bs_preforcast_resolved_stage_job_uses_arima_best_params(
     tmp_path: Path,
 ):
     from residual.bs_preforcast_runtime import _resolved_stage_job, _stage_execution_loaded
@@ -4163,9 +4205,9 @@ def test_bs_preforcast_resolved_stage_job_maps_stage_season_length_to_season_len
     stage_payload["dataset"]["hist_exog_cols"] = []
     stage_payload["training"].update({"input_size": 2, "max_steps": 1, "val_size": 1})
     stage_payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
-    stage_payload["jobs"] = [{"model": "AutoARIMA", "params": {}}]
+    stage_payload["jobs"] = [{"model": "ARIMA", "params": {}}]
     stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_root = tmp_path / "stage_autoarima_auto"
+    stage_root = tmp_path / "stage_arima_auto"
     stage_root.mkdir(parents=True, exist_ok=True)
     stage_path = _write_config(stage_root, stage_payload, ".yaml")
     payload["bs_preforcast"]["config_path"] = str(stage_path)
@@ -4176,8 +4218,8 @@ def test_bs_preforcast_resolved_stage_job_maps_stage_season_length_to_season_len
             "training": [],
             "residual": {"xgboost": ["n_estimators"]},
             "bs_preforcast_models": {
-                "AutoARIMA": {
-                    "stage_season_length": {
+                "ARIMA": {
+                    "season_length": {
                         "type": "categorical",
                         "choices": [1, 4],
                     }
@@ -4191,10 +4233,10 @@ def test_bs_preforcast_resolved_stage_job_maps_stage_season_length_to_season_len
         tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
     )
     stage_run_root = tmp_path / "run" / "bs_preforcast" / "runs" / "bs_a"
-    best_params_path = stage_run_root / "models" / "AutoARIMA" / "best_params.json"
+    best_params_path = stage_run_root / "models" / "ARIMA" / "best_params.json"
     best_params_path.parent.mkdir(parents=True, exist_ok=True)
     best_params_path.write_text(
-        json.dumps({"stage_season_length": 4}),
+        json.dumps({"season_length": 4, "order": [1, 1, 0]}),
         encoding="utf-8",
     )
     loaded.normalized_payload.setdefault("bs_preforcast", {})["stage1_run_roots"] = [
@@ -4209,7 +4251,7 @@ def test_bs_preforcast_resolved_stage_job_maps_stage_season_length_to_season_len
 
     assert resolved.validated_mode == "learned_fixed"
     assert resolved.params["season_length"] == 4
-    assert "stage_season_length" not in resolved.params
+    assert resolved.params["order"] == (1, 1, 0)
 
 
 def test_bs_preforcast_direct_stage_variant_rejects_short_dataset_for_horizon(
@@ -4236,10 +4278,10 @@ def test_bs_preforcast_direct_stage_variant_rejects_short_dataset_for_horizon(
     stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
     stage_payload["dataset"]["target_col"] = "bs_a"
     stage_payload["dataset"]["hist_exog_cols"] = []
-    stage_payload["jobs"] = [{"model": "AutoARIMA", "params": {}}]
+    stage_payload["jobs"] = [{"model": "ARIMA", "params": {}}]
     stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     stage_payload["runtime"]["opt_n_trial"] = 1
-    stage_root = tmp_path / "stage_autoarima_direct"
+    stage_root = tmp_path / "stage_arima_direct"
     stage_root.mkdir(parents=True, exist_ok=True)
     stage_path = _write_config(stage_root, stage_payload, ".yaml")
     payload["bs_preforcast"]["config_path"] = str(stage_path)
@@ -4250,8 +4292,8 @@ def test_bs_preforcast_direct_stage_variant_rejects_short_dataset_for_horizon(
             "training": [],
             "residual": {"xgboost": ["n_estimators"]},
             "bs_preforcast_models": {
-                "AutoARIMA": {
-                    "stage_season_length": {
+                "ARIMA": {
+                    "season_length": {
                         "type": "categorical",
                         "choices": [4],
                     }
@@ -4358,12 +4400,12 @@ def test_bs_preforcast_direct_stage_variant_writes_cv_forecasts_for_aggregate_ar
     future_df = pd.DataFrame({"dt": ["2020-01-15"], "bs_a": [12.0]})
     _write_direct_stage_artifacts(
         stage_run_root,
-        model_name="AutoARIMA",
+        model_name="ARIMA",
         target_column="bs_a",
         forecasts=[11.5],
         future_df=future_df,
         dt_col="dt",
-        best_params={"stage_season_length": 4},
+        best_params={"season_length": 4, "order": [1, 1, 0]},
         best_training_params={},
         study_summary={"best_value": 0.1},
     )
@@ -6780,7 +6822,7 @@ def test_repo_search_space_bs_preforcast_sections_are_unique_and_include_stage_o
     search_space = _load_search_space_strict()
 
     assert set(search_space["bs_preforcast_models"]) == {
-        "AutoARIMA",
+        "ARIMA",
         "ES",
         "xgboost",
         "lightgbm",
@@ -6789,15 +6831,37 @@ def test_repo_search_space_bs_preforcast_sections_are_unique_and_include_stage_o
         "TimeXer",
         "TFT",
     }
-    assert "AutoARIMA" in SUPPORTED_BS_PREFORCAST_MODELS
+    assert "ARIMA" in SUPPORTED_BS_PREFORCAST_MODELS
     assert "ES" in SUPPORTED_BS_PREFORCAST_MODELS
     assert "xgboost" in SUPPORTED_BS_PREFORCAST_MODELS
     assert "lightgbm" in SUPPORTED_BS_PREFORCAST_MODELS
-    assert tuple(search_space["bs_preforcast_models"]["AutoARIMA"]) == (
-        "stage_season_length",
+    assert tuple(search_space["bs_preforcast_models"]["ARIMA"]) == (
+        "order",
+        "seasonal_order",
+        "season_length",
+        "include_mean",
+        "include_drift",
     )
     assert tuple(search_space["bs_preforcast_models"]["ES"]) == (
-        "stage_season_length",
+        "season_length",
+        "trend",
+        "seasonal",
+        "damped_trend",
+    )
+    assert tuple(search_space["bs_preforcast_models"]["xgboost"]) == (
+        "lags",
+        "n_estimators",
+        "max_depth",
+        "learning_rate",
+    )
+    assert tuple(search_space["bs_preforcast_models"]["lightgbm"]) == (
+        "lags",
+        "n_estimators",
+        "max_depth",
+        "learning_rate",
+        "num_leaves",
+        "min_child_samples",
+        "feature_fraction",
     )
 
 
