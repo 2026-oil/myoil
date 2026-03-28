@@ -1,0 +1,15 @@
+task:
+  name: bs_preforcast_uni
+dataset: 
+  path: data/df.csv
+  target_col: BS_Core_Index_Integrated
+  dt_col: dt
+  task:
+    multivariable: false
+  hist_exog_cols: []
+  futr_exog_cols: []
+  static_exog_cols: []
+residual:
+  enabled: false
+jobs:
+- yaml/jobs/bs_preforcast/bs_preforcast_jobs_uni.yaml
