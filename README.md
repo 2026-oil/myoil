@@ -1,6 +1,6 @@
 # NeuralForecast wrapper README
 
-이 문서는 이 저장소의 **wrapper 실행 방식과 `config.yaml` 설정**만 다룹니다.
+이 문서는 이 저장소의 **wrapper 실행 방식과 명시적 app config 설정**만 다룹니다.
 upstream Nixtla 일반 소개가 아니라, 현재 이 checkout에서 실제로 쓰는 운영 기준 문서입니다.
 
 ---
@@ -39,7 +39,7 @@ uv sync --group dev
 최소 실행 확인:
 
 ```bash
-uv run python main.py --validate-only
+uv run python main.py --validate-only --config yaml/experiment/feature_set/brentoil-case1.yaml
 ```
 
 설명:
@@ -65,8 +65,11 @@ uv run python main.py --validate-only
 
 ```bash
 cd neuralforecast
-uv run python main.py --validate-only
+uv run python main.py --validate-only --config yaml/experiment/feature_set/brentoil-case1.yaml
 ```
+
+`main.py`는 더 이상 repo 루트 기본 config를 자동 탐색하지 않습니다.
+항상 `--config` / `--config-path` / `--config-toml` 중 하나를 명시해야 합니다.
 
 주요 인자:
 
@@ -76,7 +79,6 @@ uv run python main.py --validate-only
 - `--setting <path>`
 - `--validate-only`
 - `--jobs <job-name...>`
-- `--output-root <path>`
 
 예시:
 
@@ -84,24 +86,24 @@ uv run python main.py --validate-only
 
 ```bash
 cd neuralforecast
-uv run python main.py --validate-only --config config.yaml
+uv run python main.py --validate-only --config yaml/experiment/feature_set/brentoil-case1.yaml
 ```
 
 ### 특정 shared setting으로 검증
 
 ```bash
 cd neuralforecast
-uv run python main.py --validate-only --config config.yaml --setting yaml/setting/setting.yaml
+uv run python main.py --validate-only --config yaml/experiment/feature_set/brentoil-case1.yaml --setting yaml/setting/setting.yaml
 ```
 
 ### 특정 job만 실행
 
 ```bash
 cd neuralforecast
-uv run python main.py --config config.yaml --jobs TFT --output-root runs/single-job-smoke
+uv run python main.py --config yaml/experiment/feature_set/brentoil-case1.yaml --jobs TFT
 ```
 
-`--output-root`를 생략한 단일 job 재실행은 기존 scheduler run을 재사용할 수 있습니다.
+단일 job 재실행은 기존 scheduler run을 재사용할 수 있습니다.
 같은 config source path와 같은 resolved config signature로 생성된 scheduler-backed run이 이미 있으면, runtime은 가장 최근 run의
 `scheduler/workers/<job>` 경로를 자동 재사용하고 해당 job의 기존 산출물을 지운 뒤 fresh rerun을 수행합니다.
 그 후 부모 run의 `summary/leaderboard.csv`, `summary/sample.md`, `summary/last_fold_*.png`도 다시 생성합니다.
@@ -111,7 +113,7 @@ uv run python main.py --config config.yaml --jobs TFT --output-root runs/single-
 
 ```bash
 cd neuralforecast
-uv run python main.py --config examples/real_smoke.yaml --output-root runs/two-gpu-smoke
+uv run python main.py --config yaml/experiment/feature_set/brentoil-case1.yaml
 ```
 
 현재 동작 기준:
@@ -133,12 +135,13 @@ uv run python main.py --config examples/real_smoke.yaml --output-root runs/two-g
 1. `--config`
 2. `--config-path`
 3. `--config-toml`
-4. 미지정 시 repo 루트의 `config.yaml` / `config.yml` / `config.toml`
+
+미지정 시에는 에러가 나며, 명시적 config 경로가 필요합니다.
 
 현재 대표 예시 파일:
 
-- `config.yaml`
-- `examples/real_smoke.yaml`
+- `yaml/experiment/feature_set/brentoil-case1.yaml`
+- `yaml/experiment/feature_set/wti-case1.yaml`
 
 top-level section:
 
@@ -274,7 +277,7 @@ uv run python xl_2_yaml.py reverse \
 - reverse conversion은 adapter provenance를 복원하지 않고, 확인 가능한 YAML 의미를 core sheet 기준으로 정규화합니다.
 - blank cell은 기본적으로 "omit" 의미이고, 명시적으로 적은 default 값은 재생성 시 유지됩니다.
 
-## 4. `config.yaml` 설정표
+## 4. app config 설정표
 
 ### 4.1 `dataset`
 
@@ -368,7 +371,7 @@ baseline (`Naive`, `SeasonalNaive`, `HistoricAverage`)은 fairness normalization
 
 ---
 
-## 5. 현재 `config.yaml` 예시
+## 5. 명시적 YAML 예시
 
 ### 상단 구조 예시
 
@@ -577,33 +580,31 @@ def build_residual_plugin(config: Any) -> ResidualPlugin:
 
 ```bash
 cd neuralforecast
-uv run python main.py --validate-only
+uv run python main.py --validate-only --config yaml/experiment/feature_set/brentoil-case1.yaml
 ```
 
 ### single job smoke
 
 ```bash
 cd neuralforecast
-uv run python main.py --config examples/real_smoke.yaml --jobs TFT --output-root runs/single-job-smoke
+uv run python main.py --config yaml/experiment/feature_set/brentoil-case1.yaml --jobs TFT
 ```
 
-`examples/real_smoke.yaml` keeps a small `max_steps=10` smoke budget and a tiny
-`xgboost` residual config; non-smoke configs should set their own training
-budget under `training.max_steps`.
+run root는 `task.name`과 config 위치를 기준으로 자동 파생됩니다.
 
 ### two-gpu scheduler smoke
 
 ```bash
 cd neuralforecast
-uv run python main.py --config examples/real_smoke.yaml --output-root runs/two-gpu-smoke
+uv run python main.py --config yaml/experiment/feature_set/brentoil-case1.yaml
 ```
 
 관련 산출물 예시:
 
-- `runs/two-gpu-smoke/scheduler/events.jsonl`
-- `runs/two-gpu-smoke/scheduler/workers/*/summary.json`
-- `runs/two-gpu-smoke/scheduler/workers/*/stdout.log`
-- `runs/two-gpu-smoke/scheduler/workers/*/stderr.log`
+- `runs/feature_set_brentoil_case1/scheduler/events.jsonl`
+- `runs/feature_set_brentoil_case1/scheduler/workers/*/summary.json`
+- `runs/feature_set_brentoil_case1/scheduler/workers/*/stdout.log`
+- `runs/feature_set_brentoil_case1/scheduler/workers/*/stderr.log`
 
 ---
 
@@ -612,7 +613,7 @@ uv run python main.py --config examples/real_smoke.yaml --output-root runs/two-g
 이 저장소에서 현재 기억해야 할 핵심은 아래입니다.
 
 - 실행 진입점: `main.py`
-- 설정 중심: `config.yaml` / `config.toml`
+- 설정 중심: 명시적 `--config` / `--config-path` / `--config-toml`
 - 공통 loss: `training.loss = mse`
 - CV 방식: **expanding-window TS-CV**
 - residual 관리 중심: `residual/`
