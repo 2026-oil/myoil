@@ -93,7 +93,6 @@ RESIDUAL_DEFAULTS = {
 }
 DEFAULT_TRAINING_PARAMS = {
     "input_size": 64,
-    "season_length": 52,
     "batch_size": 32,
     "valid_batch_size": 64,
     "windows_batch_size": 1024,
@@ -109,7 +108,6 @@ DEFAULT_TRAINING_PARAMS = {
 }
 LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD = {"step_size": "model_step_size"}
 FIXED_TRAINING_VALUES = {
-    "season_length": 52,
     "max_steps": 1000,
     "val_size": 8,
     "val_check_steps": 100,

@@ -59,18 +59,11 @@ BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY: dict[str, dict[str, dict[str, Any]]] = 
             "type": "categorical",
             "choices": ["[1, 0, 0]", "[1, 1, 0]", "[2, 1, 0]"],
         },
-        "seasonal_order": {
-            "type": "categorical",
-            "choices": ["[0, 0, 0]", "[1, 0, 0]"],
-        },
-        "season_length": {"type": "categorical", "choices": [1, 4, 8, 12]},
         "include_mean": {"type": "categorical", "choices": [True, False]},
         "include_drift": {"type": "categorical", "choices": [False, True]},
     },
     "ES": {
-        "season_length": {"type": "categorical", "choices": [1, 4, 8, 12]},
         "trend": {"type": "categorical", "choices": [None, "add"]},
-        "seasonal": {"type": "categorical", "choices": [None, "add"]},
         "damped_trend": {"type": "categorical", "choices": [False, True]},
     },
     "xgboost": {

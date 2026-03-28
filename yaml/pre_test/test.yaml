@@ -1,33 +1,39 @@
 task:
-  name: wti_case3_HPO
+  name: brentoil_case1_HPO
 dataset:
   path: data/df.csv
-  target_col: Com_CrudeOil
+  target_col: BS_Core_Index_Integrated
   dt_col: dt
   hist_exog_cols:
-  - Com_Gasoline
+  - Idx_SnPVIX
+  - Bonds_MOVE
+  - Idx_GVZ
+  - Idx_OVX
+  - Idx_DxyUSD
   - Com_BloombergCommodity_BCOM
-  - Com_LME_Ni_Cash
-  - Com_Coal
-  - Com_LME_Al_Cash
   - Com_LMEX
-  - Bonds_KOR_10Y
-  - Com_LME_Ni_Inv
-  - BS_Core_Index_A
-  - BS_Core_Index_B
-  - BS_Core_Index_C
-  - BS_Core_Index_Integrated
   futr_exog_cols: []
   static_exog_cols: []
 runtime:
   opt_n_trial: 100
 training:
+  val_check_steps: 50
+  early_stop_patience_steps: 3
+  loss: mse
   dataloader_kwargs:
     num_workers: 2
     pin_memory: true
     persistent_workers: true
     prefetch_factor: 2
+cv:
+  horizon: 8
+  step_size: 8
+  n_windows: 5
+  max_train_size: null
 scheduler:
+  gpu_ids:
+  - 0
+  - 1
   parallelize_single_job_tuning: true
 residual:
   enabled: false

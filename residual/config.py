@@ -25,6 +25,7 @@ from .optuna_spaces import (
 )
 
 CONFIG_FILENAMES = ("config.yaml", "config.yml", "config.toml")
+SHARED_SETTINGS_RELATIVE_PATH = Path("yaml/setting.yaml")
 DEFAULT_MANIFEST_VERSION = "1"
 DEFAULT_ARTIFACT_SCHEMA_VERSION = "1"
 DEFAULT_EVALUATION_PROTOCOL_VERSION = "2"
@@ -58,6 +59,34 @@ LEGACY_SHARED_JOB_TRAINING_KEYS = {
     "early_stop_patience_steps",
     "num_lr_decays",
 }
+SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
+    "runtime.random_seed",
+    "training.batch_size",
+    "training.valid_batch_size",
+    "training.windows_batch_size",
+    "training.inference_windows_batch_size",
+    "training.max_steps",
+    "training.val_size",
+    "training.model_step_size",
+    "cv.gap",
+    "cv.overlap_eval_policy",
+    "scheduler.max_concurrent_jobs",
+    "scheduler.worker_devices",
+)
+FAMILY_SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
+    "training.input_size",
+    "training.learning_rate",
+    "training.val_check_steps",
+    "training.early_stop_patience_steps",
+    "training.loss",
+    "cv.horizon",
+    "cv.step_size",
+    "cv.n_windows",
+    "cv.max_train_size",
+    "scheduler.gpu_ids",
+)
+SHARED_SETTINGS_MAPPING_DOTTED_PATHS = frozenset()
+SHARED_SETTINGS_FAMILY_DEFAULTS_KEY = "family_defaults"
 RESIDUAL_FEATURE_KEYS = {
     "include_base_prediction",
     "include_horizon_step",
@@ -128,7 +157,6 @@ class TrainingLossParams:
 class TrainingConfig:
     train_protocol: str = "expanding_window_tscv"
     input_size: int = DEFAULT_TRAINING_PARAMS["input_size"]
-    season_length: int = DEFAULT_TRAINING_PARAMS["season_length"]
     batch_size: int = DEFAULT_TRAINING_PARAMS["batch_size"]
     valid_batch_size: int = DEFAULT_TRAINING_PARAMS["valid_batch_size"]
     windows_batch_size: int = DEFAULT_TRAINING_PARAMS["windows_batch_size"]
@@ -292,6 +320,8 @@ class LoadedConfig:
     search_space_path: Path | None
     search_space_hash: str | None
     search_space_payload: dict[str, Any] | None
+    shared_settings_path: Path | None = None
+    shared_settings_hash: str | None = None
     bs_preforcast_stage1: BsPreforcastStageLoadedConfig | None = None
     jobs_fanout_specs: tuple["JobsFanoutSpec", ...] = field(default_factory=tuple)
     active_jobs_route_slug: str | None = None
@@ -307,6 +337,222 @@ class JobsFanoutSpec:
 
 def _hash_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+_MISSING = object()
+
+
+def _lookup_dotted_path(payload: dict[str, Any], dotted_path: str) -> Any:
+    current: Any = payload
+    for part in dotted_path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return _MISSING
+        current = current[part]
+    return current
+
+
+def _set_dotted_path(payload: dict[str, Any], dotted_path: str, value: Any) -> None:
+    current = payload
+    parts = dotted_path.split(".")
+    for part in parts[:-1]:
+        child = current.get(part)
+        if not isinstance(child, dict):
+            child = {}
+            current[part] = child
+        current = child
+    current[parts[-1]] = value
+
+
+def _validate_shared_settings_fragment(
+    payload: dict[str, Any],
+    *,
+    owned_paths: tuple[str, ...],
+    section_label: str,
+) -> None:
+    owned = set(owned_paths)
+    mapping_roots = SHARED_SETTINGS_MAPPING_DOTTED_PATHS
+
+    def _walk(node: dict[str, Any], prefix: str = "") -> None:
+        for key, value in node.items():
+            path = f"{prefix}.{key}" if prefix else str(key)
+            if path in owned:
+                if path in mapping_roots and not isinstance(value, dict):
+                    raise ValueError(f"{section_label} {path} must be a mapping")
+                continue
+            if any(owned_path.startswith(path + ".") for owned_path in owned):
+                if not isinstance(value, dict):
+                    raise ValueError(f"{section_label} {path} must be a mapping")
+                _walk(value, path)
+                continue
+            if any(path.startswith(root + ".") for root in mapping_roots):
+                continue
+            raise ValueError(f"{section_label} contains unsupported key: {path}")
+
+    _walk(payload)
+
+
+def _validate_shared_settings_payload(payload: Any) -> dict[str, Any]:
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        raise ValueError("yaml/setting.yaml must be a mapping")
+
+    validated = dict(payload)
+    global_payload = {
+        key: value
+        for key, value in validated.items()
+        if key != SHARED_SETTINGS_FAMILY_DEFAULTS_KEY
+    }
+    _validate_shared_settings_fragment(
+        global_payload,
+        owned_paths=SHARED_SETTINGS_OWNED_DOTTED_PATHS,
+        section_label="yaml/setting.yaml",
+    )
+
+    family_defaults = validated.get(SHARED_SETTINGS_FAMILY_DEFAULTS_KEY)
+    if family_defaults is None:
+        return validated
+    if not isinstance(family_defaults, dict):
+        raise ValueError("yaml/setting.yaml family_defaults must be a mapping")
+    for family_name, family_payload in family_defaults.items():
+        if not isinstance(family_payload, dict):
+            raise ValueError(
+                f"yaml/setting.yaml family_defaults.{family_name} must be a mapping"
+            )
+        files_payload = family_payload.get("files")
+        family_base = {
+            key: value for key, value in family_payload.items() if key != "files"
+        }
+        _validate_shared_settings_fragment(
+            family_base,
+            owned_paths=FAMILY_SHARED_SETTINGS_OWNED_DOTTED_PATHS,
+            section_label=f"yaml/setting.yaml family_defaults.{family_name}",
+        )
+        if files_payload is None:
+            continue
+        if not isinstance(files_payload, dict):
+            raise ValueError(
+                f"yaml/setting.yaml family_defaults.{family_name}.files must be a mapping"
+            )
+        for filename, file_payload in files_payload.items():
+            if not isinstance(file_payload, dict):
+                raise ValueError(
+                    "yaml/setting.yaml "
+                    f"family_defaults.{family_name}.files.{filename} must be a mapping"
+                )
+            _validate_shared_settings_fragment(
+                file_payload,
+                owned_paths=FAMILY_SHARED_SETTINGS_OWNED_DOTTED_PATHS,
+                section_label=(
+                    "yaml/setting.yaml "
+                    f"family_defaults.{family_name}.files.{filename}"
+                ),
+            )
+    return validated
+
+
+def _load_shared_settings_for_yaml_app_config(
+    repo_root: Path,
+) -> tuple[dict[str, Any] | None, Path | None, str | None]:
+    path = (repo_root / SHARED_SETTINGS_RELATIVE_PATH).resolve()
+    if not path.exists():
+        return None, None, None
+    text = path.read_text(encoding="utf-8")
+    payload = yaml.safe_load(text)
+    validated = _validate_shared_settings_payload(payload)
+    return validated, path, _hash_text(text)
+
+
+def _uses_repo_shared_settings(repo_root: Path, source_path: Path) -> bool:
+    try:
+        return source_path.resolve().is_relative_to(repo_root.resolve())
+    except AttributeError:
+        source_resolved = source_path.resolve()
+        repo_resolved = repo_root.resolve()
+        return str(source_resolved).startswith(str(repo_resolved) + "/")
+
+
+def _overlay_shared_fragment(
+    base_payload: dict[str, Any],
+    fragment: dict[str, Any],
+    *,
+    owned_paths: tuple[str, ...],
+) -> dict[str, Any]:
+    merged = json.loads(json.dumps(base_payload))
+    for dotted_path in owned_paths:
+        shared_value = _lookup_dotted_path(fragment, dotted_path)
+        if shared_value is _MISSING:
+            continue
+        _set_dotted_path(merged, dotted_path, json.loads(json.dumps(shared_value)))
+    return merged
+
+
+def _effective_shared_settings_for_source(
+    repo_root: Path,
+    source_path: Path,
+    shared_settings: dict[str, Any],
+) -> tuple[dict[str, Any], tuple[str, ...]]:
+    effective = _overlay_shared_fragment(
+        {},
+        {
+            key: value
+            for key, value in shared_settings.items()
+            if key != SHARED_SETTINGS_FAMILY_DEFAULTS_KEY
+        },
+        owned_paths=SHARED_SETTINGS_OWNED_DOTTED_PATHS,
+    )
+    owned_paths = list(SHARED_SETTINGS_OWNED_DOTTED_PATHS)
+    try:
+        relative_parts = source_path.resolve().relative_to(repo_root.resolve()).parts
+    except ValueError:
+        return effective, tuple(owned_paths)
+    if len(relative_parts) < 3 or relative_parts[0] != "yaml":
+        return effective, tuple(owned_paths)
+    family_name = relative_parts[1]
+    filename = relative_parts[-1]
+    family_defaults = shared_settings.get(SHARED_SETTINGS_FAMILY_DEFAULTS_KEY, {})
+    if not isinstance(family_defaults, dict):
+        return effective, tuple(owned_paths)
+    family_payload = family_defaults.get(family_name)
+    if not isinstance(family_payload, dict):
+        return effective, tuple(owned_paths)
+    effective = _overlay_shared_fragment(
+        effective,
+        {key: value for key, value in family_payload.items() if key != "files"},
+        owned_paths=FAMILY_SHARED_SETTINGS_OWNED_DOTTED_PATHS,
+    )
+    owned_paths.extend(FAMILY_SHARED_SETTINGS_OWNED_DOTTED_PATHS)
+    files_payload = family_payload.get("files")
+    if isinstance(files_payload, dict) and isinstance(files_payload.get(filename), dict):
+        effective = _overlay_shared_fragment(
+            effective,
+            files_payload[filename],
+            owned_paths=FAMILY_SHARED_SETTINGS_OWNED_DOTTED_PATHS,
+        )
+    return effective, tuple(dict.fromkeys(owned_paths))
+
+
+def _merge_shared_settings_into_payload(
+    payload: dict[str, Any],
+    shared_settings: dict[str, Any],
+    *,
+    owned_paths: tuple[str, ...] = SHARED_SETTINGS_OWNED_DOTTED_PATHS,
+) -> dict[str, Any]:
+    merged = json.loads(json.dumps(payload))
+    duplicates: list[str] = []
+    for dotted_path in owned_paths:
+        shared_value = _lookup_dotted_path(shared_settings, dotted_path)
+        if shared_value is _MISSING:
+            continue
+        if _lookup_dotted_path(merged, dotted_path) is not _MISSING:
+            duplicates.append(dotted_path)
+            continue
+        _set_dotted_path(merged, dotted_path, json.loads(json.dumps(shared_value)))
+    if duplicates:
+        raise ValueError(
+            "config repeats shared setting path(s): " + ", ".join(sorted(duplicates))
+        )
+    return merged
 
 
 def _as_tuple(value: Any) -> tuple[str, ...]:
@@ -781,6 +1027,8 @@ def _normalize_payload(
     dataset = dict(payload.get("dataset", {}))
     runtime = dict(payload.get("runtime", {}))
     training = dict(payload.get("training", {}))
+    training.pop("train_protocol", None)
+    training.pop("season_length", None)
     for selector, field_name in LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD.items():
         if selector in training:
             if field_name in training:
@@ -1026,17 +1274,6 @@ def _normalize_payload(
     normalized_jobs = cast(tuple[JobConfig, ...], jobs)
     for normalized_job in normalized_jobs:
         duplicated = CENTRALIZED_TRAINING_KEYS.intersection(normalized_job.params)
-        if (
-            (
-                stage_scope == "bs_preforcast"
-                or (
-                    search_space is not None
-                    and search_space.get("__scope__") == "bs_preforcast"
-                )
-            )
-            and normalized_job.model in {"ARIMA", "ES"}
-        ):
-            duplicated = duplicated.difference({"season_length"})
         if (
             (
                 stage_scope == "bs_preforcast"
@@ -1302,6 +1539,26 @@ def load_app_config(
     )
     raw_text = source_path.read_text(encoding="utf-8")
     payload = _load_document(source_path, source_type)
+    shared_settings_payload: dict[str, Any] | None = None
+    shared_settings_path: Path | None = None
+    shared_settings_hash: str | None = None
+    if source_type == "yaml" and _uses_repo_shared_settings(repo_root, source_path):
+        (
+            shared_settings_payload,
+            shared_settings_path,
+            shared_settings_hash,
+        ) = _load_shared_settings_for_yaml_app_config(repo_root)
+        if shared_settings_payload is not None:
+            effective_shared_settings, effective_owned_paths = (
+                _effective_shared_settings_for_source(
+                    repo_root, source_path, shared_settings_payload
+                )
+            )
+            payload = _merge_shared_settings_into_payload(
+                payload,
+                effective_shared_settings,
+                owned_paths=effective_owned_paths,
+            )
     jobs_fanout_specs = _resolve_jobs_fanout_specs(
         repo_root,
         source_path=source_path,
@@ -1336,26 +1593,20 @@ def load_app_config(
             raise ValueError(
                 "bs_preforcast routed YAML must define a top-level bs_preforcast block"
             )
-        routed_bs_preforcast = bs_preforcast_config.normalize_linked_bs_preforcast_config(
+        bs_preforcast_config.normalize_linked_bs_preforcast_config(
             stage_raw_payload.get("bs_preforcast"),
             unknown_keys=_unknown_keys,
             coerce_bool=_coerce_bool,
             coerce_name_tuple=_coerce_name_tuple,
         )
-        stage_payload_probe = bs_preforcast_config.merge_stage_payload(
-            {
-                key: value
-                for key, value in dict(stage_raw_payload).items()
-                if key != "bs_preforcast"
-            },
-            multivariable=routed_bs_preforcast.task.multivariable,
-        )
-        stage_payload_probe = dict(stage_payload_probe)
-        stage_payload_probe["jobs"] = _resolve_jobs_reference(
-            repo_root,
-            source_path=stage_source_path,
-            jobs_value=stage_payload_probe.get("jobs", []),
-        )
+        stage_payload_probe = {
+            "jobs": _resolve_jobs_reference(
+                repo_root,
+                source_path=stage_source_path,
+                jobs_value=dict(stage_raw_payload).get("jobs", []),
+            ),
+            "residual": dict(payload.get("residual", {})),
+        }
     search_space_contract: SearchSpaceContract | None = None
     requested_search_space = False
     payload = dict(payload)
@@ -1472,6 +1723,10 @@ def load_app_config(
     normalized_payload["search_space_sha256"] = (
         search_space_contract.sha256 if search_space_contract else None
     )
+    normalized_payload["shared_settings_path"] = (
+        str(shared_settings_path) if shared_settings_path is not None else None
+    )
+    normalized_payload["shared_settings_sha256"] = shared_settings_hash
     resolved_text = json.dumps(normalized_payload, sort_keys=True, ensure_ascii=False)
     return LoadedConfig(
         config=config,
@@ -1483,6 +1738,8 @@ def load_app_config(
         search_space_path=search_space_contract.path if search_space_contract else None,
         search_space_hash=search_space_contract.sha256 if search_space_contract else None,
         search_space_payload=search_space_contract.payload if search_space_contract else None,
+        shared_settings_path=shared_settings_path,
+        shared_settings_hash=shared_settings_hash,
         bs_preforcast_stage1=bs_preforcast_stage1,
         jobs_fanout_specs=jobs_fanout_specs,
     )
@@ -1496,8 +1753,42 @@ def loaded_config_for_jobs_fanout(
     model_search_space_key: str = "models",
     training_search_space_key: str = "training",
 ) -> LoadedConfig:
-    payload = _load_document(loaded.source_path, loaded.source_type)
-    payload = dict(payload)
+    payload = {
+        key: json.loads(json.dumps(value))
+        for key, value in loaded.normalized_payload.items()
+        if key
+        in {
+            "task",
+            "dataset",
+            "runtime",
+            "training",
+            "cv",
+            "scheduler",
+            "residual",
+            "jobs",
+            "bs_preforcast",
+        }
+    }
+    if isinstance(payload.get("bs_preforcast"), dict):
+        payload["bs_preforcast"] = {
+            key: value
+            for key, value in payload["bs_preforcast"].items()
+            if key in {"enabled", "config_path"}
+        }
+    if isinstance(payload.get("residual"), dict):
+        payload["residual"] = {
+            key: value
+            for key, value in payload["residual"].items()
+            if key
+            in {
+                "enabled",
+                "model",
+                "target",
+                "cpu_threads",
+                "params",
+                "features",
+            }
+        }
     payload["jobs"] = [dict(job) for job in spec.jobs_payload]
     dataset_base_dir = _resolve_dataset_base_dir(
         repo_root,
@@ -1522,6 +1813,10 @@ def loaded_config_for_jobs_fanout(
         str(loaded.search_space_path) if loaded.search_space_path else None
     )
     normalized_payload["search_space_sha256"] = loaded.search_space_hash
+    normalized_payload["shared_settings_path"] = (
+        str(loaded.shared_settings_path) if loaded.shared_settings_path else None
+    )
+    normalized_payload["shared_settings_sha256"] = loaded.shared_settings_hash
     resolved_text = json.dumps(normalized_payload, sort_keys=True, ensure_ascii=False)
     return replace(
         loaded,

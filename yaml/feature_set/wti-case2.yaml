@@ -23,36 +23,6 @@ dataset:
   - Com_LME_Ni_Inv
   futr_exog_cols: []
   static_exog_cols: []
-runtime:
-  random_seed: 1
-training:
-  train_protocol: expanding_window_tscv
-  input_size: 64
-  season_length: 52
-  batch_size: 32
-  valid_batch_size: 64
-  windows_batch_size: 1024
-  inference_windows_batch_size: 1024
-  learning_rate: 0.001
-  model_step_size: 8
-  max_steps: 1000
-  val_size: 8
-  val_check_steps: 50
-  early_stop_patience_steps: 5
-  loss: mse
-cv:
-  horizon: 8
-  step_size: 8
-  n_windows: 12
-  gap: 0
-  max_train_size: null
-  overlap_eval_policy: by_cutoff_mean
-scheduler:
-  gpu_ids:
-  - 0
-  - 1
-  max_concurrent_jobs: 2
-  worker_devices: 1
 residual:
   enabled: false
 jobs:

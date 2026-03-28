@@ -292,9 +292,7 @@ uv run python xl_2_yaml.py reverse \
 
 | Key | Type | Required | Meaning |
 | --- | --- | --- | --- |
-| `train_protocol` | string | no | 학습/eval 프로토콜 선언값. 현재 `expanding_window_tscv` |
 | `input_size` | int | no | 모델 입력 길이 |
-| `season_length` | int | no | seasonality 길이 |
 | `batch_size` | int | no | 학습 배치 크기 |
 | `valid_batch_size` | int | no | validation 배치 크기 |
 | `windows_batch_size` | int | no | training windows batch 크기 |
@@ -379,9 +377,7 @@ runtime:
   random_seed: 1
 
 training:
-  train_protocol: expanding_window_tscv
   input_size: 64
-  season_length: 52
   batch_size: 32
   valid_batch_size: 32
   windows_batch_size: 1024

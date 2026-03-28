@@ -1,5 +1,5 @@
 task:
-  name: wti_case3_HPO
+  name: wti_case4_bs_preforcast
 dataset:
   path: data/df.csv
   target_col: Com_CrudeOil
@@ -9,26 +9,34 @@ dataset:
   - Com_BloombergCommodity_BCOM
   - Com_LME_Ni_Cash
   - Com_Coal
+  - Com_Canola
+  - Com_Cotton
   - Com_LME_Al_Cash
   - Com_LMEX
   - Bonds_KOR_10Y
+  - Com_PalmOil
+  - Com_Barley
+  - Com_Corn
+  - Com_Oat
+  - Com_Wheat
+  - Com_Soybeans
   - Com_LME_Ni_Inv
+  - Com_NaturalGas
+  - Idx_OVX
+  - Com_Gold
   - BS_Core_Index_A
   - BS_Core_Index_B
   - BS_Core_Index_C
   - BS_Core_Index_Integrated
   futr_exog_cols: []
   static_exog_cols: []
-runtime:
-  opt_n_trial: 100
-training:
-  dataloader_kwargs:
-    num_workers: 2
-    pin_memory: true
-    persistent_workers: true
-    prefetch_factor: 2
-scheduler:
-  parallelize_single_job_tuning: true
 residual:
   enabled: false
-jobs: yaml/jobs_tune.yaml
+jobs:
+- yaml/jobs_1.yaml
+- yaml/jobs_2.yaml
+- yaml/jobs_3.yaml
+- yaml/jobs_4.yaml
+bs_preforcast:
+  enabled: true
+  config_path: bs_preforcast.yaml

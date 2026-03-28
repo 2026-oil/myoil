@@ -87,6 +87,12 @@ def build_manifest(
         if loaded.search_space_path
         else None,
         'search_space_sha256': loaded.search_space_hash,
+        'shared_settings_path': (
+            str(loaded.shared_settings_path)
+            if loaded.shared_settings_path is not None
+            else None
+        ),
+        'shared_settings_sha256': loaded.shared_settings_hash,
         'entrypoint_version': entrypoint_version,
         'compat_mode': compat_mode,
         'jobs': [

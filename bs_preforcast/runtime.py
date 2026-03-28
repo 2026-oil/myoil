@@ -578,22 +578,24 @@ def _predict_stage_univariate_arima(
     fit_df["ds"] = pd.to_datetime(fit_df["ds"])
     fit_df.insert(0, "unique_id", target_column)
     params = dict(job.params)
-    season_length = max(
-        1,
-        int(params.pop("season_length", stage_loaded.config.training.season_length)),
+    params.pop("season_length", None)
+    seasonal_order = _coerce_arima_triplet(
+        params.pop("seasonal_order", (0, 0, 0)),
+        field_name="seasonal_order",
+        default=(0, 0, 0),
     )
+    if seasonal_order != (0, 0, 0):
+        raise ValueError(
+            "bs_preforcast ARIMA no longer supports seasonal_order/season_length"
+        )
     model = ARIMA(
         order=_coerce_arima_triplet(
             params.pop("order", (1, 0, 0)),
             field_name="order",
             default=(1, 0, 0),
         ),
-        season_length=season_length,
-        seasonal_order=_coerce_arima_triplet(
-            params.pop("seasonal_order", (0, 0, 0)),
-            field_name="seasonal_order",
-            default=(0, 0, 0),
-        ),
+        season_length=1,
+        seasonal_order=seasonal_order,
         include_mean=bool(params.pop("include_mean", True)),
         include_drift=bool(params.pop("include_drift", False)),
         include_constant=params.pop("include_constant", None),
@@ -623,9 +625,7 @@ def _predict_stage_univariate_es(
 
     series = train_df[target_column].astype(float)
     params = dict(job.params)
-    season_length = int(
-        params.pop("season_length", stage_loaded.config.training.season_length)
-    )
+    params.pop("season_length", None)
     kwargs: dict[str, Any] = {
         "trend": params.pop("trend", None),
         "seasonal": params.pop("seasonal", None),
@@ -634,12 +634,10 @@ def _predict_stage_univariate_es(
             params.pop("initialization_method", "estimated")
         ),
     }
-    if kwargs["seasonal"] is not None and season_length > 1:
-        kwargs["seasonal_periods"] = season_length
-    elif kwargs["seasonal"] is not None:
-        kwargs["seasonal"] = None
-    if kwargs["seasonal"] is None:
-        kwargs.pop("seasonal_periods", None)
+    if kwargs["seasonal"] is not None:
+        raise ValueError(
+            "bs_preforcast ES no longer supports seasonal components"
+        )
     fitted = ExponentialSmoothing(
         series,
         **kwargs,

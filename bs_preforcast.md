@@ -223,9 +223,6 @@ bs_preforcast_models:
     order:
       type: categorical
       choices: ["[1, 0, 0]", "[1, 1, 0]", "[2, 1, 0]"]
-    season_length:
-      type: categorical
-      choices: [1, 4, 8, 12]
   xgboost:
     lags:
       type: categorical
@@ -261,13 +258,7 @@ bs_preforcast_models:
     order:
       type: categorical
       choices: ["[1, 0, 0]", "[1, 1, 0]", "[2, 1, 0]"]
-    season_length:
-      type: categorical
-      choices: [1, 4, 8, 12]
   ES:
-    season_length:
-      type: categorical
-      choices: [1, 4, 8, 12]
   xgboost:
     lags:
       type: categorical
@@ -276,8 +267,7 @@ bs_preforcast_models:
         - "[1, 2, 3, 6, 12]"
 ```
 
-실행 시 statistical model은 direct predictor의 `season_length`를 사용하고,
-`xgboost` / `lightgbm`는 `skforecast.direct.ForecasterDirect`에 `lags`를 그대로 전달합니다.
+실행 시 `xgboost` / `lightgbm`는 `skforecast.direct.ForecasterDirect`에 `lags`를 그대로 전달합니다.
 
 ---
 

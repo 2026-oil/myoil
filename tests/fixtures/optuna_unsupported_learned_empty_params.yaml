@@ -6,18 +6,10 @@ dataset:
   futr_exog_cols: []
   static_exog_cols: []
 runtime:
-  random_seed: 7
   opt_n_trial: 20
 training:
   input_size: 1
-  season_length: 1
-  batch_size: 1
-  valid_batch_size: 1
-  windows_batch_size: 8
-  inference_windows_batch_size: 8
   learning_rate: 0.001
-  max_steps: 1
-  val_size: 1
   val_check_steps: 1
   early_stop_patience_steps: -1
   loss: mse
@@ -25,16 +17,13 @@ cv:
   horizon: 1
   step_size: 1
   n_windows: 2
-  gap: 0
-  overlap_eval_policy: by_cutoff_mean
 scheduler:
-  gpu_ids: [0]
-  max_concurrent_jobs: 1
-  worker_devices: 1
+  gpu_ids:
+  - 0
 residual:
   enabled: false
   model: xgboost
   params: {}
 jobs:
-  - model: DummyUnivariate
-    params: {}
+- model: DummyUnivariate
+  params: {}

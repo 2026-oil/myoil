@@ -22,7 +22,13 @@ import bs_preforcast.runtime as bs_runtime
 from neuralforecast.core import MODEL_FILENAME_DICT
 from residual.adapters import build_multivariate_inputs, build_univariate_inputs
 from residual.bs_preforcast_runtime import prepare_bs_preforcast_fold_inputs
-from residual.config import TrainingLossParams, load_app_config
+from residual.config import (
+    TrainingLossParams,
+    _effective_shared_settings_for_source,
+    _load_shared_settings_for_yaml_app_config,
+    _merge_shared_settings_into_payload,
+    load_app_config,
+)
 from residual.models import (
     MODEL_CLASSES,
     build_model,
@@ -1214,7 +1220,7 @@ def test_model_builder_propagates_centralized_training_controls(tmp_path: Path):
         assert model.hparams.early_stop_patience_steps == 11
 
 
-def test_load_app_config_preserves_training_season_length_and_maps_model_step_size(
+def test_load_app_config_drops_training_season_length_and_maps_model_step_size(
     tmp_path: Path,
 ):
     payload = _payload()
@@ -1227,10 +1233,9 @@ def test_load_app_config_preserves_training_season_length_and_maps_model_step_si
         tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
     )
 
-    assert loaded.config.training.season_length == 52
     assert loaded.config.training.model_step_size == 6
-    assert loaded.normalized_payload["training"]["season_length"] == 52
     assert loaded.normalized_payload["training"]["model_step_size"] == 6
+    assert "season_length" not in loaded.normalized_payload["training"]
     assert "step_size" not in loaded.normalized_payload["training"]
 
 
@@ -6101,15 +6106,11 @@ def test_repo_search_space_bs_preforcast_sections_are_unique_and_include_stage_o
     assert "lightgbm" in SUPPORTED_BS_PREFORCAST_MODELS
     assert tuple(search_space["bs_preforcast_models"]["ARIMA"]) == (
         "order",
-        "seasonal_order",
-        "season_length",
         "include_mean",
         "include_drift",
     )
     assert tuple(search_space["bs_preforcast_models"]["ES"]) == (
-        "season_length",
         "trend",
-        "seasonal",
         "damped_trend",
     )
     assert tuple(search_space["bs_preforcast_models"]["xgboost"]) == (
@@ -6756,7 +6757,6 @@ OPTUNA_CONFIG_YAML_FILES = [
 
 EXPECTED_CASE_TRAINING = {
     "input_size": 64,
-    "season_length": 52,
     "batch_size": 32,
     "valid_batch_size": 64,
     "windows_batch_size": 1024,
@@ -6766,7 +6766,6 @@ EXPECTED_CASE_TRAINING = {
     "max_steps": 1000,
     "val_size": 8,
     "val_check_steps": 50,
-    "train_protocol": "expanding_window_tscv",
     "early_stop_patience_steps": 5,
     "loss": "mse",
 }
@@ -6813,8 +6812,6 @@ EXPECTED_CASE_MODEL_LIST = [
 ]
 
 EXPECTED_HPT_CASE12_TRAINING = {
-    "train_protocol": "expanding_window_tscv",
-    "season_length": 52,
     "batch_size": 32,
     "valid_batch_size": 64,
     "windows_batch_size": 1024,
@@ -7127,6 +7124,8 @@ def _load_case_yaml_raw(path: Path) -> dict[str, Any]:
 
 def _resolve_case_jobs(path: Path, jobs: Any) -> list[dict[str, Any]]:
     if isinstance(jobs, list):
+        if jobs and all(isinstance(item, str) for item in jobs):
+            return _resolve_case_jobs(path, jobs[0])
         return jobs
     if isinstance(jobs, dict):
         resolved_jobs = jobs.get("jobs")
@@ -7148,6 +7147,21 @@ def _resolve_case_jobs(path: Path, jobs: Any) -> list[dict[str, Any]]:
 
 def _load_case_yaml(path: Path) -> dict[str, Any]:
     payload = _load_case_yaml_raw(path)
+    if path.suffix.lower() in {".yaml", ".yml"}:
+        shared_settings_payload, _, _ = _load_shared_settings_for_yaml_app_config(
+            REPO_ROOT
+        )
+        if shared_settings_payload is not None:
+            effective_shared_settings, effective_owned_paths = (
+                _effective_shared_settings_for_source(
+                    REPO_ROOT, path.resolve(), shared_settings_payload
+                )
+            )
+            payload = _merge_shared_settings_into_payload(
+                payload,
+                effective_shared_settings,
+                owned_paths=effective_owned_paths,
+            )
     payload["jobs"] = _resolve_case_jobs(path, payload.get("jobs", []))
     return payload
 
@@ -7349,6 +7363,84 @@ def test_jobs_path_list_loading_builds_fanout_specs(tmp_path: Path) -> None:
     assert second_variant.active_jobs_route_slug == "jobs_2"
 
 
+def test_load_app_config_auto_loads_repo_shared_settings_for_repo_yaml(tmp_path: Path) -> None:
+    (tmp_path / "yaml").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml" / "setting.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "runtime": {"random_seed": 11},
+                "training": {
+                    "batch_size": 32,
+                    "valid_batch_size": 64,
+                    "windows_batch_size": 128,
+                    "inference_windows_batch_size": 128,
+                    "max_steps": 99,
+                    "val_size": 7,
+                    "model_step_size": 6,
+                },
+                "cv": {"gap": 0, "overlap_eval_policy": "by_cutoff_mean"},
+                "scheduler": {"max_concurrent_jobs": 2, "worker_devices": 1},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    dataset_path = tmp_path / "df.csv"
+    dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
+    config_path = tmp_path / "yaml" / "case.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "task": {"name": "shared_case"},
+                "dataset": {"path": str(dataset_path), "target_col": "y"},
+                "training": {"input_size": 8, "learning_rate": 0.01, "val_check_steps": 5},
+                "cv": {"horizon": 1, "step_size": 1, "n_windows": 2},
+                "scheduler": {"gpu_ids": [0]},
+                "residual": {"enabled": False},
+                "jobs": [{"model": "Naive", "params": {}}],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    assert loaded.config.runtime.random_seed == 11
+    assert loaded.config.training.batch_size == 32
+    assert loaded.config.training.model_step_size == 6
+    assert loaded.normalized_payload["shared_settings_path"].endswith("yaml/setting.yaml")
+    assert loaded.shared_settings_hash is not None
+
+
+def test_load_app_config_rejects_duplicate_repo_shared_setting_paths(tmp_path: Path) -> None:
+    (tmp_path / "yaml").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml" / "setting.yaml").write_text(
+        yaml.safe_dump({"training": {"batch_size": 32}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    dataset_path = tmp_path / "df.csv"
+    dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
+    config_path = tmp_path / "yaml" / "case.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "dataset": {"path": str(dataset_path), "target_col": "y"},
+                "training": {"batch_size": 16},
+                "cv": {"horizon": 1, "step_size": 1, "n_windows": 1},
+                "scheduler": {"gpu_ids": [0]},
+                "residual": {"enabled": False},
+                "jobs": [{"model": "Naive", "params": {}}],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="training.batch_size"):
+        load_app_config(tmp_path, config_path=config_path)
+
+
 def test_jobs_path_list_rejects_duplicate_route_stems(tmp_path: Path) -> None:
     dataset_path = tmp_path / "df.csv"
     dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
@@ -7475,6 +7567,61 @@ def test_jobs_fanout_variant_preserves_repo_relative_dataset_resolution(
     variant = loaded_config_for_jobs_fanout(tmp_path, loaded, loaded.jobs_fanout_specs[1])
 
     assert variant.config.dataset.path == dataset_dir / "df.csv"
+
+
+def test_jobs_fanout_variant_preserves_shared_settings_metadata(tmp_path: Path) -> None:
+    from residual.config import loaded_config_for_jobs_fanout
+
+    (tmp_path / "yaml").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml" / "setting.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "runtime": {"random_seed": 13},
+                "training": {"batch_size": 32, "valid_batch_size": 64},
+                "cv": {"gap": 0, "overlap_eval_policy": "by_cutoff_mean"},
+                "scheduler": {"max_concurrent_jobs": 2, "worker_devices": 1},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    dataset_path = tmp_path / "df.csv"
+    dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
+    jobs_one = tmp_path / "jobs_1.yaml"
+    jobs_two = tmp_path / "jobs_2.yaml"
+    jobs_one.write_text(
+        yaml.safe_dump({"jobs": [{"model": "Naive", "params": {}}]}, sort_keys=False),
+        encoding="utf-8",
+    )
+    jobs_two.write_text(
+        yaml.safe_dump({"jobs": [{"model": "Naive", "params": {}}]}, sort_keys=False),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "yaml" / "fanout.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "task": {"name": "fanout_case"},
+                "dataset": {"path": str(dataset_path), "target_col": "y"},
+                "training": {"input_size": 8, "learning_rate": 0.01, "max_steps": 10},
+                "cv": {"horizon": 1, "step_size": 1, "n_windows": 1},
+                "scheduler": {"gpu_ids": [0]},
+                "residual": {"enabled": False},
+                "jobs": [str(jobs_one), str(jobs_two)],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+    variant = loaded_config_for_jobs_fanout(
+        tmp_path, loaded, loaded.jobs_fanout_specs[1]
+    )
+
+    assert variant.shared_settings_path == loaded.shared_settings_path
+    assert variant.shared_settings_hash == loaded.shared_settings_hash
+    assert variant.normalized_payload["shared_settings_sha256"] == loaded.shared_settings_hash
 
 
 def test_runtime_validate_only_fans_out_jobs_path_list(
@@ -7660,6 +7807,48 @@ def test_case_yaml_training_mapping_matches_expected_across_all_files():
     for path in CASE_YAML_FILES:
         payload = _load_case_yaml(path)
         assert payload["training"] == EXPECTED_CASE_TRAINING
+
+
+def test_feature_set_raw_yaml_defers_requested_training_cv_scheduler_keys_to_setting():
+    raw_payload = _load_case_yaml_raw(REPO_ROOT / "yaml" / "feature_set" / "brentoil-case1.yaml")
+
+    assert "training" not in raw_payload
+    assert "cv" not in raw_payload
+    assert "scheduler" not in raw_payload
+
+
+def test_feature_set_case3_effective_scheduler_gpu_ids_comes_from_setting_override():
+    payload = _load_case_yaml(REPO_ROOT / "yaml" / "feature_set" / "brentoil-case3.yaml")
+
+    assert payload["scheduler"]["gpu_ids"] == [1]
+
+
+def test_hpt_n100_bs_raw_yaml_defers_requested_training_cv_scheduler_keys_to_setting():
+    raw_payload = _load_case_yaml_raw(
+        REPO_ROOT / "yaml" / "feature_set_HPT_n100_bs" / "brentoil-case1.yaml"
+    )
+
+    assert "input_size" not in raw_payload["training"]
+    assert "learning_rate" not in raw_payload["training"]
+    assert "val_check_steps" not in raw_payload["training"]
+    assert "early_stop_patience_steps" not in raw_payload["training"]
+    assert "loss" not in raw_payload["training"]
+    assert "cv" not in raw_payload
+    assert "gpu_ids" not in raw_payload["scheduler"]
+
+
+def test_hpt_n100_bs_effective_training_and_scheduler_come_from_setting():
+    payload = _load_case_yaml(
+        REPO_ROOT / "yaml" / "feature_set_HPT_n100_bs" / "brentoil-case1.yaml"
+    )
+
+    assert payload["training"]["input_size"] == 64
+    assert payload["training"]["learning_rate"] == pytest.approx(0.001)
+    assert payload["training"]["val_check_steps"] == 50
+    assert payload["training"]["early_stop_patience_steps"] == 3
+    assert payload["training"]["loss"] == "mse"
+    assert payload["cv"]["n_windows"] == 5
+    assert payload["scheduler"]["gpu_ids"] == [0, 1]
 
 
 @pytest.mark.parametrize("path", CASE_YAML_FILES, ids=lambda p: p.name)

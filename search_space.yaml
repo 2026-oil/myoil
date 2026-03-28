@@ -384,18 +384,6 @@ bs_preforcast_models:
       - "[1, 0, 0]"
       - "[1, 1, 0]"
       - "[2, 1, 0]"
-    seasonal_order:
-      type: categorical
-      choices:
-      - "[0, 0, 0]"
-      - "[1, 0, 0]"
-    season_length:
-      type: categorical
-      choices:
-      - 1
-      - 4
-      - 8
-      - 12
     include_mean:
       type: categorical
       choices:
@@ -407,19 +395,7 @@ bs_preforcast_models:
       - false
       - true
   ES:
-    season_length:
-      type: categorical
-      choices:
-      - 1
-      - 4
-      - 8
-      - 12
     trend:
-      type: categorical
-      choices:
-      - null
-      - add
-    seasonal:
       type: categorical
       choices:
       - null

@@ -2,48 +2,9 @@ bs_preforcast:
   target_columns: [bs_a]
   task:
     multivariable: false
+  exog_columns: []
 
-common:
-  dataset:
-    path: tests/fixtures/bs_preforcast_smoke_data.csv
-    dt_col: dt
-    hist_exog_cols: []
-    futr_exog_cols: []
-    static_exog_cols: []
-  runtime:
-    random_seed: 7
-  training:
-    input_size: 1
-    season_length: 1
-    batch_size: 1
-    valid_batch_size: 1
-    windows_batch_size: 8
-    inference_windows_batch_size: 8
-    learning_rate: 0.001
-    max_steps: 1
-    val_size: 1
-    val_check_steps: 1
-    early_stop_patience_steps: -1
-    loss: mse
-  cv:
-    horizon: 1
-    step_size: 1
-    n_windows: 2
-    gap: 0
-    overlap_eval_policy: by_cutoff_mean
-  scheduler:
-    gpu_ids: [0]
-    max_concurrent_jobs: 1
-    worker_devices: 1
-    parallelize_single_job_tuning: false
-  residual:
-    enabled: false
-    model: xgboost
-    params: {}
-
-univariable:
-  task:
-    name: bs_preforcast_fixture_stage
-  dataset:
-    target_col: bs_a
-  jobs: yaml/bs_preforcast_jobs_default.yaml
+jobs:
+  - model: DummyUnivariate
+    params:
+      start_padding_enabled: true

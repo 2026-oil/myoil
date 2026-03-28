@@ -18,34 +18,19 @@ dataset:
   - Com_Iron_Ore
   futr_exog_cols: []
   static_exog_cols: []
-runtime:
-  random_seed: 1
 training:
-  # Learned models are trained separately for each expanding-window TS-CV fold.
-  train_protocol: expanding_window_tscv
-  season_length: 52
-  batch_size: 32
-  valid_batch_size: 64
-  windows_batch_size: 1024
-  inference_windows_batch_size: 1024
-  max_steps: 1000
-  val_size: 8
   val_check_steps: 100
   early_stop_patience_steps: 5
   loss: mse
 cv:
-  # Time-series cross-validation uses expanding windows:
-  # each fold trains on all data up to the cutoff and forecasts the next horizon.
   horizon: 12
   step_size: 8
   n_windows: 24
-  gap: 0
-  max_train_size:
-  overlap_eval_policy: by_cutoff_mean
+  max_train_size: null
 scheduler:
-  gpu_ids: [0, 1]
-  max_concurrent_jobs: 2
-  worker_devices: 1
+  gpu_ids:
+  - 0
+  - 1
 residual:
   enabled: true
   model: xgboost
@@ -56,50 +41,62 @@ residual:
     subsample: 1.0
     colsample_bytree: 1.0
 jobs:
-  - model: TFT
-    params:
-      hidden_size: 128
-  - model: VanillaTransformer
-    params:
-      hidden_size: 128
-      dropout: 0.05
-      scaler_type: identity
-  - model: Informer
-    params:
-      hidden_size: 128
-      factor: 3
-      dropout: 0.05
-      scaler_type: identity
-  - model: Autoformer
-    params:
-      hidden_size: 128
-      factor: 3
-      dropout: 0.05
-      scaler_type: identity
-  - model: PatchTST
-    params:
-      hidden_size: 128
-      n_heads: 16
-      encoder_layers: 3
-      patch_len: 16
-      dropout: 0.2
-      scaler_type: identity
-  - model: LSTM
-    params:
-      encoder_hidden_size: 128
-      decoder_hidden_size: 128
-  - model: NHITS
-    params:
-      mlp_units: [[64, 64], [64, 64], [64, 64]]
-      n_pool_kernel_size: [2, 2, 1]
-      n_freq_downsample: [4, 2, 1]
-      dropout_prob_theta: 0.0
-      activation: ReLU
-  - model: iTransformer
-    params:
-      hidden_size: 128
-      n_heads: 8
-      e_layers: 2
-      d_ff: 256
-  - model: Naive
-    params: {}
+- model: TFT
+  params:
+    hidden_size: 128
+- model: VanillaTransformer
+  params:
+    hidden_size: 128
+    dropout: 0.05
+    scaler_type: identity
+- model: Informer
+  params:
+    hidden_size: 128
+    factor: 3
+    dropout: 0.05
+    scaler_type: identity
+- model: Autoformer
+  params:
+    hidden_size: 128
+    factor: 3
+    dropout: 0.05
+    scaler_type: identity
+- model: PatchTST
+  params:
+    hidden_size: 128
+    n_heads: 16
+    encoder_layers: 3
+    patch_len: 16
+    dropout: 0.2
+    scaler_type: identity
+- model: LSTM
+  params:
+    encoder_hidden_size: 128
+    decoder_hidden_size: 128
+- model: NHITS
+  params:
+    mlp_units:
+    - - 64
+      - 64
+    - - 64
+      - 64
+    - - 64
+      - 64
+    n_pool_kernel_size:
+    - 2
+    - 2
+    - 1
+    n_freq_downsample:
+    - 4
+    - 2
+    - 1
+    dropout_prob_theta: 0.0
+    activation: ReLU
+- model: iTransformer
+  params:
+    hidden_size: 128
+    n_heads: 8
+    e_layers: 2
+    d_ff: 256
+- model: Naive
+  params: {}
