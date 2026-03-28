@@ -278,7 +278,7 @@ params = { hidden_size = 32, n_heads = 4, e_layers = 2, d_ff = 64 }
         text = text.replace("__RESIDUAL_TARGET__", residual_target)
         path.write_text(text, encoding="utf-8")
     else:
-    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+        path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     return path
 
 
@@ -2538,22 +2538,26 @@ def test_runtime_uses_config_parent_and_task_name_for_default_run_directory(
             shutil.rmtree(output_root)
 
 
-def test_default_output_root_uses_repo_name_for_repo_root_config():
+def test_default_output_root_uses_repo_name_for_repo_root_config(tmp_path: Path):
     from residual.runtime import _default_output_root
 
-    repo_root = REPO_ROOT.parent / "tmp-output-root-contract"
-    if repo_root.exists():
-        import shutil
-
-        shutil.rmtree(repo_root)
+    repo_root = tmp_path / "neuralforecast"
     repo_root.mkdir(parents=True)
     config_path = _write_repo_root_contract_config(repo_root)
 
     loaded = load_app_config(repo_root, config_path=config_path)
 
-    assert _default_output_root(REPO_ROOT, loaded) == (
-        REPO_ROOT / "runs" / f"{repo_root.name}_semi_test"
+    assert _default_output_root(repo_root, loaded) == (
+        repo_root / "runs" / f"{repo_root.name}_semi_test"
     )
+
+
+def test_load_app_config_requires_explicit_path():
+    with pytest.raises(
+        ValueError,
+        match="config path is required; pass --config/--config-path or --config-toml",
+    ):
+        load_app_config(REPO_ROOT)
 
 
 @pytest.mark.parametrize(
@@ -3410,7 +3414,8 @@ def test_apply_residual_plugin_uses_fold_local_backcasts_only(
         return _RecordingResidualPlugin(plugin_log)
 
     monkeypatch.setattr(runtime, "build_residual_plugin", _build_plugin)
-    loaded = load_app_config(REPO_ROOT, config_path=REPO_ROOT / "config.yaml")
+    config_path = _write_repo_root_contract_config(tmp_path)
+    loaded = load_app_config(tmp_path, config_path=config_path)
     job = next(job for job in loaded.config.jobs if job.model == "TFT")
     run_root = tmp_path / "run"
     fold_payloads = []
@@ -3846,17 +3851,18 @@ def test_runtime_skips_residual_artifacts_for_baseline_models(tmp_path: Path):
     assert not (output_root / "holdout").exists()
     assert not (output_root / "residual" / "Naive").exists()
 
-
-def test_repo_config_keeps_only_naive_baseline_job():
-    loaded = load_app_config(REPO_ROOT, config_path=REPO_ROOT / "config.yaml")
+def test_repo_root_contract_keeps_only_naive_baseline_job(tmp_path: Path):
+    config_path = _write_repo_root_contract_config(tmp_path)
+    loaded = load_app_config(tmp_path, config_path=config_path)
     params_by_model = {job.model: job.params for job in loaded.config.jobs}
     assert params_by_model["Naive"] == {}
     assert "SeasonalNaive" not in params_by_model
     assert "HistoricAverage" not in params_by_model
 
 
-def test_repo_config_sets_explicit_itransformer_fairness_target():
-    loaded = load_app_config(REPO_ROOT, config_path=REPO_ROOT / "config.yaml")
+def test_repo_root_contract_sets_explicit_itransformer_fairness_target(tmp_path: Path):
+    config_path = _write_repo_root_contract_config(tmp_path)
+    loaded = load_app_config(tmp_path, config_path=config_path)
     params_by_model = {job.model: job.params for job in loaded.config.jobs}
     assert params_by_model["iTransformer"] == {
         "hidden_size": 128,
@@ -3866,8 +3872,9 @@ def test_repo_config_sets_explicit_itransformer_fairness_target():
     }
 
 
-def test_repo_config_conservative_fairness_matrix():
-    loaded = load_app_config(REPO_ROOT, config_path=REPO_ROOT / "config.yaml")
+def test_repo_root_contract_conservative_fairness_matrix(tmp_path: Path):
+    config_path = _write_repo_root_contract_config(tmp_path)
+    loaded = load_app_config(tmp_path, config_path=config_path)
     params_by_model = {job.model: job.params for job in loaded.config.jobs}
 
     for model_name in (
@@ -7128,20 +7135,6 @@ def test_runtime_single_job_rerun_prunes_stale_model_artifacts_and_rebuilds_summ
     assert (run_root / "summary" / "last_fold_all_models.png").exists()
 
 
-TOP_LEVEL_FIXED_TRAINING_YAML_FILES = [
-    REPO_ROOT / "config.yaml",
-]
-
-
-@pytest.mark.parametrize("path", TOP_LEVEL_FIXED_TRAINING_YAML_FILES, ids=lambda p: p.name)
-def test_top_level_yaml_files_pin_fixed_training_controls(path: Path):
-    payload = _load_case_yaml(path)
-    training = payload["training"]
-
-    for key, value in EXPECTED_FIXED_TRAINING_VALUES.items():
-        assert training[key] == value
-
-
 CASE_YAML_FILES = [
     REPO_ROOT / "yaml" / "experiment" / "feature_set" / "brentoil-case1.yaml",
     REPO_ROOT / "yaml" / "experiment" / "feature_set" / "brentoil-case2.yaml",
@@ -7454,16 +7447,6 @@ EXCLUDED_REPO_TRAINING_SELECTORS = [
     "windows_batch_size",
     "inference_windows_batch_size",
 ]
-
-EXPECTED_FIXED_TRAINING_VALUES = {
-    "batch_size": 32,
-    "valid_batch_size": 64,
-    "windows_batch_size": 1024,
-    "inference_windows_batch_size": 1024,
-    "max_steps": 1000,
-    "val_size": 8,
-    "val_check_steps": 50,
-}
 
 FEATURE_SET_RESIDUAL_EXPECTED_FILENAMES = sorted(
     path.name for path in FEATURE_SET_RESIDUAL_YAML_FILES

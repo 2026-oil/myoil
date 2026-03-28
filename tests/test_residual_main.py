@@ -44,18 +44,39 @@ def test_main_loads_config_and_dispatches_without_reexec_and_preserves_pythonpat
     monkeypatch.setattr(runtime, 'load_app_config', fake_load_app_config)
     monkeypatch.setattr(runtime, 'run_loaded_config', fake_run_loaded_config)
 
-    assert bootstrap_main.main(['--validate-only']) == 0
+    assert (
+        bootstrap_main.main(
+            ['--config', 'yaml/experiment/feature_set/brentoil-case1.yaml', '--validate-only']
+        )
+        == 0
+    )
     assert calls['load_repo_root'] == bootstrap_main.WORKSPACE_ROOT
     assert calls['run_repo_root'] == bootstrap_main.WORKSPACE_ROOT
     assert calls['loaded'] is loaded
     assert getattr(calls['args'], 'validate_only') is True
     assert getattr(calls['args'], 'jobs') is None
+    assert calls['config_path'] == 'yaml/experiment/feature_set/brentoil-case1.yaml'
     assert calls['shared_settings_path'] is None
 
     parts = os.environ['PYTHONPATH'].split(os.pathsep)
     assert parts[0] == workspace_root
     assert parts.count(workspace_root) == 1
     assert '/tmp/example' in parts
+
+
+def test_main_requires_explicit_config(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv(bootstrap_main._BOOTSTRAP_ENV, '1')
+
+    with pytest.raises(SystemExit) as exc_info:
+        bootstrap_main.main(['--validate-only'])
+
+    assert exc_info.value.code == 2
+    assert (
+        'config path is required; pass --config/--config-path or --config-toml'
+        in capsys.readouterr().err
+    )
 
 
 def test_main_passes_setting_override_to_load_app_config(
