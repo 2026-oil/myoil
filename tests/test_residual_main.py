@@ -3,13 +3,14 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 import main as bootstrap_main
 
 
-def test_main_delegates_without_reexec_and_preserves_pythonpath(
+def test_main_loads_config_and_dispatches_without_reexec_and_preserves_pythonpath(
     monkeypatch: pytest.MonkeyPatch,
 ):
     import residual.runtime as runtime
@@ -19,19 +20,66 @@ def test_main_delegates_without_reexec_and_preserves_pythonpath(
     monkeypatch.setenv(bootstrap_main._BOOTSTRAP_ENV, '1')
     monkeypatch.setenv('PYTHONPATH', os.pathsep.join([workspace_root, '/tmp/example']))
 
-    def fake_runtime_main(args: list[str]) -> int:
-        calls['args'] = list(args)
-        return 17
+    loaded = SimpleNamespace(jobs_fanout_specs=[])
 
-    monkeypatch.setattr(runtime, 'main', fake_runtime_main)
+    def fake_load_app_config(repo_root: Path, *, config_path=None, config_toml_path=None):
+        calls['load_repo_root'] = repo_root
+        calls['config_path'] = config_path
+        calls['config_toml_path'] = config_toml_path
+        return loaded
 
-    assert bootstrap_main.main(['--validate-only']) == 17
-    assert calls['args'] == ['--validate-only']
+    def fake_run_loaded_config(repo_root: Path, loaded_config, args):
+        calls['run_repo_root'] = repo_root
+        calls['loaded'] = loaded_config
+        calls['args'] = args
+        return {'ok': True}
+
+    monkeypatch.setattr(runtime, 'load_app_config', fake_load_app_config)
+    monkeypatch.setattr(runtime, 'run_loaded_config', fake_run_loaded_config)
+
+    assert bootstrap_main.main(['--validate-only']) == 0
+    assert calls['load_repo_root'] == bootstrap_main.WORKSPACE_ROOT
+    assert calls['run_repo_root'] == bootstrap_main.WORKSPACE_ROOT
+    assert calls['loaded'] is loaded
+    assert getattr(calls['args'], 'validate_only') is True
+    assert getattr(calls['args'], 'jobs') is None
 
     parts = os.environ['PYTHONPATH'].split(os.pathsep)
     assert parts[0] == workspace_root
     assert parts.count(workspace_root) == 1
     assert '/tmp/example' in parts
+
+
+def test_runtime_main_delegates_back_to_bootstrap_main(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import residual.runtime as runtime
+
+    calls: dict[str, object] = {}
+
+    def fake_run_cli(args, **kwargs):
+        calls['args'] = list(args)
+        calls['kwargs'] = dict(kwargs)
+        return 23
+
+    monkeypatch.setattr(bootstrap_main, '_run_cli', fake_run_cli)
+
+    assert runtime.main(['--validate-only']) == 23
+    assert calls['args'] == ['--validate-only']
+    assert calls['kwargs']['repo_root'] == Path(runtime.__file__).resolve().parents[1]
+
+
+def test_residual_shims_expose_bootstrap_owned_contracts() -> None:
+    import app_config
+    import residual.config as residual_config
+    import residual.stage_plugin as residual_stage_plugin
+    import residual.stage_registry as residual_stage_registry
+    from plugin_contracts.stage_plugin import StagePlugin
+    from plugin_contracts.stage_registry import get_active_stage_plugin
+
+    assert residual_config.load_app_config is app_config.load_app_config
+    assert residual_stage_plugin.StagePlugin is StagePlugin
+    assert residual_stage_registry.get_active_stage_plugin is get_active_stage_plugin
 
 
 def test_main_reexecs_with_expected_args_and_bootstrap_env(
@@ -100,31 +148,20 @@ def test_needs_reexec_falls_back_to_true_when_sys_executable_resolution_fails(
 
 
 @pytest.mark.parametrize(
-    "argv",
+    'argv',
     [
-        ["--output-root", "runs/custom"],
-        ["--output-root=runs/custom"],
+        ['--output-root', 'runs/custom'],
+        ['--output-root=runs/custom'],
     ],
 )
 def test_main_rejects_removed_output_root_flag(argv: list[str]) -> None:
-    with pytest.raises(SystemExit, match="--output-root is no longer supported"):
+    with pytest.raises(SystemExit, match='--output-root is no longer supported'):
         bootstrap_main.main(argv)
 
 
 def test_main_allows_internal_output_root_bypass(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import residual.runtime as runtime
-
-    calls: dict[str, object] = {}
-    monkeypatch.setenv(bootstrap_main._BOOTSTRAP_ENV, '1')
     monkeypatch.setenv(bootstrap_main._ALLOW_INTERNAL_OUTPUT_ROOT_ENV, '1')
 
-    def fake_runtime_main(args: list[str]) -> int:
-        calls['args'] = list(args)
-        return 0
-
-    monkeypatch.setattr(runtime, 'main', fake_runtime_main)
-
-    assert bootstrap_main.main(['--output-root', 'runs/internal']) == 0
-    assert calls['args'] == ['--output-root', 'runs/internal']
+    bootstrap_main._reject_removed_args(['--output-root', 'runs/internal'])
