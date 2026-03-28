@@ -150,6 +150,42 @@ models:
       type: categorical
       choices:
       - true
+  NonstationaryTransformer:
+    hidden_size:
+      type: categorical
+      choices:
+      - 64
+      - 128
+      - 256
+    dropout:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.1
+      - 0.2
+      - 0.3
+    n_head:
+      type: categorical
+      choices:
+      - 4
+      - 8
+    conv_hidden_size:
+      type: categorical
+      choices:
+      - 64
+      - 128
+      - 256
+    encoder_layers:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 3
+    decoder_layers:
+      type: categorical
+      choices:
+      - 1
+      - 2
 training:
   global:
     input_size:
@@ -250,6 +286,27 @@ training:
         type: categorical
         choices:
         - 16
+      scaler_type:
+        type: categorical
+        choices:
+        - null
+      model_step_size:
+        type: categorical
+        choices:
+        - 4
+    NonstationaryTransformer:
+      input_size:
+        type: categorical
+        choices:
+        - 48
+        - 64
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
       scaler_type:
         type: categorical
         choices:
