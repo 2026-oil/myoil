@@ -1,0 +1,6 @@
+- model: LSTM
+  params:
+    encoder_hidden_size: 64
+    decoder_hidden_size: 64
+    encoder_n_layers: 4
+    context_size: 8

@@ -127,11 +127,13 @@ jobs:
 
 - `target_columns` 각각에 대해 개별 stage run을 수행합니다.
 - plugin-only contract에서는 linked YAML에 **정확히 1개의 fixed-param job**만 둡니다.
+- shared catalog가 필요하면 `yaml/jobs/bs_preforcast/bs_preforcast_jobs_uni.yaml`에서 `yaml/jobs/bs_preforcast/uni/*.yaml` single-job route들로 fanout시키고, runtime은 route별 top-level run으로 분리 실행합니다.
 
 ### `task.multivariable: true`
 
 - `target_columns` 전체를 하나의 stage run으로 처리합니다.
 - direct-model (`ARIMA`, `ES`, `xgboost`, `lightgbm`) 경로는 multivariable mode를 지원하지 않고 즉시 실패합니다.
+- shared catalog가 필요하면 `yaml/jobs/bs_preforcast/bs_preforcast_jobs_multi.yaml`에서 `yaml/jobs/bs_preforcast/multi/*.yaml` single-job route들로 fanout시키고, baseline-only stage job(`Naive` 등)은 catalog에 넣지 않습니다.
 
 ---
 
@@ -242,7 +244,7 @@ bs_preforcast_training:
 
 - plugin-only direct stage는 linked YAML에 **정확히 1개의 fixed-param job**만 허용합니다.
 - main `models` / `training` section과는 독립적으로 direct-model defaults를 관리합니다.
-- 여러 direct-model 후보를 실험하려면 plugin YAML을 바꿔가며 개별 실행하거나, 별도 실험 family에서 config를 나눠 관리해야 합니다.
+- 여러 direct-model 후보를 실험하려면 `yaml/jobs/bs_preforcast/bs_preforcast_jobs_uni.yaml` 같은 catalog에서 single-job route 파일들을 fanout시키거나, 별도 실험 family에서 config를 나눠 관리해야 합니다.
 
 ---
 

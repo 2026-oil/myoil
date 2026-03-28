@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -59,6 +60,200 @@ def test_validate_only_bs_preforcast_smoke_fixture_materializes_metadata_shell(
     assert manifest["bs_preforcast"]["validate_only"] is True
     assert manifest["bs_preforcast"]["stage1_run_roots"] == []
     assert manifest["bs_preforcast"]["stage1_selected_jobs_path"] is None
+
+
+def test_validate_only_bs_preforcast_uni_catalog_fanout_runs_per_stage_job(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    tmp_repo = tmp_path / "repo"
+    shutil.copytree(repo_root / "yaml" / "plugins", tmp_repo / "yaml" / "plugins")
+    shutil.copytree(
+        repo_root / "yaml" / "jobs" / "bs_preforcast",
+        tmp_repo / "yaml" / "jobs" / "bs_preforcast",
+    )
+    shutil.copytree(repo_root / "yaml" / "HPO", tmp_repo / "yaml" / "HPO")
+
+    data_path = tmp_repo / "data.csv"
+    data_path.write_text(
+        "dt,target,BS_Core_Index_Integrated\n"
+        "2020-01-01,1,10\n"
+        "2020-01-08,2,11\n"
+        "2020-01-15,3,12\n"
+        "2020-01-22,4,13\n",
+        encoding="utf-8",
+    )
+    config_path = tmp_repo / "config.yaml"
+    config_path.write_text(
+        json.dumps(
+            {
+                "task": {"name": "bs_preforcast_uni_catalog_validate"},
+                "dataset": {
+                    "path": str(data_path),
+                    "target_col": "target",
+                    "dt_col": "dt",
+                    "hist_exog_cols": [],
+                    "futr_exog_cols": [],
+                    "static_exog_cols": [],
+                },
+                "bs_preforcast": {
+                    "enabled": True,
+                    "config_path": "yaml/plugins/bs_preforcast_uni.yaml",
+                },
+                "training": {
+                    "input_size": 2,
+                    "val_check_steps": 1,
+                    "early_stop_patience_steps": -1,
+                    "batch_size": 1,
+                    "valid_batch_size": 1,
+                    "windows_batch_size": 8,
+                    "inference_windows_batch_size": 8,
+                    "max_steps": 1,
+                    "loss": "mse",
+                    "lr_scheduler": {
+                        "name": "OneCycleLR",
+                        "max_lr": 0.001,
+                        "pct_start": 0.3,
+                        "div_factor": 25.0,
+                        "final_div_factor": 10000.0,
+                        "anneal_strategy": "cos",
+                        "three_phase": False,
+                        "cycle_momentum": False,
+                    },
+                },
+                "cv": {"horizon": 1, "step_size": 1, "n_windows": 1},
+                "scheduler": {
+                    "gpu_ids": [0],
+                    "worker_devices": 1,
+                    "parallelize_single_job_tuning": False,
+                },
+                "residual": {"enabled": False, "model": "xgboost", "params": {}},
+                "jobs": [{"model": "Naive", "params": {}}],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        residual_runtime, "__file__", str(tmp_repo / "runtime_support" / "runner.py")
+    )
+
+    code = residual_runtime.main(["--config", str(config_path), "--validate-only"])
+
+    assert code == 0
+    lines = capsys.readouterr().out.strip().splitlines()
+    payload = json.loads(lines[-1])
+    assert payload["ok"] is True
+    fanout_runs = payload["fanout_runs"]
+    assert [run["jobs_route"] for run in fanout_runs] == [
+        "xgboost",
+        "lightgbm",
+        "lstm",
+        "patchtst",
+        "dlinear",
+        "nhits",
+        "es",
+        "arima",
+    ]
+
+
+def test_validate_only_bs_preforcast_multi_catalog_fanout_runs_per_stage_job(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    tmp_repo = tmp_path / "repo"
+    shutil.copytree(repo_root / "yaml" / "plugins", tmp_repo / "yaml" / "plugins")
+    shutil.copytree(
+        repo_root / "yaml" / "jobs" / "bs_preforcast",
+        tmp_repo / "yaml" / "jobs" / "bs_preforcast",
+    )
+    shutil.copytree(repo_root / "yaml" / "HPO", tmp_repo / "yaml" / "HPO")
+
+    data_path = tmp_repo / "data.csv"
+    data_path.write_text(
+        "dt,target,BS_Core_Index_Integrated,Idx_SnPVIX,Bonds_MOVE,Idx_GVZ,Idx_OVX,Idx_DxyUSD,Com_LMEX,Com_BloombergCommodity_BCOM\n"
+        "2020-01-01,1,10,1,2,3,4,5,6,7\n"
+        "2020-01-08,2,11,2,3,4,5,6,7,8\n"
+        "2020-01-15,3,12,3,4,5,6,7,8,9\n"
+        "2020-01-22,4,13,4,5,6,7,8,9,10\n",
+        encoding="utf-8",
+    )
+    config_path = tmp_repo / "config.yaml"
+    config_path.write_text(
+        json.dumps(
+            {
+                "task": {"name": "bs_preforcast_multi_catalog_validate"},
+                "dataset": {
+                    "path": str(data_path),
+                    "target_col": "target",
+                    "dt_col": "dt",
+                    "hist_exog_cols": [],
+                    "futr_exog_cols": [],
+                    "static_exog_cols": [],
+                },
+                "bs_preforcast": {
+                    "enabled": True,
+                    "config_path": "yaml/plugins/bs_preforcast_multi.yaml",
+                },
+                "training": {
+                    "input_size": 2,
+                    "val_check_steps": 1,
+                    "early_stop_patience_steps": -1,
+                    "batch_size": 1,
+                    "valid_batch_size": 1,
+                    "windows_batch_size": 8,
+                    "inference_windows_batch_size": 8,
+                    "max_steps": 1,
+                    "loss": "mse",
+                    "lr_scheduler": {
+                        "name": "OneCycleLR",
+                        "max_lr": 0.001,
+                        "pct_start": 0.3,
+                        "div_factor": 25.0,
+                        "final_div_factor": 10000.0,
+                        "anneal_strategy": "cos",
+                        "three_phase": False,
+                        "cycle_momentum": False,
+                    },
+                },
+                "cv": {"horizon": 1, "step_size": 1, "n_windows": 1},
+                "scheduler": {
+                    "gpu_ids": [0],
+                    "worker_devices": 1,
+                    "parallelize_single_job_tuning": False,
+                },
+                "residual": {"enabled": False, "model": "xgboost", "params": {}},
+                "jobs": [{"model": "Naive", "params": {}}],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        residual_runtime, "__file__", str(tmp_repo / "runtime_support" / "runner.py")
+    )
+
+    code = residual_runtime.main(["--config", str(config_path), "--validate-only"])
+
+    assert code == 0
+    lines = capsys.readouterr().out.strip().splitlines()
+    payload = json.loads(lines[-1])
+    assert payload["ok"] is True
+    fanout_runs = payload["fanout_runs"]
+    assert [run["jobs_route"] for run in fanout_runs] == [
+        "timexer",
+        "tsmixerx",
+        "itransformer",
+        "lstm",
+    ]
 
 
 def test_materialize_stage_fails_before_stage_side_effects_for_unsupported_futr_exog(

@@ -357,6 +357,7 @@ class JobsFanoutSpec:
     resolved_path: Path
     route_slug: str
     jobs_payload: tuple[dict[str, Any], ...]
+    stage_jobs_reference: str | None = None
 
 
 def _hash_text(text: str) -> str:
@@ -1705,6 +1706,29 @@ def load_app_config(
             jobs_value=payload.get("jobs", []),
         )
         jobs_payload_candidates = [payload["jobs"]]
+        stage_fanout_probe = (
+            tuple(stage_payload_probe.get("jobs_fanout_specs", ()))
+            if isinstance(stage_payload_probe, dict)
+            else ()
+        )
+        if stage_fanout_probe:
+            jobs_fanout_specs = tuple(
+                JobsFanoutSpec(
+                    reference=spec.reference,
+                    resolved_path=spec.resolved_path,
+                    route_slug=spec.route_slug,
+                    jobs_payload=tuple(dict(job) for job in payload["jobs"]),
+                    stage_jobs_reference=(
+                        str(spec.resolved_path.relative_to(repo_root.resolve()))
+                        if str(spec.resolved_path).startswith(str(repo_root.resolve()) + "/")
+                        else str(spec.resolved_path)
+                    ),
+                )
+                for spec in stage_fanout_probe
+            )
+            jobs_payload_candidates = [
+                [dict(job) for job in spec.jobs_payload] for spec in jobs_fanout_specs
+            ]
     for jobs_candidate in jobs_payload_candidates:
         for job in jobs_candidate:
             if str(job.get("model")) not in BASELINE_MODEL_NAMES and not dict(job.get("params", {})):
@@ -1868,9 +1892,56 @@ def loaded_config_for_jobs_fanout(
         repo_root=repo_root,
         source_path=loaded.source_path,
     )
+    if (
+        spec.stage_jobs_reference is not None
+        and getattr(config, "stage_plugin_config", None) is not None
+        and hasattr(config.stage_plugin_config, "jobs_config_path")
+    ):
+        config = replace(
+            config,
+            stage_plugin_config=replace(
+                config.stage_plugin_config,
+                jobs_config_path=spec.stage_jobs_reference,
+            ),
+        )
+    stage_plugin_loaded = loaded.stage_plugin_loaded
+    if (
+        stage_plugin is not None
+        and config.stage_plugin_config is not None
+        and stage_plugin.is_enabled(config.stage_plugin_config)
+        and getattr(config.stage_plugin_config, "config_path", None)
+    ):
+        stage_search_space_contract = (
+            SearchSpaceContract(
+                path=loaded.search_space_path,
+                payload=loaded.search_space_payload,
+                sha256=loaded.search_space_hash,
+            )
+            if loaded.search_space_path is not None
+            and loaded.search_space_hash is not None
+            and loaded.search_space_payload is not None
+            else None
+        )
+        stage_source_path = _resolve_relative_config_reference(
+            repo_root,
+            loaded.source_path,
+            config.stage_plugin_config.config_path,
+        )
+        if stage_source_path.exists():
+            stage_plugin_loaded = stage_plugin.load_stage(
+                repo_root,
+                source_path=loaded.source_path,
+                source_type=loaded.source_type,
+                config=config.stage_plugin_config,
+                search_space_contract=stage_search_space_contract,
+            )
+            config = stage_plugin.apply_stage_to_config(config, stage_plugin_loaded)
     normalized_payload = config.to_dict()
     if stage_plugin is not None:
-        extra = stage_plugin.fanout_stage_payload(loaded)
+        if stage_plugin_loaded is not None:
+            extra = stage_plugin.stage_normalized_payload(config, stage_plugin_loaded)
+        else:
+            extra = stage_plugin.fanout_stage_payload(loaded)
         if extra is not None:
             for k, v in extra.items():
                 normalized_payload.setdefault(k, {}).update(v)
@@ -1888,6 +1959,7 @@ def loaded_config_for_jobs_fanout(
         config=config,
         normalized_payload=normalized_payload,
         resolved_hash=_hash_text(resolved_text),
+        stage_plugin_loaded=stage_plugin_loaded,
         jobs_fanout_specs=(),
         active_jobs_route_slug=spec.route_slug,
     )

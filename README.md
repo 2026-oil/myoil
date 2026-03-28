@@ -169,6 +169,8 @@ bs_preforcast:
 
 - `bs_preforcast.md`
 - `yaml/jobs/bs_preforcast_jobs_default.yaml` (univariable direct-model 기본 파라미터)
+- `yaml/jobs/bs_preforcast/bs_preforcast_jobs_uni.yaml` (univariable stage1 fanout catalog; 실제 단일 stage job은 `yaml/jobs/bs_preforcast/uni/*.yaml`)
+- `yaml/jobs/bs_preforcast/bs_preforcast_jobs_multi.yaml` (multivariable stage1 fanout catalog; 실제 단일 stage job은 `yaml/jobs/bs_preforcast/multi/*.yaml`)
 
 ---
 

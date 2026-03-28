@@ -1,0 +1,3 @@
+- model: DLinear
+  params:
+    moving_avg_window: 3

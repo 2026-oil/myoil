@@ -1,0 +1,12 @@
+- model: xgboost
+  params:
+    lags:
+    - 1
+    - 2
+    - 3
+    - 6
+    - 12
+    n_estimators: 64
+    max_depth: 4
+    subsample: 1.0
+    colsample_bytree: 1.0

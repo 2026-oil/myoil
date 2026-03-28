@@ -59,6 +59,7 @@ class BsPreforcastStagePlugin:
         payload = asdict(config)
         if not payload.get("enabled", False):
             return None
+        payload.pop("jobs_config_path", None)
         payload["target_columns"] = list(payload["target_columns"])
         return payload
 
@@ -80,7 +81,6 @@ class BsPreforcastStagePlugin:
         if not self.is_enabled(config):
             return None
         from residual.config import (
-            _resolve_jobs_reference,
             _resolve_relative_config_reference,
         )
 
@@ -108,12 +108,14 @@ class BsPreforcastStagePlugin:
             coerce_bool=coerce_bool,
             coerce_name_tuple=coerce_name_tuple,
         )
+        stage_jobs_payload, jobs_fanout_specs = _cfg._resolve_plugin_jobs_payload(
+            repo_root,
+            stage_source_path=stage_source_path,
+            jobs_value=dict(stage_raw_payload).get("jobs", []),
+        )
         return {
-            "jobs": _resolve_jobs_reference(
-                repo_root,
-                source_path=stage_source_path,
-                jobs_value=dict(stage_raw_payload).get("jobs", []),
-            ),
+            "jobs": stage_jobs_payload,
+            "jobs_fanout_specs": jobs_fanout_specs,
             "residual": {},
         }
 

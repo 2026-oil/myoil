@@ -1,0 +1,7 @@
+- model: iTransformer
+  params:
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 2
+    d_ff: 192
+    dropout: 0.0

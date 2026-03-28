@@ -31,6 +31,7 @@ class BsPreforcastTaskConfig:
 class BsPreforcastConfig:
     enabled: bool = False
     config_path: str | None = None
+    jobs_config_path: str | None = None
     target_columns: tuple[str, ...] = field(default_factory=tuple)
     hist_columns: tuple[str, ...] = field(default_factory=tuple)
     task: BsPreforcastTaskConfig = field(default_factory=BsPreforcastTaskConfig)
@@ -155,6 +156,58 @@ def _validate_plugin_jobs(jobs: list[dict[str, Any]]) -> None:
             )
 
 
+def _resolve_plugin_jobs_payload(
+    repo_root: Path,
+    *,
+    stage_source_path: Path,
+    jobs_value: Any,
+) -> tuple[list[dict[str, Any]], tuple[Any, ...]]:
+    from residual.config import (
+        _load_document,
+        _resolve_jobs_fanout_specs,
+        _resolve_jobs_path_reference,
+        _resolve_jobs_reference,
+    )
+
+    fanout_specs: tuple[Any, ...] = ()
+    source_for_fanout = stage_source_path
+    candidate_jobs_value = jobs_value
+
+    if isinstance(jobs_value, str):
+        jobs_path, loaded_jobs_value = _resolve_jobs_path_reference(
+            repo_root,
+            source_path=stage_source_path,
+            jobs_value=jobs_value,
+        )
+        source_for_fanout = jobs_path
+        candidate_jobs_value = _load_document(
+            jobs_path,
+            "toml" if jobs_path.suffix.lower() == ".toml" else "yaml",
+        )
+
+    fanout_specs = _resolve_jobs_fanout_specs(
+        repo_root,
+        source_path=source_for_fanout,
+        jobs_value=(
+            candidate_jobs_value.get("jobs")
+            if isinstance(candidate_jobs_value, dict)
+            else candidate_jobs_value
+        ),
+    )
+    if fanout_specs:
+        for spec in fanout_specs:
+            _validate_plugin_jobs([dict(job) for job in spec.jobs_payload])
+        return [dict(job) for job in fanout_specs[0].jobs_payload], fanout_specs
+
+    jobs_payload = _resolve_jobs_reference(
+        repo_root,
+        source_path=stage_source_path,
+        jobs_value=jobs_value,
+    )
+    _validate_plugin_jobs(jobs_payload)
+    return jobs_payload, ()
+
+
 def resolve_bs_preforcast_route_path(
     repo_root: Path,
     bs_preforcast: BsPreforcastConfig,
@@ -188,7 +241,6 @@ def load_bs_preforcast_stage1(
         _merge_shared_settings_into_payload,
         _normalize_payload,
         _unknown_keys,
-        _resolve_jobs_reference,
         _resolve_relative_config_reference,
     )
 
@@ -253,13 +305,18 @@ def load_bs_preforcast_stage1(
         "cv": json.loads(json.dumps(main_payload.get("cv", {}))),
         "scheduler": json.loads(json.dumps(main_payload.get("scheduler", {}))),
         "residual": json.loads(json.dumps(main_payload.get("residual", {}))),
-        "jobs": _resolve_jobs_reference(
-            repo_root,
-            source_path=stage_source_path,
-            jobs_value=routed_payload_without_owner.get("jobs", []),
-        ),
+        "jobs": [],
     }
-    _validate_plugin_jobs(stage_payload["jobs"])
+    stage_jobs_payload, _stage_jobs_fanout_specs = _resolve_plugin_jobs_payload(
+        repo_root,
+        stage_source_path=stage_source_path,
+        jobs_value=(
+            bs_preforcast.jobs_config_path
+            if bs_preforcast.jobs_config_path is not None
+            else routed_payload_without_owner.get("jobs", [])
+        ),
+    )
+    stage_payload["jobs"] = stage_jobs_payload
     stage_payload["training"].pop("train_protocol", None)
     stage_payload["cv"].pop("n_windows", None)
     stage_payload["cv"].pop("step_size", None)

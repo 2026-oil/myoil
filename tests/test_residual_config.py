@@ -7728,33 +7728,120 @@ def test_case_yaml_files_reference_shared_jobs_paths(
 
 
 @pytest.mark.parametrize(
-    ("relative_path", "expected_jobs_ref", "expected_models"),
+    ("relative_path", "expected_jobs_ref"),
     [
         (
             "yaml/plugins/bs_preforcast_uni.yaml",
             "yaml/jobs/bs_preforcast/bs_preforcast_jobs_uni.yaml",
-            ["xgboost", "lightgbm", "LSTM", "PatchTST", "DLinear", "NHITS", "ES", "ARIMA"],
         ),
         (
             "yaml/plugins/bs_preforcast_multi.yaml",
             "yaml/jobs/bs_preforcast/bs_preforcast_jobs_multi.yaml",
-            ["TimeXer", "TSMixerx", "Naive", "iTransformer", "LSTM"],
         ),
     ],
 )
 def test_bs_preforcast_plugin_yaml_routes_to_shared_jobs_files(
-    relative_path: str, expected_jobs_ref: str, expected_models: list[str]
+    relative_path: str, expected_jobs_ref: str
 ) -> None:
     path = REPO_ROOT / relative_path
     payload = _load_case_yaml_raw(path)
 
     assert payload["jobs"] == expected_jobs_ref
-    assert [job["model"] for job in _resolve_case_jobs(path, payload["jobs"])] == expected_models
+
+
+def test_bs_preforcast_uni_jobs_yaml_fanout_catalog_matches_requested_fixed_params() -> None:
+    path = REPO_ROOT / "yaml" / "jobs" / "bs_preforcast" / "bs_preforcast_jobs_uni.yaml"
+    refs = yaml.safe_load(path.read_text(encoding="utf-8"))
+
+    assert refs == [
+        "uni/xgboost.yaml",
+        "uni/lightgbm.yaml",
+        "uni/lstm.yaml",
+        "uni/patchtst.yaml",
+        "uni/dlinear.yaml",
+        "uni/nhits.yaml",
+        "uni/es.yaml",
+        "uni/arima.yaml",
+    ]
+
+    resolved_jobs = []
+    for ref in refs:
+        route_jobs = _resolve_case_jobs(path, ref)
+        assert len(route_jobs) == 1
+        resolved_jobs.extend(route_jobs)
+
+    params_by_model = {job["model"]: job["params"] for job in resolved_jobs}
+    assert [job["model"] for job in resolved_jobs] == [
+        "xgboost",
+        "lightgbm",
+        "LSTM",
+        "PatchTST",
+        "DLinear",
+        "NHITS",
+        "ES",
+        "ARIMA",
+    ]
+    assert params_by_model == {
+        "xgboost": {
+            "lags": [1, 2, 3, 6, 12],
+            "n_estimators": 64,
+            "max_depth": 4,
+            "subsample": 1.0,
+            "colsample_bytree": 1.0,
+        },
+        "lightgbm": {
+            "lags": [1, 2, 3, 6, 12],
+            "n_estimators": 96,
+            "max_depth": 6,
+            "num_leaves": 31,
+            "min_child_samples": 20,
+        },
+        "LSTM": {
+            "encoder_hidden_size": 64,
+            "decoder_hidden_size": 64,
+            "encoder_n_layers": 4,
+            "context_size": 8,
+        },
+        "PatchTST": {
+            "hidden_size": 16,
+            "n_heads": 4,
+            "encoder_layers": 2,
+            "patch_len": 4,
+        },
+        "DLinear": {
+            "moving_avg_window": 3,
+        },
+        "NHITS": {
+            "mlp_units": [[32, 32], [32, 32], [32, 32]],
+        },
+        "ES": {
+            "trend": "add",
+            "damped_trend": False,
+        },
+        "ARIMA": {
+            "order": [1, 1, 0],
+            "include_mean": True,
+            "include_drift": False,
+        },
+    }
 
 
 def test_bs_preforcast_multi_jobs_yaml_matches_requested_fixed_params() -> None:
     path = REPO_ROOT / "yaml" / "jobs" / "bs_preforcast" / "bs_preforcast_jobs_multi.yaml"
-    jobs = _resolve_case_jobs(path, yaml.safe_load(path.read_text(encoding="utf-8")))
+    refs = yaml.safe_load(path.read_text(encoding="utf-8"))
+
+    assert refs == [
+        "multi/timexer.yaml",
+        "multi/tsmixerx.yaml",
+        "multi/itransformer.yaml",
+        "multi/lstm.yaml",
+    ]
+
+    jobs: list[dict[str, Any]] = []
+    for ref in refs:
+        route_jobs = _resolve_case_jobs(path, ref)
+        assert len(route_jobs) == 1
+        jobs.extend(route_jobs)
     params_by_model = {job["model"]: job["params"] for job in jobs}
 
     assert params_by_model == {
@@ -7774,7 +7861,6 @@ def test_bs_preforcast_multi_jobs_yaml_matches_requested_fixed_params() -> None:
             "dropout": 0.05,
             "revin": True,
         },
-        "Naive": {},
         "iTransformer": {
             "hidden_size": 64,
             "n_heads": 4,

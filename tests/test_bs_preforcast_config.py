@@ -133,16 +133,118 @@ def test_load_app_config_materializes_bs_preforcast_stage_with_top_level_config_
 
     assert isinstance(loaded.config.stage_plugin_config, BsPreforcastConfig)
     assert isinstance(loaded.stage_plugin_loaded, BsPreforcastStageLoadedConfig)
+
+
+def test_load_app_config_builds_stage_jobs_fanout_specs_from_uni_catalog(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    data_path = tmp_path / "data.csv"
+    data_path.write_text(
+        "dt,target,BS_Core_Index_Integrated\n"
+        "2020-01-01,1,10\n"
+        "2020-01-08,2,11\n"
+        "2020-01-15,3,12\n",
+        encoding="utf-8",
+    )
+    payload = _base_payload(data_path)
+    payload["bs_preforcast"] = _main_bs_preforcast(
+        config_path="yaml/plugins/bs_preforcast_uni.yaml"
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    loaded = load_app_config(repo_root, config_path=config_path)
+
+    assert [spec.route_slug for spec in loaded.jobs_fanout_specs] == [
+        "xgboost",
+        "lightgbm",
+        "lstm",
+        "patchtst",
+        "dlinear",
+        "nhits",
+        "es",
+        "arima",
+    ]
+    assert [spec.stage_jobs_reference for spec in loaded.jobs_fanout_specs] == [
+        "yaml/jobs/bs_preforcast/uni/xgboost.yaml",
+        "yaml/jobs/bs_preforcast/uni/lightgbm.yaml",
+        "yaml/jobs/bs_preforcast/uni/lstm.yaml",
+        "yaml/jobs/bs_preforcast/uni/patchtst.yaml",
+        "yaml/jobs/bs_preforcast/uni/dlinear.yaml",
+        "yaml/jobs/bs_preforcast/uni/nhits.yaml",
+        "yaml/jobs/bs_preforcast/uni/es.yaml",
+        "yaml/jobs/bs_preforcast/uni/arima.yaml",
+    ]
+    assert [job.model for job in loaded.config.jobs] == ["Naive"]
+    assert [job.model for job in loaded.stage_plugin_loaded.config.jobs] == ["xgboost"]
     assert loaded.stage_plugin_loaded is not None
-    assert loaded.stage_plugin_loaded.source_path == stage_path.resolve()
-    assert loaded.config.stage_plugin_config.target_columns == ("bs_a",)
-    assert loaded.config.stage_plugin_config.hist_columns == ("aux_a",)
+    assert loaded.stage_plugin_loaded.source_path == (
+        repo_root / "yaml" / "plugins" / "bs_preforcast_uni.yaml"
+    ).resolve()
+    assert loaded.config.stage_plugin_config.target_columns == (
+        "BS_Core_Index_Integrated",
+    )
+    assert loaded.config.stage_plugin_config.hist_columns == ()
     assert loaded.stage_plugin_loaded.config.dataset.path == data_path
-    assert loaded.stage_plugin_loaded.config.dataset.target_col == "bs_a"
-    assert loaded.stage_plugin_loaded.config.dataset.hist_exog_cols == ("aux_a",)
+    assert loaded.stage_plugin_loaded.config.dataset.target_col == "BS_Core_Index_Integrated"
+    assert loaded.stage_plugin_loaded.config.dataset.hist_exog_cols == ()
     assert loaded.stage_plugin_loaded.normalized_payload["bs_preforcast"][
         "selected_config_path"
-    ] == str(stage_path.resolve())
+    ] == str((repo_root / "yaml" / "plugins" / "bs_preforcast_uni.yaml").resolve())
+
+
+def test_load_app_config_builds_stage_jobs_fanout_specs_from_multi_catalog(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    data_path = tmp_path / "data.csv"
+    data_path.write_text(
+        "dt,target,BS_Core_Index_Integrated,Idx_SnPVIX,Bonds_MOVE,Idx_GVZ,Idx_OVX,Idx_DxyUSD,Com_LMEX,Com_BloombergCommodity_BCOM\n"
+        "2020-01-01,1,10,1,2,3,4,5,6,7\n"
+        "2020-01-08,2,11,2,3,4,5,6,7,8\n"
+        "2020-01-15,3,12,3,4,5,6,7,8,9\n",
+        encoding="utf-8",
+    )
+    payload = _base_payload(data_path)
+    payload["bs_preforcast"] = _main_bs_preforcast(
+        config_path="yaml/plugins/bs_preforcast_multi.yaml"
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    loaded = load_app_config(repo_root, config_path=config_path)
+
+    assert [spec.route_slug for spec in loaded.jobs_fanout_specs] == [
+        "timexer",
+        "tsmixerx",
+        "itransformer",
+        "lstm",
+    ]
+    assert [spec.stage_jobs_reference for spec in loaded.jobs_fanout_specs] == [
+        "yaml/jobs/bs_preforcast/multi/timexer.yaml",
+        "yaml/jobs/bs_preforcast/multi/tsmixerx.yaml",
+        "yaml/jobs/bs_preforcast/multi/itransformer.yaml",
+        "yaml/jobs/bs_preforcast/multi/lstm.yaml",
+    ]
+    assert [job.model for job in loaded.config.jobs] == ["Naive"]
+    assert [job.model for job in loaded.stage_plugin_loaded.config.jobs] == ["TimeXer"]
+    assert loaded.stage_plugin_loaded is not None
+    assert loaded.stage_plugin_loaded.source_path == (
+        repo_root / "yaml" / "plugins" / "bs_preforcast_multi.yaml"
+    ).resolve()
+    assert loaded.config.stage_plugin_config.target_columns == (
+        "BS_Core_Index_Integrated",
+    )
+    assert loaded.config.stage_plugin_config.hist_columns == (
+        "Idx_SnPVIX",
+        "Bonds_MOVE",
+        "Idx_GVZ",
+        "Idx_OVX",
+        "Idx_DxyUSD",
+        "Com_LMEX",
+        "Com_BloombergCommodity_BCOM",
+    )
 
 
 def test_load_app_config_accepts_bs_preforcast_plugin_with_multiple_jobs(

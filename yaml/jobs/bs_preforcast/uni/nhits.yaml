@@ -1,0 +1,9 @@
+- model: NHITS
+  params:
+    mlp_units:
+    - - 32
+      - 32
+    - - 32
+      - 32
+    - - 32
+      - 32
