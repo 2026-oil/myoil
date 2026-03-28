@@ -7,7 +7,7 @@ from residual.models import MODEL_CLASSES, supports_auto_mode
 
 
 def test_new_model_support_matrix_is_explicit():
-    search_space = yaml.safe_load(open('search_space.yaml', encoding='utf-8'))
+    search_space = yaml.safe_load(open('yaml/HPO/search_space.yaml', encoding='utf-8'))
 
     supported = {
         'DeformTime': {
@@ -46,7 +46,7 @@ def test_new_model_support_matrix_is_explicit():
 
 
 def test_excluded_or_covered_requested_models_are_explicit():
-    search_space = yaml.safe_load(open('search_space.yaml', encoding='utf-8'))
+    search_space = yaml.safe_load(open('yaml/HPO/search_space.yaml', encoding='utf-8'))
 
     assert not hasattr(nf_models, 'LightGTS')
     assert 'LightGTS' not in MODEL_CLASSES

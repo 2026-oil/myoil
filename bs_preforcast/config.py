@@ -74,7 +74,7 @@ def normalize_bs_preforcast_config(
     )
     if enabled:
         if config_path is None:
-            config_path = "bs_preforcast.yaml"
+            config_path = "yaml/plugins/bs_preforcast.yaml"
     return BsPreforcastConfig(
         enabled=enabled,
         config_path=config_path,

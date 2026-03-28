@@ -13,7 +13,7 @@ import yaml
 
 import bs_preforcast.search_space as bs_preforcast_search_space
 
-SEARCH_SPACE_FILENAME = "search_space.yaml"
+SEARCH_SPACE_FILENAME = "yaml/HPO/search_space.yaml"
 BASELINE_MODEL_NAMES = {"Naive", "SeasonalNaive", "HistoricAverage"}
 EXCLUDED_AUTO_MODEL_NAMES = {"HINT"}
 SUPPORTED_AUTO_MODEL_NAMES = {
@@ -513,12 +513,12 @@ def _normalize_training_section(
 
 def normalize_search_space_payload(payload: dict[str, Any]) -> dict[str, Any]:
     if not payload:
-        raise ValueError("search_space.yaml is empty")
+        raise ValueError("yaml/HPO/search_space.yaml is empty")
     required_sections = {"models", "residual"}
     missing = required_sections.difference(payload)
     if missing:
         raise ValueError(
-            "search_space.yaml must contain top-level sections: models and residual"
+            "yaml/HPO/search_space.yaml must contain top-level sections: models and residual"
         )
     residual_fallback = globals().get("RESIDUAL_PARAM_REGISTRY")
 

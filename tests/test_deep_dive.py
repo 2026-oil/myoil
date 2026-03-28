@@ -158,17 +158,17 @@ def temp_repo(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     (root / "data").mkdir(parents=True, exist_ok=True)
     (root / "data" / "df.csv").write_text("dt,target\n2020-01-01,1\n", encoding="utf-8")
-    _write_yaml(root / "search_space.yaml", _search_space_payload())
+    _write_yaml(root / "yaml/HPO/search_space.yaml", _search_space_payload())
     for stem, target in (("brentoil-case1", "Com_BrentCrudeOil"), ("wti-case1", "Com_CrudeOil")):
         baseline_payload = _base_payload(stem.replace("-", "_"), target, bs=False)
         incumbent_payload = _base_payload(stem.replace("-", "_") + "_bs", target, bs=True)
-        _write_yaml(root / "yaml" / "feature_set" / f"{stem}.yaml", baseline_payload)
-        _write_yaml(root / "yaml" / "feature_set_bs" / f"{stem}.yaml", incumbent_payload)
+        _write_yaml(root / "yaml" / "experiment" / "feature_set" / f"{stem}.yaml", baseline_payload)
+        _write_yaml(root / "yaml" / "experiment" / "feature_set_bs" / f"{stem}.yaml", incumbent_payload)
         baseline_root = root / "runs" / "feature_set" / f"feature_set_{baseline_payload['task']['name']}"
         incumbent_root = root / "runs" / "feature_set_bs" / f"feature_set_bs_{incumbent_payload['task']['name']}"
         for run_root, payload, cfg_path in (
-            (baseline_root, baseline_payload, root / "yaml" / "feature_set" / f"{stem}.yaml"),
-            (incumbent_root, incumbent_payload, root / "yaml" / "feature_set_bs" / f"{stem}.yaml"),
+            (baseline_root, baseline_payload, root / "yaml" / "experiment" / "feature_set" / f"{stem}.yaml"),
+            (incumbent_root, incumbent_payload, root / "yaml" / "experiment" / "feature_set_bs" / f"{stem}.yaml"),
         ):
             _write_manifest(run_root, cfg_path, [job["model"] for job in payload["jobs"]])
             _write_resolved_config(run_root, payload, valid_batch_size=32)

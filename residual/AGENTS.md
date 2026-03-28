@@ -35,7 +35,7 @@ This directory contains the local experiment runtime layered on top of `neuralfo
 ### Testing Requirements
 - Primary regression pass: `uv run pytest --no-cov tests/test_residual_config.py tests/test_residual_main.py`.
 - Residual backend changes should also cover representative validate-only fixture runs in `tests/fixtures/residual_runtime_smoke_*.yaml`.
-- If you touch search-space wiring, check `search_space.yaml` parity and run the relevant targeted tests before broader runs.
+- If you touch search-space wiring, check `yaml/HPO/search_space.yaml` parity and run the relevant targeted tests before broader runs.
 
 ### Common Patterns
 - Config dataclasses live in `config.py`; runtime consumes normalized dataclass objects rather than raw YAML dicts.

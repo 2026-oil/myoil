@@ -78,7 +78,10 @@ def _linked_bs_preforcast(
 
 
 def _write_search_space(tmp_path: Path) -> None:
-    (tmp_path / "search_space.yaml").write_text(
+    (tmp_path / "yaml/HPO").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/HPO").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/HPO").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/HPO/search_space.yaml").write_text(
         yaml.safe_dump(
             {
                 "models": {},
@@ -109,7 +112,8 @@ def test_load_app_config_materializes_bs_preforcast_stage_with_top_level_config_
         "2020-01-15,3,4,7,12\n",
         encoding="utf-8",
     )
-    stage_path = tmp_path / "bs_preforcast.yaml"
+    stage_path = tmp_path / "yaml/plugins/bs_preforcast.yaml"
+    stage_path.parent.mkdir(parents=True, exist_ok=True)
     stage_path.write_text(
         yaml.safe_dump(
             {
@@ -155,7 +159,8 @@ def test_load_app_config_accepts_bs_preforcast_plugin_with_multiple_jobs(
         "2020-01-15,3,4,12\n",
         encoding="utf-8",
     )
-    stage_path = tmp_path / "bs_preforcast.yaml"
+    stage_path = tmp_path / "yaml/plugins/bs_preforcast.yaml"
+    stage_path.parent.mkdir(parents=True, exist_ok=True)
     stage_path.write_text(
         yaml.safe_dump(
             {
@@ -195,7 +200,8 @@ def test_load_app_config_rejects_bs_preforcast_exog_columns_overlap(
         "2020-01-15,3,4,12\n",
         encoding="utf-8",
     )
-    stage_path = tmp_path / "bs_preforcast.yaml"
+    stage_path = tmp_path / "yaml/plugins/bs_preforcast.yaml"
+    stage_path.parent.mkdir(parents=True, exist_ok=True)
     stage_path.write_text(
         yaml.safe_dump(
             {
@@ -229,7 +235,8 @@ def test_load_app_config_rejects_legacy_plugin_owned_linked_yaml_sections(
         "2020-01-15,3,4,12\n",
         encoding="utf-8",
     )
-    stage_path = tmp_path / "bs_preforcast.yaml"
+    stage_path = tmp_path / "yaml/plugins/bs_preforcast.yaml"
+    stage_path.parent.mkdir(parents=True, exist_ok=True)
     stage_path.write_text(
         yaml.safe_dump(
             {
@@ -272,7 +279,8 @@ def test_load_app_config_rejects_legacy_using_futr_exog_in_linked_stage_yaml(
         "2020-01-15,3,4,12\n",
         encoding="utf-8",
     )
-    stage_path = tmp_path / "bs_preforcast.yaml"
+    stage_path = tmp_path / "yaml/plugins/bs_preforcast.yaml"
+    stage_path.parent.mkdir(parents=True, exist_ok=True)
     stage_path.write_text(
         yaml.safe_dump(
             {
@@ -297,7 +305,7 @@ def test_load_app_config_rejects_legacy_using_futr_exog_in_linked_stage_yaml(
 
 def test_repo_bs_preforcast_yaml_defaults_to_integrated_univariable_plugin() -> None:
     payload = yaml.safe_load(
-        (Path(__file__).resolve().parents[1] / "bs_preforcast.yaml").read_text(
+        (Path(__file__).resolve().parents[1] / "yaml/plugins/bs_preforcast.yaml").read_text(
             encoding="utf-8"
         )
     )
@@ -327,6 +335,7 @@ def test_repo_bs_preforcast_jobs_default_yaml_contains_direct_models() -> None:
         (
             Path(__file__).resolve().parents[1]
             / "yaml"
+            / "jobs"
             / "bs_preforcast_jobs_default.yaml"
         ).read_text(encoding="utf-8")
     )
@@ -350,12 +359,13 @@ def test_repo_default_bs_preforcast_path_is_loadable_with_defaults_yaml(
         "2020-01-15,3,4,12\n",
         encoding="utf-8",
     )
-    defaults_dir = tmp_path / "yaml"
+    defaults_dir = tmp_path / "yaml" / "jobs"
     defaults_dir.mkdir(parents=True, exist_ok=True)
     defaults_payload = yaml.safe_load(
         (
             Path(__file__).resolve().parents[1]
             / "yaml"
+            / "jobs"
             / "bs_preforcast_jobs_default.yaml"
         ).read_text(encoding="utf-8")
     )
@@ -363,11 +373,12 @@ def test_repo_default_bs_preforcast_path_is_loadable_with_defaults_yaml(
         yaml.safe_dump(defaults_payload, sort_keys=False),
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             {
                 **_linked_bs_preforcast(),
-                "jobs": "yaml/bs_preforcast_jobs_default.yaml",
+                "jobs": "yaml/jobs/bs_preforcast_jobs_default.yaml",
             },
             sort_keys=False,
         ),
@@ -375,7 +386,10 @@ def test_repo_default_bs_preforcast_path_is_loadable_with_defaults_yaml(
     )
     main_payload = _base_payload(data_path)
     main_payload["bs_preforcast"] = {"enabled": True}
-    (tmp_path / "search_space.yaml").write_text(
+    (tmp_path / "yaml/HPO").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/HPO").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/HPO").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/HPO/search_space.yaml").write_text(
         yaml.safe_dump(
             {
                 "models": {},
@@ -425,7 +439,8 @@ def test_load_app_config_rejects_bs_preforcast_autoarima_stage_job(
         "2020-01-15,3,4,12\n",
         encoding="utf-8",
     )
-    stage_path = tmp_path / "bs_preforcast.yaml"
+    stage_path = tmp_path / "yaml/plugins/bs_preforcast.yaml"
+    stage_path.parent.mkdir(parents=True, exist_ok=True)
     stage_path.write_text(
         yaml.safe_dump(
             {
@@ -438,7 +453,8 @@ def test_load_app_config_rejects_bs_preforcast_autoarima_stage_job(
     )
     main_payload = _base_payload(data_path)
     main_payload["bs_preforcast"] = _main_bs_preforcast(config_path=str(stage_path))
-    (tmp_path / "search_space.yaml").write_text(
+    (tmp_path / "yaml/HPO").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/HPO/search_space.yaml").write_text(
         yaml.safe_dump(
             {
                 "models": {},

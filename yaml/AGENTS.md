@@ -9,9 +9,12 @@ This directory holds the curated experiment configurations used by the local wra
 ## Key Subdirectories
 | Directory | Purpose |
 |-----------|---------|
-| `feature_set/` | Base Brent/WTI feature-set case configs. |
-| `feature_set_HPT/` | Hyperparameter-tuning variants of the feature-set cases. |
-| `feature_set_HPT_c3/` | Focused case3 HPT configs used by wait-chain/batch flows. |
+| `experiment/feature_set/` | Base Brent/WTI feature-set case configs. |
+| `experiment/feature_set_HPT*/` | Hyperparameter-tuning feature-set case families. |
+| `jobs/` | Shared jobs route files used by case configs. |
+| `setting/` | Shared setting authority files for centralized YAML controls. |
+| `HPO/` | Central Optuna/search-space contracts. |
+| `plugins/` | Plugin-owned linked YAMLs such as `bs_preforcast.yaml`. |
 | `bomb/` | Case3 bomb sweep configs for exloss + diff/residual variations. |
 | `bomb_trans/` | Transformation-focused case3 bomb sweep configs used by `run_bomb_trans.sh`. |
 | `univar/` | Univariate baseline configs. |
@@ -23,7 +26,7 @@ This directory holds the curated experiment configurations used by the local wra
 ### Working In This Directory
 - Preserve family naming and Brent/WTI pairing conventions; downstream scripts depend on predictable file paths.
 - Prefer editing the narrowest family affected by the request instead of copying settings across unrelated trees.
-- Keep config semantics aligned with `residual/config.py` and `search_space.yaml`.
+- Keep config semantics aligned with `residual/config.py` and `yaml/HPO/search_space.yaml`.
 - Do not silently add new top-level keys; runtime validation is strict.
 
 ### Testing Requirements

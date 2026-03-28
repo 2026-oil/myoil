@@ -185,7 +185,7 @@ class BundleOutcome:
 def _normalize_model_search_specs(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
     models = payload.get("models")
     if not isinstance(models, dict):
-        raise ValueError("search_space.yaml must contain a models mapping")
+        raise ValueError("yaml/HPO/search_space.yaml must contain a models mapping")
     normalized: dict[str, dict[str, Any]] = {}
     for model_name, specs in models.items():
         if not isinstance(specs, dict):
@@ -195,7 +195,7 @@ def _normalize_model_search_specs(payload: dict[str, Any]) -> dict[str, dict[str
 
 
 def load_search_space_contract(repo_root: Path) -> SearchSpaceContract:
-    path = (repo_root / "search_space.yaml").resolve()
+    path = (repo_root / "yaml/HPO/search_space.yaml").resolve()
     payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     return SearchSpaceContract(path=path, payload={"models": _normalize_model_search_specs(payload)})
 
@@ -246,8 +246,8 @@ def dump_yaml(payload: dict[str, Any], path: Path) -> Path:
 
 def discover_cases(repo_root: Path) -> list[CaseSpec]:
     out: list[CaseSpec] = []
-    baseline_dir = repo_root / "yaml" / "feature_set"
-    incumbent_dir = repo_root / "yaml" / "feature_set_bs"
+    baseline_dir = repo_root / "yaml" / "experiment" / "feature_set"
+    incumbent_dir = repo_root / "yaml" / "experiment" / "feature_set_bs"
     for incumbent_path in sorted(incumbent_dir.glob("*.yaml")):
         baseline_path = baseline_dir / incumbent_path.name
         if not baseline_path.exists():

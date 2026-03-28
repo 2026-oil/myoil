@@ -18,7 +18,7 @@ uv run python main.py --config baseline-wti.yaml
 
 1. `main.py`가 먼저 `.venv` 파이썬으로 재실행(re-exec)한다.
 2. `residual.runtime.main()`으로 진입한다.
-3. `baseline-wti.yaml`을 읽고 `search_space.yaml`도 함께 읽는다.
+3. `baseline-wti.yaml`을 읽고 `yaml/HPO/search_space.yaml`도 함께 읽는다.
 4. `task.name=baseline_wti`를 기준으로 기본 출력 경로를 `runs/baseline_wti`로 잡는다.
 5. 전체 job 23개를 정규화한다.
 6. `Naive` 1개는 baseline 고정 모드, 나머지 22개는 `params: {}` 이므로 Optuna 자동튜닝 모드가 된다.
@@ -174,7 +174,7 @@ uv run python main.py --config baseline-wti.yaml
 - 사용자가 하이퍼파라미터를 직접 고정하지 않았다.
 - 따라서 Optuna 자동탐색이 필요하다.
 
-그래서 `load_app_config()`는 자동으로 `search_space.yaml`도 함께 읽는다.
+그래서 `load_app_config()`는 자동으로 `yaml/HPO/search_space.yaml`도 함께 읽는다.
 
 ### 6-3. task 기반 출력 경로 결정
 `task.name=baseline_wti` 이므로, `--output-root`를 명시하지 않으면 기본 출력 경로는:
@@ -495,7 +495,7 @@ learned model은 대체로 다음 순서로 실행된다.
 - trial 수 = 기본 5 (`NEURALFORECAST_OPTUNA_NUM_TRIALS` 없으면 5)
 
 각 trial마다:
-1. `search_space.yaml`에서 해당 모델의 탐색 파라미터 후보를 읽고
+1. `yaml/HPO/search_space.yaml`에서 해당 모델의 탐색 파라미터 후보를 읽고
 2. 파라미터를 샘플링한 뒤
 3. 모든 fold(24개)에 대해 fit/predict를 수행하고
 4. 각 fold의 MSE 평균을 objective로 사용한다.
@@ -761,7 +761,7 @@ residual.runtime.main()
   ↓
 baseline-wti.yaml 로드
   ↓
-(search_space.yaml 자동 로드)
+(yaml/HPO/search_space.yaml 자동 로드)
   ↓
 config 정규화 + mode 판정
   ↓

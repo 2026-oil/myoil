@@ -98,8 +98,8 @@ def test_run_after_pid7130_feature_set_script_defaults_are_scoped_correctly() ->
     script = SCRIPT_PATH.read_text(encoding="utf-8")
 
     assert 'NF_WAIT_CHAIN_WAIT_PID:-7130' in script
-    assert 'yaml/feature_set' in script
-    assert 'yaml/feature_set_HPT_c3' in script
+    assert 'yaml/experiment/feature_set' in script
+    assert 'yaml/experiment/feature_set_HPT_c3' in script
     assert '--jobs TSMixerx' in script
     assert 'wti-case3.yaml' in script
     assert 'brentoil-case3.yaml' in script

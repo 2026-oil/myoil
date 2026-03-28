@@ -60,7 +60,7 @@ def test_watch_wti_case3_then_stop_run_stops_target_process_after_completion(
 
         with results_tsv.open("a", encoding="utf-8") as handle:
             handle.write(
-                "yaml/feature_set_HPT_n100_bs/wti-case3.yaml\tpassed\t0\t"
+                "yaml/experiment/feature_set_HPT_n100_bs/wti-case3.yaml\tpassed\t0\t"
                 "runs/_batch_logs/20260324T072251Z/wti-case3.log\t"
                 "2026-03-24T07:22:51Z\t2026-03-24T10:22:51Z\n"
             )
@@ -76,7 +76,7 @@ def test_watch_wti_case3_then_stop_run_stops_target_process_after_completion(
             sleeper.wait(timeout=5)
 
     assert watcher.returncode == 0, stderr
-    assert "[watch-stop] detected yaml/feature_set_HPT_n100_bs/wti-case3.yaml completion with status=passed" in stdout
+    assert "[watch-stop] detected yaml/experiment/feature_set_HPT_n100_bs/wti-case3.yaml completion with status=passed" in stdout
     assert f"[watch-stop] run_pid={sleeper.pid}" in stdout
     assert marker_path.read_text(encoding="utf-8").splitlines() == ["INT"]
 
@@ -84,7 +84,7 @@ def test_watch_wti_case3_then_stop_run_stops_target_process_after_completion(
 def test_watch_wti_case3_then_stop_run_script_defaults_are_scoped_correctly() -> None:
     script = SCRIPT_PATH.read_text(encoding="utf-8")
 
-    assert "yaml/feature_set_HPT_n100_bs/wti-case3.yaml" in script
+    assert "yaml/experiment/feature_set_HPT_n100_bs/wti-case3.yaml" in script
     assert 'runs/_batch_logs' in script
     assert 'NF_WTI_STOP_SIGNAL:-INT' in script
     assert 'NF_WTI_STOP_GRACE_SECONDS:-20' in script

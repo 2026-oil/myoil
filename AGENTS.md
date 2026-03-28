@@ -3,14 +3,14 @@
 # neuralforecast
 
 ## Purpose
-This checkout is not just the upstream `neuralforecast` package. It is a hybrid workspace that combines the library source under `neuralforecast/` with a local experiment runner built around `main.py`, `residual/`, `config.yaml`, `search_space.yaml`, and the curated `yaml/` case matrix used for Brent/WTI research runs.
+This checkout is not just the upstream `neuralforecast` package. It is a hybrid workspace that combines the library source under `neuralforecast/` with a local experiment runner built around `main.py`, `residual/`, `config.yaml`, `yaml/HPO/search_space.yaml`, and the curated `yaml/` case matrix used for Brent/WTI research runs.
 
 ## Key Files
 | File | Description |
 |------|-------------|
 | `main.py` | Bootstrap entrypoint that re-execs into `.venv` and hands control to `residual.runtime.main()`. |
 | `config.yaml` | Default experiment config used when no explicit config path is passed. |
-| `search_space.yaml` | Central Optuna/search-space contract shared by runtime config validation. |
+| `yaml/HPO/search_space.yaml` | Central Optuna/search-space contract shared by runtime config validation. |
 | `run.sh` | Batch runner that executes config sweeps, records summaries, and can auto-commit/push outputs. |
 | `run_case3_bomb.sh` | Preloads the case3 bomb config set into `run.sh`. |
 | `run_bomb_trans.sh` | Preloads the case3 transformation bomb config set into `run.sh`. |
@@ -38,7 +38,7 @@ This checkout is not just the upstream `neuralforecast` package. It is a hybrid 
 - Default to `uv run ...` for Python execution, tests, and validation.
 - Treat this repo as a config-driven experiment harness layered on top of the library package; changes often need package code, residual runtime code, and YAML/test parity together.
 - Preserve the current wrapper contract: `main.py` is the operator entrypoint, while the real scheduler/runtime lives under `residual/`.
-- When adding or retiring model support, check shared surfaces together: `neuralforecast/models/__init__.py`, `neuralforecast/auto.py`, `neuralforecast/core.py`, `residual/models.py`, `residual/optuna_spaces.py`, `search_space.yaml`, and the relevant tests.
+- When adding or retiring model support, check shared surfaces together: `neuralforecast/models/__init__.py`, `neuralforecast/auto.py`, `neuralforecast/core.py`, `residual/models.py`, `residual/optuna_spaces.py`, `yaml/HPO/search_space.yaml`, and the relevant tests.
 - When changing residual behavior, keep config validation, plugin registry, runtime manifests, and validate-only smoke fixtures aligned.
 - Avoid editing generated outputs under `runs/`, `lightning_logs/`, `htmlcov/`, or `.omx/` unless the user explicitly asks for artifact manipulation.
 
@@ -58,7 +58,7 @@ This checkout is not just the upstream `neuralforecast` package. It is a hybrid 
 
 ### Internal
 - `main.py` depends on `residual/runtime.py`.
-- `residual/` depends on both `neuralforecast/` model surfaces and `search_space.yaml`.
+- `residual/` depends on both `neuralforecast/` model surfaces and `yaml/HPO/search_space.yaml`.
 - `tests/` includes both package-style tests and wrapper/runtime contract tests.
 
 ### External

@@ -246,7 +246,7 @@ def test_generate_rejects_removed_legacy_workbook_columns(
 
 def test_reverse_round_trip_preserves_semantics_and_explicit_defaults(tmp_path: Path) -> None:
     repo_root = _repo_with_data(tmp_path)
-    config_path = repo_root / "yaml" / "feature_set" / "orig.yaml"
+    config_path = repo_root / "yaml" / "experiment" / "feature_set" / "orig.yaml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     original_payload = {
         "task": {"name": "orig_task"},
@@ -342,7 +342,8 @@ def test_adapter_set_binds_only_matching_adapter_sheet(tmp_path: Path) -> None:
 
 def test_auto_mode_requires_matching_searchspace_rows(tmp_path: Path) -> None:
     repo_root = _repo_with_data(tmp_path)
-    (repo_root / "search_space.yaml").write_text(
+    (repo_root / "yaml/HPO").mkdir(parents=True, exist_ok=True)
+    (repo_root / "yaml/HPO/search_space.yaml").write_text(
         yaml.safe_dump(
             {
                 "models": {"LSTM": ["encoder_hidden_size"]},
@@ -375,7 +376,8 @@ def test_auto_mode_requires_matching_searchspace_rows(tmp_path: Path) -> None:
 
 def test_auto_mode_searchspace_mismatch_fails(tmp_path: Path) -> None:
     repo_root = _repo_with_data(tmp_path)
-    (repo_root / "search_space.yaml").write_text(
+    (repo_root / "yaml/HPO").mkdir(parents=True, exist_ok=True)
+    (repo_root / "yaml/HPO/search_space.yaml").write_text(
         yaml.safe_dump(
             {
                 "models": {"LSTM": ["encoder_hidden_size"]},
@@ -401,7 +403,8 @@ def test_auto_mode_searchspace_mismatch_fails(tmp_path: Path) -> None:
 
 def test_reverse_auto_mode_round_trip_populates_searchspace_sheet(tmp_path: Path) -> None:
     repo_root = _repo_with_data(tmp_path)
-    (repo_root / "search_space.yaml").write_text(
+    (repo_root / "yaml/HPO").mkdir(parents=True, exist_ok=True)
+    (repo_root / "yaml/HPO/search_space.yaml").write_text(
         yaml.safe_dump(
             {
                 "models": {"LSTM": ["encoder_hidden_size"]},
@@ -412,7 +415,7 @@ def test_reverse_auto_mode_round_trip_populates_searchspace_sheet(tmp_path: Path
         ),
         encoding="utf-8",
     )
-    config_path = repo_root / "yaml" / "feature_set" / "auto-roundtrip.yaml"
+    config_path = repo_root / "yaml" / "experiment" / "feature_set" / "auto-roundtrip.yaml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
         yaml.safe_dump(

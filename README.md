@@ -151,13 +151,13 @@ top-level section:
 ```yaml
 bs_preforcast:
   enabled: true
-  config_path: bs_preforcast.yaml
+  config_path: yaml/plugins/bs_preforcast.yaml
 ```
 
 상세 설정/동작/아티팩트 설명은 별도 문서를 보세요:
 
 - `bs_preforcast.md`
-- `yaml/bs_preforcast_jobs_default.yaml` (univariable direct-model 기본 파라미터)
+- `yaml/jobs/bs_preforcast_jobs_default.yaml` (univariable direct-model 기본 파라미터)
 
 ---
 
@@ -225,7 +225,7 @@ uv run python xl_2_yaml.py generate /tmp/nf-template.xlsx --catalog-id cfg1 --ca
 
 ```bash
 cd neuralforecast
-uv run python xl_2_yaml.py reverse yaml/feature_set/wti-case3.yaml --output /tmp/wti-case3.xlsx
+uv run python xl_2_yaml.py reverse yaml/experiment/feature_set/wti-case3.yaml --output /tmp/wti-case3.xlsx
 ```
 
 여러 YAML도 한 workbook으로 역변환할 수 있습니다.
@@ -233,8 +233,8 @@ uv run python xl_2_yaml.py reverse yaml/feature_set/wti-case3.yaml --output /tmp
 ```bash
 cd neuralforecast
 uv run python xl_2_yaml.py reverse \
-  yaml/feature_set/wti-case3.yaml \
-  yaml/feature_set/brentoil-case3.yaml \
+  yaml/experiment/feature_set/wti-case3.yaml \
+  yaml/experiment/feature_set/brentoil-case3.yaml \
   --output /tmp/case3-batch.xlsx
 ```
 

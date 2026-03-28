@@ -26,7 +26,7 @@
 ```yaml
 bs_preforcast:
   enabled: true
-  config_path: bs_preforcast.yaml
+  config_path: yaml/plugins/bs_preforcast.yaml
 ```
 
 ### 필드 설명
@@ -37,11 +37,11 @@ bs_preforcast:
 
 - `config_path`
   - 독립 `bs_preforcast` 설정 YAML 경로
-  - 생략하면 repo root의 `bs_preforcast.yaml` 사용
+  - 생략하면 repo root의 `yaml/plugins/bs_preforcast.yaml` 사용
 
 ### `config_path`에 대해
 
-현재 구현은 `config_path`를 **생략하면 기본값으로 repo root의 `bs_preforcast.yaml`**을 사용합니다.
+현재 구현은 `config_path`를 **생략하면 기본값으로 repo root의 `yaml/plugins/bs_preforcast.yaml`**을 사용합니다.
 
 즉 보통은 메인 YAML에 `enabled`만 두고, 다른 파일을 쓰고 싶을 때만 `config_path`를 명시합니다.
 
@@ -50,7 +50,7 @@ bs_preforcast:
 ```yaml
 bs_preforcast:
   enabled: true
-  config_path: custom_bs_preforcast.yaml
+  config_path: yaml/plugins/custom_bs_preforcast.yaml
 ```
 
 ### 제거된 방식
@@ -60,9 +60,9 @@ bs_preforcast:
 
 ---
 
-## 3. 독립 파일 `bs_preforcast.yaml`
+## 3. 독립 파일 `yaml/plugins/bs_preforcast.yaml`
 
-권장 방식은 repo root의 `bs_preforcast.yaml`를 두는 것입니다.
+권장 방식은 repo root의 `yaml/plugins/bs_preforcast.yaml`를 두는 것입니다.
 
 현재 contract는 **plugin-only YAML** 입니다.  
 즉 stage1 linked YAML은 아래만 소유합니다.
@@ -206,7 +206,7 @@ jobs:
 
 ### 주의
 
-- `yaml/bs_preforcast_jobs_default.yaml`는 direct-model 후보/예시 레퍼런스이며, plugin-only linked YAML 자체는 그중 **정확히 1개의 fixed-param job**만 선택해 적어야 합니다.
+- `yaml/jobs/bs_preforcast_jobs_default.yaml`는 direct-model 후보/예시 레퍼런스이며, plugin-only linked YAML 자체는 그중 **정확히 1개의 fixed-param job**만 선택해 적어야 합니다.
 - baseline-only job (`Naive`, `SeasonalNaive`, `HistoricAverage`)는 stage1 actual execution에서 지원하지 않음
 - statistical / tree model은 direct-run execution 경로
 - NF-native 모델은 기존 `main.py` runtime subprocess 경로 재사용
@@ -215,7 +215,7 @@ jobs:
 
 ## 7. stage1 search-space
 
-repo root `search_space.yaml`에 아래 section이 추가됩니다.
+repo root `yaml/HPO/search_space.yaml`에 아래 section이 추가됩니다.
 
 ```yaml
 bs_preforcast_models:
@@ -306,7 +306,7 @@ main artifact에는 아래가 기록됩니다.
 `--validate-only`일 때도 아래를 확인/기록합니다.
 
 - main `bs_preforcast` config normalize
-- `bs_preforcast.yaml` 존재 여부
+- `yaml/plugins/bs_preforcast.yaml` 존재 여부
 - stage1 config normalize
 - stage1 dedicated search-space
 - main/stage1 provenance
@@ -388,7 +388,7 @@ uv run python main.py --config path/to/main.yaml --jobs DLinear --output-root ru
 ## 14. 현재 구현 기준 요약
 
 - `bs_preforcast`는 main 앞단 stage1
-- `bs_preforcast.yaml` 독립 파일 기반
+- `yaml/plugins/bs_preforcast.yaml` 독립 파일 기반
 - main YAML은 `enabled`, `config_path`만 소유
 - linked YAML의 top-level `bs_preforcast`가 `target_columns`, `task.multivariable`를 소유
 - `futr_exog` 지원 모델이면 future exog 주입

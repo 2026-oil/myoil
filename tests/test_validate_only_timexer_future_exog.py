@@ -10,6 +10,7 @@ from residual import runtime
 
 
 def _write_yaml(path: Path, payload: dict) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     return path
 
@@ -27,7 +28,7 @@ def test_runtime_validate_only_accepts_timexer_future_exog(
         encoding="utf-8",
     )
     _write_yaml(
-        tmp_path / "search_space.yaml",
+        tmp_path / "yaml/HPO/search_space.yaml",
         {
             "models": {},
             "training": [],

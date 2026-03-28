@@ -280,25 +280,25 @@ def test_run_brent_wti_cases_script_default_config_scope_uses_yaml_list_registra
 
     assert "yaml_list=(" in script
     assert script.count('"yaml/') == 20
-    assert '"yaml/feature_set_HPT_n100_bs/brentoil-case1.yaml"' not in script
-    assert '"yaml/feature_set_HPT_n100_bs/wti-case1.yaml"' not in script
-    assert '"yaml/feature_set_HPT_n100_bs/wti-case4.yaml"' in script
-    assert '"yaml/feature_set_residual_bs_HPT/brentoil-case1.yaml"' not in script
-    assert '"yaml/feature_set_residual_bs_HPT/wti-case1.yaml"' not in script
-    assert '"yaml/feature_set_residual_bs_HPT/wti-case4.yaml"' in script
-    assert '"yaml/feature_set_residual/brentoil-case3.yaml"' in script
-    assert '"yaml/feature_set_residual/wti-case3.yaml"' in script
-    assert '"yaml/feature_set_residual_bs/brentoil-case1.yaml"' not in script
-    assert '"yaml/feature_set_residual_bs/wti-case1.yaml"' not in script
-    assert '"yaml/feature_set_residual_bs/wti-case4.yaml"' in script
-    assert script.index('"yaml/feature_set_HPT_n100_bs/brentoil-case2.yaml"') < script.index(
-        '"yaml/feature_set_residual_bs_HPT/brentoil-case2.yaml"'
+    assert '"yaml/experiment/feature_set_HPT_n100_bs/brentoil-case1.yaml"' not in script
+    assert '"yaml/experiment/feature_set_HPT_n100_bs/wti-case1.yaml"' not in script
+    assert '"yaml/experiment/feature_set_HPT_n100_bs/wti-case4.yaml"' in script
+    assert '"yaml/experiment/feature_set_residual_bs_HPT/brentoil-case1.yaml"' not in script
+    assert '"yaml/experiment/feature_set_residual_bs_HPT/wti-case1.yaml"' not in script
+    assert '"yaml/experiment/feature_set_residual_bs_HPT/wti-case4.yaml"' in script
+    assert '"yaml/experiment/feature_set_residual/brentoil-case3.yaml"' in script
+    assert '"yaml/experiment/feature_set_residual/wti-case3.yaml"' in script
+    assert '"yaml/experiment/feature_set_residual_bs/brentoil-case1.yaml"' not in script
+    assert '"yaml/experiment/feature_set_residual_bs/wti-case1.yaml"' not in script
+    assert '"yaml/experiment/feature_set_residual_bs/wti-case4.yaml"' in script
+    assert script.index('"yaml/experiment/feature_set_HPT_n100_bs/brentoil-case2.yaml"') < script.index(
+        '"yaml/experiment/feature_set_residual_bs_HPT/brentoil-case2.yaml"'
     )
-    assert script.index('"yaml/feature_set_residual_bs_HPT/brentoil-case2.yaml"') < script.index(
-        '"yaml/feature_set_residual/brentoil-case3.yaml"'
+    assert script.index('"yaml/experiment/feature_set_residual_bs_HPT/brentoil-case2.yaml"') < script.index(
+        '"yaml/experiment/feature_set_residual/brentoil-case3.yaml"'
     )
-    assert script.index('"yaml/feature_set_residual/brentoil-case3.yaml"') < script.index(
-        '"yaml/feature_set_residual_bs/brentoil-case2.yaml"'
+    assert script.index('"yaml/experiment/feature_set_residual/brentoil-case3.yaml"') < script.index(
+        '"yaml/experiment/feature_set_residual_bs/brentoil-case2.yaml"'
     )
     assert 'configs=("${yaml_list[@]}")' in script
     assert '--config" "$cfg" "$@' in script

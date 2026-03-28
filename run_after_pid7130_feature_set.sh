@@ -4,8 +4,8 @@ set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 wait_pid="${NF_WAIT_CHAIN_WAIT_PID:-7130}"
 poll_seconds="${NF_WAIT_CHAIN_POLL_SECONDS:-5}"
-feature_set_dir="${NF_WAIT_CHAIN_FEATURE_SET_DIR:-yaml/feature_set}"
-hpt_c3_dir="${NF_WAIT_CHAIN_HPT_C3_DIR:-yaml/feature_set_HPT_c3}"
+feature_set_dir="${NF_WAIT_CHAIN_FEATURE_SET_DIR:-yaml/experiment/feature_set}"
+hpt_c3_dir="${NF_WAIT_CHAIN_HPT_C3_DIR:-yaml/experiment/feature_set_HPT_c3}"
 
 echo "[wait-chain] waiting for PID ${wait_pid} to exit naturally"
 while ps -p "$wait_pid" >/dev/null 2>&1; do

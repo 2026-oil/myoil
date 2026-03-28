@@ -52,7 +52,7 @@ def _base_payload(data_path: Path) -> dict[str, object]:
         },
         "residual": {"enabled": False, "model": "xgboost", "params": {}},
         "jobs": [{"model": "Naive", "params": {}}],
-        "bs_preforcast": {"enabled": True, "config_path": "bs_preforcast.yaml"},
+        "bs_preforcast": {"enabled": True, "config_path": "yaml/plugins/bs_preforcast.yaml"},
     }
 
 
@@ -83,13 +83,15 @@ def _write_search_space(tmp_path: Path, payload: dict[str, object] | None = None
     }
     if payload:
         base.update(payload)
-    (tmp_path / "search_space.yaml").write_text(
+    (tmp_path / "yaml/HPO").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/HPO/search_space.yaml").write_text(
         yaml.safe_dump(base, sort_keys=False),
         encoding="utf-8",
     )
 
 
 def _write_config(path: Path, payload: dict[str, object]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     return path
 
@@ -104,7 +106,7 @@ def test_plugin_only_yaml_inherits_main_dataset_and_exog_columns(tmp_path: Path)
         encoding="utf-8",
     )
     main_payload = _base_payload(data_path)
-    stage_path = tmp_path / "bs_preforcast.yaml"
+    stage_path = tmp_path / "yaml/plugins/bs_preforcast.yaml"
     _write_config(
         stage_path,
         _plugin_payload(
@@ -127,7 +129,7 @@ def test_plugin_only_yaml_rejects_dataset_block(tmp_path: Path) -> None:
     data_path = tmp_path / "data.csv"
     data_path.write_text("dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n", encoding="utf-8")
     main_payload = _base_payload(data_path)
-    stage_path = tmp_path / "bs_preforcast.yaml"
+    stage_path = tmp_path / "yaml/plugins/bs_preforcast.yaml"
     _write_config(
         stage_path,
         {
@@ -151,7 +153,7 @@ def test_plugin_only_yaml_rejects_learned_auto_and_training_auto(tmp_path: Path)
         encoding="utf-8",
     )
     main_payload = _base_payload(data_path)
-    stage_path = tmp_path / "bs_preforcast.yaml"
+    stage_path = tmp_path / "yaml/plugins/bs_preforcast.yaml"
     _write_config(stage_path, _plugin_payload(jobs=[{"model": "TFT", "params": {}}]))
     _write_search_space(
         tmp_path,
@@ -197,7 +199,7 @@ def test_lag_derived_injection_fails_when_train_shorter_than_horizon(
     main_payload = _base_payload(data_path)
     main_payload["cv"]["horizon"] = 2
     main_payload["jobs"] = [{"model": "Naive", "params": {}}]
-    stage_path = tmp_path / "bs_preforcast.yaml"
+    stage_path = tmp_path / "yaml/plugins/bs_preforcast.yaml"
     _write_config(
         stage_path,
         _plugin_payload(
