@@ -109,7 +109,6 @@ class BaseModel(pl.LightningModule):
         windows_batch_size: int,
         inference_windows_batch_size: Union[int, None],
         start_padding_enabled: bool,
-        max_lr: float = 1e-3,
         training_data_availability_threshold: Union[float, List[float]] = 0.0,
         n_series: Union[int, None] = None,
         n_samples: Union[int, None] = 100,
@@ -127,8 +126,9 @@ class BaseModel(pl.LightningModule):
         alias: Union[str, None] = None,
         optimizer: Union[torch.optim.Optimizer, None] = None,
         optimizer_kwargs: Union[Dict, None] = None,
-        lr_scheduler: Union[torch.optim.lr_scheduler.LRScheduler, None] = None,
-        lr_scheduler_kwargs: Union[Dict, None] = None,
+        _max_lr: float = 1e-3,
+        _lr_scheduler_cls: Union[torch.optim.lr_scheduler.LRScheduler, None] = None,
+        _lr_scheduler_kwargs: Union[Dict, None] = None,
         dataloader_kwargs=None,
         **trainer_kwargs,
     ):
@@ -209,15 +209,15 @@ class BaseModel(pl.LightningModule):
         self.optimizer_kwargs = optimizer_kwargs if optimizer_kwargs is not None else {}
 
         # lr scheduler
-        if lr_scheduler is not None and not issubclass(
-            lr_scheduler, torch.optim.lr_scheduler.LRScheduler
+        if _lr_scheduler_cls is not None and not issubclass(
+            _lr_scheduler_cls, torch.optim.lr_scheduler.LRScheduler
         ):
             raise TypeError(
                 "lr_scheduler is not a valid subclass of torch.optim.lr_scheduler.LRScheduler"
             )
-        self.lr_scheduler = lr_scheduler
-        self.lr_scheduler_kwargs = (
-            lr_scheduler_kwargs if lr_scheduler_kwargs is not None else {}
+        self._lr_scheduler_cls = _lr_scheduler_cls
+        self._lr_scheduler_kwargs = (
+            _lr_scheduler_kwargs if _lr_scheduler_kwargs is not None else {}
         )
 
         # Variables
@@ -390,7 +390,7 @@ class BaseModel(pl.LightningModule):
             )
 
         # Optimization
-        self.max_lr = max_lr
+        self.max_lr = _max_lr
         self.max_steps = max_steps
         self.early_stop_patience_steps = early_stop_patience_steps
         self.val_check_steps = val_check_steps
@@ -630,7 +630,7 @@ class BaseModel(pl.LightningModule):
                 )
             optimizer = torch.optim.Adam(self.parameters(), lr=self.max_lr)
 
-        scheduler_cls = self.lr_scheduler or torch.optim.lr_scheduler.OneCycleLR
+        scheduler_cls = self._lr_scheduler_cls or torch.optim.lr_scheduler.OneCycleLR
         lr_scheduler_signature = inspect.signature(scheduler_cls)
         lr_scheduler_kwargs = {
             "max_lr": self.max_lr,
@@ -641,7 +641,7 @@ class BaseModel(pl.LightningModule):
             "anneal_strategy": "cos",
             "three_phase": False,
             "cycle_momentum": False,
-            **deepcopy(self.lr_scheduler_kwargs),
+            **deepcopy(self._lr_scheduler_kwargs),
         }
         if "optimizer" in lr_scheduler_signature.parameters:
             if "optimizer" in lr_scheduler_kwargs:

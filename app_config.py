@@ -30,7 +30,6 @@ from tuning.search_space import (
     SUPPORTED_RESIDUAL_MODELS,
 )
 
-CONFIG_FILENAMES = ("config.yaml", "config.yml", "config.toml")
 SHARED_SETTINGS_RELATIVE_PATH = Path("yaml/setting/setting.yaml")
 DEFAULT_MANIFEST_VERSION = "1"
 DEFAULT_ARTIFACT_SCHEMA_VERSION = "1"
@@ -468,9 +467,7 @@ def _uses_repo_shared_settings(repo_root: Path, source_path: Path) -> bool:
         relative_path = Path(str(source_resolved)[len(str(repo_resolved)) + 1 :])
     except ValueError:
         return False
-    return relative_path == Path("config.yaml") or (
-        bool(relative_path.parts) and relative_path.parts[0] == "yaml"
-    )
+    return bool(relative_path.parts) and relative_path.parts[0] == "yaml"
 
 
 def _overlay_shared_fragment(
@@ -982,14 +979,9 @@ def resolve_config_path(
         if suffix == ".toml":
             return path, "toml"
         raise ValueError(f"Unsupported config extension: {path}")
-    for name in CONFIG_FILENAMES:
-        candidate = repo_root / name
-        if candidate.exists():
-            return candidate, "yaml" if candidate.suffix in {
-                ".yaml",
-                ".yml",
-            } else "toml"
-    raise FileNotFoundError("No config file found in repo root (config.yaml/yml/toml)")
+    raise ValueError(
+        "config path is required; pass --config/--config-path or --config-toml"
+    )
 
 
 def _load_document(path: Path, source_type: str) -> Any:

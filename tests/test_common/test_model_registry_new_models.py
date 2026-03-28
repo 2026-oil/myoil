@@ -9,7 +9,7 @@ from residual.models import MODEL_CLASSES, supports_auto_mode
 def test_new_model_support_matrix_is_explicit():
     search_space = yaml.safe_load(open('yaml/HPO/search_space.yaml', encoding='utf-8'))
 
-    supported = {
+    runtime_only_supported = {
         'DeformTime': {
             'pkg': hasattr(nf_models, 'DeformTime'),
             'auto': hasattr(nf_auto, 'AutoDeformTime'),
@@ -36,13 +36,32 @@ def test_new_model_support_matrix_is_explicit():
         },
     }
 
-    for surface in supported.values():
+    full_parity_supported = {
+        'NonstationaryTransformer': {
+            'pkg': hasattr(nf_models, 'NonstationaryTransformer'),
+            'auto': hasattr(nf_auto, 'AutoNonstationaryTransformer'),
+            'runtime': 'NonstationaryTransformer' in MODEL_CLASSES,
+            'supports_auto': supports_auto_mode('NonstationaryTransformer'),
+            'search': 'NonstationaryTransformer' in search_space['models'],
+            'filename_alias': 'nonstationarytransformer' in MODEL_FILENAME_DICT,
+        },
+    }
+
+    for surface in runtime_only_supported.values():
+        assert surface['pkg'] is True
+        assert surface['runtime'] is True
+        assert surface['supports_auto'] is True
+        assert surface['search'] is False
+        assert surface['filename_alias'] is True
+        assert surface['auto'] is False
+
+    for surface in full_parity_supported.values():
         assert surface['pkg'] is True
         assert surface['runtime'] is True
         assert surface['supports_auto'] is True
         assert surface['search'] is True
         assert surface['filename_alias'] is True
-        assert surface['auto'] is False
+        assert surface['auto'] is True
 
 
 def test_excluded_or_covered_requested_models_are_explicit():
@@ -57,7 +76,7 @@ def test_excluded_or_covered_requested_models_are_explicit():
     # not as a separate model class in this repo.
     assert hasattr(nf_models, 'TimeMixer')
     assert 'TimeMixer' in MODEL_CLASSES
-    assert 'TimeMixer' in search_space['models']
+    assert 'TimeMixer' not in search_space['models']
     assert 'timemixer' in MODEL_FILENAME_DICT
 
     for alias in ('TimeMixerPP', 'TimeMixerPlusPlus'):

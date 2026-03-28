@@ -75,6 +75,10 @@ def _run_cli(
     args = parser.parse_args(list(argv) if argv is not None else None)
     repo_root = WORKSPACE_ROOT if repo_root is None else repo_root
     config_path = args.config or args.config_path
+    if config_path is None and args.config_toml is None:
+        parser.error(
+            'config path is required; pass --config/--config-path or --config-toml'
+        )
     loaded = runtime_module.load_app_config(
         repo_root,
         config_path=config_path,

@@ -278,7 +278,13 @@ params = { hidden_size = 32, n_heads = 4, e_layers = 2, d_ff = 64 }
         text = text.replace("__RESIDUAL_TARGET__", residual_target)
         path.write_text(text, encoding="utf-8")
     else:
-        path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    return path
+
+
+def _write_yaml_payload(path: Path, payload: dict[str, Any]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     return path
 
 
@@ -354,6 +360,97 @@ def _payload() -> dict:
             },
         ],
     }
+
+
+def _repo_root_contract_payload() -> dict[str, Any]:
+    payload = copy.deepcopy(_payload())
+    payload["task"] = {"name": "semi_test"}
+    payload["residual"]["params"] = {
+        "n_estimators": 64,
+        "max_depth": 3,
+        "subsample": 1.0,
+        "colsample_bytree": 1.0,
+    }
+    payload["jobs"] = [
+        {"model": "TFT", "params": {"hidden_size": 128}},
+        {
+            "model": "VanillaTransformer",
+            "params": {
+                "hidden_size": 128,
+                "dropout": 0.05,
+                "scaler_type": "identity",
+            },
+        },
+        {
+            "model": "Informer",
+            "params": {
+                "hidden_size": 128,
+                "factor": 3,
+                "dropout": 0.05,
+                "scaler_type": "identity",
+            },
+        },
+        {
+            "model": "Autoformer",
+            "params": {
+                "hidden_size": 128,
+                "factor": 3,
+                "dropout": 0.05,
+                "scaler_type": "identity",
+            },
+        },
+        {
+            "model": "PatchTST",
+            "params": {
+                "hidden_size": 128,
+                "n_heads": 16,
+                "encoder_layers": 3,
+                "patch_len": 16,
+                "dropout": 0.2,
+                "scaler_type": "identity",
+            },
+        },
+        {
+            "model": "LSTM",
+            "params": {
+                "encoder_hidden_size": 128,
+                "decoder_hidden_size": 128,
+            },
+        },
+        {
+            "model": "NHITS",
+            "params": {
+                "mlp_units": [[64, 64], [64, 64], [64, 64]],
+                "n_pool_kernel_size": [2, 2, 1],
+                "n_freq_downsample": [4, 2, 1],
+                "dropout_prob_theta": 0.0,
+                "activation": "ReLU",
+            },
+        },
+        {
+            "model": "iTransformer",
+            "params": {
+                "hidden_size": 128,
+                "n_heads": 8,
+                "e_layers": 2,
+                "d_ff": 256,
+            },
+        },
+        {"model": "Naive", "params": {}},
+    ]
+    return payload
+
+
+def _write_repo_root_contract_config(repo_root: Path) -> Path:
+    (repo_root / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    _write_search_space(repo_root)
+    return _write_yaml_payload(
+        repo_root / "repo-root-contract.yaml",
+        _repo_root_contract_payload(),
+    )
 
 
 def _main_bs_preforcast(
@@ -2444,10 +2541,18 @@ def test_runtime_uses_config_parent_and_task_name_for_default_run_directory(
 def test_default_output_root_uses_repo_name_for_repo_root_config():
     from residual.runtime import _default_output_root
 
-    loaded = load_app_config(REPO_ROOT)
+    repo_root = REPO_ROOT.parent / "tmp-output-root-contract"
+    if repo_root.exists():
+        import shutil
+
+        shutil.rmtree(repo_root)
+    repo_root.mkdir(parents=True)
+    config_path = _write_repo_root_contract_config(repo_root)
+
+    loaded = load_app_config(repo_root, config_path=config_path)
 
     assert _default_output_root(REPO_ROOT, loaded) == (
-        REPO_ROOT / "runs" / "neuralforecast_semi_test"
+        REPO_ROOT / "runs" / f"{repo_root.name}_semi_test"
     )
 
 
@@ -2993,6 +3098,7 @@ def test_runtime_diff_residual_enabled_skips_short_backcast_history_without_cras
 
 def test_runtime_writes_loss_curve_images_for_residual_disabled_learned_folds(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ):
     payload = _payload()
     payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
@@ -3010,6 +3116,59 @@ def test_runtime_writes_loss_curve_images_for_residual_disabled_learned_folds(
     config_path = _write_config(tmp_path, payload, ".yaml")
 
     from residual.runtime import main as runtime_main
+    import residual.runtime as runtime
+
+    class _FakeNF:
+        def __init__(self, model_name: str, target_col: str):
+            self.models = [
+                SimpleNamespace(
+                    train_trajectories=[(1, 1.0), (10, 0.6), (20, 0.3)],
+                    valid_trajectories=[(1, 1.2), (10, 0.8), (20, 0.4)],
+                )
+            ]
+            self._model_name = model_name
+            self._target_col = target_col
+
+        def predict(self, df, static_df=None, futr_df=None):
+            source = futr_df if futr_df is not None else df.tail(1)
+            ds = source["ds"].reset_index(drop=True)
+            return pd.DataFrame(
+                {
+                    "unique_id": [self._target_col] * len(ds),
+                    "ds": ds,
+                    self._model_name: [1.0] * len(ds),
+                }
+            )
+
+    def _fake_fit_and_predict_fold(
+        loaded,
+        job,
+        *,
+        source_df,
+        freq,
+        train_idx,
+        test_idx,
+        params_override=None,
+        training_override=None,
+    ):
+        nf = _FakeNF(job.model, loaded.config.dataset.target_col)
+        predictions = pd.DataFrame(
+            {
+                "unique_id": [loaded.config.dataset.target_col],
+                "ds": pd.Series([source_df.iloc[test_idx[0]][loaded.config.dataset.dt_col]]),
+                job.model: [float(source_df.iloc[test_idx[0]][loaded.config.dataset.target_col])],
+            }
+        )
+        actuals = pd.Series([float(source_df.iloc[test_idx[0]][loaded.config.dataset.target_col])])
+        return (
+            predictions,
+            actuals,
+            source_df.iloc[train_idx][-1:][loaded.config.dataset.dt_col].iloc[0],
+            source_df.iloc[train_idx].reset_index(drop=True),
+            nf,
+        )
+
+    monkeypatch.setattr(runtime, "_fit_and_predict_fold", _fake_fit_and_predict_fold)
 
     output_root = tmp_path / "run_loss_curves"
     code = runtime_main(
@@ -3046,6 +3205,7 @@ def test_runtime_writes_loss_curve_images_for_residual_disabled_learned_folds(
 
 def test_runtime_writes_loss_curve_images_for_residual_enabled_learned_folds(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ):
     payload = _payload()
     payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
@@ -3067,6 +3227,59 @@ def test_runtime_writes_loss_curve_images_for_residual_enabled_learned_folds(
     config_path = _write_config(tmp_path, payload, ".yaml")
 
     from residual.runtime import main as runtime_main
+    import residual.runtime as runtime
+
+    class _FakeNF:
+        def __init__(self, model_name: str, target_col: str):
+            self.models = [
+                SimpleNamespace(
+                    train_trajectories=[(1, 1.0), (10, 0.6), (20, 0.3)],
+                    valid_trajectories=[(1, 1.2), (10, 0.8), (20, 0.4)],
+                )
+            ]
+            self._model_name = model_name
+            self._target_col = target_col
+
+        def predict(self, df, static_df=None, futr_df=None):
+            source = futr_df if futr_df is not None else df.tail(1)
+            ds = source["ds"].reset_index(drop=True)
+            return pd.DataFrame(
+                {
+                    "unique_id": [self._target_col] * len(ds),
+                    "ds": ds,
+                    self._model_name: [1.0] * len(ds),
+                }
+            )
+
+    def _fake_fit_and_predict_fold(
+        loaded,
+        job,
+        *,
+        source_df,
+        freq,
+        train_idx,
+        test_idx,
+        params_override=None,
+        training_override=None,
+    ):
+        nf = _FakeNF(job.model, loaded.config.dataset.target_col)
+        predictions = pd.DataFrame(
+            {
+                "unique_id": [loaded.config.dataset.target_col],
+                "ds": pd.Series([source_df.iloc[test_idx[0]][loaded.config.dataset.dt_col]]),
+                job.model: [float(source_df.iloc[test_idx[0]][loaded.config.dataset.target_col])],
+            }
+        )
+        actuals = pd.Series([float(source_df.iloc[test_idx[0]][loaded.config.dataset.target_col])])
+        return (
+            predictions,
+            actuals,
+            source_df.iloc[train_idx][-1:][loaded.config.dataset.dt_col].iloc[0],
+            source_df.iloc[train_idx].reset_index(drop=True),
+            nf,
+        )
+
+    monkeypatch.setattr(runtime, "_fit_and_predict_fold", _fake_fit_and_predict_fold)
 
     output_root = tmp_path / "run_loss_curves_residual"
     code = runtime_main(

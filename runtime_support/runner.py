@@ -23,8 +23,8 @@ from plugin_contracts.stage_registry import get_active_stage_plugin
 from app_config import (
     JobConfig,
     LoadedConfig,
-    load_app_config,
-    loaded_config_for_jobs_fanout,
+    load_app_config,  # noqa: F401 - re-exported for residual.runtime compatibility/tests
+    loaded_config_for_jobs_fanout,  # noqa: F401 - compatibility export
 )
 from runtime_support.features import build_residual_feature_frame, hist_exog_lag_feature_name
 from runtime_support.manifest import (
@@ -66,6 +66,10 @@ from runtime_support.scheduler import (
 
 ENTRYPOINT_VERSION = "neuralforecast-residual-v1"
 SUMMARY_REPORT_FILENAME = "sample.md"
+LOSS_CURVE_PLOT_FILENAME = "loss_curve.png"
+LOSS_CURVE_SAMPLE_FILENAME = "loss_curve_every_10_global_steps.csv"
+SUMMARY_LOSS_ARTIFACTS_FILENAME = "loss_curve_artifacts.csv"
+LOSS_CURVE_SAMPLE_EVERY_N_STEPS = 10
 TARGET_DISPLAY_NAMES = {
     "Com_BrentCrudeOil": "BrentCrude",
     "Com_CrudeOil": "WTI",
@@ -2556,6 +2560,21 @@ def _loss_curve_series(
     return train_series, val_series
 
 
+def _sample_loss_curve_frame(
+    curve_frame: pd.DataFrame,
+    *,
+    every_n_steps: int = LOSS_CURVE_SAMPLE_EVERY_N_STEPS,
+) -> pd.DataFrame:
+    if curve_frame.empty:
+        return curve_frame.copy()
+    sampled = curve_frame.copy()
+    sampled["global_step"] = pd.to_numeric(sampled["global_step"], errors="coerce")
+    sampled = sampled.dropna(subset=["global_step"]).copy()
+    sampled["global_step"] = sampled["global_step"].astype(int)
+    sampled = sampled[sampled["global_step"] % every_n_steps == 0].reset_index(drop=True)
+    return sampled
+
+
 def _configure_loss_curve_axis(axis: Any, curve_frame: pd.DataFrame) -> None:
     from matplotlib.ticker import LogFormatterMathtext, LogLocator
 
@@ -2587,7 +2606,9 @@ def _write_loss_curve_artifact(
 
     fold_root = _learned_fold_artifact_dir(run_root, model_name, fold_idx)
     fold_root.mkdir(parents=True, exist_ok=True)
-    figure_path = fold_root / "loss_curve.png"
+    figure_path = fold_root / LOSS_CURVE_PLOT_FILENAME
+    sampled_curve_path = fold_root / LOSS_CURVE_SAMPLE_FILENAME
+    _sample_loss_curve_frame(curve_frame).to_csv(sampled_curve_path, index=False)
     train_series, val_series = _loss_curve_series(curve_frame)
     figure, axis = plt.subplots(figsize=(10, 5))
     axis.plot(
@@ -2635,6 +2656,9 @@ def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
         "leaderboard": str(workbook_path),
         "markdown": str(markdown_path),
     }
+    loss_artifact_summary_path = _write_loss_artifact_summary(run_root)
+    if loss_artifact_summary_path is not None:
+        plot_paths["loss_artifacts"] = str(loss_artifact_summary_path)
     if forecasts.empty:
         return plot_paths
     last_fold = int(forecasts["fold_idx"].max())
@@ -2655,6 +2679,47 @@ def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
         plot_paths[slug] = str(plot_path)
     plot_paths.update(_build_residual_comparison_plots(run_root, last_fold_forecasts))
     return plot_paths
+
+
+def _load_loss_artifacts_for_summary(run_root: Path) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+    for root in _summary_job_roots(run_root):
+        for csv_path in sorted(
+            root.glob(f"models/*/folds/fold_*/{LOSS_CURVE_SAMPLE_FILENAME}")
+        ):
+            sampled = pd.read_csv(csv_path)
+            if "global_step" in sampled.columns:
+                valid_steps = pd.to_numeric(
+                    sampled["global_step"], errors="coerce"
+                ).dropna()
+            else:
+                valid_steps = pd.Series(dtype=float)
+            rows.append(
+                {
+                    "model": csv_path.parents[2].name,
+                    "fold_idx": int(csv_path.parent.name.removeprefix("fold_")),
+                    "sample_every_n_steps": LOSS_CURVE_SAMPLE_EVERY_N_STEPS,
+                    "sample_count": int(len(sampled)),
+                    "first_global_step": (
+                        int(valid_steps.iloc[0]) if not valid_steps.empty else None
+                    ),
+                    "last_global_step": (
+                        int(valid_steps.iloc[-1]) if not valid_steps.empty else None
+                    ),
+                    "loss_csv_path": str(csv_path.relative_to(run_root)),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def _write_loss_artifact_summary(run_root: Path) -> Path | None:
+    loss_artifacts = _load_loss_artifacts_for_summary(run_root)
+    if loss_artifacts.empty:
+        return None
+    summary_path = run_root / "summary" / SUMMARY_LOSS_ARTIFACTS_FILENAME
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    loss_artifacts.to_csv(summary_path, index=False)
+    return summary_path
 
 
 def _run_single_job(

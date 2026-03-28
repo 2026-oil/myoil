@@ -14,7 +14,6 @@ def _make_model(**overrides):
         "input_size": 4,
         "n_series": 1,
         "max_steps": 1,
-        "max_lr": 1e-3,
         "batch_size": 1,
         "valid_batch_size": 1,
         "windows_batch_size": 1,
