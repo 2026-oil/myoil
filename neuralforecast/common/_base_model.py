@@ -102,7 +102,6 @@ class BaseModel(pl.LightningModule):
         input_size: int,
         loss: Union[BasePointLoss, DistributionLoss, nn.Module],
         valid_loss: Union[BasePointLoss, DistributionLoss, nn.Module],
-        max_lr: float,
         max_steps: int,
         val_check_steps: int,
         batch_size: int,
@@ -110,6 +109,7 @@ class BaseModel(pl.LightningModule):
         windows_batch_size: int,
         inference_windows_batch_size: Union[int, None],
         start_padding_enabled: bool,
+        max_lr: float = 1e-3,
         training_data_availability_threshold: Union[float, List[float]] = 0.0,
         n_series: Union[int, None] = None,
         n_samples: Union[int, None] = 100,
@@ -496,6 +496,7 @@ class BaseModel(pl.LightningModule):
             test_size,
         ):
             import pytorch_lightning as pl
+            from pytorch_lightning.strategies import DDPStrategy
 
             # we instantiate here to avoid pickling large tensors (weights)
             model = model_cls(**model_params)
@@ -504,7 +505,7 @@ class BaseModel(pl.LightningModule):
             for arg in ("devices", "num_nodes"):
                 trainer_kwargs.pop(arg, None)
             trainer = pl.Trainer(
-                strategy="ddp",
+                strategy=DDPStrategy(process_group_backend="gloo"),
                 use_distributed_sampler=False,  # to ensure our dataloaders are used as-is
                 num_nodes=num_tasks,
                 devices=num_proc_per_task,

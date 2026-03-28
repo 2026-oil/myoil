@@ -4,14 +4,4 @@ bs_preforcast:
   task:
     multivariable: false
   exog_columns: []
-jobs:
-  - model: TimeXer
-    params:
-      patch_len: 16
-      hidden_size: 768
-      n_heads: 16
-      e_layers: 4
-      d_ff: 1024
-      factor: 8
-      dropout: 0.2
-      use_norm: true
+jobs: yaml/jobs/bs_preforcast/bs_preforcast_jobs_uni.yaml

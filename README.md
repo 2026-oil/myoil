@@ -490,15 +490,6 @@ residual:
     lookback: 8
     hidden_size: 32
     epochs: 50
-    lr_scheduler:
-    name: OneCycleLR
-    max_lr: 0.001
-    pct_start: 0.3
-    div_factor: 25.0
-    final_div_factor: 10000.0
-    anneal_strategy: cos
-    three_phase: false
-    cycle_momentum: false
 ```
 
 스키마 예시:
@@ -517,7 +508,6 @@ class _MLPConfig:
     lookback: int = 8
     hidden_size: int = 32
     epochs: int = 50
-    max_lr: float = 0.001
 
 
 class MLPResidualPlugin(ResidualPlugin):
@@ -529,13 +519,11 @@ class MLPResidualPlugin(ResidualPlugin):
         lookback: int = 8,
         hidden_size: int = 32,
         epochs: int = 50,
-        max_lr: float = 0.001,
     ):
         self.config = _MLPConfig(
             lookback=lookback,
             hidden_size=hidden_size,
             epochs=epochs,
-            max_lr=max_lr,
         )
 
     def fit(self, panel_df: pd.DataFrame, context: ResidualContext) -> None:
@@ -550,7 +538,6 @@ class MLPResidualPlugin(ResidualPlugin):
             "lookback": self.config.lookback,
             "hidden_size": self.config.hidden_size,
             "epochs": self.config.epochs,
-            "max_lr": self.config.max_lr,
         }
 ```
 
