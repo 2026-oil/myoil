@@ -238,9 +238,7 @@ def load_bs_preforcast_stage1(
         )
         if shared_settings_payload is not None:
             effective_shared_settings, effective_owned_paths = (
-                _effective_shared_settings_for_source(
-                    repo_root, source_path, shared_settings_payload
-                )
+                _effective_shared_settings_for_source(shared_settings_payload)
             )
             main_payload = _merge_shared_settings_into_payload(
                 main_payload,
@@ -327,7 +325,7 @@ def load_bs_preforcast_stage1(
         raise ValueError(
             "bs_preforcast plugin-only mode does not support training_auto"
         )
-    stage_config = replace(stage_config, bs_preforcast=routed_bs_preforcast)
+    stage_config = replace(stage_config, stage_plugin_config=routed_bs_preforcast)
     stage_normalized_payload = stage_config.to_dict()
     stage_normalized_payload["bs_preforcast"]["selected_config_path"] = str(
         stage_source_path
@@ -352,39 +350,41 @@ def load_bs_preforcast_stage1(
 
 
 def is_bs_preforcast_enabled(loaded: LoadedConfig) -> bool:
-    return bool(loaded.config.bs_preforcast.enabled)
+    return bool(loaded.config.stage_plugin_config.enabled)
 
 
 def load_bs_preforcast_stage1_config(
     repo_root: Path,
     loaded: LoadedConfig,
 ) -> LoadedConfig:
-    if loaded.bs_preforcast_stage1 is None:
+    stage1 = loaded.stage_plugin_loaded
+    if stage1 is None:
         raise ValueError("bs_preforcast stage1 config is not loaded")
-    normalized = dict(loaded.bs_preforcast_stage1.normalized_payload)
+    normalized = dict(stage1.normalized_payload)
     normalized["bs_preforcast_parent_config_path"] = str(loaded.source_path.resolve())
     normalized["bs_preforcast_target_columns"] = list(
-        loaded.bs_preforcast_stage1.config.bs_preforcast.target_columns
+        stage1.config.stage_plugin_config.target_columns
     )
     return LoadedConfig(
-        config=loaded.bs_preforcast_stage1.config,
-        source_path=loaded.bs_preforcast_stage1.source_path,
-        source_type=loaded.bs_preforcast_stage1.source_type,
+        config=stage1.config,
+        source_path=stage1.source_path,
+        source_type=stage1.source_type,
         normalized_payload=normalized,
-        input_hash=loaded.bs_preforcast_stage1.input_hash,
-        resolved_hash=loaded.bs_preforcast_stage1.resolved_hash,
-        search_space_path=loaded.bs_preforcast_stage1.search_space_path,
-        search_space_hash=loaded.bs_preforcast_stage1.search_space_hash,
-        search_space_payload=loaded.bs_preforcast_stage1.search_space_payload,
+        input_hash=stage1.input_hash,
+        resolved_hash=stage1.resolved_hash,
+        search_space_path=stage1.search_space_path,
+        search_space_hash=stage1.search_space_hash,
+        search_space_payload=stage1.search_space_payload,
     )
 
 
 def stage1_route_metadata(loaded: LoadedConfig) -> dict[str, object]:
+    bs_cfg = loaded.config.stage_plugin_config
     return {
-        "enabled": loaded.config.bs_preforcast.enabled,
-        "config_path": loaded.config.bs_preforcast.config_path,
-        "target_columns": list(loaded.config.bs_preforcast.target_columns),
-        "exog_columns": list(loaded.config.bs_preforcast.exog_columns),
-        "multivariable": loaded.config.bs_preforcast.task.multivariable,
-        "selected_config_path": loaded.config.bs_preforcast.config_path,
+        "enabled": bs_cfg.enabled,
+        "config_path": bs_cfg.config_path,
+        "target_columns": list(bs_cfg.target_columns),
+        "exog_columns": list(bs_cfg.exog_columns),
+        "multivariable": bs_cfg.task.multivariable,
+        "selected_config_path": bs_cfg.config_path,
     }

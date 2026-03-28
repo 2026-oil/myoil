@@ -21,7 +21,7 @@ import neuralforecast.models as nf_models
 import bs_preforcast.runtime as bs_runtime
 from neuralforecast.core import MODEL_FILENAME_DICT
 from residual.adapters import build_multivariate_inputs, build_univariate_inputs
-from residual.bs_preforcast_runtime import prepare_bs_preforcast_fold_inputs
+from bs_preforcast.runtime import prepare_bs_preforcast_fold_inputs
 from residual.config import (
     TrainingLossParams,
     _effective_shared_settings_for_source,
@@ -35,6 +35,7 @@ from residual.models import (
     supports_auto_mode,
 )
 from neuralforecast.losses.pytorch import ExLoss
+from bs_preforcast.search_space import SUPPORTED_BS_PREFORCAST_MODELS
 from residual.optuna_spaces import (
     DEFAULT_OPTUNA_NUM_TRIALS,
     EXCLUDED_AUTO_MODEL_NAMES,
@@ -42,7 +43,6 @@ from residual.optuna_spaces import (
     MODEL_PARAM_REGISTRY,
     RESIDUAL_PARAM_REGISTRY,
     SUPPORTED_AUTO_MODEL_NAMES,
-    SUPPORTED_BS_PREFORCAST_MODELS,
     SUPPORTED_RESIDUAL_MODELS,
     TRAINING_PARAM_REGISTRY,
     TRAINING_PARAM_REGISTRY_BY_MODEL,
@@ -3611,10 +3611,10 @@ def test_load_app_config_normalizes_bs_preforcast_selection(tmp_path: Path):
         tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
     )
 
-    assert loaded.config.bs_preforcast.enabled is True
-    assert loaded.config.bs_preforcast.task.multivariable is True
-    assert loaded.config.bs_preforcast.target_columns == ("bs_a", "bs_b")
-    assert loaded.config.bs_preforcast.config_path == "yaml/plugins/bs_preforcast.yaml"
+    assert loaded.config.stage_plugin_config.enabled is True
+    assert loaded.config.stage_plugin_config.task.multivariable is True
+    assert loaded.config.stage_plugin_config.target_columns == ("bs_a", "bs_b")
+    assert loaded.config.stage_plugin_config.config_path == "yaml/plugins/bs_preforcast.yaml"
     assert loaded.normalized_payload["bs_preforcast"]["config_path"] == "yaml/plugins/bs_preforcast.yaml"
 
 
@@ -3645,11 +3645,11 @@ def test_load_app_config_defaults_bs_preforcast_config_path_when_enabled(
     )
     _write_search_space(tmp_path, {"models": {}, "training": [], "residual": {"xgboost": ["n_estimators"]}, "bs_preforcast_models": {}, "bs_preforcast_training": []})
     loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
-    assert loaded.config.bs_preforcast.config_path == "yaml/plugins/bs_preforcast.yaml"
+    assert loaded.config.stage_plugin_config.config_path == "yaml/plugins/bs_preforcast.yaml"
     assert loaded.normalized_payload["bs_preforcast"]["config_path"] == "yaml/plugins/bs_preforcast.yaml"
-    assert loaded.bs_preforcast_stage1 is not None
-    assert loaded.bs_preforcast_stage1.source_path == (tmp_path / "yaml/plugins/bs_preforcast.yaml").resolve()
-    assert loaded.bs_preforcast_stage1.config.jobs[0].model == "DummyUnivariate"
+    assert loaded.stage_plugin_loaded is not None
+    assert loaded.stage_plugin_loaded.source_path == (tmp_path / "yaml/plugins/bs_preforcast.yaml").resolve()
+    assert loaded.stage_plugin_loaded.config.jobs[0].model == "DummyUnivariate"
 
 def test_load_app_config_accepts_independent_bs_preforcast_config_path(
     tmp_path: Path,
@@ -3679,11 +3679,11 @@ def test_load_app_config_accepts_independent_bs_preforcast_config_path(
     )
     _write_search_space(tmp_path, {"models": {}, "training": [], "residual": {"xgboost": ["n_estimators"]}, "bs_preforcast_models": {}, "bs_preforcast_training": []})
     loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
-    assert loaded.config.bs_preforcast.config_path == "custom-bs.yaml"
-    assert loaded.bs_preforcast_stage1 is not None
-    assert loaded.bs_preforcast_stage1.source_path == custom_path.resolve()
-    assert loaded.bs_preforcast_stage1.config.jobs[0].model == "DummyMultivariate"
-    assert loaded.bs_preforcast_stage1.config.dataset.hist_exog_cols == ("bs_b",)
+    assert loaded.config.stage_plugin_config.config_path == "custom-bs.yaml"
+    assert loaded.stage_plugin_loaded is not None
+    assert loaded.stage_plugin_loaded.source_path == custom_path.resolve()
+    assert loaded.stage_plugin_loaded.config.jobs[0].model == "DummyMultivariate"
+    assert loaded.stage_plugin_loaded.config.dataset.hist_exog_cols == ("bs_b",)
 
 def test_load_app_config_rejects_legacy_bs_preforcast_routing_keys(
     tmp_path: Path,
@@ -3842,9 +3842,9 @@ def test_load_app_config_bs_preforcast_loads_stage1_route_and_authoritative_targ
     payload["bs_preforcast"]["config_path"] = str(stage_path)
     _write_search_space(tmp_path, {"models": {}, "training": [], "residual": {"xgboost": ["n_estimators"]}, "bs_preforcast_models": {}, "bs_preforcast_training": []})
     loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
-    assert loaded.bs_preforcast_stage1 is not None
-    assert loaded.bs_preforcast_stage1.source_path == stage_path.resolve()
-    assert loaded.bs_preforcast_stage1.normalized_payload["bs_preforcast"]["target_columns"] == ["bs_a", "bs_b"]
+    assert loaded.stage_plugin_loaded is not None
+    assert loaded.stage_plugin_loaded.source_path == stage_path.resolve()
+    assert loaded.stage_plugin_loaded.normalized_payload["bs_preforcast"]["target_columns"] == ["bs_a", "bs_b"]
     assert loaded.normalized_payload["bs_preforcast"]["stage1"]["source_path"] == str(stage_path.resolve())
     assert loaded.normalized_payload["bs_preforcast"]["stage1"]["config_resolved_sha256"]
 
@@ -3919,10 +3919,10 @@ def test_load_app_config_loads_bs_preforcast_stage1_with_dedicated_search_space(
     )
     _write_search_space(tmp_path, {"models": {}, "training": [], "residual": {}, "bs_preforcast_models": {"TFT": ["hidden_size"]}, "bs_preforcast_training": ["input_size"]})
     loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
-    assert loaded.bs_preforcast_stage1 is not None
-    assert loaded.bs_preforcast_stage1.config.jobs[0].model == "TFT"
-    assert loaded.bs_preforcast_stage1.config.jobs[0].validated_mode == "learned_fixed"
-    assert loaded.bs_preforcast_stage1.normalized_payload["bs_preforcast"]["target_columns"] == ["bs_a", "bs_b"]
+    assert loaded.stage_plugin_loaded is not None
+    assert loaded.stage_plugin_loaded.config.jobs[0].model == "TFT"
+    assert loaded.stage_plugin_loaded.config.jobs[0].validated_mode == "learned_fixed"
+    assert loaded.stage_plugin_loaded.normalized_payload["bs_preforcast"]["target_columns"] == ["bs_a", "bs_b"]
 
 def test_load_app_config_rejects_invalid_linked_bs_preforcast_owner_keys(tmp_path: Path):
     payload = _payload()
@@ -4672,7 +4672,7 @@ def test_prepare_bs_preforcast_fold_inputs_missing_forecasts_fail_fast(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    import residual.bs_preforcast_runtime as bs_runtime
+    import bs_preforcast.runtime as bs_runtime
 
     payload = _payload()
     payload["training"].update({"input_size": 2, "max_steps": 1, "val_size": 1})
@@ -4887,7 +4887,7 @@ def test_prepare_bs_preforcast_fold_inputs_auto_adds_missing_target_to_futr_exog
 def test_bs_preforcast_inline_learned_stage_surfaces_multi_gpu_resolution(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    import residual.bs_preforcast_runtime as bs_runtime
+    import bs_preforcast.runtime as bs_runtime
 
     payload = _payload()
     payload["bs_preforcast"] = _main_bs_preforcast()

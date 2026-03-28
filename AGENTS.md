@@ -1,4 +1,4 @@
-<!-- Generated: 2026-03-23 | Updated: 2026-03-23 -->
+<!-- Generated: 2026-03-23 | Updated: 2026-03-28 -->
 
 # neuralforecast
 
@@ -23,7 +23,8 @@ This checkout is not just the upstream `neuralforecast` package. It is a hybrid 
 | Directory | Purpose |
 |-----------|---------|
 | `neuralforecast/` | Upstream-style forecasting package sources plus added model surfaces (see `neuralforecast/AGENTS.md`). |
-| `residual/` | Config parsing, runtime orchestration, Optuna integration, and residual plugin support (see `residual/AGENTS.md`). |
+| `residual/` | Config parsing, runtime orchestration, Optuna integration, residual plugin support, and **Stage Plugin system** (see `residual/AGENTS.md`). |
+| `bs_preforcast/` | `bs_preforcast` stage plugin — registers as a `StagePlugin` via `bs_preforcast/plugin.py`; `residual/` never imports it directly. |
 | `yaml/` | Experiment matrix for Brent/WTI, bomb, HPT, univariate, and ad-hoc case families (see `yaml/AGENTS.md`). |
 | `tests/` | Regression coverage for package code, residual runtime, YAML contracts, and shell helpers (see `tests/AGENTS.md`). |
 | `scripts/` | Analysis and helper utilities used around the runtime and research workflows (see `scripts/AGENTS.md`). |
@@ -40,6 +41,7 @@ This checkout is not just the upstream `neuralforecast` package. It is a hybrid 
 - Preserve the current wrapper contract: `main.py` is the operator entrypoint, while the real scheduler/runtime lives under `residual/`.
 - When adding or retiring model support, check shared surfaces together: `neuralforecast/models/__init__.py`, `neuralforecast/auto.py`, `neuralforecast/core.py`, `residual/models.py`, `residual/optuna_spaces.py`, `yaml/HPO/search_space.yaml`, and the relevant tests.
 - When changing residual behavior, keep config validation, plugin registry, runtime manifests, and validate-only smoke fixtures aligned.
+- **Stage plugins** (e.g. `bs_preforcast`) are managed exclusively in their own packages. `residual/` dispatches to them via the `StagePlugin` Protocol in `residual/stage_plugin.py` and the registry in `residual/stage_registry.py`. Do NOT add direct `bs_preforcast` imports to `residual/`.
 - Avoid editing generated outputs under `runs/`, `lightning_logs/`, `htmlcov/`, or `.omx/` unless the user explicitly asks for artifact manipulation.
 
 ### Testing Requirements
@@ -58,7 +60,8 @@ This checkout is not just the upstream `neuralforecast` package. It is a hybrid 
 
 ### Internal
 - `main.py` depends on `residual/runtime.py`.
-- `residual/` depends on both `neuralforecast/` model surfaces and `yaml/HPO/search_space.yaml`.
+- `residual/` depends on `neuralforecast/` model surfaces and `yaml/HPO/search_space.yaml`. It does NOT depend on `bs_preforcast/` directly; stage plugins are loaded via lazy discovery in `stage_registry.py`.
+- `bs_preforcast/` depends on `residual/config.py` (for `AppConfig`/`LoadedConfig` types) and `residual/stage_registry.py` (to register itself).
 - `tests/` includes both package-style tests and wrapper/runtime contract tests.
 
 ### External

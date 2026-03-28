@@ -12,6 +12,7 @@ from .config import (
     LoadedConfig,
 )
 from .features import hist_exog_lag_feature_name
+from .stage_registry import get_active_stage_plugin
 
 
 def _coerce_mapping(value: Any) -> dict[str, Any]:
@@ -67,6 +68,14 @@ def residual_active_feature_columns(feature_config: Any) -> list[str]:
     return columns
 
 
+def _stage_plugin_manifest_block(loaded: LoadedConfig) -> dict[str, Any]:
+    result = get_active_stage_plugin(loaded.config)
+    if result is None:
+        return {}
+    plugin, _ = result
+    return {plugin.config_key: plugin.manifest_block(loaded)}
+
+
 def build_manifest(
     loaded: LoadedConfig,
     *,
@@ -111,32 +120,7 @@ def build_manifest(
                 loaded.config.training_search.selected_search_params
             ),
         },
-        'bs_preforcast': {
-            'enabled': loaded.config.bs_preforcast.enabled,
-            'config_path': loaded.config.bs_preforcast.config_path,
-            'target_columns': list(loaded.config.bs_preforcast.target_columns),
-            'multivariable': loaded.config.bs_preforcast.task.multivariable,
-            'selected_config_path': (
-                loaded.normalized_payload.get('bs_preforcast', {})
-                .get('selected_config_path', loaded.config.bs_preforcast.config_path)
-            ),
-            'stage1': (
-                {
-                    'source_path': str(loaded.bs_preforcast_stage1.source_path),
-                    'source_type': loaded.bs_preforcast_stage1.source_type,
-                    'config_input_sha256': loaded.bs_preforcast_stage1.input_hash,
-                    'config_resolved_sha256': loaded.bs_preforcast_stage1.resolved_hash,
-                    'search_space_path': (
-                        str(loaded.bs_preforcast_stage1.search_space_path)
-                        if loaded.bs_preforcast_stage1.search_space_path is not None
-                        else None
-                    ),
-                    'search_space_sha256': loaded.bs_preforcast_stage1.search_space_hash,
-                }
-                if loaded.bs_preforcast_stage1 is not None
-                else None
-            ),
-        },
+        **_stage_plugin_manifest_block(loaded),
         'residual': {
             'model': loaded.config.residual.model,
             'target': loaded.config.residual.target,

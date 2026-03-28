@@ -18,11 +18,8 @@ import pandas as pd
 from neuralforecast import NeuralForecast
 from optuna.trial import TrialState
 
-from bs_preforcast.runtime import (
-    materialize_bs_preforcast_stage,
-    prepare_bs_preforcast_fold_inputs,
-)
 from .adapters import build_multivariate_inputs, build_univariate_inputs
+from .stage_registry import get_active_stage_plugin
 from .config import (
     JobConfig,
     LoadedConfig,
@@ -417,11 +414,6 @@ def _build_resolved_artifacts(
 
 
 def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -> None:
-    selected_bs_config_path = (
-        str(loaded.bs_preforcast_stage1.source_path)
-        if loaded.bs_preforcast_stage1 is not None
-        else loaded.config.bs_preforcast.config_path
-    )
     payload = {}
     caps_by_model: dict[str, Any] = {}
     for job in selected_jobs:
@@ -467,23 +459,12 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
         "unknown_search_params": [],
         "validation_error": None,
     }
-    payload["bs_preforcast"] = {
-        "enabled": loaded.config.bs_preforcast.enabled,
-        "config_path": loaded.config.bs_preforcast.config_path,
-        "target_columns": list(loaded.config.bs_preforcast.target_columns),
-        "multivariable": loaded.config.bs_preforcast.task.multivariable,
-        "selected_config_path": selected_bs_config_path,
-        "job_injection_results": [
-            {
-                "model": job.model,
-                "injection_mode": (
-                    "futr_exog" if caps_by_model[job.model].supports_futr_exog else "lag_derived"
-                ),
-                "supports_futr_exog": bool(caps_by_model[job.model].supports_futr_exog),
-            }
-            for job in selected_jobs
-        ],
-    }
+    stage_result = get_active_stage_plugin(loaded.config)
+    if stage_result is not None:
+        plugin, _ = stage_result
+        payload[plugin.config_key] = plugin.validation_payload(
+            loaded, selected_jobs, caps_by_model
+        )
     capability_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
@@ -771,8 +752,10 @@ def _fit_and_predict_fold(
     target_col = loaded.config.dataset.target_col
     train_df = source_df.iloc[train_idx].reset_index(drop=True)
     future_df = source_df.iloc[test_idx].reset_index(drop=True)
-    if loaded.config.bs_preforcast.enabled:
-        effective_loaded, train_df, future_df, _ = prepare_bs_preforcast_fold_inputs(
+    stage_result = get_active_stage_plugin(loaded.config)
+    if stage_result is not None:
+        plugin, _ = stage_result
+        effective_loaded, train_df, future_df, _ = plugin.prepare_fold_inputs(
             loaded,
             job,
             train_df,
@@ -1181,7 +1164,7 @@ def _main_job_objective(
                     "params_override": candidate_params,
                     "training_override": candidate_training_params,
                 }
-                if loaded.config.bs_preforcast.enabled:
+                if get_active_stage_plugin(loaded.config) is not None:
                     fit_kwargs["run_root"] = None
                 (
                     target_predictions,
@@ -2858,7 +2841,7 @@ def _run_single_job(
                     "test_idx": test_idx,
                     "training_override": effective_training_params,
                 }
-                if loaded.config.bs_preforcast.enabled:
+                if get_active_stage_plugin(loaded.config) is not None:
                     fit_kwargs["run_root"] = run_root
                 target_predictions, target_actuals, train_end_ds, train_df, nf = (
                     _fit_and_predict_fold(
@@ -3089,8 +3072,10 @@ def _run_loaded_config(
     paths = _build_resolved_artifacts(repo_root, loaded, resolved_roots["run_root"])
     _validate_jobs(loaded, selected_jobs, paths["capability_path"])
     _validate_adapters(loaded, selected_jobs)
-    if loaded.config.bs_preforcast.enabled:
-        materialize_bs_preforcast_stage(
+    stage_result = get_active_stage_plugin(loaded.config)
+    if stage_result is not None:
+        stage_plugin, _ = stage_result
+        stage_plugin.materialize_stage(
             loaded=loaded,
             selected_jobs=selected_jobs,
             run_root=paths["run_root"],

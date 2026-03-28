@@ -78,7 +78,7 @@ def resolve_bs_preforcast_injection_mode(
     *,
     selected_jobs: Iterable[Any],
 ) -> str:
-    if not loaded.config.bs_preforcast.enabled:
+    if not loaded.config.stage_plugin_config.enabled:
         return "disabled"
     jobs = list(selected_jobs)
     if not jobs:
@@ -296,18 +296,18 @@ def _stage_prediction_column(predictions: pd.DataFrame, model_name: str) -> str:
 
 
 def _stage_execution_loaded(loaded: LoadedConfig) -> LoadedConfig:
-    if loaded.bs_preforcast_stage1 is None:
+    if loaded.stage_plugin_loaded is None:
         raise ValueError("bs_preforcast stage1 config is required when enabled")
     return LoadedConfig(
-        config=loaded.bs_preforcast_stage1.config,
-        source_path=loaded.bs_preforcast_stage1.source_path,
-        source_type=loaded.bs_preforcast_stage1.source_type,
-        normalized_payload=loaded.bs_preforcast_stage1.normalized_payload,
-        input_hash=loaded.bs_preforcast_stage1.input_hash,
-        resolved_hash=loaded.bs_preforcast_stage1.resolved_hash,
-        search_space_path=loaded.bs_preforcast_stage1.search_space_path,
-        search_space_hash=loaded.bs_preforcast_stage1.search_space_hash,
-        search_space_payload=loaded.bs_preforcast_stage1.search_space_payload,
+        config=loaded.stage_plugin_loaded.config,
+        source_path=loaded.stage_plugin_loaded.source_path,
+        source_type=loaded.stage_plugin_loaded.source_type,
+        normalized_payload=loaded.stage_plugin_loaded.normalized_payload,
+        input_hash=loaded.stage_plugin_loaded.input_hash,
+        resolved_hash=loaded.stage_plugin_loaded.resolved_hash,
+        search_space_path=loaded.stage_plugin_loaded.search_space_path,
+        search_space_hash=loaded.stage_plugin_loaded.search_space_hash,
+        search_space_payload=loaded.stage_plugin_loaded.search_space_payload,
     )
 
 
@@ -776,8 +776,8 @@ def compute_bs_preforcast_fold_forecasts(
     run_root: Path | None = None,
 ) -> dict[str, list[float]]:
     stage_loaded = _stage_execution_loaded(loaded)
-    target_columns = list(loaded.config.bs_preforcast.target_columns)
-    if loaded.config.bs_preforcast.task.multivariable:
+    target_columns = list(loaded.config.stage_plugin_config.target_columns)
+    if loaded.config.stage_plugin_config.task.multivariable:
         return _predict_stage_multivariate(
             loaded,
             stage_loaded,
@@ -811,9 +811,9 @@ def prepare_bs_preforcast_fold_inputs(
         loaded,
         selected_jobs=[job],
     )
-    if not loaded.config.bs_preforcast.enabled:
+    if not loaded.config.stage_plugin_config.enabled:
         return loaded, train_df, future_df, injection_mode
-    target_columns = list(loaded.config.bs_preforcast.target_columns)
+    target_columns = list(loaded.config.stage_plugin_config.target_columns)
     horizon = len(future_df)
     train_frame = train_df.copy()
     future_frame = future_df.copy()
@@ -884,7 +884,7 @@ def materialize_bs_preforcast_stage(
     entrypoint_version: str,
     validate_only: bool,
 ) -> dict[str, Any]:
-    if not loaded.config.bs_preforcast.enabled:
+    if not loaded.config.stage_plugin_config.enabled:
         return {}
     stage_loaded = load_bs_preforcast_stage_config(_repo_root(), loaded)
     if stage_loaded is None:
@@ -938,23 +938,23 @@ def load_bs_preforcast_stage_config(
     _repo_root: Path,
     loaded: LoadedConfig,
 ) -> LoadedConfig | None:
-    if not loaded.config.bs_preforcast.enabled:
+    if not loaded.config.stage_plugin_config.enabled:
         return None
-    if loaded.bs_preforcast_stage1 is None:
+    if loaded.stage_plugin_loaded is None:
         return None
     return LoadedConfig(
         config=replace(
-            loaded.bs_preforcast_stage1.config,
-            bs_preforcast=loaded.config.bs_preforcast,
+            loaded.stage_plugin_loaded.config,
+            stage_plugin_config=loaded.config.stage_plugin_config,
         ),
-        source_path=loaded.bs_preforcast_stage1.source_path,
-        source_type=loaded.bs_preforcast_stage1.source_type,
-        normalized_payload=loaded.bs_preforcast_stage1.normalized_payload,
-        input_hash=loaded.bs_preforcast_stage1.input_hash,
-        resolved_hash=loaded.bs_preforcast_stage1.resolved_hash,
-        search_space_path=loaded.bs_preforcast_stage1.search_space_path,
-        search_space_hash=loaded.bs_preforcast_stage1.search_space_hash,
-        search_space_payload=loaded.bs_preforcast_stage1.search_space_payload,
+        source_path=loaded.stage_plugin_loaded.source_path,
+        source_type=loaded.stage_plugin_loaded.source_type,
+        normalized_payload=loaded.stage_plugin_loaded.normalized_payload,
+        input_hash=loaded.stage_plugin_loaded.input_hash,
+        resolved_hash=loaded.stage_plugin_loaded.resolved_hash,
+        search_space_path=loaded.stage_plugin_loaded.search_space_path,
+        search_space_hash=loaded.stage_plugin_loaded.search_space_hash,
+        search_space_payload=loaded.stage_plugin_loaded.search_space_payload,
     )
 
 
@@ -984,7 +984,7 @@ def attach_bs_preforcast_stage_metadata(
     stage_loaded: LoadedConfig | None = None,
     job_injection_results: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    if not loaded.config.bs_preforcast.enabled:
+    if not loaded.config.stage_plugin_config.enabled:
         return {}
     stage_loaded = stage_loaded or load_bs_preforcast_stage_config(_repo_root(), loaded)
     if stage_loaded is None:
@@ -995,7 +995,7 @@ def attach_bs_preforcast_stage_metadata(
     stage_root = _stage_root(run_root)
     dashboard_path = write_bs_preforcast_dashboard(
         stage_root,
-        target_columns=list(loaded.config.bs_preforcast.target_columns),
+        target_columns=list(loaded.config.stage_plugin_config.target_columns),
         job_injection_results=job_injection_results,
         stage_run_roots=[],
     )
@@ -1011,7 +1011,7 @@ def attach_bs_preforcast_stage_metadata(
         "stage1_selected_jobs_path": None,
         "stage1_run_roots": [],
         "target_columns_used_for_injection": list(
-            loaded.config.bs_preforcast.target_columns
+            loaded.config.stage_plugin_config.target_columns
         ),
         "validate_only": validate_only,
     }

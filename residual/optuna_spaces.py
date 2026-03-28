@@ -11,8 +11,6 @@ from typing import Any, Literal
 import optuna
 import yaml
 
-import bs_preforcast.search_space as bs_preforcast_search_space
-
 SEARCH_SPACE_FILENAME = "yaml/HPO/search_space.yaml"
 BASELINE_MODEL_NAMES = {"Naive", "SeasonalNaive", "HistoricAverage"}
 EXCLUDED_AUTO_MODEL_NAMES = {"HINT"}
@@ -125,10 +123,6 @@ FIXED_TRAINING_VALUES = {
 }
 FIXED_TRAINING_KEYS = tuple(FIXED_TRAINING_VALUES)
 GLOBAL_TRAINING_RANGE_SOURCE = "global_fallback"
-SUPPORTED_BS_PREFORCAST_MODELS = bs_preforcast_search_space.SUPPORTED_BS_PREFORCAST_MODELS
-BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY = (
-    bs_preforcast_search_space.BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY
-)
 
 ExecutionMode = Literal[
     "baseline_fixed",
@@ -316,9 +310,11 @@ def _coerce_legacy_param_name_list(value: Any, *, section: str, owner: str) -> t
 
 
 def _known_model_param_names(model_name: str) -> set[str]:
-    stage_only = BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY or {}
-    if model_name in stage_only:
-        return set(stage_only[model_name])
+    from .stage_registry import all_stage_plugins
+    for sp in all_stage_plugins().values():
+        stage_only = sp.stage_only_param_registry()
+        if model_name in stage_only:
+            return set(stage_only[model_name])
     try:
         import neuralforecast.models as nf_models
     except Exception:
@@ -384,9 +380,13 @@ def _normalize_model_section(
         raise ValueError(f"search_space.{section} must be a mapping")
     if not _LOADING_DEFAULT_REGISTRIES:
         _ensure_default_registries()
+    from .stage_registry import all_stage_plugins
     model_fallback = MODEL_PARAM_REGISTRY or None
     residual_fallback = RESIDUAL_PARAM_REGISTRY or None
-    stage_only_fallback = BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY or None
+    stage_only_registries: dict[str, dict[str, dict[str, Any]]] = {}
+    for sp in all_stage_plugins().values():
+        key = sp.model_search_space_key()
+        stage_only_registries[key] = sp.stage_only_param_registry()
     models = {
         str(model_name): _normalize_selector_specs(
             model_specs,
@@ -400,14 +400,13 @@ def _normalize_model_section(
                 )
                 or (
                     residual_fallback.get(str(model_name))
-                    if section == "bs_preforcast_models"
+                    if section in stage_only_registries
                     and residual_fallback is not None
                     else None
                 )
                 or (
-                    stage_only_fallback.get(str(model_name))
-                    if section == "bs_preforcast_models"
-                    and stage_only_fallback is not None
+                    stage_only_registries[section].get(str(model_name))
+                    if section in stage_only_registries
                     else None
                 )
                 or _auto_default_param_specs(str(model_name))
@@ -551,19 +550,22 @@ def normalize_search_space_payload(payload: dict[str, Any]) -> dict[str, Any]:
         )
 
     training = _normalize_training_section(payload.get("training"), section="training")
-    bs_preforcast_models, bs_preforcast_training = bs_preforcast_search_space.normalize_bs_preforcast_sections(
-        payload,
-        normalize_model_section=_normalize_model_section,
-        normalize_training_section=_normalize_training_section,
-    )
 
-    return {
+    result: dict[str, Any] = {
         "models": models,
         "training": training,
         "residual": residual,
-        "bs_preforcast_models": bs_preforcast_models,
-        "bs_preforcast_training": bs_preforcast_training,
     }
+    from .stage_registry import all_stage_plugins
+    for sp in all_stage_plugins().values():
+        result.update(
+            sp.normalize_search_space_sections(
+                payload,
+                normalize_model_section=_normalize_model_section,
+                normalize_training_section=_normalize_training_section,
+            )
+        )
+    return result
 
 
 def load_search_space_contract(repo_root: Path) -> SearchSpaceContract:

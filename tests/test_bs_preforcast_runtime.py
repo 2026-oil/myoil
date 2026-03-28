@@ -11,14 +11,14 @@ import pytest
 import bs_preforcast.runtime as bs_runtime
 import residual.runtime as residual_runtime
 from residual.config import JobConfig
+from residual.stage_registry import get_stage_plugin
 
 
-def test_residual_runtime_uses_authoritative_bs_preforcast_runtime_apis() -> None:
-    assert (
-        residual_runtime.prepare_bs_preforcast_fold_inputs
-        is bs_runtime.prepare_bs_preforcast_fold_inputs
-    )
-    assert residual_runtime.materialize_bs_preforcast_stage is bs_runtime.materialize_bs_preforcast_stage
+def test_bs_preforcast_plugin_is_registered() -> None:
+    import bs_preforcast.plugin  # noqa: F401
+    plugin = get_stage_plugin("bs_preforcast")
+    assert plugin is not None
+    assert plugin.config_key == "bs_preforcast"
 
 
 def test_validate_only_bs_preforcast_smoke_fixture_materializes_metadata_shell(
@@ -66,7 +66,7 @@ def test_materialize_stage_fails_before_stage_side_effects_for_unsupported_futr_
 ) -> None:
     calls: list[str] = []
     loaded = SimpleNamespace(
-        config=SimpleNamespace(bs_preforcast=SimpleNamespace(enabled=True)),
+        config=SimpleNamespace(stage_plugin_config=SimpleNamespace(enabled=True)),
         normalized_payload={},
     )
     stage_loaded = SimpleNamespace(

@@ -96,9 +96,9 @@ def _write_search_space(tmp_path: Path) -> None:
     )
 
 
-def test_residual_config_uses_bs_preforcast_authoritative_types() -> None:
-    assert residual_config.BsPreforcastConfig is BsPreforcastConfig
-    assert residual_config.BsPreforcastStageLoadedConfig is BsPreforcastStageLoadedConfig
+def test_bs_preforcast_types_not_leaked_into_residual_config() -> None:
+    assert not hasattr(residual_config, "BsPreforcastConfig")
+    assert not hasattr(residual_config, "BsPreforcastStageLoadedConfig")
 
 
 def test_load_app_config_materializes_bs_preforcast_stage_with_top_level_config_types(
@@ -134,16 +134,16 @@ def test_load_app_config_materializes_bs_preforcast_stage_with_top_level_config_
 
     loaded = load_app_config(tmp_path, config_path=config_path)
 
-    assert isinstance(loaded.config.bs_preforcast, BsPreforcastConfig)
-    assert isinstance(loaded.bs_preforcast_stage1, BsPreforcastStageLoadedConfig)
-    assert loaded.bs_preforcast_stage1 is not None
-    assert loaded.bs_preforcast_stage1.source_path == stage_path.resolve()
-    assert loaded.config.bs_preforcast.target_columns == ("bs_a",)
-    assert loaded.config.bs_preforcast.exog_columns == ("aux_a",)
-    assert loaded.bs_preforcast_stage1.config.dataset.path == data_path
-    assert loaded.bs_preforcast_stage1.config.dataset.target_col == "bs_a"
-    assert loaded.bs_preforcast_stage1.config.dataset.hist_exog_cols == ("aux_a",)
-    assert loaded.bs_preforcast_stage1.normalized_payload["bs_preforcast"][
+    assert isinstance(loaded.config.stage_plugin_config, BsPreforcastConfig)
+    assert isinstance(loaded.stage_plugin_loaded, BsPreforcastStageLoadedConfig)
+    assert loaded.stage_plugin_loaded is not None
+    assert loaded.stage_plugin_loaded.source_path == stage_path.resolve()
+    assert loaded.config.stage_plugin_config.target_columns == ("bs_a",)
+    assert loaded.config.stage_plugin_config.exog_columns == ("aux_a",)
+    assert loaded.stage_plugin_loaded.config.dataset.path == data_path
+    assert loaded.stage_plugin_loaded.config.dataset.target_col == "bs_a"
+    assert loaded.stage_plugin_loaded.config.dataset.hist_exog_cols == ("aux_a",)
+    assert loaded.stage_plugin_loaded.normalized_payload["bs_preforcast"][
         "selected_config_path"
     ] == str(stage_path.resolve())
 
@@ -182,8 +182,8 @@ def test_load_app_config_accepts_bs_preforcast_plugin_with_multiple_jobs(
 
     loaded = load_app_config(tmp_path, config_path=config_path)
 
-    assert loaded.bs_preforcast_stage1 is not None
-    assert [job.model for job in loaded.bs_preforcast_stage1.config.jobs] == [
+    assert loaded.stage_plugin_loaded is not None
+    assert [job.model for job in loaded.stage_plugin_loaded.config.jobs] == [
         "DummyUnivariate",
         "WindowAverage",
     ]
@@ -418,8 +418,8 @@ def test_repo_default_bs_preforcast_path_is_loadable_with_defaults_yaml(
 
     loaded = load_app_config(tmp_path, config_path=config_path)
 
-    assert loaded.bs_preforcast_stage1 is not None
-    assert [job.model for job in loaded.bs_preforcast_stage1.config.jobs] == [
+    assert loaded.stage_plugin_loaded is not None
+    assert [job.model for job in loaded.stage_plugin_loaded.config.jobs] == [
         "ARIMA",
         "ES",
         "xgboost",

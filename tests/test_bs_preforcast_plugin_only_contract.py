@@ -8,7 +8,7 @@ import pytest
 import yaml
 
 from residual.config import load_app_config
-from residual.bs_preforcast_runtime import prepare_bs_preforcast_fold_inputs
+from bs_preforcast.runtime import prepare_bs_preforcast_fold_inputs
 
 
 def _base_payload(data_path: Path) -> dict[str, object]:
@@ -118,11 +118,11 @@ def test_plugin_only_yaml_inherits_main_dataset_and_exog_columns(tmp_path: Path)
 
     loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path / "config.yaml", main_payload))
 
-    assert loaded.bs_preforcast_stage1 is not None
-    assert loaded.bs_preforcast_stage1.config.dataset.path == data_path
-    assert loaded.bs_preforcast_stage1.config.dataset.target_col == "bs_a"
-    assert loaded.bs_preforcast_stage1.config.dataset.hist_exog_cols == ("aux_a",)
-    assert loaded.bs_preforcast_stage1.config.bs_preforcast.exog_columns == ("aux_a",)
+    assert loaded.stage_plugin_loaded is not None
+    assert loaded.stage_plugin_loaded.config.dataset.path == data_path
+    assert loaded.stage_plugin_loaded.config.dataset.target_col == "bs_a"
+    assert loaded.stage_plugin_loaded.config.dataset.hist_exog_cols == ("aux_a",)
+    assert loaded.stage_plugin_loaded.config.stage_plugin_config.exog_columns == ("aux_a",)
 
 
 def test_plugin_only_yaml_rejects_dataset_block(tmp_path: Path) -> None:
@@ -186,7 +186,7 @@ def test_metadata_shell_uses_empty_run_roots_and_null_selected_jobs_path(tmp_pat
 def test_lag_derived_injection_fails_when_train_shorter_than_horizon(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import residual.bs_preforcast_runtime as bs_runtime
+    import bs_preforcast.runtime as bs_runtime
 
     data_path = tmp_path / "data.csv"
     data_path.write_text(

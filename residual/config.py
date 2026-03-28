@@ -10,8 +10,12 @@ import math
 import tomllib
 
 import yaml
-import bs_preforcast.config as bs_preforcast_config
-import bs_preforcast.search_space as bs_preforcast_search_space
+from .stage_registry import (
+    _ensure_plugins_loaded,
+    get_active_stage_plugin,
+    get_stage_plugin,
+    get_stage_plugin_for_payload,
+)
 from .optuna_spaces import (
     BASELINE_MODEL_NAMES,
     DEFAULT_TRAINING_LR_SCHEDULER,
@@ -110,13 +114,6 @@ FORBIDDEN_RESIDUAL_LAG_SOURCES = {
 }
 ResidualTargetMode = Literal["level", "delta"]
 RuntimeTransformationMode = Literal["diff"]
-
-BsPreforcastConfig = bs_preforcast_config.BsPreforcastConfig
-BsPreforcastStageLoadedConfig = bs_preforcast_config.BsPreforcastStageLoadedConfig
-SUPPORTED_BS_PREFORCAST_MODELS = (
-    bs_preforcast_search_space.SUPPORTED_BS_PREFORCAST_MODELS
-)
-
 
 @dataclass(frozen=True)
 class DatasetConfig:
@@ -276,7 +273,6 @@ class JobConfig:
 @dataclass(frozen=True)
 class AppConfig:
     task: TaskConfig
-    bs_preforcast: BsPreforcastConfig
     dataset: DatasetConfig
     runtime: RuntimeConfig
     training: TrainingConfig
@@ -285,17 +281,21 @@ class AppConfig:
     scheduler: SchedulerConfig
     residual: ResidualConfig
     jobs: tuple[JobConfig, ...]
+    stage_plugin_config: Any = None
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
+        payload.pop("stage_plugin_config", None)
+        if self.stage_plugin_config is not None:
+            _ensure_plugins_loaded()
+            result = get_active_stage_plugin(self)
+            if result is not None:
+                plugin, _ = result
+                serialized = plugin.config_to_dict(self.stage_plugin_config)
+                if serialized is not None:
+                    payload[plugin.config_key] = serialized
         if self.task.name is None:
             payload.pop("task", None)
-        if not payload["bs_preforcast"].get("enabled", False):
-            payload.pop("bs_preforcast", None)
-        else:
-            payload["bs_preforcast"]["target_columns"] = list(
-                payload["bs_preforcast"]["target_columns"]
-            )
         payload["dataset"]["path"] = str(self.dataset.path)
         for key in ("transformations_target", "transformations_exog"):
             if payload["runtime"].get(key) is None:
@@ -336,7 +336,7 @@ class LoadedConfig:
     search_space_payload: dict[str, Any] | None
     shared_settings_path: Path | None = None
     shared_settings_hash: str | None = None
-    bs_preforcast_stage1: BsPreforcastStageLoadedConfig | None = None
+    stage_plugin_loaded: Any = None
     jobs_fanout_specs: tuple["JobsFanoutSpec", ...] = field(default_factory=tuple)
     active_jobs_route_slug: str | None = None
 
@@ -965,16 +965,17 @@ def _normalize_job(
     search_space: dict[str, Any] | None,
     allow_missing_search_space: bool = False,
     model_search_space_key: str = "models",
+    stage_scope: str | None = None,
 ) -> JobConfig:
     model_name = str(job["model"])
-    if model_search_space_key == "bs_preforcast_models" and model_name == "AutoARIMA":
-        raise ValueError(
-            "bs_preforcast stage no longer supports AutoARIMA; use ARIMA instead"
-        )
+    _ensure_plugins_loaded()
+    stage_plugin = get_stage_plugin(stage_scope) if stage_scope else None
+    if stage_plugin is not None:
+        stage_plugin.validate_model(model_name)
     params = dict(job.get("params", {}))
     supported_auto_models = (
-        SUPPORTED_BS_PREFORCAST_MODELS
-        if model_search_space_key == "bs_preforcast_models"
+        stage_plugin.supported_models()
+        if stage_plugin is not None
         else SUPPORTED_AUTO_MODEL_NAMES
     )
     requested_mode = _requested_job_mode(model_name, params)
@@ -990,13 +991,15 @@ def _normalize_job(
                 f"jobs[{model_name}] uses empty params but has no supported learned_auto Optuna mapping"
             )
         search_space_models = None
+        fallback_key = (
+            stage_plugin.model_search_space_fallback_key()
+            if stage_plugin is not None
+            else None
+        )
         if search_space is not None:
             search_space_models = search_space.get(model_search_space_key)
-            if (
-                search_space_models is None
-                and model_search_space_key == "bs_preforcast_models"
-            ):
-                search_space_models = search_space.get("models")
+            if search_space_models is None and fallback_key is not None:
+                search_space_models = search_space.get(fallback_key)
         if search_space_models is None or model_name not in search_space_models:
             if allow_missing_search_space:
                 validated_mode = "learned_fixed"
@@ -1058,11 +1061,19 @@ def _normalize_payload(
 
     scheduler = dict(payload.get("scheduler", {}))
     residual = dict(payload.get("residual", {}))
-    bs_preforcast = bs_preforcast_config.normalize_bs_preforcast_config(
-        payload.get("bs_preforcast"),
-        unknown_keys=_unknown_keys,
-        coerce_bool=_coerce_bool,
-        coerce_optional_path_string=_coerce_optional_path_string,
+    _ensure_plugins_loaded()
+    stage_plugin = (
+        get_stage_plugin(stage_scope) if stage_scope else None
+    ) or get_stage_plugin_for_payload(payload)
+    stage_plugin_config = (
+        stage_plugin.normalize_config(
+            payload.get(stage_plugin.config_key),
+            unknown_keys=_unknown_keys,
+            coerce_bool=_coerce_bool,
+            coerce_optional_path_string=_coerce_optional_path_string,
+        )
+        if stage_plugin is not None
+        else None
     )
 
     target_col = str(dataset.get("target_col", "")).strip()
@@ -1284,6 +1295,7 @@ def _normalize_payload(
             search_space=search_space,
             allow_missing_search_space=allow_missing_search_space,
             model_search_space_key=model_search_space_key,
+            stage_scope=stage_scope,
         )
         for job in jobs_payload
     )
@@ -1306,11 +1318,13 @@ def _normalize_payload(
         training_search_payload = None
         if search_space is not None:
             training_search_payload = search_space.get(training_search_space_key)
-            if (
-                training_search_payload is None
-                and training_search_space_key == "bs_preforcast_training"
-            ):
-                training_search_payload = search_space.get("training")
+            if training_search_payload is None and stage_plugin is not None:
+                fallback = stage_plugin.training_search_space_fallback_key()
+                if (
+                    fallback is not None
+                    and training_search_space_key != fallback
+                ):
+                    training_search_payload = search_space.get(fallback)
         training_selected = (
             tuple(training_search_payload["global"])
             if training_search_payload is not None
@@ -1329,7 +1343,6 @@ def _normalize_payload(
         task=TaskConfig(name=str(task["name"]).strip() or None)
         if "name" in task
         else TaskConfig(),
-        bs_preforcast=bs_preforcast,
         dataset=DatasetConfig(
             path=dataset_path,
             target_col=target_col,
@@ -1355,6 +1368,7 @@ def _normalize_payload(
             selected_search_params=residual_selected,
         ),
         jobs=jobs,
+        stage_plugin_config=stage_plugin_config,
     )
 
 
@@ -1575,49 +1589,27 @@ def load_app_config(
         source_path=source_path,
         jobs_value=payload.get("jobs", []),
     )
-    raw_bs_preforcast = bs_preforcast_config.normalize_bs_preforcast_config(
-        payload.get("bs_preforcast"),
-        unknown_keys=_unknown_keys,
-        coerce_bool=_coerce_bool,
-        coerce_optional_path_string=_coerce_optional_path_string,
-    )
+    _ensure_plugins_loaded()
+    stage_plugin = get_stage_plugin_for_payload(payload)
     stage_source_path: Path | None = None
     stage_payload_probe: dict[str, Any] | None = None
-    if raw_bs_preforcast.enabled:
-        selected_config_path = raw_bs_preforcast.config_path
-        if selected_config_path is None:
-            raise ValueError("bs_preforcast enabled but config_path was not resolved")
-        stage_source_path = _resolve_relative_config_reference(
-            repo_root,
-            source_path,
-            selected_config_path,
-        )
-        if not stage_source_path.exists():
-            raise FileNotFoundError(
-                f"bs_preforcast selected route does not exist: {stage_source_path}"
-            )
-        stage_source_type = (
-            "toml" if stage_source_path.suffix.lower() == ".toml" else "yaml"
-        )
-        stage_raw_payload = _load_document(stage_source_path, stage_source_type)
-        if stage_raw_payload.get("bs_preforcast") in (None, {}):
-            raise ValueError(
-                "bs_preforcast routed YAML must define a top-level bs_preforcast block"
-            )
-        bs_preforcast_config.normalize_linked_bs_preforcast_config(
-            stage_raw_payload.get("bs_preforcast"),
+    if stage_plugin is not None:
+        raw_stage_config = stage_plugin.normalize_config(
+            payload.get(stage_plugin.config_key),
             unknown_keys=_unknown_keys,
             coerce_bool=_coerce_bool,
-            coerce_name_tuple=_coerce_name_tuple,
+            coerce_optional_path_string=_coerce_optional_path_string,
         )
-        stage_payload_probe = {
-            "jobs": _resolve_jobs_reference(
+        if stage_plugin.is_enabled(raw_stage_config):
+            stage_payload_probe = stage_plugin.validate_route(
                 repo_root,
-                source_path=stage_source_path,
-                jobs_value=dict(stage_raw_payload).get("jobs", []),
-            ),
-            "residual": dict(payload.get("residual", {})),
-        }
+                source_path,
+                raw_stage_config,
+                load_document=_load_document,
+                unknown_keys=_unknown_keys,
+                coerce_bool=_coerce_bool,
+                coerce_name_tuple=_coerce_name_tuple,
+            )
     search_space_contract: SearchSpaceContract | None = None
     requested_search_space = False
     payload = dict(payload)
@@ -1647,13 +1639,13 @@ def load_app_config(
     ):
         requested_search_space = True
     if stage_payload_probe is not None:
-        assert stage_source_path is not None
-        if _stage_payload_requests_search_space(
-            repo_root,
-            source_path=stage_source_path,
-            stage_payload=stage_payload_probe,
-        ):
-            requested_search_space = True
+        stage_jobs = stage_payload_probe.get("jobs", [])
+        for sjob in stage_jobs:
+            if str(sjob.get("model")) not in BASELINE_MODEL_NAMES and not dict(
+                sjob.get("params", {})
+            ):
+                requested_search_space = True
+                break
     if requested_search_space:
         search_space_contract = load_search_space_contract(repo_root)
     search_space = (
@@ -1674,12 +1666,17 @@ def load_app_config(
         model_search_space_key=model_search_space_key,
         training_search_space_key=training_search_space_key,
     )
-    bs_preforcast_stage1 = None
-    if config.bs_preforcast.enabled and config.bs_preforcast.config_path:
+    stage_plugin_loaded = None
+    if (
+        stage_plugin is not None
+        and config.stage_plugin_config is not None
+        and stage_plugin.is_enabled(config.stage_plugin_config)
+        and getattr(config.stage_plugin_config, "config_path", None)
+    ):
         stage_source_path = _resolve_relative_config_reference(
             repo_root,
             source_path,
-            config.bs_preforcast.config_path,
+            config.stage_plugin_config.config_path,
         )
         if stage_source_path.exists():
             stage_search_space_contract = search_space_contract
@@ -1687,36 +1684,26 @@ def load_app_config(
                 candidate = (repo_root / "yaml/HPO/search_space.yaml").resolve()
                 if candidate.exists():
                     stage_search_space_contract = load_search_space_contract(repo_root)
-            bs_preforcast_stage1 = bs_preforcast_config.load_bs_preforcast_stage1(
+            stage_plugin_loaded = stage_plugin.load_stage(
                 repo_root,
                 source_path=source_path,
                 source_type=source_type,
-                bs_preforcast=config.bs_preforcast,
+                config=config.stage_plugin_config,
                 search_space_contract=stage_search_space_contract,
             )
-            config = replace(config, bs_preforcast=bs_preforcast_stage1.config.bs_preforcast)
+            config = stage_plugin.apply_stage_to_config(config, stage_plugin_loaded)
             if search_space_contract is None:
                 search_space_contract = stage_search_space_contract
-        elif Path(config.bs_preforcast.config_path).is_absolute():
+        elif Path(config.stage_plugin_config.config_path).is_absolute():
             raise FileNotFoundError(
-                f"bs_preforcast selected route does not exist: {stage_source_path}"
+                f"Stage plugin selected route does not exist: {stage_source_path}"
             )
     normalized_payload = config.to_dict()
-    if bs_preforcast_stage1 is not None:
-        normalized_payload.setdefault("bs_preforcast", {})["stage1"] = {
-            "source_path": str(bs_preforcast_stage1.source_path),
-            "source_type": bs_preforcast_stage1.source_type,
-            "config_input_sha256": bs_preforcast_stage1.input_hash,
-            "config_resolved_sha256": bs_preforcast_stage1.resolved_hash,
-            "search_space_path": (
-                str(bs_preforcast_stage1.search_space_path)
-                if bs_preforcast_stage1.search_space_path is not None
-                else None
-            ),
-            "search_space_sha256": bs_preforcast_stage1.search_space_hash,
-            "target_columns": list(config.bs_preforcast.target_columns),
-            "multivariable": config.bs_preforcast.task.multivariable,
-        }
+    if stage_plugin is not None and stage_plugin_loaded is not None:
+        for key, value in stage_plugin.stage_normalized_payload(
+            config, stage_plugin_loaded
+        ).items():
+            normalized_payload.setdefault(key, {}).update(value)
     normalized_payload["search_space_path"] = (
         str(search_space_contract.path) if search_space_contract else None
     )
@@ -1740,7 +1727,7 @@ def load_app_config(
         search_space_payload=search_space_contract.payload if search_space_contract else None,
         shared_settings_path=shared_settings_path,
         shared_settings_hash=shared_settings_hash,
-        bs_preforcast_stage1=bs_preforcast_stage1,
+        stage_plugin_loaded=stage_plugin_loaded,
         jobs_fanout_specs=jobs_fanout_specs,
     )
 
@@ -1753,28 +1740,23 @@ def loaded_config_for_jobs_fanout(
     model_search_space_key: str = "models",
     training_search_space_key: str = "training",
 ) -> LoadedConfig:
+    base_keys = {
+        "task", "dataset", "runtime", "training", "cv",
+        "scheduler", "residual", "jobs",
+    }
+    _ensure_plugins_loaded()
+    stage_plugin = get_stage_plugin_for_payload(loaded.normalized_payload)
+    if stage_plugin is not None:
+        base_keys |= stage_plugin.fanout_config_keys()
     payload = {
         key: deepcopy(value)
         for key, value in loaded.normalized_payload.items()
-        if key
-        in {
-            "task",
-            "dataset",
-            "runtime",
-            "training",
-            "cv",
-            "scheduler",
-            "residual",
-            "jobs",
-            "bs_preforcast",
-        }
+        if key in base_keys
     }
-    if isinstance(payload.get("bs_preforcast"), dict):
-        payload["bs_preforcast"] = {
-            key: value
-            for key, value in payload["bs_preforcast"].items()
-            if key in {"enabled", "config_path"}
-        }
+    if stage_plugin is not None:
+        sp_key = stage_plugin.config_key
+        if isinstance(payload.get(sp_key), dict):
+            payload[sp_key] = stage_plugin.fanout_filter_payload(payload[sp_key])
     if isinstance(payload.get("residual"), dict):
         payload["residual"] = {
             key: value
@@ -1805,10 +1787,11 @@ def loaded_config_for_jobs_fanout(
         source_path=loaded.source_path,
     )
     normalized_payload = config.to_dict()
-    if loaded.bs_preforcast_stage1 is not None:
-        normalized_payload.setdefault("bs_preforcast", {})["stage1"] = (
-            loaded.normalized_payload.get("bs_preforcast", {}).get("stage1")
-        )
+    if stage_plugin is not None:
+        extra = stage_plugin.fanout_stage_payload(loaded)
+        if extra is not None:
+            for k, v in extra.items():
+                normalized_payload.setdefault(k, {}).update(v)
     normalized_payload["search_space_path"] = (
         str(loaded.search_space_path) if loaded.search_space_path else None
     )
