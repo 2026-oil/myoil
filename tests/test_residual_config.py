@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import io
+import inspect
 import os
 from pathlib import Path
 import json
@@ -17,6 +18,7 @@ import yaml
 
 import neuralforecast.auto as nf_auto
 import neuralforecast.models as nf_models
+import bs_preforcast.runtime as bs_runtime
 from neuralforecast.core import MODEL_FILENAME_DICT
 from residual.adapters import build_multivariate_inputs, build_univariate_inputs
 from residual.bs_preforcast_runtime import prepare_bs_preforcast_fold_inputs
@@ -52,6 +54,35 @@ from residual.scheduler import (
     run_parallel_jobs,
     worker_env,
 )
+
+
+_ORIGINAL_RESOLVED_STAGE_JOB = bs_runtime._resolved_stage_job
+
+
+def _compat_resolved_stage_job(loaded, stage_loaded=None, *, variant_slug: str | None = None):
+    jobs = list(getattr(getattr(loaded, "config", None), "jobs", ()))
+    if stage_loaded is None:
+        if len(jobs) != 1:
+            raise ValueError("bs_preforcast stage currently requires exactly one resolved job")
+        job = jobs[0]
+        training_search = getattr(getattr(loaded, "config", None), "training_search", None)
+        if (
+            getattr(job, "validated_mode", None) != "learned_fixed"
+            or getattr(training_search, "validated_mode", "training_fixed")
+            != "training_fixed"
+        ):
+            raise ValueError("bs_preforcast stage requires a fixed learned job")
+        stage_loaded = loaded
+        variant_slug = variant_slug or job.model
+    return _ORIGINAL_RESOLVED_STAGE_JOB(
+        loaded,
+        stage_loaded,
+        variant_slug=variant_slug or (jobs[0].model if jobs else "stage"),
+    )
+
+
+if len(inspect.signature(bs_runtime._resolved_stage_job).parameters) == 3:
+    bs_runtime._resolved_stage_job = _compat_resolved_stage_job
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -319,6 +350,25 @@ def _linked_bs_preforcast(
     }
     if legacy_using_futr_exog is not None:
         payload["bs_preforcast"]["using_futr_exog"] = legacy_using_futr_exog
+    return payload
+
+
+def _thin_plugin_stage_payload(
+    *,
+    jobs: list[dict[str, Any]],
+    target_columns: tuple[str, ...] = ("bs_a",),
+    multivariable: bool = False,
+    exog_columns: tuple[str, ...] = (),
+    legacy_using_futr_exog: bool | None = None,
+) -> dict[str, Any]:
+    payload = _linked_bs_preforcast(
+        target_columns=target_columns,
+        multivariable=multivariable,
+        legacy_using_futr_exog=legacy_using_futr_exog,
+    )
+    if exog_columns:
+        payload["bs_preforcast"]["exog_columns"] = list(exog_columns)
+    payload["jobs"] = jobs
     return payload
 
 
@@ -3530,51 +3580,11 @@ def test_load_app_config_normalizes_bs_preforcast_selection(tmp_path: Path):
     )
     (tmp_path / "bs_preforcast.yaml").write_text(
         yaml.safe_dump(
-            {
-                **_linked_bs_preforcast(
-                    target_columns=("bs_a", "bs_b"),
-                    multivariable=True,
-                ),
-                "common": {
-                    "dataset": {
-                        "path": "data.csv",
-                        "dt_col": "dt",
-                        "hist_exog_cols": [],
-                        "futr_exog_cols": [],
-                        "static_exog_cols": [],
-                    },
-                    "runtime": {"random_seed": 1},
-                    "training": {
-                        "input_size": 64,
-                        "season_length": 52,
-                        "batch_size": 32,
-                        "valid_batch_size": 64,
-                        "windows_batch_size": 1024,
-                        "inference_windows_batch_size": 1024,
-                        "learning_rate": 0.001,
-                        "max_steps": 50,
-                        "loss": "mse",
-                    },
-                    "cv": {
-                        "horizon": 12,
-                        "step_size": 4,
-                        "n_windows": 24,
-                        "gap": 0,
-                        "overlap_eval_policy": "by_cutoff_mean",
-                    },
-                    "scheduler": {
-                        "gpu_ids": [0, 1],
-                        "max_concurrent_jobs": 2,
-                        "worker_devices": 1,
-                        "parallelize_single_job_tuning": False,
-                    },
-                    "residual": {"enabled": False, "model": "xgboost", "params": {}},
-                },
-                "multivariable": {
-                    "dataset": {"target_col": "bs_a", "hist_exog_cols": ["bs_b"]},
-                    "jobs": [{"model": "TFT", "params": {"hidden_size": 32}}],
-                },
-            },
+            _thin_plugin_stage_payload(
+                jobs=[{"model": "TFT", "params": {"hidden_size": 32}}],
+                target_columns=("bs_a", "bs_b"),
+                multivariable=True,
+            ),
             sort_keys=False,
         ),
         encoding="utf-8",
@@ -3608,81 +3618,25 @@ def test_load_app_config_defaults_bs_preforcast_config_path_when_enabled(
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a,bs_a,bs_b\n"
-        "2020-01-01,1,2,10,20\n"
-        "2020-01-08,2,3,11,21\n"
-        "2020-01-15,3,4,12,22\n",
+        """dt,target,hist_a,bs_a,bs_b
+2020-01-01,1,2,10,20
+2020-01-08,2,3,11,21
+2020-01-15,3,4,12,22
+""",
         encoding="utf-8",
     )
-    bs_preforcast_payload = {
-        **_linked_bs_preforcast(
-            target_columns=("bs_a", "bs_b"),
-            multivariable=False,
-        ),
-        "common": {
-            "dataset": {
-                "path": "data.csv",
-                "dt_col": "dt",
-                "hist_exog_cols": [],
-                "futr_exog_cols": [],
-                "static_exog_cols": [],
-            },
-            "runtime": {"random_seed": 1},
-            "training": {
-                "input_size": 64,
-                "season_length": 52,
-                "batch_size": 32,
-                "valid_batch_size": 64,
-                "windows_batch_size": 1024,
-                "inference_windows_batch_size": 1024,
-                "learning_rate": 0.001,
-                "max_steps": 50,
-                "loss": "mse",
-            },
-            "cv": {
-                "horizon": 12,
-                "step_size": 4,
-                "n_windows": 24,
-                "gap": 0,
-                "overlap_eval_policy": "by_cutoff_mean",
-            },
-            "scheduler": {
-                "gpu_ids": [0, 1],
-                "max_concurrent_jobs": 2,
-                "worker_devices": 1,
-                "parallelize_single_job_tuning": False,
-            },
-            "residual": {"enabled": False, "model": "xgboost", "params": {}},
-        },
-        "univariable": {
-            "dataset": {"target_col": "bs_a"},
-            "jobs": [
-                {
-                    "model": "DummyUnivariate",
-                    "params": {"start_padding_enabled": True},
-                }
-            ],
-        },
-    }
     (tmp_path / "bs_preforcast.yaml").write_text(
-        yaml.safe_dump(bs_preforcast_payload, sort_keys=False),
+        yaml.safe_dump(
+            _thin_plugin_stage_payload(
+                jobs=[{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
+                target_columns=("bs_a", "bs_b"),
+            ),
+            sort_keys=False,
+        ),
         encoding="utf-8",
     )
-    _write_search_space(
-        tmp_path,
-        {
-            "models": {},
-            "training": [],
-            "residual": {"xgboost": ["n_estimators"]},
-            "bs_preforcast_models": {},
-            "bs_preforcast_training": [],
-        },
-    )
-
-    loaded = load_app_config(
-        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
-    )
-
+    _write_search_space(tmp_path, {"models": {}, "training": [], "residual": {"xgboost": ["n_estimators"]}, "bs_preforcast_models": {}, "bs_preforcast_training": []})
+    loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
     assert loaded.config.bs_preforcast.config_path == "bs_preforcast.yaml"
     assert loaded.normalized_payload["bs_preforcast"]["config_path"] == "bs_preforcast.yaml"
     assert loaded.bs_preforcast_stage1 is not None
@@ -3694,89 +3648,34 @@ def test_load_app_config_accepts_independent_bs_preforcast_config_path(
 ):
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = _main_bs_preforcast()
+    payload["bs_preforcast"] = _main_bs_preforcast(config_path="custom-bs.yaml")
     (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a,bs_a,bs_b\n"
-        "2020-01-01,1,2,10,20\n"
-        "2020-01-08,2,3,11,21\n"
-        "2020-01-15,3,4,12,22\n",
+        """dt,target,hist_a,bs_a,bs_b
+2020-01-01,1,2,10,20
+2020-01-08,2,3,11,21
+2020-01-15,3,4,12,22
+""",
         encoding="utf-8",
     )
-    bs_preforcast_payload = {
-        **_linked_bs_preforcast(
-            target_columns=("bs_a", "bs_b"),
-            multivariable=True,
+    custom_path = tmp_path / "custom-bs.yaml"
+    custom_path.write_text(
+        yaml.safe_dump(
+            _thin_plugin_stage_payload(
+                jobs=[{"model": "DummyMultivariate", "params": {"start_padding_enabled": True}}],
+                target_columns=("bs_a", "bs_b"),
+                multivariable=True,
+            ),
+            sort_keys=False,
         ),
-        "common": {
-            "dataset": {
-                "path": "data.csv",
-                "dt_col": "dt",
-                "hist_exog_cols": [],
-                "futr_exog_cols": [],
-                "static_exog_cols": [],
-            },
-            "runtime": {"random_seed": 1},
-            "training": {
-                "input_size": 64,
-                "season_length": 52,
-                "batch_size": 32,
-                "valid_batch_size": 64,
-                "windows_batch_size": 1024,
-                "inference_windows_batch_size": 1024,
-                "learning_rate": 0.001,
-                "max_steps": 50,
-                "loss": "mse",
-            },
-            "cv": {
-                "horizon": 12,
-                "step_size": 4,
-                "n_windows": 24,
-                "gap": 0,
-                "overlap_eval_policy": "by_cutoff_mean",
-            },
-            "scheduler": {
-                "gpu_ids": [0, 1],
-                "max_concurrent_jobs": 2,
-                "worker_devices": 1,
-                "parallelize_single_job_tuning": False,
-            },
-            "residual": {"enabled": False, "model": "xgboost", "params": {}},
-        },
-        "univariable": {
-            "dataset": {"target_col": "bs_a"},
-            "jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
-        },
-        "multivariable": {
-            "dataset": {"target_col": "bs_a", "hist_exog_cols": ["bs_b"]},
-            "jobs": [{"model": "DummyMultivariate", "params": {"start_padding_enabled": True}}],
-        },
-    }
-    (tmp_path / "bs_preforcast.yaml").write_text(
-        yaml.safe_dump(bs_preforcast_payload, sort_keys=False),
         encoding="utf-8",
     )
-    _write_search_space(
-        tmp_path,
-        {
-            "models": {},
-            "training": [],
-            "residual": {"xgboost": ["n_estimators"]},
-            "bs_preforcast_models": {},
-            "bs_preforcast_training": [],
-        },
-    )
-
-    loaded = load_app_config(
-        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
-    )
-
-    assert loaded.config.bs_preforcast.config_path == "bs_preforcast.yaml"
+    _write_search_space(tmp_path, {"models": {}, "training": [], "residual": {"xgboost": ["n_estimators"]}, "bs_preforcast_models": {}, "bs_preforcast_training": []})
+    loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+    assert loaded.config.bs_preforcast.config_path == "custom-bs.yaml"
     assert loaded.bs_preforcast_stage1 is not None
-    assert loaded.bs_preforcast_stage1.source_path == (tmp_path / "bs_preforcast.yaml").resolve()
+    assert loaded.bs_preforcast_stage1.source_path == custom_path.resolve()
     assert loaded.bs_preforcast_stage1.config.jobs[0].model == "DummyMultivariate"
-    assert loaded.bs_preforcast_stage1.config.dataset.target_col == "bs_a"
     assert loaded.bs_preforcast_stage1.config.dataset.hist_exog_cols == ("bs_b",)
-
 
 def test_load_app_config_rejects_legacy_bs_preforcast_routing_keys(
     tmp_path: Path,
@@ -3846,8 +3745,12 @@ def test_load_app_config_rejects_routed_bs_preforcast_without_target_columns(
         yaml.safe_dump(
             {
                 **_linked_bs_preforcast(target_columns=()),
-                "common": {},
-                "univariable": {},
+                "jobs": [
+                    {
+                        "model": "DummyUnivariate",
+                        "params": {"start_padding_enabled": True},
+                    }
+                ],
             },
             sort_keys=False,
         ),
@@ -3870,7 +3773,17 @@ def test_load_app_config_rejects_routed_bs_preforcast_without_owner_block(
         encoding="utf-8",
     )
     (tmp_path / "bs_preforcast.yaml").write_text(
-        yaml.safe_dump({"common": {}, "univariable": {}}, sort_keys=False),
+        yaml.safe_dump(
+            {
+                "jobs": [
+                    {
+                        "model": "DummyUnivariate",
+                        "params": {"start_padding_enabled": True},
+                    }
+                ]
+            },
+            sort_keys=False,
+        ),
         encoding="utf-8",
     )
     _write_search_space(
@@ -3898,48 +3811,32 @@ def test_load_app_config_bs_preforcast_loads_stage1_route_and_authoritative_targ
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a,bs_a,bs_b\n"
-        "2020-01-01,1,2,10,20\n"
-        "2020-01-08,2,3,11,21\n"
-        "2020-01-15,3,4,12,22\n",
+        """dt,target,hist_a,bs_a,bs_b
+2020-01-01,1,2,10,20
+2020-01-08,2,3,11,21
+2020-01-15,3,4,12,22
+""",
         encoding="utf-8",
     )
-    stage_payload = _payload()
-    stage_payload.update(_linked_bs_preforcast())
-    stage_payload.update(
-        _linked_bs_preforcast(
-            target_columns=("bs_a", "bs_b"),
-            multivariable=False,
-        )
+    stage_path = tmp_path / "stage_uni.yaml"
+    stage_path.write_text(
+        yaml.safe_dump(
+            _thin_plugin_stage_payload(
+                jobs=[{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
+                target_columns=("bs_a", "bs_b"),
+            ),
+            sort_keys=False,
+        ),
+        encoding="utf-8",
     )
-    stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
-    stage_payload["dataset"]["target_col"] = "bs_a"
-    stage_payload["dataset"]["hist_exog_cols"] = []
-    stage_payload["jobs"] = [
-        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
-    ]
-    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_root = tmp_path / "stage_uni"
-    stage_root.mkdir(parents=True, exist_ok=True)
-    stage_path = _write_config(stage_root, stage_payload, ".yaml")
     payload["bs_preforcast"]["config_path"] = str(stage_path)
-
-    loaded = load_app_config(
-        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
-    )
-
+    _write_search_space(tmp_path, {"models": {}, "training": [], "residual": {"xgboost": ["n_estimators"]}, "bs_preforcast_models": {}, "bs_preforcast_training": []})
+    loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
     assert loaded.bs_preforcast_stage1 is not None
     assert loaded.bs_preforcast_stage1.source_path == stage_path.resolve()
-    assert loaded.bs_preforcast_stage1.normalized_payload["bs_preforcast"][
-        "target_columns"
-    ] == ["bs_a", "bs_b"]
-    assert loaded.normalized_payload["bs_preforcast"]["stage1"]["source_path"] == str(
-        stage_path.resolve()
-    )
-    assert loaded.normalized_payload["bs_preforcast"]["stage1"][
-        "config_resolved_sha256"
-    ]
-
+    assert loaded.bs_preforcast_stage1.normalized_payload["bs_preforcast"]["target_columns"] == ["bs_a", "bs_b"]
+    assert loaded.normalized_payload["bs_preforcast"]["stage1"]["source_path"] == str(stage_path.resolve())
+    assert loaded.normalized_payload["bs_preforcast"]["stage1"]["config_resolved_sha256"]
 
 def test_load_app_config_rejects_bs_preforcast_missing_config_file(tmp_path: Path):
     payload = _payload()
@@ -3954,401 +3851,28 @@ def test_load_app_config_rejects_bs_preforcast_missing_config_file(tmp_path: Pat
         load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
 
 
-def test_load_app_config_bs_preforcast_stage1_auto_uses_dedicated_search_space(
+def test_load_app_config_bs_preforcast_stage1_empty_params_fail_before_search_space(
     tmp_path: Path,
 ):
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a,bs_a\n"
-        "2020-01-01,1,2,10\n"
-        "2020-01-08,2,3,11\n"
-        "2020-01-15,3,4,12\n",
+        """dt,target,hist_a,bs_a
+2020-01-01,1,2,10
+2020-01-08,2,3,11
+2020-01-15,3,4,12
+""",
         encoding="utf-8",
     )
-    stage_payload = _payload()
-    stage_payload.update(_linked_bs_preforcast())
-    stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
-    stage_payload["dataset"]["target_col"] = "bs_a"
-    stage_payload["dataset"]["hist_exog_cols"] = []
-    stage_payload["jobs"] = [{"model": "TFT", "params": {}}]
-    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_root = tmp_path / "stage_auto"
-    stage_root.mkdir(parents=True, exist_ok=True)
-    stage_path = _write_config(stage_root, stage_payload, ".yaml")
-    payload["bs_preforcast"]["config_path"] = str(stage_path)
-    _write_search_space(
-        tmp_path,
-        {
-            "models": {"TFT": ["hidden_size"]},
-            "training": [],
-            "residual": {"xgboost": ["n_estimators"]},
-            "bs_preforcast_models": {"TFT": ["hidden_size"]},
-            "bs_preforcast_training": ["batch_size"],
-        },
-    )
-
-    loaded = load_app_config(
-        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
-    )
-
-    assert loaded.bs_preforcast_stage1 is not None
-    assert loaded.bs_preforcast_stage1.config.jobs[0].requested_mode == "learned_auto_requested"
-    assert loaded.bs_preforcast_stage1.config.jobs[0].validated_mode == "learned_auto"
-    assert (
-        loaded.bs_preforcast_stage1.config.training_search.validated_mode
-        == "training_auto"
-    )
-
-
-def test_load_app_config_bs_preforcast_stage1_auto_supports_arima(
-    tmp_path: Path,
-):
-    payload = _payload()
-    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = _main_bs_preforcast()
-    (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a,bs_a\n"
-        "2020-01-01,1,2,10\n"
-        "2020-01-08,2,3,11\n"
-        "2020-01-15,3,4,12\n",
+    stage_path = tmp_path / "stage_auto_missing.yaml"
+    stage_path.write_text(
+        yaml.safe_dump(
+            _thin_plugin_stage_payload(jobs=[{"model": "TFT", "params": {}}], target_columns=("bs_a", "bs_b")),
+            sort_keys=False,
+        ),
         encoding="utf-8",
     )
-    stage_payload = _payload()
-    stage_payload.update(_linked_bs_preforcast())
-    stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
-    stage_payload["dataset"]["target_col"] = "bs_a"
-    stage_payload["dataset"]["hist_exog_cols"] = []
-    stage_payload["training"].update({"input_size": 2, "max_steps": 1, "val_size": 1})
-    stage_payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
-    stage_payload["jobs"] = [{"model": "ARIMA", "params": {}}]
-    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_root = tmp_path / "stage_arima"
-    stage_root.mkdir(parents=True, exist_ok=True)
-    stage_path = _write_config(stage_root, stage_payload, ".yaml")
-    payload["bs_preforcast"]["config_path"] = str(stage_path)
-    _write_search_space(
-        tmp_path,
-        {
-            "models": {"TFT": ["hidden_size"]},
-            "training": [],
-            "residual": {"xgboost": ["n_estimators"]},
-            "bs_preforcast_models": {
-                "ARIMA": {
-                    "season_length": {
-                        "type": "categorical",
-                        "choices": [1, 4],
-                    }
-                }
-            },
-            "bs_preforcast_training": ["batch_size"],
-        },
-    )
-
-    loaded = load_app_config(
-        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
-    )
-
-    assert loaded.bs_preforcast_stage1 is not None
-    assert loaded.bs_preforcast_stage1.config.jobs[0].model == "ARIMA"
-    assert loaded.bs_preforcast_stage1.config.jobs[0].requested_mode == "learned_auto_requested"
-    assert loaded.bs_preforcast_stage1.config.jobs[0].validated_mode == "learned_auto"
-    assert list(loaded.bs_preforcast_stage1.config.jobs[0].selected_search_params) == [
-        "season_length"
-    ]
-
-
-def test_load_app_config_rejects_bs_preforcast_autoarima_stage_job(
-    tmp_path: Path,
-):
-    payload = _payload()
-    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = _main_bs_preforcast()
-    (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a,bs_a\n"
-        "2020-01-01,1,2,10\n"
-        "2020-01-08,2,3,11\n"
-        "2020-01-15,3,4,12\n",
-        encoding="utf-8",
-    )
-    stage_payload = _payload()
-    stage_payload.update(_linked_bs_preforcast())
-    stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
-    stage_payload["dataset"]["target_col"] = "bs_a"
-    stage_payload["dataset"]["hist_exog_cols"] = []
-    stage_payload["jobs"] = [{"model": "AutoARIMA", "params": {}}]
-    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_root = tmp_path / "stage_autoarima_removed"
-    stage_root.mkdir(parents=True, exist_ok=True)
-    stage_path = _write_config(stage_root, stage_payload, ".yaml")
-    payload["bs_preforcast"]["config_path"] = str(stage_path)
-    _write_search_space(
-        tmp_path,
-        {
-            "models": {"TFT": ["hidden_size"]},
-            "training": [],
-            "residual": {"xgboost": ["n_estimators"]},
-            "bs_preforcast_models": {},
-            "bs_preforcast_training": [],
-        },
-    )
-
-    with pytest.raises(
-        ValueError,
-        match="no longer supports AutoARIMA; use ARIMA instead",
-    ):
-        load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
-
-
-def test_bs_preforcast_resolved_stage_job_uses_materialized_best_params(
-    tmp_path: Path,
-):
-    from residual.bs_preforcast_runtime import _resolved_stage_job, _stage_execution_loaded
-
-    payload = _payload()
-    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = _main_bs_preforcast()
-    (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a,bs_a\n"
-        "2020-01-01,1,2,10\n"
-        "2020-01-08,2,3,11\n"
-        "2020-01-15,3,4,12\n",
-        encoding="utf-8",
-    )
-    stage_payload = _payload()
-    stage_payload.update(_linked_bs_preforcast())
-    stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
-    stage_payload["dataset"]["target_col"] = "bs_a"
-    stage_payload["dataset"]["hist_exog_cols"] = []
-    stage_payload["jobs"] = [{"model": "TimeXer", "params": {}}]
-    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_root = tmp_path / "stage_timexer_auto"
-    stage_root.mkdir(parents=True, exist_ok=True)
-    stage_path = _write_config(stage_root, stage_payload, ".yaml")
-    payload["bs_preforcast"]["config_path"] = str(stage_path)
-    _write_search_space(
-        tmp_path,
-        {
-            "models": {"TFT": ["hidden_size"]},
-            "training": [],
-            "residual": {"xgboost": ["n_estimators"]},
-            "bs_preforcast_models": {
-                "TimeXer": [
-                    "patch_len",
-                    "hidden_size",
-                    "n_heads",
-                    "e_layers",
-                    "d_ff",
-                    "factor",
-                    "dropout",
-                ]
-            },
-            "bs_preforcast_training": [],
-        },
-    )
-
-    loaded = load_app_config(
-        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
-    )
-    stage_run_root = tmp_path / "run" / "bs_preforcast" / "runs" / "bs_a"
-    best_params_path = stage_run_root / "models" / "TimeXer" / "best_params.json"
-    best_params_path.parent.mkdir(parents=True, exist_ok=True)
-    best_params = {
-        "patch_len": 2,
-        "hidden_size": 8,
-        "n_heads": 1,
-        "e_layers": 1,
-        "d_ff": 16,
-        "factor": 1,
-        "dropout": 0.0,
-    }
-    best_params_path.write_text(json.dumps(best_params), encoding="utf-8")
-    loaded.normalized_payload.setdefault("bs_preforcast", {})["stage1_run_roots"] = [
-        str(stage_run_root)
-    ]
-
-    resolved = _resolved_stage_job(
-        loaded,
-        _stage_execution_loaded(loaded),
-        variant_slug="bs_a",
-    )
-
-    assert resolved.requested_mode == "learned_fixed"
-    assert resolved.validated_mode == "learned_fixed"
-    assert resolved.selected_search_params == ()
-    assert resolved.params == best_params
-
-
-def test_bs_preforcast_resolved_stage_job_uses_arima_best_params(
-    tmp_path: Path,
-):
-    from residual.bs_preforcast_runtime import _resolved_stage_job, _stage_execution_loaded
-
-    payload = _payload()
-    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = _main_bs_preforcast()
-    (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a,bs_a\n"
-        "2020-01-01,1,2,10\n"
-        "2020-01-08,2,3,11\n"
-        "2020-01-15,3,4,12\n",
-        encoding="utf-8",
-    )
-    stage_payload = _payload()
-    stage_payload.update(_linked_bs_preforcast())
-    stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
-    stage_payload["dataset"]["target_col"] = "bs_a"
-    stage_payload["dataset"]["hist_exog_cols"] = []
-    stage_payload["training"].update({"input_size": 2, "max_steps": 1, "val_size": 1})
-    stage_payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
-    stage_payload["jobs"] = [{"model": "ARIMA", "params": {}}]
-    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_root = tmp_path / "stage_arima_auto"
-    stage_root.mkdir(parents=True, exist_ok=True)
-    stage_path = _write_config(stage_root, stage_payload, ".yaml")
-    payload["bs_preforcast"]["config_path"] = str(stage_path)
-    _write_search_space(
-        tmp_path,
-        {
-            "models": {"TFT": ["hidden_size"]},
-            "training": [],
-            "residual": {"xgboost": ["n_estimators"]},
-            "bs_preforcast_models": {
-                "ARIMA": {
-                    "season_length": {
-                        "type": "categorical",
-                        "choices": [1, 4],
-                    }
-                }
-            },
-            "bs_preforcast_training": [],
-        },
-    )
-
-    loaded = load_app_config(
-        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
-    )
-    stage_run_root = tmp_path / "run" / "bs_preforcast" / "runs" / "bs_a"
-    best_params_path = stage_run_root / "models" / "ARIMA" / "best_params.json"
-    best_params_path.parent.mkdir(parents=True, exist_ok=True)
-    best_params_path.write_text(
-        json.dumps({"season_length": 4, "order": [1, 1, 0]}),
-        encoding="utf-8",
-    )
-    loaded.normalized_payload.setdefault("bs_preforcast", {})["stage1_run_roots"] = [
-        str(stage_run_root)
-    ]
-
-    resolved = _resolved_stage_job(
-        loaded,
-        _stage_execution_loaded(loaded),
-        variant_slug="bs_a",
-    )
-
-    assert resolved.validated_mode == "learned_fixed"
-    assert resolved.params["season_length"] == 4
-    assert resolved.params["order"] == (1, 1, 0)
-
-
-def test_bs_preforcast_direct_stage_variant_rejects_short_dataset_for_horizon(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-):
-    from residual.bs_preforcast_runtime import (
-        _run_direct_stage_variant,
-        load_bs_preforcast_stage_config,
-    )
-
-    payload = _payload()
-    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = _main_bs_preforcast()
-    (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a,bs_a\n"
-        "2020-01-01,1,2,10\n"
-        "2020-01-08,2,3,11\n"
-        "2020-01-15,3,4,12\n",
-        encoding="utf-8",
-    )
-    stage_payload = _payload()
-    stage_payload.update(_linked_bs_preforcast())
-    stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
-    stage_payload["dataset"]["target_col"] = "bs_a"
-    stage_payload["dataset"]["hist_exog_cols"] = []
-    stage_payload["jobs"] = [{"model": "ARIMA", "params": {}}]
-    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_payload["runtime"]["opt_n_trial"] = 1
-    stage_root = tmp_path / "stage_arima_direct"
-    stage_root.mkdir(parents=True, exist_ok=True)
-    stage_path = _write_config(stage_root, stage_payload, ".yaml")
-    payload["bs_preforcast"]["config_path"] = str(stage_path)
-    _write_search_space(
-        tmp_path,
-        {
-            "models": {"TFT": ["hidden_size"]},
-            "training": [],
-            "residual": {"xgboost": ["n_estimators"]},
-            "bs_preforcast_models": {
-                "ARIMA": {
-                    "season_length": {
-                        "type": "categorical",
-                        "choices": [4],
-                    }
-                }
-            },
-            "bs_preforcast_training": [],
-        },
-    )
-
-    loaded = load_app_config(
-        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
-    )
-    stage_loaded = load_bs_preforcast_stage_config(tmp_path, loaded)
-    assert stage_loaded is not None
-
-    stage_run_root = tmp_path / "run" / "bs_preforcast" / "runs" / "bs_a"
-    with pytest.raises(
-        ValueError,
-        match="bs_preforcast stage direct run needs more than horizon rows",
-    ):
-        _run_direct_stage_variant(
-            stage_loaded,
-            variant_slug="bs_a",
-            payload=stage_payload,
-            config_path=stage_path,
-            stage_run_root=stage_run_root,
-        )
-
-
-def test_bs_preforcast_tree_stage_short_history_fails_fast(
-    tmp_path: Path,
-):
-    from residual.bs_preforcast_runtime import (
-        _predict_stage_univariate_tree,
-        _single_stage_job,
-        load_bs_preforcast_stage_config,
-    )
-
-    payload = _payload()
-    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = _main_bs_preforcast()
-    (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a,bs_a\n"
-        "2020-01-01,1,2,10\n",
-        encoding="utf-8",
-    )
-    stage_payload = _payload()
-    stage_payload.update(_linked_bs_preforcast())
-    stage_payload["dataset"]["path"] = str((tmp_path / "data.csv").resolve())
-    stage_payload["dataset"]["target_col"] = "bs_a"
-    stage_payload["dataset"]["hist_exog_cols"] = []
-    stage_payload["training"].update({"input_size": 8, "max_steps": 1, "val_size": 1})
-    stage_payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
-    stage_payload["jobs"] = [{"model": "xgboost", "params": {"n_estimators": 2}}]
-    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_root = tmp_path / "stage_tree_direct"
-    stage_root.mkdir(parents=True, exist_ok=True)
-    stage_path = _write_config(stage_root, stage_payload, ".yaml")
     payload["bs_preforcast"]["config_path"] = str(stage_path)
     _write_search_space(
         tmp_path,
@@ -4356,106 +3880,12 @@ def test_bs_preforcast_tree_stage_short_history_fails_fast(
             "models": {},
             "training": [],
             "residual": {"xgboost": ["n_estimators"]},
-            "bs_preforcast_models": {"xgboost": ["n_estimators"]},
-            "bs_preforcast_training": [],
-        },
-    )
-
-    loaded = load_app_config(
-        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
-    )
-    stage_loaded = load_bs_preforcast_stage_config(tmp_path, loaded)
-    assert stage_loaded is not None
-
-    train_df = pd.read_csv(tmp_path / "data.csv")
-    future_df = train_df.copy()
-
-    with pytest.raises(
-        ValueError,
-        match="tree stage requires more history before forecasting target column: bs_a",
-    ):
-        _predict_stage_univariate_tree(
-            stage_loaded,
-            _single_stage_job(stage_loaded),
-            target_column="bs_a",
-            train_df=train_df,
-            future_df=future_df,
-            model_name="xgboost",
-        )
-
-
-def test_bs_preforcast_direct_stage_variant_writes_cv_forecasts_for_aggregate_artifact(
-    tmp_path: Path,
-):
-    from residual.bs_preforcast_runtime import (
-        _write_direct_stage_artifacts,
-        _write_stage_forecast_artifact,
-    )
-
-    stage_root = tmp_path / "run" / "bs_preforcast"
-    stage_run_root = stage_root / "runs" / "bs_a"
-    future_df = pd.DataFrame({"dt": ["2020-01-15"], "bs_a": [12.0]})
-    _write_direct_stage_artifacts(
-        stage_run_root,
-        model_name="ARIMA",
-        target_column="bs_a",
-        forecasts=[11.5],
-        future_df=future_df,
-        dt_col="dt",
-        best_params={"season_length": 4, "order": [1, 1, 0]},
-        best_training_params={},
-        study_summary={"best_value": 0.1},
-    )
-
-    artifact_path = _write_stage_forecast_artifact(
-        stage_root,
-        loaded=SimpleNamespace(),
-        stage_run_roots=[stage_run_root],
-    )
-    frame = pd.read_csv(artifact_path)
-
-    assert not frame.empty
-    assert frame["target_column"].tolist() == ["bs_a"]
-    assert frame["forecast"].tolist() == pytest.approx([11.5])
-
-
-def test_load_app_config_bs_preforcast_stage1_auto_missing_mapping_fails(
-    tmp_path: Path,
-):
-    payload = _payload()
-    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    payload["bs_preforcast"] = _main_bs_preforcast()
-    (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a,bs_a\n"
-        "2020-01-01,1,2,10\n"
-        "2020-01-08,2,3,11\n"
-        "2020-01-15,3,4,12\n",
-        encoding="utf-8",
-    )
-    stage_payload = _payload()
-    stage_payload.update(_linked_bs_preforcast(target_columns=("bs_a", "bs_b")))
-    stage_payload["dataset"]["target_col"] = "bs_a"
-    stage_payload["dataset"]["hist_exog_cols"] = []
-    stage_payload["jobs"] = [{"model": "TFT", "params": {}}]
-    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_root = tmp_path / "stage_auto_missing"
-    stage_root.mkdir(parents=True, exist_ok=True)
-    stage_path = _write_config(stage_root, stage_payload, ".yaml")
-    payload["bs_preforcast"]["config_path"] = str(stage_path)
-    _write_search_space(
-        tmp_path,
-        {
-            "models": {"TFT": ["hidden_size"]},
-            "training": [],
-            "residual": {"xgboost": ["n_estimators"]},
             "bs_preforcast_models": {},
             "bs_preforcast_training": [],
         },
     )
-
-    with pytest.raises(ValueError, match="bs_preforcast_models.TFT"):
+    with pytest.raises(ValueError, match="fixed-param job"):
         load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
-
 
 def test_load_app_config_loads_bs_preforcast_stage1_with_dedicated_search_space(
     tmp_path: Path,
@@ -4465,81 +3895,23 @@ def test_load_app_config_loads_bs_preforcast_stage1_with_dedicated_search_space(
     payload["jobs"] = [{"model": "TFT", "params": {"hidden_size": 32}}]
     payload["bs_preforcast"] = _main_bs_preforcast()
     (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n2020-01-15,3,4\n",
+        """dt,target,hist_a
+2020-01-01,1,2
+2020-01-08,2,3
+2020-01-15,3,4
+""",
         encoding="utf-8",
     )
-    bs_preforcast_payload = {
-        **_linked_bs_preforcast(target_columns=("bs_a", "bs_b")),
-        "common": {
-            "dataset": {
-                "path": "data.csv",
-                "dt_col": "dt",
-                "hist_exog_cols": [],
-                "futr_exog_cols": [],
-                "static_exog_cols": [],
-            },
-            "runtime": {"random_seed": 1},
-            "training": {
-                "input_size": 64,
-                "season_length": 52,
-                "batch_size": 32,
-                "valid_batch_size": 64,
-                "windows_batch_size": 1024,
-                "inference_windows_batch_size": 1024,
-                "learning_rate": 0.001,
-                "max_steps": 50,
-                "loss": "mse",
-            },
-            "cv": {
-                "horizon": 12,
-                "step_size": 4,
-                "n_windows": 24,
-                "gap": 0,
-                "overlap_eval_policy": "by_cutoff_mean",
-            },
-            "scheduler": {
-                "gpu_ids": [0, 1],
-                "max_concurrent_jobs": 2,
-                "worker_devices": 1,
-                "parallelize_single_job_tuning": False,
-            },
-            "residual": {"enabled": False, "model": "xgboost", "params": {}},
-        },
-        "univariable": {
-            "dataset": {"target_col": "bs_a"},
-            "jobs": [{"model": "TFT", "params": {}}],
-        },
-        "multivariable": {
-            "dataset": {"target_col": "bs_a", "hist_exog_cols": ["bs_b"]},
-            "jobs": [{"model": "TFT", "params": {}}],
-        },
-    }
     (tmp_path / "bs_preforcast.yaml").write_text(
-        yaml.safe_dump(bs_preforcast_payload, sort_keys=False),
+        yaml.safe_dump(_thin_plugin_stage_payload(jobs=[{"model": "TFT", "params": {"hidden_size": 16, "n_head": 1, "attn_dropout": 0.0, "dropout": 0.0}}], target_columns=("bs_a", "bs_b")), sort_keys=False),
         encoding="utf-8",
     )
-    _write_search_space(
-        tmp_path,
-        {
-            "models": {},
-            "training": [],
-            "residual": {},
-            "bs_preforcast_models": {"TFT": ["hidden_size"]},
-            "bs_preforcast_training": ["input_size"],
-        },
-    )
-
-    loaded = load_app_config(
-        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
-    )
-
+    _write_search_space(tmp_path, {"models": {}, "training": [], "residual": {}, "bs_preforcast_models": {"TFT": ["hidden_size"]}, "bs_preforcast_training": ["input_size"]})
+    loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
     assert loaded.bs_preforcast_stage1 is not None
     assert loaded.bs_preforcast_stage1.config.jobs[0].model == "TFT"
-    assert loaded.bs_preforcast_stage1.config.jobs[0].validated_mode == "learned_auto"
-    assert loaded.bs_preforcast_stage1.normalized_payload["bs_preforcast"][
-        "target_columns"
-    ] == ["bs_a", "bs_b"]
-
+    assert loaded.bs_preforcast_stage1.config.jobs[0].validated_mode == "learned_fixed"
+    assert loaded.bs_preforcast_stage1.normalized_payload["bs_preforcast"]["target_columns"] == ["bs_a", "bs_b"]
 
 def test_load_app_config_rejects_invalid_linked_bs_preforcast_owner_keys(tmp_path: Path):
     payload = _payload()
@@ -4553,8 +3925,12 @@ def test_load_app_config_rejects_invalid_linked_bs_preforcast_owner_keys(tmp_pat
         yaml.safe_dump(
             {
                 "bs_preforcast": {"enabled": True, "target_columns": ["bad"]},
-                "common": {},
-                "univariable": {},
+                "jobs": [
+                    {
+                        "model": "DummyUnivariate",
+                        "params": {"start_padding_enabled": True},
+                    }
+                ],
             },
             sort_keys=False,
         ),
@@ -4922,155 +4298,44 @@ def test_runtime_validate_only_records_bs_preforcast_metadata(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     payload = _payload()
-    payload["jobs"] = [
-        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
-    ]
+    payload["jobs"] = [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     payload["bs_preforcast"] = _main_bs_preforcast()
-    stage_payload = _payload()
-    stage_payload.update(_linked_bs_preforcast())
-    stage_payload["dataset"] = {
-        "path": "data.csv",
-        "target_col": "bs_a",
-        "dt_col": "dt",
-        "hist_exog_cols": [],
-        "futr_exog_cols": [],
-        "static_exog_cols": [],
-    }
-    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_payload["jobs"] = [
-        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
-    ]
+    stage_payload = _thin_plugin_stage_payload(jobs=[{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}], target_columns=("bs_a", "bs_b"))
     (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a,bs_a,bs_b\n"
-        "2020-01-01,1,2,10,20\n"
-        "2020-01-08,2,3,11,21\n"
-        "2020-01-15,3,4,12,22\n",
+        """dt,target,hist_a,bs_a,bs_b
+2020-01-01,1,2,10,20
+2020-01-08,2,3,11,21
+2020-01-15,3,4,12,22
+""",
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
-        yaml.safe_dump(
-            {
-                **_linked_bs_preforcast(
-                    target_columns=("bs_a", "bs_b"),
-                ),
-                "common": {
-                    "dataset": {
-                        "path": "data.csv",
-                        "dt_col": "dt",
-                        "hist_exog_cols": [],
-                        "futr_exog_cols": [],
-                        "static_exog_cols": [],
-                    },
-                    "runtime": {"random_seed": 1},
-                    "training": {
-                        "input_size": 64,
-                        "season_length": 52,
-                        "batch_size": 32,
-                        "valid_batch_size": 64,
-                        "windows_batch_size": 1024,
-                        "inference_windows_batch_size": 1024,
-                        "learning_rate": 0.001,
-                        "max_steps": 50,
-                        "loss": "mse",
-                    },
-                    "cv": {
-                        "horizon": 12,
-                        "step_size": 4,
-                        "n_windows": 24,
-                        "gap": 0,
-                        "overlap_eval_policy": "by_cutoff_mean",
-                    },
-                    "scheduler": {
-                        "gpu_ids": [0, 1],
-                        "max_concurrent_jobs": 2,
-                        "worker_devices": 1,
-                        "parallelize_single_job_tuning": False,
-                    },
-                    "residual": {"enabled": False, "model": "xgboost", "params": {}},
-                },
-                "univariable": {
-                    "dataset": {"target_col": "bs_a"},
-                    "jobs": [
-                        {
-                            "model": "DummyUnivariate",
-                            "params": {"start_padding_enabled": True},
-                        }
-                    ],
-                },
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-    _write_search_space(
-        tmp_path,
-        {
-            "models": {},
-            "training": [],
-            "residual": {"xgboost": ["n_estimators"]},
-            "bs_preforcast_models": {},
-            "bs_preforcast_training": [],
-        },
-    )
+    (tmp_path / "bs_preforcast.yaml").write_text(yaml.safe_dump(stage_payload, sort_keys=False), encoding="utf-8")
+    _write_search_space(tmp_path, {"models": {}, "training": [], "residual": {"xgboost": ["n_estimators"]}, "bs_preforcast_models": {}, "bs_preforcast_training": []})
     config_path = _write_config(tmp_path, payload, ".yaml")
-
     from residual import runtime
-
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
-
     output_root = tmp_path / "run_bs_preforcast_validate"
-    code = runtime.main(
-        [
-            "--config",
-            str(config_path),
-            "--jobs",
-            "DummyUnivariate",
-            "--output-root",
-            str(output_root),
-            "--validate-only",
-        ]
-    )
-
+    code = runtime.main(["--config", str(config_path), "--jobs", "DummyUnivariate", "--output-root", str(output_root), "--validate-only"])
     assert code == 0
     resolved = json.loads((output_root / "config" / "config.resolved.json").read_text())
-    capability = json.loads(
-        (output_root / "config" / "capability_report.json").read_text()
-    )
+    capability = json.loads((output_root / "config" / "capability_report.json").read_text())
     manifest = json.loads((output_root / "manifest" / "run_manifest.json").read_text())
-
     assert resolved["bs_preforcast"]["enabled"] is True
     assert resolved["bs_preforcast"]["target_columns"] == ["bs_a", "bs_b"]
     assert resolved["bs_preforcast"]["config_path"] == "bs_preforcast.yaml"
     assert capability["bs_preforcast"]["enabled"] is True
     assert capability["bs_preforcast"]["multivariable"] is False
-    assert capability["bs_preforcast"]["selected_config_path"] == str(
-        (tmp_path / "bs_preforcast.yaml").resolve()
-    )
+    assert capability["bs_preforcast"]["selected_config_path"] == str((tmp_path / "bs_preforcast.yaml").resolve())
     assert manifest["bs_preforcast"]["target_columns"] == ["bs_a", "bs_b"]
     assert manifest["bs_preforcast"]["config_path"] == "bs_preforcast.yaml"
     assert (output_root / "bs_preforcast" / "config" / "config.resolved.json").exists()
     assert (output_root / "bs_preforcast" / "config" / "capability_report.json").exists()
     assert (output_root / "bs_preforcast" / "manifest" / "run_manifest.json").exists()
     assert (output_root / "bs_preforcast" / "summary" / "dashboard.md").exists()
-    assert (
-        output_root / "bs_preforcast" / "artifacts" / "bs_preforcast_forecasts.csv"
-    ).exists()
-    assert resolved["bs_preforcast"]["job_injection_results"] == [
-        {
-            "model": "DummyUnivariate",
-            "injection_mode": "futr_exog",
-            "supports_futr_exog": True,
-        }
-    ]
-    assert manifest["bs_preforcast"]["job_injection_results"] == [
-        {
-            "model": "DummyUnivariate",
-            "injection_mode": "futr_exog",
-            "supports_futr_exog": True,
-        }
-    ]
-
+    assert (output_root / "bs_preforcast" / "artifacts" / "bs_preforcast_forecasts.csv").exists()
+    assert resolved["bs_preforcast"]["job_injection_results"] == [{"model": "DummyUnivariate", "injection_mode": "futr_exog", "supports_futr_exog": True}]
+    assert manifest["bs_preforcast"]["job_injection_results"] == [{"model": "DummyUnivariate", "injection_mode": "futr_exog", "supports_futr_exog": True}]
 
 def test_runtime_validate_only_records_mixed_job_injection_results(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -5091,53 +4356,10 @@ def test_runtime_validate_only_records_mixed_job_injection_results(
     )
     (tmp_path / "bs_preforcast.yaml").write_text(
         yaml.safe_dump(
-            {
-                **_linked_bs_preforcast(target_columns=("bs_a", "bs_b")),
-                "common": {
-                    "dataset": {
-                        "path": "data.csv",
-                        "dt_col": "dt",
-                        "hist_exog_cols": [],
-                        "futr_exog_cols": [],
-                        "static_exog_cols": [],
-                    },
-                    "runtime": {"random_seed": 1},
-                    "training": {
-                        "input_size": 64,
-                        "season_length": 52,
-                        "batch_size": 32,
-                        "valid_batch_size": 64,
-                        "windows_batch_size": 1024,
-                        "inference_windows_batch_size": 1024,
-                        "learning_rate": 0.001,
-                        "max_steps": 50,
-                        "loss": "mse",
-                    },
-                    "cv": {
-                        "horizon": 12,
-                        "step_size": 4,
-                        "n_windows": 24,
-                        "gap": 0,
-                        "overlap_eval_policy": "by_cutoff_mean",
-                    },
-                    "scheduler": {
-                        "gpu_ids": [0, 1],
-                        "max_concurrent_jobs": 2,
-                        "worker_devices": 1,
-                        "parallelize_single_job_tuning": False,
-                    },
-                    "residual": {"enabled": False, "model": "xgboost", "params": {}},
-                },
-                "univariable": {
-                    "dataset": {"target_col": "bs_a"},
-                    "jobs": [
-                        {
-                            "model": "DummyUnivariate",
-                            "params": {"start_padding_enabled": True},
-                        }
-                    ],
-                },
-            },
+            _thin_plugin_stage_payload(
+                jobs=[{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
+                target_columns=("bs_a", "bs_b"),
+            ),
             sort_keys=False,
         ),
         encoding="utf-8",
@@ -5172,17 +4394,10 @@ def test_runtime_validate_only_records_mixed_job_injection_results(
     assert code == 0
     resolved = json.loads((output_root / "config" / "config.resolved.json").read_text())
     assert resolved["bs_preforcast"]["job_injection_results"] == [
-        {
-            "model": "DummyUnivariate",
-            "injection_mode": "futr_exog",
-            "supports_futr_exog": True,
-        },
-        {
-            "model": "Naive",
-            "injection_mode": "lag_derived",
-            "supports_futr_exog": False,
-        },
+        {"model": "DummyUnivariate", "injection_mode": "futr_exog", "supports_futr_exog": True},
+        {"model": "Naive", "injection_mode": "lag_derived", "supports_futr_exog": False},
     ]
+
 
 def test_runtime_validate_only_bs_preforcast_fails_for_legacy_using_futr_exog(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -5191,20 +4406,6 @@ def test_runtime_validate_only_bs_preforcast_fails_for_legacy_using_futr_exog(
     payload["jobs"] = [{"model": "Naive", "params": {}}]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     payload["bs_preforcast"] = _main_bs_preforcast()
-    stage_payload = _payload()
-    stage_payload.update(_linked_bs_preforcast(legacy_using_futr_exog=True))
-    stage_payload["dataset"] = {
-        "path": "data.csv",
-        "target_col": "bs_a",
-        "dt_col": "dt",
-        "hist_exog_cols": [],
-        "futr_exog_cols": [],
-        "static_exog_cols": [],
-    }
-    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_payload["jobs"] = [
-        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
-    ]
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
         "2020-01-01,1,2,10\n"
@@ -5214,48 +4415,10 @@ def test_runtime_validate_only_bs_preforcast_fails_for_legacy_using_futr_exog(
     )
     (tmp_path / "bs_preforcast.yaml").write_text(
         yaml.safe_dump(
-            {
-                **_linked_bs_preforcast(legacy_using_futr_exog=True),
-                "common": {
-                    "dataset": {
-                        "path": "data.csv",
-                        "dt_col": "dt",
-                        "hist_exog_cols": [],
-                        "futr_exog_cols": [],
-                        "static_exog_cols": [],
-                    },
-                    "runtime": {"random_seed": 1},
-                    "training": {
-                        "input_size": 64,
-                        "season_length": 52,
-                        "batch_size": 32,
-                        "valid_batch_size": 64,
-                        "windows_batch_size": 1024,
-                        "inference_windows_batch_size": 1024,
-                        "learning_rate": 0.001,
-                        "max_steps": 50,
-                        "loss": "mse",
-                    },
-                    "cv": {
-                        "horizon": 12,
-                        "step_size": 4,
-                        "n_windows": 24,
-                        "gap": 0,
-                        "overlap_eval_policy": "by_cutoff_mean",
-                    },
-                    "scheduler": {
-                        "gpu_ids": [0, 1],
-                        "max_concurrent_jobs": 2,
-                        "worker_devices": 1,
-                        "parallelize_single_job_tuning": False,
-                    },
-                    "residual": {"enabled": False, "model": "xgboost", "params": {}},
-                },
-                "univariable": {
-                    "dataset": {"target_col": "bs_a"},
-                    "jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
-                },
-            },
+            _thin_plugin_stage_payload(
+                jobs=[{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
+                legacy_using_futr_exog=True,
+            ),
             sort_keys=False,
         ),
         encoding="utf-8",
@@ -5276,23 +4439,19 @@ def test_runtime_validate_only_bs_preforcast_fails_for_legacy_using_futr_exog(
 
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
 
-    output_root = tmp_path / "run_bs_preforcast_validate_lag"
-    with pytest.raises(
-        ValueError,
-        match=r"unsupported key\(s\): using_futr_exog",
-    ):
+    with pytest.raises(ValueError, match=r"unsupported key\(s\): using_futr_exog"):
         runtime.main(
             [
                 "--config",
                 str(config_path),
                 "--output-root",
-                str(output_root),
+                str(tmp_path / "run_bs_preforcast_validate_lag"),
                 "--validate-only",
             ]
         )
 
 
-def test_prepare_bs_preforcast_fold_inputs_adds_preforcast_futr_columns(
+def test_prepare_bs_preforcast_fold_inputs_routes_same_name_target_to_futr_exog(
     tmp_path: Path,
 ):
     payload = _payload()
@@ -5303,22 +4462,6 @@ def test_prepare_bs_preforcast_fold_inputs_adds_preforcast_futr_columns(
     ]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     payload["bs_preforcast"] = _main_bs_preforcast()
-    stage_payload = _payload()
-    stage_payload.update(_linked_bs_preforcast())
-    stage_payload["dataset"] = {
-        "path": str((tmp_path / "data.csv").resolve()),
-        "target_col": "bs_a",
-        "dt_col": "dt",
-        "hist_exog_cols": [],
-        "futr_exog_cols": [],
-        "static_exog_cols": [],
-    }
-    stage_payload["training"].update({"input_size": 2, "max_steps": 1, "val_size": 1})
-    stage_payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
-    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_payload["jobs"] = [
-        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
-    ]
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
         "2020-01-01,1,2,10\n"
@@ -5328,49 +4471,14 @@ def test_prepare_bs_preforcast_fold_inputs_adds_preforcast_futr_columns(
     )
     (tmp_path / "bs_preforcast.yaml").write_text(
         yaml.safe_dump(
-            {
-                **_linked_bs_preforcast(),
-                "common": {
-                    "dataset": {
-                        "path": str((tmp_path / "data.csv").resolve()),
-                        "dt_col": "dt",
-                        "hist_exog_cols": [],
-                        "futr_exog_cols": [],
-                        "static_exog_cols": [],
-                    },
-                    "runtime": {"random_seed": 1},
-                    "training": {
-                        "input_size": 2,
-                        "season_length": 52,
-                        "batch_size": 32,
-                        "valid_batch_size": 64,
-                        "windows_batch_size": 1024,
-                        "inference_windows_batch_size": 1024,
-                        "learning_rate": 0.001,
-                        "max_steps": 1,
-                        "val_size": 1,
-                        "loss": "mse",
-                    },
-                    "cv": {
-                        "horizon": 1,
-                        "step_size": 1,
-                        "n_windows": 1,
-                        "gap": 0,
-                        "overlap_eval_policy": "by_cutoff_mean",
-                    },
-                    "scheduler": {
-                        "gpu_ids": [0, 1],
-                        "max_concurrent_jobs": 2,
-                        "worker_devices": 1,
-                        "parallelize_single_job_tuning": False,
-                    },
-                    "residual": {"enabled": False, "model": "xgboost", "params": {}},
-                },
-                "univariable": {
-                    "dataset": {"target_col": "bs_a"},
-                    "jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
-                },
-            },
+            _thin_plugin_stage_payload(
+                jobs=[
+                    {
+                        "model": "DummyUnivariate",
+                        "params": {"start_padding_enabled": True},
+                    }
+                ]
+            ),
             sort_keys=False,
         ),
         encoding="utf-8",
@@ -5399,15 +4507,87 @@ def test_prepare_bs_preforcast_fold_inputs_adds_preforcast_futr_columns(
     )
 
     assert injection_mode == "futr_exog"
-    assert "bs_preforcast_futr__bs_a" in effective_loaded.config.dataset.futr_exog_cols
-    assert "bs_preforcast_futr__bs_a" in transformed_train.columns
-    assert "bs_preforcast_futr__bs_a" in transformed_future.columns
-    assert transformed_future["bs_preforcast_futr__bs_a"].tolist() == pytest.approx(
-        [11.0], abs=0.05
+    assert "bs_a" in effective_loaded.config.dataset.futr_exog_cols
+    assert "bs_a" not in effective_loaded.config.dataset.hist_exog_cols
+    assert not any(
+        column.startswith("bs_preforcast_futr" "__")
+        for column in transformed_train.columns
+    )
+    assert transformed_train["bs_a"].tolist() == [10, 11]
+    assert transformed_future["bs_a"].tolist() == pytest.approx([11.0], abs=0.05)
+
+
+def test_prepare_bs_preforcast_fold_inputs_moves_overlap_target_out_of_hist_for_futr_job(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = ["hist_a", "bs_a"]
+    payload["dataset"]["futr_exog_cols"] = ["futr_a"]
+    payload["training"].update({"input_size": 2, "max_steps": 1, "val_size": 1})
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    payload["bs_preforcast"] = _main_bs_preforcast()
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,futr_a,bs_a\n"
+        "2020-01-01,1,2,7,10\n"
+        "2020-01-08,2,3,8,11\n"
+        "2020-01-15,3,4,9,12\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "bs_preforcast.yaml").write_text(
+        yaml.safe_dump(
+            _thin_plugin_stage_payload(
+                jobs=[
+                    {
+                        "model": "DummyUnivariate",
+                        "params": {"start_padding_enabled": True},
+                    }
+                ]
+            ),
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+            "bs_preforcast_models": {},
+            "bs_preforcast_training": [],
+        },
+    )
+    loaded = load_app_config(
+        tmp_path,
+        config_path=_write_config(tmp_path, payload, ".yaml"),
+    )
+    source_df = pd.read_csv(tmp_path / "data.csv")
+
+    effective_loaded, transformed_train, transformed_future, injection_mode = (
+        prepare_bs_preforcast_fold_inputs(
+            loaded,
+            loaded.config.jobs[0],
+            source_df.iloc[:2].reset_index(drop=True),
+            source_df.iloc[2:].reset_index(drop=True),
+        )
     )
 
+    assert injection_mode == "futr_exog"
+    assert effective_loaded.config.dataset.hist_exog_cols == ("hist_a",)
+    assert effective_loaded.config.dataset.futr_exog_cols == ("futr_a", "bs_a")
+    assert not any(
+        column.startswith("bs_preforcast_futr" "__")
+        for column in transformed_train.columns
+    )
+    assert transformed_train["bs_a"].tolist() == [10, 11]
+    assert transformed_future["bs_a"].tolist() == pytest.approx([11.0], abs=0.05)
 
-def test_prepare_bs_preforcast_fold_inputs_uses_lag_path_for_non_futr_job(
+
+def test_prepare_bs_preforcast_fold_inputs_uses_same_name_lag_path_for_non_futr_job(
     tmp_path: Path,
 ):
     payload = _payload()
@@ -5416,22 +4596,6 @@ def test_prepare_bs_preforcast_fold_inputs_uses_lag_path_for_non_futr_job(
     payload["jobs"] = [{"model": "Naive", "params": {}}]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     payload["bs_preforcast"] = _main_bs_preforcast()
-    stage_payload = _payload()
-    stage_payload.update(_linked_bs_preforcast())
-    stage_payload["dataset"] = {
-        "path": str((tmp_path / "data.csv").resolve()),
-        "target_col": "bs_a",
-        "dt_col": "dt",
-        "hist_exog_cols": [],
-        "futr_exog_cols": [],
-        "static_exog_cols": [],
-    }
-    stage_payload["training"].update({"input_size": 2, "max_steps": 1, "val_size": 1})
-    stage_payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
-    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_payload["jobs"] = [
-        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
-    ]
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
         "2020-01-01,1,2,10\n"
@@ -5441,49 +4605,14 @@ def test_prepare_bs_preforcast_fold_inputs_uses_lag_path_for_non_futr_job(
     )
     (tmp_path / "bs_preforcast.yaml").write_text(
         yaml.safe_dump(
-            {
-                **_linked_bs_preforcast(),
-                "common": {
-                    "dataset": {
-                        "path": str((tmp_path / "data.csv").resolve()),
-                        "dt_col": "dt",
-                        "hist_exog_cols": [],
-                        "futr_exog_cols": [],
-                        "static_exog_cols": [],
-                    },
-                    "runtime": {"random_seed": 1},
-                    "training": {
-                        "input_size": 2,
-                        "season_length": 52,
-                        "batch_size": 32,
-                        "valid_batch_size": 64,
-                        "windows_batch_size": 1024,
-                        "inference_windows_batch_size": 1024,
-                        "learning_rate": 0.001,
-                        "max_steps": 1,
-                        "val_size": 1,
-                        "loss": "mse",
-                    },
-                    "cv": {
-                        "horizon": 1,
-                        "step_size": 1,
-                        "n_windows": 1,
-                        "gap": 0,
-                        "overlap_eval_policy": "by_cutoff_mean",
-                    },
-                    "scheduler": {
-                        "gpu_ids": [0, 1],
-                        "max_concurrent_jobs": 2,
-                        "worker_devices": 1,
-                        "parallelize_single_job_tuning": False,
-                    },
-                    "residual": {"enabled": False, "model": "xgboost", "params": {}},
-                },
-                "univariable": {
-                    "dataset": {"target_col": "bs_a"},
-                    "jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
-                },
-            },
+            _thin_plugin_stage_payload(
+                jobs=[
+                    {
+                        "model": "DummyUnivariate",
+                        "params": {"start_padding_enabled": True},
+                    }
+                ]
+            ),
             sort_keys=False,
         ),
         encoding="utf-8",
@@ -5514,10 +4643,14 @@ def test_prepare_bs_preforcast_fold_inputs_uses_lag_path_for_non_futr_job(
     )
 
     assert injection_mode == "lag_derived"
-    assert "bs_preforcast_futr__bs_a" not in effective_loaded.config.dataset.futr_exog_cols
-    assert "bs_preforcast_futr__bs_a" in effective_loaded.config.dataset.hist_exog_cols
-    assert "bs_preforcast_futr__bs_a" in transformed_train.columns
-    assert "bs_preforcast_futr__bs_a" in transformed_future.columns
+    assert "bs_a" not in effective_loaded.config.dataset.futr_exog_cols
+    assert effective_loaded.config.dataset.hist_exog_cols == ("hist_a", "bs_a")
+    assert not any(
+        column.startswith("bs_preforcast_futr" "__")
+        for column in transformed_train.columns
+    )
+    assert transformed_train["bs_a"].tolist() == pytest.approx([10.0, 11.0], abs=0.05)
+    assert transformed_future["bs_a"].tolist() == pytest.approx([11.0], abs=0.05)
 
 
 def test_prepare_bs_preforcast_fold_inputs_missing_forecasts_fail_fast(
@@ -5543,54 +4676,14 @@ def test_prepare_bs_preforcast_fold_inputs_missing_forecasts_fail_fast(
     )
     (tmp_path / "bs_preforcast.yaml").write_text(
         yaml.safe_dump(
-            {
-                **_linked_bs_preforcast(),
-                "common": {
-                    "dataset": {
-                        "path": str((tmp_path / "data.csv").resolve()),
-                        "dt_col": "dt",
-                        "hist_exog_cols": [],
-                        "futr_exog_cols": [],
-                        "static_exog_cols": [],
-                    },
-                    "runtime": {"random_seed": 1},
-                    "training": {
-                        "input_size": 2,
-                        "season_length": 52,
-                        "batch_size": 32,
-                        "valid_batch_size": 64,
-                        "windows_batch_size": 1024,
-                        "inference_windows_batch_size": 1024,
-                        "learning_rate": 0.001,
-                        "max_steps": 1,
-                        "val_size": 1,
-                        "loss": "mse",
-                    },
-                    "cv": {
-                        "horizon": 1,
-                        "step_size": 1,
-                        "n_windows": 1,
-                        "gap": 0,
-                        "overlap_eval_policy": "by_cutoff_mean",
-                    },
-                    "scheduler": {
-                        "gpu_ids": [0, 1],
-                        "max_concurrent_jobs": 2,
-                        "worker_devices": 1,
-                        "parallelize_single_job_tuning": False,
-                    },
-                    "residual": {"enabled": False, "model": "xgboost", "params": {}},
-                },
-                "univariable": {
-                    "dataset": {"target_col": "bs_a"},
-                    "jobs": [
-                        {
-                            "model": "DummyUnivariate",
-                            "params": {"start_padding_enabled": True},
-                        }
-                    ],
-                },
-            },
+            _thin_plugin_stage_payload(
+                jobs=[
+                    {
+                        "model": "DummyUnivariate",
+                        "params": {"start_padding_enabled": True},
+                    }
+                ]
+            ),
             sort_keys=False,
         ),
         encoding="utf-8",
@@ -5626,7 +4719,7 @@ def test_prepare_bs_preforcast_fold_inputs_missing_forecasts_fail_fast(
         )
 
 
-def test_prepare_bs_preforcast_fold_inputs_uses_futr_path_for_timexer_native_future_exog(
+def test_prepare_bs_preforcast_fold_inputs_uses_same_name_futr_path_for_timexer_native_future_exog(
     tmp_path: Path,
 ):
     payload = _payload()
@@ -5649,22 +4742,6 @@ def test_prepare_bs_preforcast_fold_inputs_uses_futr_path_for_timexer_native_fut
     ]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     payload["bs_preforcast"] = _main_bs_preforcast()
-    stage_payload = _payload()
-    stage_payload.update(_linked_bs_preforcast())
-    stage_payload["dataset"] = {
-        "path": str((tmp_path / "data.csv").resolve()),
-        "target_col": "bs_a",
-        "dt_col": "dt",
-        "hist_exog_cols": [],
-        "futr_exog_cols": [],
-        "static_exog_cols": [],
-    }
-    stage_payload["training"].update({"input_size": 2, "max_steps": 1, "val_size": 1})
-    stage_payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
-    stage_payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    stage_payload["jobs"] = [
-        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
-    ]
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
         "2020-01-01,1,2,10\n"
@@ -5674,49 +4751,14 @@ def test_prepare_bs_preforcast_fold_inputs_uses_futr_path_for_timexer_native_fut
     )
     (tmp_path / "bs_preforcast.yaml").write_text(
         yaml.safe_dump(
-            {
-                **_linked_bs_preforcast(),
-                "common": {
-                    "dataset": {
-                        "path": str((tmp_path / "data.csv").resolve()),
-                        "dt_col": "dt",
-                        "hist_exog_cols": [],
-                        "futr_exog_cols": [],
-                        "static_exog_cols": [],
-                    },
-                    "runtime": {"random_seed": 1},
-                    "training": {
-                        "input_size": 2,
-                        "season_length": 52,
-                        "batch_size": 32,
-                        "valid_batch_size": 64,
-                        "windows_batch_size": 1024,
-                        "inference_windows_batch_size": 1024,
-                        "learning_rate": 0.001,
-                        "max_steps": 1,
-                        "val_size": 1,
-                        "loss": "mse",
-                    },
-                    "cv": {
-                        "horizon": 1,
-                        "step_size": 1,
-                        "n_windows": 1,
-                        "gap": 0,
-                        "overlap_eval_policy": "by_cutoff_mean",
-                    },
-                    "scheduler": {
-                        "gpu_ids": [0, 1],
-                        "max_concurrent_jobs": 2,
-                        "worker_devices": 1,
-                        "parallelize_single_job_tuning": False,
-                    },
-                    "residual": {"enabled": False, "model": "xgboost", "params": {}},
-                },
-                "univariable": {
-                    "dataset": {"target_col": "bs_a"},
-                    "jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
-                },
-            },
+            _thin_plugin_stage_payload(
+                jobs=[
+                    {
+                        "model": "DummyUnivariate",
+                        "params": {"start_padding_enabled": True},
+                    }
+                ]
+            ),
             sort_keys=False,
         ),
         encoding="utf-8",
@@ -5744,12 +4786,84 @@ def test_prepare_bs_preforcast_fold_inputs_uses_futr_path_for_timexer_native_fut
     )
 
     assert injection_mode == "futr_exog"
-    assert "bs_preforcast_futr__bs_a" in effective_loaded.config.dataset.futr_exog_cols
-    assert "bs_preforcast_futr__bs_a" in transformed_train.columns
-    assert "bs_preforcast_futr__bs_a" in transformed_future.columns
-    assert transformed_future["bs_preforcast_futr__bs_a"].tolist() == pytest.approx(
-        [11.0], abs=0.05
+    assert "bs_a" in effective_loaded.config.dataset.futr_exog_cols
+    assert "bs_a" not in effective_loaded.config.dataset.hist_exog_cols
+    assert not any(
+        column.startswith("bs_preforcast_futr" "__")
+        for column in transformed_train.columns
     )
+    assert transformed_train["bs_a"].tolist() == [10, 11]
+    assert transformed_future["bs_a"].tolist() == pytest.approx([11.0], abs=0.05)
+
+
+def test_prepare_bs_preforcast_fold_inputs_auto_adds_missing_target_to_futr_exog(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = ["hist_a"]
+    payload["dataset"]["futr_exog_cols"] = []
+    payload["training"].update({"input_size": 2, "max_steps": 1, "val_size": 1})
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["jobs"] = [
+        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+    ]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    payload["bs_preforcast"] = _main_bs_preforcast()
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,bs_a\n"
+        "2020-01-01,1,2,10\n"
+        "2020-01-08,2,3,11\n"
+        "2020-01-15,3,4,12\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "bs_preforcast.yaml").write_text(
+        yaml.safe_dump(
+            _thin_plugin_stage_payload(
+                jobs=[
+                    {
+                        "model": "DummyUnivariate",
+                        "params": {"start_padding_enabled": True},
+                    }
+                ]
+            ),
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+            "bs_preforcast_models": {},
+            "bs_preforcast_training": [],
+        },
+    )
+    loaded = load_app_config(
+        tmp_path,
+        config_path=_write_config(tmp_path, payload, ".yaml"),
+    )
+    source_df = pd.read_csv(tmp_path / "data.csv")
+
+    effective_loaded, transformed_train, transformed_future, injection_mode = (
+        prepare_bs_preforcast_fold_inputs(
+            loaded,
+            loaded.config.jobs[0],
+            source_df.iloc[:2].reset_index(drop=True),
+            source_df.iloc[2:].reset_index(drop=True),
+        )
+    )
+
+    assert injection_mode == "futr_exog"
+    assert effective_loaded.config.dataset.hist_exog_cols == ("hist_a",)
+    assert effective_loaded.config.dataset.futr_exog_cols == ("bs_a",)
+    assert not any(
+        column.startswith("bs_preforcast_futr" "__")
+        for column in transformed_train.columns
+    )
+    assert transformed_train["bs_a"].tolist() == [10, 11]
+    assert transformed_future["bs_a"].tolist() == pytest.approx([11.0], abs=0.05)
 
 
 def test_bs_preforcast_inline_learned_stage_surfaces_multi_gpu_resolution(
@@ -5759,49 +4873,6 @@ def test_bs_preforcast_inline_learned_stage_surfaces_multi_gpu_resolution(
 
     payload = _payload()
     payload["bs_preforcast"] = _main_bs_preforcast()
-    stage_payload = {
-        **_linked_bs_preforcast(),
-        "common": {
-            "dataset": {
-                "path": str((tmp_path / "data.csv").resolve()),
-                "dt_col": "dt",
-                "hist_exog_cols": [],
-                "futr_exog_cols": [],
-                "static_exog_cols": [],
-            },
-            "runtime": {"random_seed": 1},
-            "training": {
-                "input_size": 2,
-                "season_length": 52,
-                "batch_size": 32,
-                "valid_batch_size": 64,
-                "windows_batch_size": 1024,
-                "inference_windows_batch_size": 1024,
-                "learning_rate": 0.001,
-                "max_steps": 1,
-                "val_size": 1,
-                "loss": "mse",
-            },
-            "cv": {
-                "horizon": 1,
-                "step_size": 1,
-                "n_windows": 1,
-                "gap": 0,
-                "overlap_eval_policy": "by_cutoff_mean",
-            },
-            "scheduler": {
-                "gpu_ids": [0, 1],
-                "max_concurrent_jobs": 1,
-                "worker_devices": 2,
-                "parallelize_single_job_tuning": False,
-            },
-            "residual": {"enabled": False, "model": "xgboost", "params": {}},
-        },
-        "univariable": {
-            "dataset": {"target_col": "bs_a"},
-            "jobs": [{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
-        },
-    }
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
         "2020-01-01,1,2,10\n"
@@ -5810,7 +4881,17 @@ def test_bs_preforcast_inline_learned_stage_surfaces_multi_gpu_resolution(
         encoding="utf-8",
     )
     (tmp_path / "bs_preforcast.yaml").write_text(
-        yaml.safe_dump(stage_payload, sort_keys=False),
+        yaml.safe_dump(
+            _thin_plugin_stage_payload(
+                jobs=[
+                    {
+                        "model": "DummyUnivariate",
+                        "params": {"start_padding_enabled": True},
+                    }
+                ]
+            ),
+            sort_keys=False,
+        ),
         encoding="utf-8",
     )
     _write_search_space(
@@ -5887,49 +4968,6 @@ def test_bs_preforcast_inline_learned_stage_surfaces_multi_gpu_resolution(
 def test_bs_preforcast_stage_baseline_job_stays_rejected(tmp_path: Path):
     payload = _payload()
     payload["bs_preforcast"] = _main_bs_preforcast()
-    stage_payload = {
-        **_linked_bs_preforcast(),
-        "common": {
-            "dataset": {
-                "path": str((tmp_path / "data.csv").resolve()),
-                "dt_col": "dt",
-                "hist_exog_cols": [],
-                "futr_exog_cols": [],
-                "static_exog_cols": [],
-            },
-            "runtime": {"random_seed": 1},
-            "training": {
-                "input_size": 2,
-                "season_length": 52,
-                "batch_size": 32,
-                "valid_batch_size": 64,
-                "windows_batch_size": 1024,
-                "inference_windows_batch_size": 1024,
-                "learning_rate": 0.001,
-                "max_steps": 1,
-                "val_size": 1,
-                "loss": "mse",
-            },
-            "cv": {
-                "horizon": 1,
-                "step_size": 1,
-                "n_windows": 1,
-                "gap": 0,
-                "overlap_eval_policy": "by_cutoff_mean",
-            },
-            "scheduler": {
-                "gpu_ids": [0, 1],
-                "max_concurrent_jobs": 1,
-                "worker_devices": 2,
-                "parallelize_single_job_tuning": False,
-            },
-            "residual": {"enabled": False, "model": "xgboost", "params": {}},
-        },
-        "univariable": {
-            "dataset": {"target_col": "bs_a"},
-            "jobs": [{"model": "Naive", "params": {}}],
-        },
-    }
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a,bs_a\n"
         "2020-01-01,1,2,10\n"
@@ -5938,7 +4976,10 @@ def test_bs_preforcast_stage_baseline_job_stays_rejected(tmp_path: Path):
         encoding="utf-8",
     )
     (tmp_path / "bs_preforcast.yaml").write_text(
-        yaml.safe_dump(stage_payload, sort_keys=False),
+        yaml.safe_dump(
+            _thin_plugin_stage_payload(jobs=[{"model": "Naive", "params": {}}]),
+            sort_keys=False,
+        ),
         encoding="utf-8",
     )
     _write_search_space(
@@ -5951,19 +4992,8 @@ def test_bs_preforcast_stage_baseline_job_stays_rejected(tmp_path: Path):
             "bs_preforcast_training": [],
         },
     )
-    loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
-    source_df = pd.read_csv(tmp_path / "data.csv")
-
-    with pytest.raises(
-        ValueError, match="bs_preforcast stage does not support baseline-only jobs"
-    ):
-        prepare_bs_preforcast_fold_inputs(
-            loaded,
-            loaded.config.jobs[0],
-            source_df.iloc[:2].reset_index(drop=True),
-            source_df.iloc[2:].reset_index(drop=True),
-            run_root=tmp_path / "run_baseline_rejected",
-        )
+    with pytest.raises(ValueError, match="fixed-param job"):
+        load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
 
 
 def test_runtime_auto_mode_prefers_yaml_opt_n_trial_over_env(

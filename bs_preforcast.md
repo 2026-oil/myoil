@@ -64,128 +64,74 @@ bs_preforcast:
 
 권장 방식은 repo root의 `bs_preforcast.yaml`를 두는 것입니다.
 
-메인 YAML은 이 파일을 자동으로 읽고, stage1 실행 시 이 파일 안의
+현재 contract는 **plugin-only YAML** 입니다.  
+즉 stage1 linked YAML은 아래만 소유합니다.
 
 - top-level `bs_preforcast`
-- `common`
-- `univariable`
-- `multivariable`
+- `jobs`
 
-section을 merge해서 사용합니다.
+그리고 main YAML의 아래 section을 그대로 상속합니다.
+
+- `task`
+- `dataset`
+- `runtime`
+- `training`
+- `cv`
+- `scheduler`
+- `residual`
 
 예:
 
 ```yaml
 bs_preforcast:
   target_columns:
-    - bs_a
-    - bs_b
+    - BS_Core_Index_Integrated
   task:
     multivariable: false
+  exog_columns: []
 
-common:
-  dataset:
-    path: data/df.csv
-    dt_col: dt
-    hist_exog_cols: []
-    futr_exog_cols: []
-    static_exog_cols: []
-  runtime:
-    random_seed: 1
-  training:
-    train_protocol: expanding_window_tscv
-    input_size: 64
-    season_length: 52
-    batch_size: 32
-    valid_batch_size: 64
-    windows_batch_size: 1024
-    inference_windows_batch_size: 1024
-    learning_rate: 0.001
-    model_step_size: 8
-    max_steps: 200
-    val_size: 8
-    val_check_steps: 50
-    early_stop_patience_steps: 5
-    loss: mse
-  cv:
-    horizon: 8
-    step_size: 8
-    n_windows: 12
-    gap: 0
-    overlap_eval_policy: by_cutoff_mean
-  scheduler:
-    gpu_ids: [0, 1]
-    max_concurrent_jobs: 2
-    worker_devices: 1
-    parallelize_single_job_tuning: false
-  residual:
-    enabled: false
-    model: xgboost
-    params: {}
-
-univariable:
-  task:
-    name: bs_preforcast_univariable
-  dataset:
-    target_col: BS_Core_Index_A
-  jobs:
-    - model: TimeXer
-      params: {}
-
-multivariable:
-  task:
-    name: bs_preforcast_multivariable
-  dataset:
-    target_col: BS_Core_Index_A
-    hist_exog_cols: [BS_Core_Index_B]
-  jobs:
-    - model: TimeXer
-      params: {}
+jobs:
+  - model: TimeXer
+    params:
+      patch_len: 16
+      hidden_size: 768
+      n_heads: 16
+      e_layers: 4
+      d_ff: 1024
 ```
 
 ### 독립 파일이 소유하는 것
 
 - `bs_preforcast.target_columns`
+- `bs_preforcast.exog_columns`
 - `bs_preforcast.task.multivariable`
+- `jobs`
+
+### main YAML에서 상속하는 것
+
+- `task`
 - `dataset`
 - `runtime`
 - `training`
 - `cv`
 - `scheduler`
-- `jobs`
+- `residual`
 
-즉 실제 어떤 `bs_*` 컬럼을 돌릴지와 `multivariable` 구성까지 모두 linked YAML이 결정합니다.
+즉 linked YAML은 **bs 대상 컬럼 / exog 컬럼 / multivariable 여부 / stage1 job**만 결정하고, 나머지 실행 contract는 main YAML이 소유합니다.
 
 ---
 
-## 4. section 선택 규칙
+## 4. 실행 규칙
 
 ### `task.multivariable: false`
 
-- `common + univariable`를 merge
-- `target_columns` 각각에 대해 개별 stage run 수행
-
-예:
-
-```yaml
-target_columns:
-  - bs_a
-  - bs_b
-```
-
-이면 stage1 run은 2개 생깁니다.
+- `target_columns` 각각에 대해 개별 stage run을 수행합니다.
+- plugin-only contract에서는 linked YAML에 **정확히 1개의 fixed-param job**만 둡니다.
 
 ### `task.multivariable: true`
 
-- `common + multivariable`를 merge
-- `target_columns` 전체를 하나의 stage run으로 처리
-
-이때 내부 stage payload는:
-
-- 첫 번째 target → `dataset.target_col`
-- 나머지 target → `dataset.hist_exog_cols`
-
-로 구성됩니다.
+- `target_columns` 전체를 하나의 stage run으로 처리합니다.
+- direct-model (`ARIMA`, `ES`, `xgboost`, `lightgbm`) 경로는 multivariable mode를 지원하지 않고 즉시 실패합니다.
 
 ---
 
@@ -201,12 +147,14 @@ target_columns:
 
 동작:
 
-- `bs_preforcast_futr__<column>` 컬럼 생성
-- 이를 `futr_exog_cols`로 주입
+- target 컬럼명을 그대로 유지
+- 해당 컬럼을 `hist_exog_cols`에서 제거하고 `futr_exog_cols`로 이동
+- train 구간은 과거 실제값을 유지하고, future 구간은 plugin 예측값으로 채움
 
 예:
 
-- `bs_a` -> `bs_preforcast_futr__bs_a`
+- `bs_a` -> 컬럼 이름은 그대로 `bs_a`
+- futr-capable main 모델이면 `bs_a ∈ futr_exog_cols`, `bs_a ∉ hist_exog_cols`
 
 ### B. `lag_derived`
 
@@ -216,20 +164,16 @@ target_columns:
 
 동작:
 
-- stage1 예측값을 새 컬럼으로 생성
-- 이 컬럼을 `hist_exog_cols` 쪽으로 붙임
-- 즉 main 모델은 이를 future exog가 아니라 **lag/history feature처럼** 보게 됨
+- target 컬럼명을 그대로 유지
+- 해당 컬럼을 `hist_exog_cols`에 둔 채 사용
+- train의 마지막 horizon 구간과 future horizon 구간을 plugin 예측값 기준으로 overwrite
+- 즉 main 모델은 같은 이름의 컬럼을 **lag/history feature처럼** 보게 됨
 
-현재 컬럼 이름은 futr 경로와 동일하게:
+정리하면:
 
-- `bs_preforcast_futr__<column>`
-
-을 사용하지만,
-
-- futr 모드에서는 `futr_exog_cols`
-- lag-derived 모드에서는 `hist_exog_cols`
-
-로 연결됩니다.
+- futr 모드에서는 target 컬럼이 `futr_exog_cols`로 이동
+- lag-derived 모드에서는 target 컬럼이 `hist_exog_cols`에 남음
+- source YAML을 rewrite하지 않고 **runtime에서 effective exog membership만 바뀜**
 
 ### fail-fast 규칙
 
@@ -262,7 +206,7 @@ target_columns:
 
 ### 주의
 
-- univariable direct-model 기본값은 `yaml/bs_preforcast_jobs_default.yaml`가 소유합니다.
+- `yaml/bs_preforcast_jobs_default.yaml`는 direct-model 후보/예시 레퍼런스이며, plugin-only linked YAML 자체는 그중 **정확히 1개의 fixed-param job**만 선택해 적어야 합니다.
 - baseline-only job (`Naive`, `SeasonalNaive`, `HistoricAverage`)는 stage1 actual execution에서 지원하지 않음
 - statistical / tree model은 direct-run execution 경로
 - NF-native 모델은 기존 `main.py` runtime subprocess 경로 재사용
@@ -299,10 +243,9 @@ bs_preforcast_training:
 
 ### 규칙
 
-- stage1 auto mode는 `bs_preforcast_models` / `bs_preforcast_training`만 참조
-- main `models` / `training` section과 분리
-- stage1 `jobs[*].params`가 비어 있으면 auto mode
-- tuned params는 run artifact에만 저장되고 source YAML은 rewrite하지 않음
+- plugin-only direct stage는 linked YAML에 **정확히 1개의 fixed-param job**만 허용합니다.
+- main `models` / `training` section과는 독립적으로 direct-model defaults를 관리합니다.
+- 여러 direct-model 후보를 실험하려면 plugin YAML을 바꿔가며 개별 실행하거나, 별도 실험 family에서 config를 나눠 관리해야 합니다.
 
 ---
 
@@ -355,8 +298,6 @@ runs/<task>/bs_preforcast/
     dashboard.md
   artifacts/
     bs_preforcast_forecasts.csv
-  runs/
-    <target-or-multivariable>/
 ```
 
 main artifact에는 아래가 기록됩니다.
@@ -365,9 +306,8 @@ main artifact에는 아래가 기록됩니다.
 - selected stage config path
 - job별 injection result (`futr_exog` / `lag_derived`)
 - target columns
-- stage1 artifact paths
-- stage1 run roots
-- stage1 best params 소비 경로
+- stage1 forecast artifact path
+- metadata shell (`stage1_run_roots == []`, `stage1_selected_jobs_path == null`)
 
 ---
 
@@ -465,6 +405,6 @@ uv run python main.py --config path/to/main.yaml --jobs DLinear --output-root ru
 - main 모델 capability에 따라 job별 injection mode를 자동 선택
 - futr 미지원 모델은 lag/history 쪽으로 주입
 - statistical / tree / NF-native stage model 모두 지원 경로 존재
-- learned-auto stage job은 materialized `best_params.json`을 fold-time injection에서 재사용
+- plugin-only contract에서는 linked YAML에 정확히 1개의 fixed-param stage job만 둠
 - 짧은 데이터 + 큰 horizon direct stage는 fail-fast
 - tree direct stage short-history도 fail-fast
