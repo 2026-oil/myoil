@@ -3,13 +3,12 @@
 # neuralforecast
 
 ## Purpose
-This checkout is not just the upstream `neuralforecast` package. It is a hybrid workspace that combines the library source under `neuralforecast/` with a local experiment runner built around `main.py`, `residual/`, `config.yaml`, `yaml/HPO/search_space.yaml`, and the curated `yaml/` case matrix used for Brent/WTI research runs.
+This checkout is not just the upstream `neuralforecast` package. It is a hybrid workspace that combines the library source under `neuralforecast/` with a local experiment runner built around `main.py`, `residual/`, `yaml/HPO/search_space.yaml`, and the curated `yaml/` case matrix used for Brent/WTI research runs.
 
 ## Key Files
 | File | Description |
 |------|-------------|
 | `main.py` | Bootstrap entrypoint that re-execs into `.venv` and hands control to `residual.runtime.main()`. |
-| `config.yaml` | Default experiment config used when no explicit config path is passed. |
 | `yaml/HPO/search_space.yaml` | Central Optuna/search-space contract shared by runtime config validation. |
 | `run.sh` | Batch runner that executes config sweeps, records summaries, and can auto-commit/push outputs. |
 | `run_case3_bomb.sh` | Preloads the case3 bomb config set into `run.sh`. |
