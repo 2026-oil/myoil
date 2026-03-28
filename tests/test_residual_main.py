@@ -109,7 +109,7 @@ def test_main_passes_setting_override_to_load_app_config(
         bootstrap_main.main(
             [
                 '--config',
-                'config.yaml',
+                'demo.yaml',
                 '--setting',
                 'yaml/setting/setting.yaml',
                 '--validate-only',
@@ -118,7 +118,7 @@ def test_main_passes_setting_override_to_load_app_config(
         == 0
     )
     assert calls['repo_root'] == bootstrap_main.WORKSPACE_ROOT
-    assert calls['config_path'] == 'config.yaml'
+    assert calls['config_path'] == 'demo.yaml'
     assert calls['config_toml_path'] is None
     assert calls['shared_settings_path'] == 'yaml/setting/setting.yaml'
 
