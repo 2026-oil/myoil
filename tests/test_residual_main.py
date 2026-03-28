@@ -22,10 +22,17 @@ def test_main_loads_config_and_dispatches_without_reexec_and_preserves_pythonpat
 
     loaded = SimpleNamespace(jobs_fanout_specs=[])
 
-    def fake_load_app_config(repo_root: Path, *, config_path=None, config_toml_path=None):
+    def fake_load_app_config(
+        repo_root: Path,
+        *,
+        config_path=None,
+        config_toml_path=None,
+        shared_settings_path=None,
+    ):
         calls['load_repo_root'] = repo_root
         calls['config_path'] = config_path
         calls['config_toml_path'] = config_toml_path
+        calls['shared_settings_path'] = shared_settings_path
         return loaded
 
     def fake_run_loaded_config(repo_root: Path, loaded_config, args):
@@ -43,11 +50,56 @@ def test_main_loads_config_and_dispatches_without_reexec_and_preserves_pythonpat
     assert calls['loaded'] is loaded
     assert getattr(calls['args'], 'validate_only') is True
     assert getattr(calls['args'], 'jobs') is None
+    assert calls['shared_settings_path'] is None
 
     parts = os.environ['PYTHONPATH'].split(os.pathsep)
     assert parts[0] == workspace_root
     assert parts.count(workspace_root) == 1
     assert '/tmp/example' in parts
+
+
+def test_main_passes_setting_override_to_load_app_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import residual.runtime as runtime
+
+    calls: dict[str, object] = {}
+    monkeypatch.setenv(bootstrap_main._BOOTSTRAP_ENV, '1')
+
+    loaded = SimpleNamespace(jobs_fanout_specs=[])
+
+    def fake_load_app_config(
+        repo_root: Path,
+        *,
+        config_path=None,
+        config_toml_path=None,
+        shared_settings_path=None,
+    ):
+        calls['repo_root'] = repo_root
+        calls['config_path'] = config_path
+        calls['config_toml_path'] = config_toml_path
+        calls['shared_settings_path'] = shared_settings_path
+        return loaded
+
+    monkeypatch.setattr(runtime, 'load_app_config', fake_load_app_config)
+    monkeypatch.setattr(runtime, 'run_loaded_config', lambda *args, **kwargs: {'ok': True})
+
+    assert (
+        bootstrap_main.main(
+            [
+                '--config',
+                'config.yaml',
+                '--setting',
+                'yaml/setting/setting.yaml',
+                '--validate-only',
+            ]
+        )
+        == 0
+    )
+    assert calls['repo_root'] == bootstrap_main.WORKSPACE_ROOT
+    assert calls['config_path'] == 'config.yaml'
+    assert calls['config_toml_path'] is None
+    assert calls['shared_settings_path'] == 'yaml/setting/setting.yaml'
 
 
 def test_runtime_main_delegates_back_to_bootstrap_main(

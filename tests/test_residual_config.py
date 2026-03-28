@@ -7580,6 +7580,89 @@ def test_load_app_config_rejects_duplicate_repo_shared_setting_paths(tmp_path: P
         load_app_config(tmp_path, config_path=config_path)
 
 
+def test_load_app_config_explicit_shared_settings_path_overrides_repo_default(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "yaml" / "setting").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml" / "setting" / "setting.yaml").write_text(
+        yaml.safe_dump({"runtime": {"random_seed": 11}}, sort_keys=False),
+        encoding="utf-8",
+    )
+    explicit_setting_path = tmp_path / "custom-setting.yaml"
+    explicit_setting_path.write_text(
+        yaml.safe_dump(
+            {
+                "runtime": {"random_seed": 22},
+                "training": {"batch_size": 48},
+                "cv": {"horizon": 3, "step_size": 3, "n_windows": 2},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    dataset_path = tmp_path / "df.csv"
+    dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
+    config_path = tmp_path / "yaml" / "case.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "task": {"name": "explicit_shared_setting_case"},
+                "dataset": {"path": str(dataset_path), "target_col": "y"},
+                "training": {},
+                "cv": {},
+                "scheduler": {"gpu_ids": [0]},
+                "residual": {"enabled": False},
+                "jobs": [{"model": "Naive", "params": {}}],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = load_app_config(
+        tmp_path,
+        config_path=config_path,
+        shared_settings_path="custom-setting.yaml",
+    )
+
+    assert loaded.config.runtime.random_seed == 22
+    assert loaded.config.training.batch_size == 48
+    assert loaded.config.cv.horizon == 3
+    assert loaded.normalized_payload["shared_settings_path"].endswith(
+        "custom-setting.yaml"
+    )
+    assert loaded.shared_settings_hash is not None
+
+
+def test_load_app_config_rejects_missing_explicit_shared_settings_path(
+    tmp_path: Path,
+) -> None:
+    dataset_path = tmp_path / "df.csv"
+    dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
+    config_path = tmp_path / "yaml" / "case.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "dataset": {"path": str(dataset_path), "target_col": "y"},
+                "cv": {"horizon": 1, "step_size": 1, "n_windows": 1},
+                "scheduler": {"gpu_ids": [0]},
+                "residual": {"enabled": False},
+                "jobs": [{"model": "Naive", "params": {}}],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(FileNotFoundError, match="missing-setting.yaml"):
+        load_app_config(
+            tmp_path,
+            config_path=config_path,
+            shared_settings_path="missing-setting.yaml",
+        )
+
+
 def test_jobs_path_list_rejects_duplicate_route_stems(tmp_path: Path) -> None:
     dataset_path = tmp_path / "df.csv"
     dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")

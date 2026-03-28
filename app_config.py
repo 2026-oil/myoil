@@ -418,16 +418,32 @@ def _validate_shared_settings_payload(payload: Any) -> dict[str, Any]:
     return dict(payload)
 
 
-def _load_shared_settings_for_yaml_app_config(
-    repo_root: Path,
+def _load_shared_settings_from_path(
+    path: Path,
 ) -> tuple[dict[str, Any] | None, Path | None, str | None]:
-    path = (repo_root / SHARED_SETTINGS_RELATIVE_PATH).resolve()
+    path = path.resolve()
     if not path.exists():
         return None, None, None
     text = path.read_text(encoding="utf-8")
     payload = yaml.safe_load(text)
     validated = _validate_shared_settings_payload(payload)
     return validated, path, _hash_text(text)
+
+
+def _load_shared_settings_for_yaml_app_config(
+    repo_root: Path,
+) -> tuple[dict[str, Any] | None, Path | None, str | None]:
+    return _load_shared_settings_from_path(repo_root / SHARED_SETTINGS_RELATIVE_PATH)
+
+
+def _resolve_shared_settings_reference(
+    repo_root: Path,
+    shared_settings_path: str | Path,
+) -> Path:
+    candidate = Path(shared_settings_path)
+    if candidate.is_absolute():
+        return candidate.resolve()
+    return (repo_root / candidate).resolve()
 
 
 def _uses_repo_shared_settings(repo_root: Path, source_path: Path) -> bool:
@@ -1556,6 +1572,7 @@ def load_app_config(
     *,
     config_path: str | Path | None = None,
     config_toml_path: str | Path | None = None,
+    shared_settings_path: str | Path | None = None,
     model_search_space_key: str = "models",
     training_search_space_key: str = "training",
 ) -> LoadedConfig:
@@ -1567,23 +1584,37 @@ def load_app_config(
     raw_text = source_path.read_text(encoding="utf-8")
     payload = _load_document(source_path, source_type)
     shared_settings_payload: dict[str, Any] | None = None
-    shared_settings_path: Path | None = None
+    resolved_shared_settings_path: Path | None = None
     shared_settings_hash: str | None = None
-    if source_type == "yaml" and _uses_repo_shared_settings(repo_root, source_path):
+    if shared_settings_path is not None:
+        explicit_shared_settings_path = _resolve_shared_settings_reference(
+            repo_root, shared_settings_path
+        )
         (
             shared_settings_payload,
-            shared_settings_path,
+            resolved_shared_settings_path,
+            shared_settings_hash,
+        ) = _load_shared_settings_from_path(explicit_shared_settings_path)
+        if resolved_shared_settings_path is None:
+            raise FileNotFoundError(
+                "Shared settings file does not exist: "
+                f"{explicit_shared_settings_path}"
+            )
+    elif source_type == "yaml" and _uses_repo_shared_settings(repo_root, source_path):
+        (
+            shared_settings_payload,
+            resolved_shared_settings_path,
             shared_settings_hash,
         ) = _load_shared_settings_for_yaml_app_config(repo_root)
-        if shared_settings_payload is not None:
-            effective_shared_settings, effective_owned_paths = (
-                _effective_shared_settings_for_source(shared_settings_payload)
-            )
-            payload = _merge_shared_settings_into_payload(
-                payload,
-                effective_shared_settings,
-                owned_paths=effective_owned_paths,
-            )
+    if shared_settings_payload is not None:
+        effective_shared_settings, effective_owned_paths = (
+            _effective_shared_settings_for_source(shared_settings_payload)
+        )
+        payload = _merge_shared_settings_into_payload(
+            payload,
+            effective_shared_settings,
+            owned_paths=effective_owned_paths,
+        )
     jobs_fanout_specs = _resolve_jobs_fanout_specs(
         repo_root,
         source_path=source_path,
@@ -1711,7 +1742,9 @@ def load_app_config(
         search_space_contract.sha256 if search_space_contract else None
     )
     normalized_payload["shared_settings_path"] = (
-        str(shared_settings_path) if shared_settings_path is not None else None
+        str(resolved_shared_settings_path)
+        if resolved_shared_settings_path is not None
+        else None
     )
     normalized_payload["shared_settings_sha256"] = shared_settings_hash
     resolved_text = json.dumps(normalized_payload, sort_keys=True, ensure_ascii=False)
@@ -1725,7 +1758,7 @@ def load_app_config(
         search_space_path=search_space_contract.path if search_space_contract else None,
         search_space_hash=search_space_contract.sha256 if search_space_contract else None,
         search_space_payload=search_space_contract.payload if search_space_contract else None,
-        shared_settings_path=shared_settings_path,
+        shared_settings_path=resolved_shared_settings_path,
         shared_settings_hash=shared_settings_hash,
         stage_plugin_loaded=stage_plugin_loaded,
         jobs_fanout_specs=jobs_fanout_specs,

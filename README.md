@@ -73,6 +73,7 @@ uv run python main.py --validate-only
 - `--config <path>`
 - `--config-path <path>`
 - `--config-toml <path>`
+- `--setting <path>`
 - `--validate-only`
 - `--jobs <job-name...>`
 - `--output-root <path>`
@@ -84,6 +85,13 @@ uv run python main.py --validate-only
 ```bash
 cd neuralforecast
 uv run python main.py --validate-only --config config.yaml
+```
+
+### 특정 shared setting으로 검증
+
+```bash
+cd neuralforecast
+uv run python main.py --validate-only --config config.yaml --setting yaml/setting/setting.yaml
 ```
 
 ### 특정 job만 실행

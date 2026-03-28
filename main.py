@@ -50,6 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('--config', default=None)
     parser.add_argument('--config-path', default=None)
     parser.add_argument('--config-toml', default=None)
+    parser.add_argument('--setting', default=None)
     parser.add_argument('--validate-only', action='store_true')
     parser.add_argument('--jobs', nargs='+', default=None)
     parser.add_argument('--output-root', default=None, help=argparse.SUPPRESS)
@@ -75,7 +76,10 @@ def _run_cli(
     repo_root = WORKSPACE_ROOT if repo_root is None else repo_root
     config_path = args.config or args.config_path
     loaded = runtime_module.load_app_config(
-        repo_root, config_path=config_path, config_toml_path=args.config_toml
+        repo_root,
+        config_path=config_path,
+        config_toml_path=args.config_toml,
+        shared_settings_path=args.setting,
     )
     if loaded.jobs_fanout_specs and args.internal_jobs_route is not None:
         selected_spec = next(
