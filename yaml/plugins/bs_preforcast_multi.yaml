@@ -3,5 +3,12 @@ bs_preforcast:
   - BS_Core_Index_Integrated
   task:
     multivariable: true
-  exog_columns: []
+  hist_columns:
+  - Idx_SnPVIX
+  - Bonds_MOVE
+  - Idx_GVZ
+  - Idx_OVX
+  - Idx_DxyUSD
+  - Com_LMEX
+  - Com_BloombergCommodity_BCOM
 jobs: yaml/jobs/bs_preforcast/bs_preforcast_jobs_multi.yaml

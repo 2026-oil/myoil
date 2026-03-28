@@ -17,7 +17,7 @@ BS_PREFORCAST_MAIN_KEYS = {
 BS_PREFORCAST_LINKED_KEYS = {
     "target_columns",
     "task",
-    "exog_columns",
+    "hist_columns",
 }
 BS_PREFORCAST_TASK_KEYS = {"multivariable"}
 
@@ -32,7 +32,7 @@ class BsPreforcastConfig:
     enabled: bool = False
     config_path: str | None = None
     target_columns: tuple[str, ...] = field(default_factory=tuple)
-    exog_columns: tuple[str, ...] = field(default_factory=tuple)
+    hist_columns: tuple[str, ...] = field(default_factory=tuple)
     task: BsPreforcastTaskConfig = field(default_factory=BsPreforcastTaskConfig)
 
 
@@ -110,18 +110,18 @@ def normalize_linked_bs_preforcast_config(
         payload.get("target_columns"),
         field_name="bs_preforcast.target_columns",
     )
-    exog_columns = coerce_name_tuple(
-        payload.get("exog_columns"),
-        field_name="bs_preforcast.exog_columns",
+    hist_columns = coerce_name_tuple(
+        payload.get("hist_columns"),
+        field_name="bs_preforcast.hist_columns",
     )
     if not target_columns:
         raise ValueError(
             "bs_preforcast.target_columns must be non-empty in routed bs_preforcast config"
         )
-    overlap = sorted(set(target_columns).intersection(exog_columns))
+    overlap = sorted(set(target_columns).intersection(hist_columns))
     if overlap:
         raise ValueError(
-            "bs_preforcast.exog_columns cannot overlap target_columns: "
+            "bs_preforcast.hist_columns cannot overlap target_columns: "
             + ", ".join(overlap)
         )
     multivariable = coerce_bool(
@@ -132,7 +132,7 @@ def normalize_linked_bs_preforcast_config(
     return BsPreforcastConfig(
         enabled=True,
         target_columns=target_columns,
-        exog_columns=exog_columns,
+        hist_columns=hist_columns,
         task=BsPreforcastTaskConfig(multivariable=multivariable),
     )
 
@@ -264,19 +264,14 @@ def load_bs_preforcast_stage1(
     stage_payload["cv"].pop("n_windows", None)
     stage_payload["cv"].pop("step_size", None)
     stage_payload["dataset"]["target_col"] = routed_bs_preforcast.target_columns[0]
-    if routed_bs_preforcast.task.multivariable:
-        stage_payload["dataset"]["hist_exog_cols"] = list(
-            dict.fromkeys(
-                [
-                    *routed_bs_preforcast.target_columns[1:],
-                    *routed_bs_preforcast.exog_columns,
-                ]
-            )
+    stage_payload["dataset"]["hist_exog_cols"] = list(
+        dict.fromkeys(
+            [
+                *routed_bs_preforcast.target_columns[1:],
+                *routed_bs_preforcast.hist_columns,
+            ]
         )
-    else:
-        stage_payload["dataset"]["hist_exog_cols"] = list(
-            routed_bs_preforcast.exog_columns
-        )
+    )
     stage_payload["dataset"]["futr_exog_cols"] = []
     stage_payload["dataset"]["static_exog_cols"] = []
     stage_search_space = stage_search_space_payload(
@@ -384,7 +379,7 @@ def stage1_route_metadata(loaded: LoadedConfig) -> dict[str, object]:
         "enabled": bs_cfg.enabled,
         "config_path": bs_cfg.config_path,
         "target_columns": list(bs_cfg.target_columns),
-        "exog_columns": list(bs_cfg.exog_columns),
+        "hist_columns": list(bs_cfg.hist_columns),
         "multivariable": bs_cfg.task.multivariable,
         "selected_config_path": bs_cfg.config_path,
     }

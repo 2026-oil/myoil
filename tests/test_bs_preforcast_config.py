@@ -62,14 +62,14 @@ def _linked_bs_preforcast(
     *,
     target_columns: tuple[str, ...] = ("bs_a",),
     multivariable: bool = False,
-    exog_columns: tuple[str, ...] = (),
+    hist_columns: tuple[str, ...] = (),
     legacy_using_futr_exog: bool | None = None,
 ) -> dict[str, object]:
     payload = {
         "bs_preforcast": {
             "target_columns": list(target_columns),
             "task": {"multivariable": multivariable},
-            "exog_columns": list(exog_columns),
+            "hist_columns": list(hist_columns),
         }
     }
     if legacy_using_futr_exog is not None:
@@ -117,7 +117,7 @@ def test_load_app_config_materializes_bs_preforcast_stage_with_top_level_config_
     stage_path.write_text(
         yaml.safe_dump(
             {
-                **_linked_bs_preforcast(exog_columns=("aux_a",)),
+                **_linked_bs_preforcast(hist_columns=("aux_a",)),
                 "jobs": [
                     {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
                 ],
@@ -139,7 +139,7 @@ def test_load_app_config_materializes_bs_preforcast_stage_with_top_level_config_
     assert loaded.stage_plugin_loaded is not None
     assert loaded.stage_plugin_loaded.source_path == stage_path.resolve()
     assert loaded.config.stage_plugin_config.target_columns == ("bs_a",)
-    assert loaded.config.stage_plugin_config.exog_columns == ("aux_a",)
+    assert loaded.config.stage_plugin_config.hist_columns == ("aux_a",)
     assert loaded.stage_plugin_loaded.config.dataset.path == data_path
     assert loaded.stage_plugin_loaded.config.dataset.target_col == "bs_a"
     assert loaded.stage_plugin_loaded.config.dataset.hist_exog_cols == ("aux_a",)
@@ -189,7 +189,7 @@ def test_load_app_config_accepts_bs_preforcast_plugin_with_multiple_jobs(
     ]
 
 
-def test_load_app_config_rejects_bs_preforcast_exog_columns_overlap(
+def test_load_app_config_rejects_bs_preforcast_hist_columns_overlap(
     tmp_path: Path,
 ) -> None:
     data_path = tmp_path / "data.csv"
@@ -205,7 +205,7 @@ def test_load_app_config_rejects_bs_preforcast_exog_columns_overlap(
     stage_path.write_text(
         yaml.safe_dump(
             {
-                **_linked_bs_preforcast(exog_columns=("bs_a",)),
+                **_linked_bs_preforcast(hist_columns=("bs_a",)),
                 "jobs": [
                     {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
                 ],
@@ -220,7 +220,7 @@ def test_load_app_config_rejects_bs_preforcast_exog_columns_overlap(
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.safe_dump(main_payload, sort_keys=False), encoding="utf-8")
 
-    with pytest.raises(ValueError, match=r"exog_columns.*overlap"):
+    with pytest.raises(ValueError, match=r"hist_columns.*overlap"):
         load_app_config(tmp_path, config_path=config_path)
 
 
@@ -312,7 +312,7 @@ def test_repo_bs_preforcast_yaml_defaults_to_integrated_univariable_plugin() -> 
 
     assert payload["bs_preforcast"]["target_columns"] == ["BS_Core_Index_Integrated"]
     assert payload["bs_preforcast"]["task"]["multivariable"] is False
-    assert payload["bs_preforcast"]["exog_columns"] == []
+    assert payload["bs_preforcast"]["hist_columns"] == []
     assert payload["jobs"] == [
         {
             "model": "TimeXer",

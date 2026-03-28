@@ -2,7 +2,7 @@ bs_preforcast:
   target_columns: [bs_a]
   task:
     multivariable: false
-  exog_columns: []
+  hist_columns: []
 
 jobs:
   - model: DummyUnivariate

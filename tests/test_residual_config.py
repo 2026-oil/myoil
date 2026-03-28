@@ -384,7 +384,7 @@ def _thin_plugin_stage_payload(
     jobs: list[dict[str, Any]],
     target_columns: tuple[str, ...] = ("bs_a",),
     multivariable: bool = False,
-    exog_columns: tuple[str, ...] = (),
+    hist_columns: tuple[str, ...] = (),
     legacy_using_futr_exog: bool | None = None,
 ) -> dict[str, Any]:
     payload = _linked_bs_preforcast(
@@ -392,8 +392,8 @@ def _thin_plugin_stage_payload(
         multivariable=multivariable,
         legacy_using_futr_exog=legacy_using_futr_exog,
     )
-    if exog_columns:
-        payload["bs_preforcast"]["exog_columns"] = list(exog_columns)
+    if hist_columns:
+        payload["bs_preforcast"]["hist_columns"] = list(hist_columns)
     payload["jobs"] = jobs
     return payload
 

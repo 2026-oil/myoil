@@ -3,5 +3,5 @@ bs_preforcast:
   - BS_Core_Index_Integrated
   task:
     multivariable: false
-  exog_columns: []
+  hist_columns: []
 jobs: yaml/jobs/bs_preforcast/bs_preforcast_jobs_uni.yaml

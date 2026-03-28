@@ -61,13 +61,13 @@ def _plugin_payload(
     jobs: list[dict[str, object]],
     target_columns: tuple[str, ...] = ("bs_a",),
     multivariable: bool = False,
-    exog_columns: tuple[str, ...] = (),
+    hist_columns: tuple[str, ...] = (),
 ) -> dict[str, object]:
     return {
         "bs_preforcast": {
             "target_columns": list(target_columns),
             "task": {"multivariable": multivariable},
-            "exog_columns": list(exog_columns),
+            "hist_columns": list(hist_columns),
         },
         "jobs": jobs,
     }
@@ -96,7 +96,7 @@ def _write_config(path: Path, payload: dict[str, object]) -> Path:
     return path
 
 
-def test_plugin_only_yaml_inherits_main_dataset_and_exog_columns(tmp_path: Path) -> None:
+def test_plugin_only_yaml_inherits_main_dataset_and_hist_columns(tmp_path: Path) -> None:
     data_path = tmp_path / "data.csv"
     data_path.write_text(
         "dt,target,hist_a,aux_a,bs_a\n"
@@ -111,7 +111,7 @@ def test_plugin_only_yaml_inherits_main_dataset_and_exog_columns(tmp_path: Path)
         stage_path,
         _plugin_payload(
             jobs=[{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
-            exog_columns=("aux_a",),
+            hist_columns=("aux_a",),
         ),
     )
     _write_search_space(tmp_path)
@@ -122,7 +122,7 @@ def test_plugin_only_yaml_inherits_main_dataset_and_exog_columns(tmp_path: Path)
     assert loaded.stage_plugin_loaded.config.dataset.path == data_path
     assert loaded.stage_plugin_loaded.config.dataset.target_col == "bs_a"
     assert loaded.stage_plugin_loaded.config.dataset.hist_exog_cols == ("aux_a",)
-    assert loaded.stage_plugin_loaded.config.stage_plugin_config.exog_columns == ("aux_a",)
+    assert loaded.stage_plugin_loaded.config.stage_plugin_config.hist_columns == ("aux_a",)
 
 
 def test_plugin_only_yaml_rejects_dataset_block(tmp_path: Path) -> None:
