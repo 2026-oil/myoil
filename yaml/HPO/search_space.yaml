@@ -346,9 +346,15 @@ bs_preforcast_models:
     order:
       type: categorical
       choices:
-      - '[1, 0, 0]'
-      - '[1, 1, 0]'
-      - '[2, 1, 0]'
+      - - 1
+        - 0
+        - 0
+      - - 1
+        - 1
+        - 0
+      - - 2
+        - 1
+        - 0
     include_mean:
       type: categorical
       choices:
@@ -374,9 +380,20 @@ bs_preforcast_models:
     lags:
       type: categorical
       choices:
-      - '[1, 2, 3]'
-      - '[1, 2, 3, 6, 12]'
-      - '[1, 2, 3, 6, 12, 24]'
+      - - 1
+        - 2
+        - 3
+      - - 1
+        - 2
+        - 3
+        - 6
+        - 12
+      - - 1
+        - 2
+        - 3
+        - 6
+        - 12
+        - 24
     n_estimators:
       type: categorical
       choices:
@@ -392,9 +409,20 @@ bs_preforcast_models:
     lags:
       type: categorical
       choices:
-      - '[1, 2, 3]'
-      - '[1, 2, 3, 6, 12]'
-      - '[1, 2, 3, 6, 12, 24]'
+      - - 1
+        - 2
+        - 3
+      - - 1
+        - 2
+        - 3
+        - 6
+        - 12
+      - - 1
+        - 2
+        - 3
+        - 6
+        - 12
+        - 24
     n_estimators:
       type: categorical
       choices:
@@ -466,6 +494,22 @@ bs_preforcast_models:
       - 16
       - 32
       - 64
+  NHITS:
+    mlp_units:
+      type: categorical
+      choices:
+      - - - 32
+          - 32
+        - - 32
+          - 32
+        - - 32
+          - 32
+      - - - 64
+          - 64
+        - - 64
+          - 64
+        - - 64
+          - 64
   TSMixerx:
     n_block:
       type: categorical

@@ -249,6 +249,21 @@ def test_predict_stage_univariate_arima_uses_statsforecast_arima(
     assert captured["predict_h"] == 2
 
 
+@pytest.mark.parametrize(
+    ("model_name", "params"),
+    [
+        ("ARIMA", {"order": "[1, 1, 0]"}),
+        ("xgboost", {"lags": "[1, 2, 3, 6, 12]"}),
+    ],
+)
+def test_normalized_direct_job_params_rejects_stringified_list_literals(
+    model_name: str,
+    params: dict[str, object],
+) -> None:
+    with pytest.raises(ValueError, match="native YAML list values"):
+        bs_runtime._normalized_direct_job_params(model_name, params)
+
+
 def test_resolved_stage_job_requires_materialized_best_params_for_learned_auto() -> None:
     stage_loaded = SimpleNamespace(
         normalized_payload={"bs_preforcast": {}},

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 from dataclasses import replace
 import json
 import os
@@ -333,15 +332,14 @@ def _parse_direct_model_literal(
     *,
     field_name: str,
 ) -> Any:
-    if not isinstance(value, str):
-        return value
-    text = value.strip()
-    if not text:
-        raise ValueError(f"bs_preforcast direct model field '{field_name}' cannot be empty")
-    try:
-        return ast.literal_eval(text)
-    except (SyntaxError, ValueError):
-        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            raise ValueError(f"bs_preforcast direct model field '{field_name}' cannot be empty")
+        raise ValueError(
+            f"bs_preforcast direct model field '{field_name}' must use native YAML list values, not string literals"
+        )
+    return value
 
 
 def _coerce_arima_triplet(

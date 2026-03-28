@@ -6110,6 +6110,7 @@ def test_repo_search_space_bs_preforcast_sections_are_unique_and_include_stage_o
         "ES",
         "xgboost",
         "lightgbm",
+        "NHITS",
         "LSTM",
         "TSMixerx",
         "TimeXer",
@@ -6141,6 +6142,32 @@ def test_repo_search_space_bs_preforcast_sections_are_unique_and_include_stage_o
         "min_child_samples",
         "feature_fraction",
     )
+    assert tuple(search_space["bs_preforcast_models"]["NHITS"]) == ("mlp_units",)
+    assert search_space["bs_preforcast_models"]["ARIMA"]["order"]["choices"][1] == [
+        1,
+        1,
+        0,
+    ]
+    assert search_space["bs_preforcast_models"]["xgboost"]["lags"]["choices"][1] == [
+        1,
+        2,
+        3,
+        6,
+        12,
+    ]
+    assert search_space["bs_preforcast_models"]["lightgbm"]["lags"]["choices"][2] == [
+        1,
+        2,
+        3,
+        6,
+        12,
+        24,
+    ]
+    assert search_space["bs_preforcast_models"]["NHITS"]["mlp_units"]["choices"][0] == [
+        [32, 32],
+        [32, 32],
+        [32, 32],
+    ]
 
 
 def test_package_exports_and_intentional_omissions_are_explicit():

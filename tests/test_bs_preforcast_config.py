@@ -77,21 +77,19 @@ def _linked_bs_preforcast(
     return payload
 
 
-def _write_search_space(tmp_path: Path) -> None:
-    (tmp_path / "yaml/HPO").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "yaml/HPO").mkdir(parents=True, exist_ok=True)
+def _write_search_space(tmp_path: Path, payload: dict[str, object] | None = None) -> None:
+    base = {
+        "models": {},
+        "training": [],
+        "residual": {"xgboost": ["n_estimators"]},
+        "bs_preforcast_models": {},
+        "bs_preforcast_training": [],
+    }
+    if payload is not None:
+        base.update(payload)
     (tmp_path / "yaml/HPO").mkdir(parents=True, exist_ok=True)
     (tmp_path / "yaml/HPO/search_space.yaml").write_text(
-        yaml.safe_dump(
-            {
-                "models": {},
-                "training": [],
-                "residual": {"xgboost": ["n_estimators"]},
-                "bs_preforcast_models": {},
-                "bs_preforcast_training": [],
-            },
-            sort_keys=False,
-        ),
+        yaml.safe_dump(base, sort_keys=False),
         encoding="utf-8",
     )
 
@@ -387,8 +385,6 @@ def test_repo_default_bs_preforcast_path_is_loadable_with_defaults_yaml(
     main_payload = _base_payload(data_path)
     main_payload["bs_preforcast"] = {"enabled": True}
     (tmp_path / "yaml/HPO").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "yaml/HPO").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "yaml/HPO").mkdir(parents=True, exist_ok=True)
     (tmp_path / "yaml/HPO/search_space.yaml").write_text(
         yaml.safe_dump(
             {
@@ -396,16 +392,33 @@ def test_repo_default_bs_preforcast_path_is_loadable_with_defaults_yaml(
                 "training": [],
                 "residual": {"xgboost": ["n_estimators"]},
                 "bs_preforcast_models": {
-                    "ARIMA": ["order", "include_mean", "include_drift"],
+                    "ARIMA": {
+                        "order": {
+                            "type": "categorical",
+                            "choices": [[1, 0, 0], [1, 1, 0]],
+                        },
+                        "include_mean": {"type": "categorical", "choices": [True, False]},
+                        "include_drift": {"type": "categorical", "choices": [False, True]},
+                    },
                     "ES": ["trend", "damped_trend"],
-                    "xgboost": ["lags", "n_estimators", "max_depth"],
-                    "lightgbm": [
-                        "lags",
-                        "n_estimators",
-                        "max_depth",
-                        "num_leaves",
-                        "min_child_samples",
-                    ],
+                    "xgboost": {
+                        "lags": {
+                            "type": "categorical",
+                            "choices": [[1, 2, 3], [1, 2, 3, 6, 12]],
+                        },
+                        "n_estimators": {"type": "categorical", "choices": [16, 32, 64]},
+                        "max_depth": {"type": "int", "low": 2, "high": 6, "step": 1},
+                    },
+                    "lightgbm": {
+                        "lags": {
+                            "type": "categorical",
+                            "choices": [[1, 2, 3], [1, 2, 3, 6, 12]],
+                        },
+                        "n_estimators": {"type": "categorical", "choices": [32, 64, 96]},
+                        "max_depth": {"type": "categorical", "choices": [4, 6, -1]},
+                        "num_leaves": {"type": "categorical", "choices": [15, 31, 63]},
+                        "min_child_samples": {"type": "categorical", "choices": [10, 20, 40]},
+                    },
                 },
                 "bs_preforcast_training": [],
             },
@@ -425,6 +438,137 @@ def test_repo_default_bs_preforcast_path_is_loadable_with_defaults_yaml(
         "xgboost",
         "lightgbm",
     ]
+
+
+def test_load_app_config_preserves_native_list_bs_preforcast_search_space_contract(
+    tmp_path: Path,
+) -> None:
+    data_path = tmp_path / "data.csv"
+    data_path.write_text(
+        "dt,target,hist_a,bs_a\n"
+        "2020-01-01,1,2,10\n"
+        "2020-01-08,2,3,11\n"
+        "2020-01-15,3,4,12\n",
+        encoding="utf-8",
+    )
+    stage_path = tmp_path / "yaml/plugins/bs_preforcast.yaml"
+    stage_path.parent.mkdir(parents=True, exist_ok=True)
+    stage_path.write_text(
+        yaml.safe_dump(
+            {
+                **_linked_bs_preforcast(),
+                "jobs": [
+                    {
+                        "model": "xgboost",
+                        "params": {
+                            "lags": [1, 2, 3, 6, 12],
+                            "n_estimators": 16,
+                            "max_depth": 3,
+                        },
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    main_payload = _base_payload(data_path)
+    main_payload["bs_preforcast"] = _main_bs_preforcast(config_path=str(stage_path))
+    _write_search_space(
+        tmp_path,
+        {
+            "bs_preforcast_models": {
+                "ARIMA": {
+                    "order": {
+                        "type": "categorical",
+                        "choices": [[1, 0, 0], [1, 1, 0]],
+                    }
+                },
+                "xgboost": {
+                    "lags": {
+                        "type": "categorical",
+                        "choices": [[1, 2, 3], [1, 2, 3, 6, 12]],
+                    }
+                },
+                "NHITS": {
+                    "mlp_units": {
+                        "type": "categorical",
+                        "choices": [
+                            [[32, 32], [32, 32], [32, 32]],
+                            [[64, 64], [64, 64], [64, 64]],
+                        ],
+                    }
+                },
+            }
+        },
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(main_payload, sort_keys=False), encoding="utf-8")
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    assert loaded.stage_plugin_loaded is not None
+    assert loaded.stage_plugin_loaded.config.jobs[0].params["lags"] == [1, 2, 3, 6, 12]
+    assert loaded.stage_plugin_loaded.search_space_payload is not None
+    assert loaded.stage_plugin_loaded.search_space_payload["models"]["xgboost"]["lags"]["choices"][1] == [
+        1,
+        2,
+        3,
+        6,
+        12,
+    ]
+    assert loaded.stage_plugin_loaded.search_space_payload["models"]["NHITS"]["mlp_units"]["choices"][0] == [
+        [32, 32],
+        [32, 32],
+        [32, 32],
+    ]
+
+
+def test_load_app_config_rejects_stringified_bs_preforcast_list_search_space_contract(
+    tmp_path: Path,
+) -> None:
+    data_path = tmp_path / "data.csv"
+    data_path.write_text(
+        "dt,target,hist_a,bs_a\n"
+        "2020-01-01,1,2,10\n"
+        "2020-01-08,2,3,11\n"
+        "2020-01-15,3,4,12\n",
+        encoding="utf-8",
+    )
+    stage_path = tmp_path / "yaml/plugins/bs_preforcast.yaml"
+    stage_path.parent.mkdir(parents=True, exist_ok=True)
+    stage_path.write_text(
+        yaml.safe_dump(
+            {
+                **_linked_bs_preforcast(),
+                "jobs": [
+                    {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    main_payload = _base_payload(data_path)
+    main_payload["bs_preforcast"] = _main_bs_preforcast(config_path=str(stage_path))
+    _write_search_space(
+        tmp_path,
+        {
+            "bs_preforcast_models": {
+                "ARIMA": {
+                    "order": {
+                        "type": "categorical",
+                        "choices": ["[1, 1, 0]"],
+                    }
+                }
+            }
+        },
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(main_payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="native YAML list values"):
+        load_app_config(tmp_path, config_path=config_path)
 
 
 def test_load_app_config_rejects_bs_preforcast_autoarima_stage_job(
