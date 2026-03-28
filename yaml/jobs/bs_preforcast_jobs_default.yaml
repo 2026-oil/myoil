@@ -1,9 +1,6 @@
 - model: ARIMA
   params:
-    order:
-      - 1
-      - 1
-      - 0
+    order: [1, 1, 0]
     include_mean: true
     include_drift: false
 - model: ES
@@ -12,24 +9,14 @@
     damped_trend: false
 - model: xgboost
   params:
-    lags:
-      - 1
-      - 2
-      - 3
-      - 6
-      - 12
+    lags: [1, 2, 3, 6, 12]
     n_estimators: 64
     max_depth: 4
     subsample: 1.0
     colsample_bytree: 1.0
 - model: lightgbm
   params:
-    lags:
-      - 1
-      - 2
-      - 3
-      - 6
-      - 12
+    lags: [1, 2, 3, 6, 12]
     n_estimators: 96
     max_depth: 6
     num_leaves: 31

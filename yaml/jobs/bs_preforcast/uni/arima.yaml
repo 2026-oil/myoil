@@ -1,8 +1,5 @@
 - model: ARIMA
   params:
-    order:
-    - 1
-    - 1
-    - 0
+    order: [1, 1, 0]
     include_mean: true
     include_drift: false
