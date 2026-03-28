@@ -34,7 +34,6 @@ def _base_payload(data_path: Path) -> dict[str, object]:
             "val_size": 1,
             "val_check_steps": 1,
             "early_stop_patience_steps": -1,
-            "num_lr_decays": -1,
             "loss": "mse",
         },
         "cv": {

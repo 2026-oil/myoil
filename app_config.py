@@ -62,7 +62,6 @@ LEGACY_SHARED_JOB_TRAINING_KEYS = {
     "scaler_type",
     "step_size",
     "early_stop_patience_steps",
-    "num_lr_decays",
 }
 SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
     "runtime.random_seed",
@@ -183,7 +182,6 @@ class TrainingConfig:
     early_stop_patience_steps: int = DEFAULT_TRAINING_PARAMS[
         "early_stop_patience_steps"
     ]
-    num_lr_decays: int = DEFAULT_TRAINING_PARAMS["num_lr_decays"]
     loss: str = "mse"
     loss_params: TrainingLossParams | None = None
     accelerator: str | None = None
@@ -1061,6 +1059,10 @@ def _normalize_payload(
     if "learning_rate" in training:
         raise ValueError(
             "legacy fixed-lr training key has been removed; use training.lr_scheduler.max_lr instead"
+        )
+    if "num_lr_decays" in training:
+        raise ValueError(
+            "legacy num_lr_decays training key has been removed; learned-model scheduling is fixed through training.lr_scheduler"
         )
     for selector, field_name in LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD.items():
         if selector in training:

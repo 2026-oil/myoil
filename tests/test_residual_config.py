@@ -116,6 +116,10 @@ RESIDUAL_RUNTIME_SMOKE_FIXTURE_FILES = [
     REPO_ROOT / "tests" / "fixtures" / "residual_runtime_smoke_lightgbm.yaml",
 ]
 NEWLY_SUPPORTED_MODEL_ALIASES = {
+    "NonstationaryTransformer": (
+        "nonstationarytransformer",
+        "autononstationarytransformer",
+    ),
     "Mamba": ("mamba", "automamba"),
     "SMamba": ("smamba", "autosmamba"),
     "CMamba": ("cmamba", "autocmamba"),
@@ -1202,7 +1206,6 @@ def test_model_builder_propagates_centralized_training_controls(tmp_path: Path):
             "scaler_type": "standard",
             "model_step_size": 3,
             "val_check_steps": 7,
-            "num_lr_decays": 2,
             "early_stop_patience_steps": 11,
         }
     )
@@ -4003,6 +4006,29 @@ def test_load_app_config_rejects_training_search_space_learning_rate(tmp_path: P
         load_app_config(tmp_path, config_path=config_path)
 
 
+def test_load_app_config_rejects_training_num_lr_decays(tmp_path: Path):
+    payload = _payload()
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    payload["training"]["num_lr_decays"] = -1
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {"TFT": ["hidden_size"]},
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    with pytest.raises(ValueError, match="legacy num_lr_decays training key has been removed"):
+        load_app_config(tmp_path, config_path=config_path)
+
+
 def test_load_app_config_rejects_unknown_training_search_space_param(tmp_path: Path):
     payload = _payload()
     payload["jobs"] = [{"model": "TFT", "params": {}}]
@@ -5856,12 +5882,9 @@ def test_effective_config_maps_training_model_step_size_override_for_training_au
     from residual import runtime
 
     loaded = load_app_config(tmp_path, config_path=config_path)
-    effective = runtime._effective_config(
-        loaded, {"model_step_size": 5, "num_lr_decays": 2}
-    )
+    effective = runtime._effective_config(loaded, {"model_step_size": 5})
 
     assert effective.training.model_step_size == 5
-    assert effective.training.num_lr_decays == 2
     assert effective.training.val_size == loaded.config.cv.horizon
 
 
@@ -6174,6 +6197,7 @@ def test_package_exports_and_intentional_omissions_are_explicit():
     for model_name in NEWLY_SUPPORTED_MODEL_ALIASES:
         assert hasattr(nf_models, model_name)
     for auto_name in (
+        "AutoNonstationaryTransformer",
         "AutoMamba",
         "AutoSMamba",
         "AutoCMamba",
@@ -6186,27 +6210,26 @@ def test_package_exports_and_intentional_omissions_are_explicit():
     assert not hasattr(nf_auto, "AutoDeformTime")
     assert not hasattr(nf_auto, "AutoModernTCN")
     assert not hasattr(nf_auto, "AutoDeepEDM")
-    assert not hasattr(nf_auto, "AutoNonstationaryTransformer")
     assert hasattr(nf_models, "DeformTime")
     assert not hasattr(nf_models, "DeepEDM")
-    assert not hasattr(nf_models, "NonstationaryTransformer")
+    assert hasattr(nf_models, "NonstationaryTransformer")
     assert hasattr(nf_models, "DeformableTST")
     assert "DeformTime" in SUPPORTED_AUTO_MODEL_NAMES
     assert "DeformTime" in MODEL_CLASSES
     assert "DeepEDM" not in SUPPORTED_AUTO_MODEL_NAMES
     assert "DeepEDM" not in MODEL_CLASSES
-    assert "NonstationaryTransformer" not in SUPPORTED_AUTO_MODEL_NAMES
-    assert "NonstationaryTransformer" not in MODEL_CLASSES
+    assert "NonstationaryTransformer" in SUPPORTED_AUTO_MODEL_NAMES
+    assert "NonstationaryTransformer" in MODEL_CLASSES
     assert "deepedm" not in MODEL_FILENAME_DICT
     assert "autodeepedm" not in MODEL_FILENAME_DICT
-    assert "nonstationarytransformer" not in MODEL_FILENAME_DICT
-    assert "autononstationarytransformer" not in MODEL_FILENAME_DICT
+    assert "nonstationarytransformer" in MODEL_FILENAME_DICT
+    assert "autononstationarytransformer" in MODEL_FILENAME_DICT
     assert "DeformableTST" in SUPPORTED_AUTO_MODEL_NAMES
     assert "DeformableTST" in MODEL_CLASSES
     search_space = yaml.safe_load((REPO_ROOT / "yaml/HPO/search_space.yaml").read_text())
     assert "DeformTime" not in search_space["models"]
     assert "DeepEDM" not in search_space["models"]
-    assert "NonstationaryTransformer" not in search_space["models"]
+    assert "NonstationaryTransformer" in search_space["models"]
     assert "DeformableTST" not in search_space["models"]
 
 
@@ -6229,6 +6252,7 @@ def test_supports_auto_mode_expands_to_newly_added_models():
         "DeepAR",
         "DeformTime",
         "DeformableTST",
+        "NonstationaryTransformer",
         "TimeMixer",
         "ModernTCN",
         "DUET",
@@ -6242,7 +6266,6 @@ def test_supports_auto_mode_expands_to_newly_added_models():
     ):
         assert supports_auto_mode(model_name) is True
     assert supports_auto_mode("DeepEDM") is False
-    assert supports_auto_mode("NonstationaryTransformer") is False
     assert supports_auto_mode("Naive") is False
 
 
@@ -6274,6 +6297,17 @@ def test_build_model_supports_new_official_model_ports(tmp_path: Path):
                 "dims": [8, 8, 8, 8],
             },
         },
+        {
+            "model": "NonstationaryTransformer",
+            "params": {
+                "hidden_size": 16,
+                "conv_hidden_size": 16,
+                "dropout": 0.1,
+                "n_head": 4,
+                "encoder_layers": 1,
+                "decoder_layers": 1,
+            },
+        },
     ]
     loaded = load_app_config(
         tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
@@ -6282,10 +6316,12 @@ def test_build_model_supports_new_official_model_ports(tmp_path: Path):
     deform = build_model(loaded.config, loaded.config.jobs[0], n_series=1)
     deformabletst = build_model(loaded.config, loaded.config.jobs[1], n_series=1)
     modern = build_model(loaded.config, loaded.config.jobs[2], n_series=1)
+    nonstationary = build_model(loaded.config, loaded.config.jobs[3], n_series=1)
 
     assert deform.__class__.__name__ == "DeformTime"
     assert deformabletst.__class__.__name__ == "DeformableTST"
     assert modern.__class__.__name__ == "ModernTCN"
+    assert nonstationary.__class__.__name__ == "NonstationaryTransformer"
 
 
 def test_should_use_multivariate_for_no_exog_multivariate_model(tmp_path: Path):
@@ -6961,6 +6997,7 @@ EXPECTED_REPO_AUTO_MODELS = [
     "iTransformer",
     "TSMixerx",
     "TimeXer",
+    "NonstationaryTransformer",
 ]
 
 EXPECTED_REPO_AUTO_SELECTORS = {
@@ -6998,6 +7035,14 @@ EXPECTED_REPO_AUTO_SELECTORS = {
         "decoder_hidden_size",
         "decoder_layers",
         "context_size",
+    ],
+    "NonstationaryTransformer": [
+        "hidden_size",
+        "dropout",
+        "n_head",
+        "conv_hidden_size",
+        "encoder_layers",
+        "decoder_layers",
     ],
 }
 EXPECTED_REPO_TRAINING_SELECTORS = [

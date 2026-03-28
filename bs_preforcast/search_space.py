@@ -73,7 +73,6 @@ BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY: dict[str, dict[str, dict[str, Any]]] = 
         },
         "n_estimators": {"type": "categorical", "choices": [16, 32, 64]},
         "max_depth": {"type": "int", "low": 2, "high": 6, "step": 1},
-        "learning_rate": {"type": "float", "low": 0.01, "high": 0.2},
     },
     "lightgbm": {
         "lags": {
@@ -82,7 +81,6 @@ BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY: dict[str, dict[str, dict[str, Any]]] = 
         },
         "n_estimators": {"type": "categorical", "choices": [32, 64, 96]},
         "max_depth": {"type": "categorical", "choices": [4, 6, -1]},
-        "learning_rate": {"type": "float", "low": 0.01, "high": 0.2},
         "num_leaves": {"type": "categorical", "choices": [15, 31, 63]},
         "min_child_samples": {"type": "categorical", "choices": [10, 20, 40]},
         "feature_fraction": {"type": "float", "low": 0.6, "high": 1.0},
@@ -217,16 +215,4 @@ def normalize_bs_preforcast_sections(
         allowed_models=SUPPORTED_BS_PREFORCAST_MODELS,
     )
     _validate_native_list_search_space_contract(bs_preforcast_models)
-    if "learning_rate" in bs_preforcast_training["global"]:
-        overlaps = sorted(
-            model_name
-            for model_name, specs in bs_preforcast_models.items()
-            if "learning_rate" in specs
-            and model_name not in {"xgboost", "lightgbm", "ARIMA", "ES"}
-        )
-        if overlaps:
-            raise ValueError(
-                "search_space.bs_preforcast_training.global.learning_rate overlaps with model-level learning_rate selector(s): "
-                + ", ".join(overlaps)
-            )
     return bs_preforcast_models, bs_preforcast_training

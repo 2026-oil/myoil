@@ -665,13 +665,17 @@ def _predict_stage_univariate_tree(
         )
     params = dict(job.params)
     params.pop("lags", None)
+    if "learning_rate" in params:
+        raise ValueError(
+            "bs_preforcast tree-stage learning_rate is no longer configurable; scheduler and optimizer-rate defaults are internal-only"
+        )
     if model_name == "xgboost":
         from xgboost import XGBRegressor
 
         regressor = XGBRegressor(
             n_estimators=int(params.pop("n_estimators", 32)),
             max_depth=int(params.pop("max_depth", 3)),
-            learning_rate=float(params.pop("learning_rate", 0.1)),
+            learning_rate=0.1,
             objective="reg:squarederror",
             n_jobs=1,
             verbosity=0,
@@ -683,7 +687,7 @@ def _predict_stage_univariate_tree(
         regressor = LGBMRegressor(
             n_estimators=int(params.pop("n_estimators", 64)),
             max_depth=int(params.pop("max_depth", -1)),
-            learning_rate=float(params.pop("learning_rate", 0.05)),
+            learning_rate=0.05,
             verbosity=-1,
             **params,
         )

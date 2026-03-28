@@ -116,7 +116,6 @@ class BaseModel(pl.LightningModule):
         h_train: int = 1,
         inference_input_size: Union[int, None] = None,
         step_size: int = 1,
-        num_lr_decays: int = 0,
         early_stop_patience_steps: int = -1,
         scaler_type: str = "identity",
         futr_exog_list: Union[List, None] = None,
@@ -393,7 +392,6 @@ class BaseModel(pl.LightningModule):
         # Optimization
         self.max_lr = max_lr
         self.max_steps = max_steps
-        self.num_lr_decays = num_lr_decays
         self.early_stop_patience_steps = early_stop_patience_steps
         self.val_check_steps = val_check_steps
         self.windows_batch_size = windows_batch_size

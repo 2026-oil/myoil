@@ -51,6 +51,7 @@ SUPPORTED_AUTO_MODEL_NAMES = {
     "SOFTS",
     "TimeMixer",
     "ModernTCN",
+    "NonstationaryTransformer",
     "DUET",
     "Mamba",
     "SMamba",
@@ -103,7 +104,6 @@ DEFAULT_TRAINING_PARAMS = {
     "val_size": 8,
     "val_check_steps": 100,
     "early_stop_patience_steps": -1,
-    "num_lr_decays": -1,
 }
 DEFAULT_TRAINING_LR_SCHEDULER = {
     "name": "OneCycleLR",
@@ -740,9 +740,3 @@ def suggest_training_params(
         name: _suggest_from_spec(trial, f"{name_prefix}{name}", registry[name])
         for name in selected_names
     }
-
-
-from bs_preforcast.search_space import (
-    BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY,
-    SUPPORTED_BS_PREFORCAST_MODELS,
-)

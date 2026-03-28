@@ -37,8 +37,6 @@ class DummyUnivariate(BaseModel):
         loss=MAE(),
         valid_loss=None,
         max_steps: int = 1,
-        max_lr: float = 0.0,  # No learning, just to test seasonal naive
-        num_lr_decays: int = -1,
         early_stop_patience_steps: int = -1,
         val_check_steps: int = 2,
         batch_size: int = 32,
@@ -54,8 +52,6 @@ class DummyUnivariate(BaseModel):
         alias: Optional[str] = None,
         optimizer=None,
         optimizer_kwargs=None,
-        lr_scheduler=None,
-        lr_scheduler_kwargs=None,
         dataloader_kwargs=None,
         **trainer_kwargs,
     ):
@@ -70,8 +66,6 @@ class DummyUnivariate(BaseModel):
             loss=loss,
             valid_loss=valid_loss,
             max_steps=max_steps,
-            max_lr=max_lr,
-            num_lr_decays=num_lr_decays,
             early_stop_patience_steps=early_stop_patience_steps,
             val_check_steps=val_check_steps,
             batch_size=batch_size,
@@ -87,8 +81,6 @@ class DummyUnivariate(BaseModel):
             alias=alias,
             optimizer=optimizer,
             optimizer_kwargs=optimizer_kwargs,
-            lr_scheduler=lr_scheduler,
-            lr_scheduler_kwargs=lr_scheduler_kwargs,
             dataloader_kwargs=dataloader_kwargs,
             **trainer_kwargs,
         )
@@ -155,8 +147,6 @@ class DummyMultivariate(BaseModel):
         loss=MAE(),
         valid_loss=None,
         max_steps: int = 1,
-        max_lr: float = 0.0,  # No learning, just to test seasonal naive
-        num_lr_decays: int = -1,
         early_stop_patience_steps: int = -1,
         val_check_steps: int = 2,
         batch_size: int = 32,
@@ -172,8 +162,6 @@ class DummyMultivariate(BaseModel):
         alias: Optional[str] = None,
         optimizer=None,
         optimizer_kwargs=None,
-        lr_scheduler=None,
-        lr_scheduler_kwargs=None,
         dataloader_kwargs=None,
         **trainer_kwargs,
     ):
@@ -189,8 +177,6 @@ class DummyMultivariate(BaseModel):
             loss=loss,
             valid_loss=valid_loss,
             max_steps=max_steps,
-            max_lr=max_lr,
-            num_lr_decays=num_lr_decays,
             early_stop_patience_steps=early_stop_patience_steps,
             val_check_steps=val_check_steps,
             batch_size=batch_size,
@@ -206,8 +192,6 @@ class DummyMultivariate(BaseModel):
             alias=alias,
             optimizer=optimizer,
             optimizer_kwargs=optimizer_kwargs,
-            lr_scheduler=lr_scheduler,
-            lr_scheduler_kwargs=lr_scheduler_kwargs,
             dataloader_kwargs=dataloader_kwargs,
             **trainer_kwargs,
         )
@@ -266,8 +250,6 @@ class DummyRecurrent(BaseModel):
         loss=MAE(),
         valid_loss=None,
         max_steps: int = 1,
-        max_lr: float = 0.0,  # No learning, just to naive prediction
-        num_lr_decays: int = -1,
         early_stop_patience_steps: int = -1,
         val_check_steps: int = 2,
         batch_size: int = 32,
@@ -283,8 +265,6 @@ class DummyRecurrent(BaseModel):
         alias: Optional[str] = None,
         optimizer=None,
         optimizer_kwargs=None,
-        lr_scheduler=None,
-        lr_scheduler_kwargs=None,
         dataloader_kwargs=None,
         **trainer_kwargs,
     ):
@@ -299,8 +279,6 @@ class DummyRecurrent(BaseModel):
             loss=loss,
             valid_loss=valid_loss,
             max_steps=max_steps,
-            max_lr=max_lr,
-            num_lr_decays=num_lr_decays,
             early_stop_patience_steps=early_stop_patience_steps,
             val_check_steps=val_check_steps,
             batch_size=batch_size,
@@ -316,8 +294,6 @@ class DummyRecurrent(BaseModel):
             alias=alias,
             optimizer=optimizer,
             optimizer_kwargs=optimizer_kwargs,
-            lr_scheduler=lr_scheduler,
-            lr_scheduler_kwargs=lr_scheduler_kwargs,
             dataloader_kwargs=dataloader_kwargs,
             **trainer_kwargs,
         )
