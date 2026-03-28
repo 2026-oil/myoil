@@ -52,3 +52,5 @@ CLAUDE.md
 
 # local run artifacts
 /runs/
+
+.omx/
