@@ -199,7 +199,6 @@ class TimeLLM(BaseModel):
         futr_exog_list (list): future exogenous columns.
         loss (PyTorch module): instantiated train loss class from [losses collection](./losses.pytorch).
         valid_loss (PyTorch module): instantiated valid loss class from [losses collection](./losses.pytorch).
-        learning_rate (float): Learning rate between (0, 1). Default: 1e-3
         max_steps (int): maximum number of training steps. Default: 1000
         val_check_steps (int): Number of training steps between every validation loss check. Default: 100
         batch_size (int): number of different series in each batch. Default: 32
@@ -209,7 +208,6 @@ class TimeLLM(BaseModel):
         start_padding_enabled (bool): if True, the model will pad the time series with zeros at the beginning, by input size. Default: False
         training_data_availability_threshold (Union[float, List[float]]): minimum fraction of valid data points required for training windows. Single float applies to both insample and outsample; list of two floats specifies [insample_fraction, outsample_fraction]. Default 0.0 allows windows with only 1 valid data point (current behavior).
         step_size (int): step size between each window of temporal data. Default: 1
-        num_lr_decays (int): Number of learning rate decays, evenly distributed across max_steps. Default: -1
         early_stop_patience_steps (int): Number of validation iterations before early stopping. Default: -1
         scaler_type (str): type of scaler for temporal inputs normalization see [temporal scalers](https://github.com/Nixtla/neuralforecast/blob/main/neuralforecast/common/_scalers.py). Default: 'identity'
         random_seed (int): random_seed for pytorch initializer and numpy generators. Default: 1
@@ -217,8 +215,6 @@ class TimeLLM(BaseModel):
         alias (str): optional,  Custom name of the model.
         optimizer (Subclass of 'torch.optim.Optimizer'): optional, user specified optimizer instead of the default choice (Adam).
         optimizer_kwargs (dict): optional, list of parameters used by the user specified `optimizer`.
-        lr_scheduler (Subclass of 'torch.optim.lr_scheduler.LRScheduler'): optional, user specified lr_scheduler instead of the default choice (StepLR).
-        lr_scheduler_kwargs (dict): optional, list of parameters used by the user specified `lr_scheduler`.
         dataloader_kwargs (dict): optional, list of parameters passed into the PyTorch Lightning dataloader by the `TimeSeriesDataLoader`.
         **trainer_kwargs (int):  keyword trainer arguments inherited from [PyTorch Lighning's trainer](https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.trainer.trainer.Trainer.html?highlight=trainer).
 
@@ -261,7 +257,6 @@ class TimeLLM(BaseModel):
         futr_exog_list=None,
         loss=MAE(),
         valid_loss=None,
-        learning_rate: float = 1e-4,
         max_steps: int = 5,
         val_check_steps: int = 100,
         batch_size: int = 32,
@@ -271,7 +266,6 @@ class TimeLLM(BaseModel):
         start_padding_enabled: bool = False,
         training_data_availability_threshold=0.0,
         step_size: int = 1,
-        num_lr_decays: int = 0,
         early_stop_patience_steps: int = -1,
         scaler_type: str = "identity",
         random_seed: int = 1,
@@ -279,8 +273,6 @@ class TimeLLM(BaseModel):
         alias: Optional[str] = None,
         optimizer=None,
         optimizer_kwargs=None,
-        lr_scheduler=None,
-        lr_scheduler_kwargs=None,
         dataloader_kwargs=None,
         **trainer_kwargs,
     ):
@@ -293,8 +285,6 @@ class TimeLLM(BaseModel):
             loss=loss,
             valid_loss=valid_loss,
             max_steps=max_steps,
-            learning_rate=learning_rate,
-            num_lr_decays=num_lr_decays,
             early_stop_patience_steps=early_stop_patience_steps,
             val_check_steps=val_check_steps,
             batch_size=batch_size,
@@ -310,8 +300,6 @@ class TimeLLM(BaseModel):
             random_seed=random_seed,
             optimizer=optimizer,
             optimizer_kwargs=optimizer_kwargs,
-            lr_scheduler=lr_scheduler,
-            lr_scheduler_kwargs=lr_scheduler_kwargs,
             dataloader_kwargs=dataloader_kwargs,
             **trainer_kwargs,
         )

@@ -7,19 +7,6 @@ dataset:
   static_exog_cols: []
 runtime:
   opt_n_trial: 20
-training:
-  input_size: 1
-  learning_rate: 0.001
-  val_check_steps: 1
-  early_stop_patience_steps: -1
-  loss: mse
-cv:
-  horizon: 1
-  step_size: 1
-  n_windows: 2
-scheduler:
-  gpu_ids:
-  - 0
 residual:
   enabled: true
   model: lightgbm

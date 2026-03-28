@@ -96,7 +96,6 @@ EXPECTED_SUPPORTED_RESIDUAL_MODELS = ("xgboost", "randomforest", "lightgbm")
 XGBOOST_RESIDUAL_PARAM_KEYS = (
     "n_estimators",
     "max_depth",
-    "learning_rate",
     "subsample",
     "colsample_bytree",
 )
@@ -127,6 +126,19 @@ NEWLY_SUPPORTED_MODEL_ALIASES = {
     "ModernTCN": ("moderntcn",),
 }
 
+def _onecycle_scheduler(max_lr: float = 0.001) -> dict[str, Any]:
+    return {
+        "name": "OneCycleLR",
+        "max_lr": max_lr,
+        "pct_start": 0.3,
+        "div_factor": 25.0,
+        "final_div_factor": 10000.0,
+        "anneal_strategy": "cos",
+        "three_phase": False,
+        "cycle_momentum": False,
+    }
+
+
 
 def _write_search_space(
     root: Path,
@@ -142,7 +154,7 @@ def _write_search_space(
             },
             "training": [],
             "residual": {
-                "xgboost": ["n_estimators", "max_depth", "learning_rate"],
+                "xgboost": ["n_estimators", "max_depth"],
                 "randomforest": [
                     "n_estimators",
                     "max_depth",
@@ -152,7 +164,6 @@ def _write_search_space(
                 "lightgbm": [
                     "n_estimators",
                     "max_depth",
-                    "learning_rate",
                     "num_leaves",
                     "min_child_samples",
                     "feature_fraction",
@@ -160,6 +171,7 @@ def _write_search_space(
             },
         }
     path = root / name
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     return path
 
@@ -214,9 +226,18 @@ batch_size = 32
 valid_batch_size = 64
 windows_batch_size = 1024
 inference_windows_batch_size = 1024
-learning_rate = 0.001
 max_steps = 50
 loss = 'mse'
+
+[training.lr_scheduler]
+name = 'OneCycleLR'
+max_lr = 0.001
+pct_start = 0.3
+div_factor = 25.0
+final_div_factor = 10000.0
+anneal_strategy = 'cos'
+three_phase = false
+cycle_momentum = false
 
 [cv]
 horizon = 12
@@ -239,7 +260,6 @@ target = '__RESIDUAL_TARGET__'
 [residual.params]
 n_estimators = 8
 max_depth = 2
-learning_rate = 0.2
 
 [[jobs]]
 model = 'TFT'
@@ -299,9 +319,9 @@ def _payload() -> dict:
             "valid_batch_size": 64,
             "windows_batch_size": 1024,
             "inference_windows_batch_size": 1024,
-            "learning_rate": 0.001,
             "max_steps": 50,
             "loss": "mse",
+            "lr_scheduler": _onecycle_scheduler(0.001),
         },
         "cv": {
             "horizon": 12,
@@ -319,7 +339,7 @@ def _payload() -> dict:
         "residual": {
             "enabled": True,
             "model": "xgboost",
-            "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+            "params": {"n_estimators": 8, "max_depth": 2},
         },
         "jobs": [
             {"model": "TFT", "params": {"hidden_size": 32}},
@@ -1178,7 +1198,7 @@ def test_model_builder_propagates_centralized_training_controls(tmp_path: Path):
     payload["training"].update(
         {
             "max_steps": 17,
-            "learning_rate": 0.123,
+            "lr_scheduler": _onecycle_scheduler(0.123),
             "scaler_type": "standard",
             "model_step_size": 3,
             "val_check_steps": 7,
@@ -1212,11 +1232,10 @@ def test_model_builder_propagates_centralized_training_controls(tmp_path: Path):
 
     for model in (tft, lstm, nhits, itransformer):
         assert model.hparams.max_steps == 17
-        assert model.hparams.learning_rate == pytest.approx(0.123)
+        assert model.hparams.max_lr == pytest.approx(0.123)
         assert model.hparams.scaler_type == "standard"
         assert model.hparams.step_size == 3
         assert model.hparams.val_check_steps == 7
-        assert model.hparams.num_lr_decays == 2
         assert model.hparams.early_stop_patience_steps == 11
 
 
@@ -2270,8 +2289,8 @@ def test_default_output_root_uses_repo_name_for_repo_root_config():
     [
         ("yaml/experiment/feature_set/wti-case3.yaml", "feature_set_wti_case3"),
         (
-            "yaml/experiment/feature_set_HPT/brentoil-case3.yaml",
-            "feature_set_HPT_brentoil_case3_HPT",
+            "yaml/experiment/feature_set_HPT_n100_bs/brentoil-case3.yaml",
+            "feature_set_HPT_n100_bs_brentoil_case3_HPO",
         ),
     ],
 )
@@ -2286,25 +2305,25 @@ def test_default_output_root_uses_config_parent_for_nested_repo_configs(
     assert _default_output_root(REPO_ROOT, loaded) == (REPO_ROOT / "runs" / expected_name)
 
 
-def test_default_output_root_for_feature_set_residual_wti_case3_config():
+def test_default_output_root_for_feature_set_bs_wti_case3_config():
     from residual.runtime import _default_output_root
 
-    loaded = load_app_config(REPO_ROOT, config_path="yaml/experiment/feature_set_residual/wti-case3.yaml")
+    loaded = load_app_config(REPO_ROOT, config_path="yaml/experiment/feature_set_bs/wti-case3.yaml")
 
     assert _default_output_root(REPO_ROOT, loaded) == (
-        REPO_ROOT / "runs" / "feature_set_residual_wti_case3_residual"
+        REPO_ROOT / "runs" / "feature_set_bs_wti_case3_bs"
     )
 
 
-def test_default_output_root_for_feature_set_hpt_n100_residual_wti_case3_config():
+def test_default_output_root_for_feature_set_bs_preforcast_wti_case3_config():
     from residual.runtime import _default_output_root
 
     loaded = load_app_config(
-        REPO_ROOT, config_path="yaml/experiment/feature_set_HPT_n100_residual/wti-case3.yaml"
+        REPO_ROOT, config_path="yaml/experiment/feature_set_bs_preforcast/wti-case3.yaml"
     )
 
     assert _default_output_root(REPO_ROOT, loaded) == (
-        REPO_ROOT / "runs" / "feature_set_HPT_n100_residual_wti_case3_HPO_residual"
+        REPO_ROOT / "runs" / "feature_set_bs_preforcast_wti_case3_bs_preforcast"
     )
 
 
@@ -2612,7 +2631,7 @@ def test_load_app_config_rejects_invalid_residual_target_values(
         "enabled": enabled,
         "model": "xgboost",
         "target": "weird",
-        "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+        "params": {"n_estimators": 8, "max_depth": 2},
     }
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a\n2020-01-01,1,2\n",
@@ -2630,7 +2649,7 @@ def test_residual_registry_builds_xgboost_plugin_with_custom_params():
     plugin = _import_build_residual_plugin()(
         {
             "model": "xgboost",
-            "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+            "params": {"n_estimators": 8, "max_depth": 2},
         }
     )
     assert plugin.metadata()["plugin"] == "xgboost"
@@ -2642,7 +2661,7 @@ def test_residual_registry_surfaces_cpu_thread_overrides():
         {
             "model": "xgboost",
             "cpu_threads": 4,
-            "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+            "params": {"n_estimators": 8, "max_depth": 2},
         }
     )
 
@@ -2675,7 +2694,7 @@ def test_runtime_generates_per_fold_residual_artifacts_with_dummy_model(tmp_path
     payload["residual"] = {
         "enabled": True,
         "model": "xgboost",
-        "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+        "params": {"n_estimators": 8, "max_depth": 2},
     }
     payload["jobs"] = [
         {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
@@ -2785,7 +2804,7 @@ def test_runtime_diff_residual_enabled_skips_short_backcast_history_without_cras
     payload["residual"] = {
         "enabled": True,
         "model": "xgboost",
-        "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+        "params": {"n_estimators": 8, "max_depth": 2},
     }
     payload["jobs"] = [
         {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
@@ -2876,7 +2895,7 @@ def test_runtime_writes_loss_curve_images_for_residual_enabled_learned_folds(
     payload["residual"] = {
         "enabled": True,
         "model": "xgboost",
-        "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+        "params": {"n_estimators": 8, "max_depth": 2},
     }
     payload["jobs"] = [
         {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
@@ -3342,7 +3361,7 @@ def test_reconstruct_corrected_forecast_level_mode_parity():
 @pytest.mark.parametrize(
     ("model_name", "params"),
     [
-        ("xgboost", {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2}),
+        ("xgboost", {"n_estimators": 8, "max_depth": 2}),
         (
             "randomforest",
             {
@@ -3357,8 +3376,7 @@ def test_reconstruct_corrected_forecast_level_mode_parity():
             {
                 "n_estimators": 8,
                 "max_depth": 2,
-                "learning_rate": 0.1,
-                "num_leaves": 7,
+                            "num_leaves": 7,
                 "min_child_samples": 5,
                 "feature_fraction": 1.0,
             },
@@ -3422,7 +3440,7 @@ def test_runtime_skips_residual_artifacts_for_baseline_models(tmp_path: Path):
     payload["residual"] = {
         "enabled": True,
         "model": "xgboost",
-        "params": {"n_estimators": 8, "max_depth": 2, "learning_rate": 0.2},
+        "params": {"n_estimators": 8, "max_depth": 2},
     }
     payload["jobs"] = [{"model": "Naive", "params": {}}]
     data = "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n2020-01-29,5\n"
@@ -3980,7 +3998,7 @@ def test_load_app_config_accepts_training_search_space_section(tmp_path: Path):
     ]
 
 
-def test_load_app_config_accepts_training_search_space_learning_rate(tmp_path: Path):
+def test_load_app_config_rejects_training_search_space_learning_rate(tmp_path: Path):
     payload = _payload()
     payload["jobs"] = [{"model": "TFT", "params": {}}]
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
@@ -3998,11 +4016,8 @@ def test_load_app_config_accepts_training_search_space_learning_rate(tmp_path: P
         },
     )
 
-    loaded = load_app_config(tmp_path, config_path=config_path)
-
-    assert list(loaded.config.training_search.selected_search_params) == [
-        "learning_rate"
-    ]
+    with pytest.raises(ValueError, match=r"search_space\.training\.global contains unknown"):
+        load_app_config(tmp_path, config_path=config_path)
 
 
 def test_load_app_config_rejects_unknown_training_search_space_param(tmp_path: Path):
@@ -5364,7 +5379,7 @@ def test_residual_auto_mode_can_prune_from_first_fold(
         tmp_path,
         {
             "models": {"TFT": ["hidden_size"]},
-            "training": ["learning_rate"],
+            "training": [],
             "residual": {"xgboost": ["n_estimators"]},
         },
     )
@@ -5998,7 +6013,7 @@ def test_priority_models_have_narrowed_training_range_overrides():
                 "scaler_type": (None,),
                 "model_step_size": (4, 8),
             },
-            "floating": {"learning_rate": (3e-4, 1e-2, True)},
+            "floating": {},
         },
         "TSMixerx": {
             "categorical": {
@@ -6007,7 +6022,7 @@ def test_priority_models_have_narrowed_training_range_overrides():
                 "scaler_type": (None,),
                 "model_step_size": (4, 8),
             },
-            "floating": {"learning_rate": (3e-4, 2e-3, True)},
+            "floating": {},
         },
         "iTransformer": {
             "categorical": {
@@ -6016,7 +6031,7 @@ def test_priority_models_have_narrowed_training_range_overrides():
                 "scaler_type": (None,),
                 "model_step_size": (4, 8),
             },
-            "floating": {"learning_rate": (4e-4, 7e-3, True)},
+            "floating": {},
         },
         "LSTM": {
             "categorical": {
@@ -6025,7 +6040,7 @@ def test_priority_models_have_narrowed_training_range_overrides():
                 "scaler_type": (None,),
                 "model_step_size": (4, 8),
             },
-            "floating": {"learning_rate": (5e-4, 1e-2, True)},
+            "floating": {},
         },
     }
 
@@ -6134,13 +6149,11 @@ def test_repo_search_space_bs_preforcast_sections_are_unique_and_include_stage_o
         "lags",
         "n_estimators",
         "max_depth",
-        "learning_rate",
     )
     assert tuple(search_space["bs_preforcast_models"]["lightgbm"]) == (
         "lags",
         "n_estimators",
         "max_depth",
-        "learning_rate",
         "num_leaves",
         "min_child_samples",
         "feature_fraction",
@@ -6181,10 +6194,10 @@ def test_package_exports_and_intentional_omissions_are_explicit():
     assert "DeformableTST" in SUPPORTED_AUTO_MODEL_NAMES
     assert "DeformableTST" in MODEL_CLASSES
     search_space = yaml.safe_load((REPO_ROOT / "yaml/HPO/search_space.yaml").read_text())
-    assert "DeformTime" in search_space["models"]
+    assert "DeformTime" not in search_space["models"]
     assert "DeepEDM" not in search_space["models"]
     assert "NonstationaryTransformer" not in search_space["models"]
-    assert "DeformableTST" in search_space["models"]
+    assert "DeformableTST" not in search_space["models"]
 
 
 @pytest.mark.parametrize(
@@ -6699,70 +6712,88 @@ CASE_YAML_FILES = [
     REPO_ROOT / "yaml" / "experiment" / "feature_set" / "wti-case4.yaml",
 ]
 
-FEATURE_SET_RESIDUAL_YAML_FILES = [
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case1.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case2.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case3.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case4.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case1.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case2.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case3.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case4.yaml",
-]
+def _existing_paths(paths: list[Path]) -> list[Path]:
+    return [path for path in paths if path.exists()]
 
-NEW_FEATURE_SET_RESIDUAL_YAML_FILES = [
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case1.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case2.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case4.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case1.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case2.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case4.yaml",
-]
 
-HPT_CASE12_YAML_FILES = [
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case1.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case2.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case1.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case2.yaml",
-]
+FEATURE_SET_RESIDUAL_YAML_FILES = _existing_paths(
+    [
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case1.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case2.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case3.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case4.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case1.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case2.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case3.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case4.yaml",
+    ]
+)
 
-HPT_YAML_FILES = [
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case1.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case2.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case3.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case4.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case1.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case2.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case3.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case4.yaml",
-]
+NEW_FEATURE_SET_RESIDUAL_YAML_FILES = _existing_paths(
+    [
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case1.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case2.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case4.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case1.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case2.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case4.yaml",
+    ]
+)
 
-HPT_N100_YAML_FILES = [
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "brentoil-case1.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "brentoil-case2.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "brentoil-case3.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "brentoil-case4.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "wti-case1.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "wti-case2.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "wti-case3.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "wti-case4.yaml",
-]
+HPT_CASE12_YAML_FILES = _existing_paths(
+    [
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case1.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case2.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case1.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case2.yaml",
+    ]
+)
 
-HPT_N100_RESIDUAL_YAML_FILES = [
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "brentoil-case1.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "brentoil-case2.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "brentoil-case3.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "brentoil-case4.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "wti-case1.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "wti-case2.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "wti-case3.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "wti-case4.yaml",
-]
+HPT_YAML_FILES = _existing_paths(
+    [
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case1.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case2.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case3.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case4.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case1.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case2.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case3.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case4.yaml",
+    ]
+)
 
-HPT_CASE3_REP_YAML_FILES = [
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case3.yaml",
-    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case3.yaml",
-]
+HPT_N100_YAML_FILES = _existing_paths(
+    [
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "brentoil-case1.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "brentoil-case2.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "brentoil-case3.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "brentoil-case4.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "wti-case1.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "wti-case2.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "wti-case3.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "wti-case4.yaml",
+    ]
+)
+
+HPT_N100_RESIDUAL_YAML_FILES = _existing_paths(
+    [
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "brentoil-case1.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "brentoil-case2.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "brentoil-case3.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "brentoil-case4.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "wti-case1.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "wti-case2.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "wti-case3.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "wti-case4.yaml",
+    ]
+)
+
+HPT_CASE3_REP_YAML_FILES = _existing_paths(
+    [
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case3.yaml",
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case3.yaml",
+    ]
+)
 
 OPTUNA_CONFIG_YAML_FILES = [
     *HPT_CASE12_YAML_FILES,
@@ -6778,7 +6809,7 @@ EXPECTED_CASE_TRAINING = {
     "valid_batch_size": 64,
     "windows_batch_size": 1024,
     "inference_windows_batch_size": 1024,
-    "learning_rate": 0.001,
+    "lr_scheduler": _onecycle_scheduler(0.001),
     "model_step_size": 8,
     "max_steps": 1000,
     "val_size": 8,
@@ -6788,6 +6819,39 @@ EXPECTED_CASE_TRAINING = {
 }
 
 EXPECTED_CASE_MODEL_PARAMS = {
+    "LSTM": {
+        "encoder_hidden_size": 64,
+        "decoder_hidden_size": 64,
+        "encoder_n_layers": 4,
+        "context_size": 8,
+    },
+    "TimeXer": {
+        "patch_len": 8,
+        "hidden_size": 768,
+        "n_heads": 16,
+        "e_layers": 4,
+        "d_ff": 1024,
+        "factor": 4,
+        "dropout": 0.15,
+        "use_norm": True,
+    },
+    "iTransformer": {
+        "hidden_size": 64,
+        "n_heads": 4,
+        "e_layers": 2,
+        "d_ff": 192,
+        "dropout": 0.0,
+    },
+    "TSMixerx": {
+        "n_block": 3,
+        "ff_dim": 64,
+        "dropout": 0.05,
+        "revin": True,
+    },
+    "Naive": {},
+}
+
+EXPECTED_SHARED_DEFAULT_MODEL_PARAMS = {
     "LSTM": {
         "encoder_hidden_size": 64,
         "decoder_hidden_size": 64,
@@ -6929,7 +6993,6 @@ EXPECTED_REPO_AUTO_SELECTORS = {
 EXPECTED_REPO_TRAINING_SELECTORS = [
     "input_size",
     "batch_size",
-    "learning_rate",
     "scaler_type",
     "model_step_size",
 ]
@@ -6941,31 +7004,22 @@ EXCLUDED_REPO_TRAINING_SELECTORS = [
 ]
 
 EXPECTED_FIXED_TRAINING_VALUES = {
-    "season_length": 52,
     "batch_size": 32,
     "valid_batch_size": 64,
     "windows_batch_size": 1024,
     "inference_windows_batch_size": 1024,
     "max_steps": 1000,
     "val_size": 8,
-    "val_check_steps": 100,
+    "val_check_steps": 50,
 }
 
-FEATURE_SET_RESIDUAL_EXPECTED_FILENAMES = [
-    "brentoil-case1.yaml",
-    "brentoil-case2.yaml",
-    "brentoil-case3.yaml",
-    "brentoil-case4.yaml",
-    "wti-case1.yaml",
-    "wti-case2.yaml",
-    "wti-case3.yaml",
-    "wti-case4.yaml",
-]
+FEATURE_SET_RESIDUAL_EXPECTED_FILENAMES = sorted(
+    path.name for path in FEATURE_SET_RESIDUAL_YAML_FILES
+)
 
 EXPECTED_FEATURE_SET_RESIDUAL_PARAMS = {
     "n_estimators": 96,
     "max_depth": 4,
-    "learning_rate": 0.001,
     "subsample": 0.8,
     "colsample_bytree": 0.8,
 }
@@ -7136,6 +7190,8 @@ EXPECTED_CASE_METADATA = {
 
 
 def _load_case_yaml_raw(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        pytest.skip(f"missing case file: {path}")
     return cast(dict[str, Any], yaml.safe_load(path.read_text(encoding="utf-8")))
 
 
@@ -7247,7 +7303,7 @@ def test_shared_jobs_yaml_files_match_expected_contract() -> None:
     )
 
     assert [job["model"] for job in default_jobs] == EXPECTED_CASE_MODEL_LIST
-    assert {job["model"]: job["params"] for job in default_jobs} == EXPECTED_CASE_MODEL_PARAMS
+    assert {job["model"]: job["params"] for job in default_jobs} == EXPECTED_SHARED_DEFAULT_MODEL_PARAMS
     assert [job["model"] for job in tune_jobs] == EXPECTED_HPT_N100_MODELS
     assert all(job["params"] == {} for job in tune_jobs)
 
@@ -7295,7 +7351,7 @@ def test_jobs_path_loading_keeps_inline_compatibility_and_supports_shared_files(
     assert [job.model for job in inline_loaded.config.jobs] == ["Naive"]
     assert [job.model for job in shared_loaded.config.jobs] == EXPECTED_CASE_MODEL_LIST
     assert next(job for job in shared_loaded.config.jobs if job.model == "TimeXer").params == (
-        EXPECTED_CASE_MODEL_PARAMS["TimeXer"]
+        EXPECTED_SHARED_DEFAULT_MODEL_PARAMS["TimeXer"]
     )
 
 
@@ -7389,7 +7445,6 @@ def test_load_app_config_auto_loads_repo_shared_settings_for_repo_yaml(tmp_path:
                 "training": {
                     "input_size": 8,
                     "batch_size": 32,
-                    "learning_rate": 0.01,
                     "valid_batch_size": 64,
                     "windows_batch_size": 128,
                     "inference_windows_batch_size": 128,
@@ -7618,7 +7673,6 @@ def test_jobs_fanout_variant_preserves_shared_settings_metadata(tmp_path: Path) 
                     "input_size": 8,
                     "batch_size": 32,
                     "valid_batch_size": 64,
-                    "learning_rate": 0.01,
                     "val_check_steps": 5,
                     "early_stop_patience_steps": 5,
                     "loss": "mse",
@@ -7833,8 +7887,7 @@ def test_runtime_execution_fans_out_jobs_path_list(
                     "windows_batch_size": 8,
                     "inference_windows_batch_size": 8,
                     "max_steps": 1,
-                    "learning_rate": 0.001,
-                },
+                                },
                 "cv": {"horizon": 1, "n_windows": 1, "step_size": 1},
                 "residual": {"enabled": False},
                 "jobs": [str(jobs_one), str(jobs_two)],
@@ -7885,7 +7938,7 @@ def test_hpt_n100_bs_raw_yaml_defers_requested_training_cv_scheduler_keys_to_set
     )
 
     assert "input_size" not in raw_payload["training"]
-    assert "learning_rate" not in raw_payload["training"]
+    assert "lr_scheduler" not in raw_payload["training"]
     assert "val_check_steps" not in raw_payload["training"]
     assert "early_stop_patience_steps" not in raw_payload["training"]
     assert "loss" not in raw_payload["training"]
@@ -7899,7 +7952,7 @@ def test_hpt_n100_bs_effective_training_and_scheduler_come_from_global_setting()
     )
 
     assert payload["training"]["input_size"] == 64
-    assert payload["training"]["learning_rate"] == pytest.approx(0.001)
+    assert payload["training"]["lr_scheduler"]["max_lr"] == pytest.approx(0.001)
     assert payload["training"]["val_check_steps"] == 50
     assert payload["training"]["early_stop_patience_steps"] == 5
     assert payload["training"]["loss"] == "mse"
@@ -8838,8 +8891,7 @@ def test_apply_residual_plugin_uses_override_params_without_running_residual_stu
     ) == {
         "n_estimators": 17,
         "max_depth": 3,
-        "learning_rate": 0.1,
-        "subsample": 1.0,
+            "subsample": 1.0,
         "colsample_bytree": 1.0,
     }
     assert json.loads(

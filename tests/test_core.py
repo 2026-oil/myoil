@@ -1545,10 +1545,10 @@ def test_neural_forecast_optimizer_lr_warning(setup_airplane_data, model):
         warnings.simplefilter("always", UserWarning)
         nf.fit(AirPassengersPanel_train)
         assert any(
-            "ignoring learning rate passed in optimizer_kwargs, using the model's learning rate"
+            "ignoring maximum learning rate passed in optimizer_kwargs, using the model's maximum learning rate"
             in str(w.message)
             for w in issued_warnings
-        ), f"Expected learning rate warning not found for {model.__name__}"
+        ), f"Expected maximum learning rate warning not found for {model.__name__}"
 
 
 # test that if we pass "optimizer_kwargs" but not "optimizer", we expect a warning
@@ -1592,7 +1592,7 @@ def test_neuralforecast_customized_lr_scheduler(setup_airplane_data, model):
     default_optimizer_predict = nf.predict()
     mean = default_optimizer_predict.loc[:, model.__name__].mean()
 
-    # Test with customized lr_scheduler (default is StepLR, using ConstantLR instead)
+    # Test with customized lr_scheduler (default is OneCycleLR, using ConstantLR instead)
     params.update(
         {
             "lr_scheduler": torch.optim.lr_scheduler.ConstantLR,

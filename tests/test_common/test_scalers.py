@@ -42,7 +42,7 @@ def base_model_params():
         'early_stop_patience_steps': 10,
         'val_check_steps': 50,
         'scaler_type': 'revin',
-        'learning_rate': 1e-3
+        'max_lr': 1e-3
     }
 
 
@@ -76,7 +76,7 @@ class TestRevinScaler:
         configs = [
             {'input_size': 12},
             {'input_size': 36},
-            {'learning_rate': 5e-4}
+            {'max_lr': 5e-4}
         ]
 
         for config in configs:

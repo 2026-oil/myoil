@@ -29,7 +29,7 @@ def _base_payload(data_path: Path) -> dict[str, object]:
             "valid_batch_size": 16,
             "windows_batch_size": 16,
             "inference_windows_batch_size": 16,
-            "learning_rate": 0.001,
+            "lr_scheduler": {"name": "OneCycleLR", "max_lr": 0.001, "pct_start": 0.3, "div_factor": 25.0, "final_div_factor": 10000.0, "anneal_strategy": "cos", "three_phase": False, "cycle_momentum": False},
             "max_steps": 1,
             "val_size": 1,
             "val_check_steps": 1,

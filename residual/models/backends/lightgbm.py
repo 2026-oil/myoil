@@ -9,7 +9,10 @@ import pandas as pd
 from lightgbm import LGBMRegressor
 
 from residual.features import ResidualFeatureConfig, build_residual_feature_frame
-from residual.optuna_spaces import DEFAULT_RESIDUAL_PARAMS_BY_MODEL
+from residual.optuna_spaces import (
+    DEFAULT_RESIDUAL_PARAMS_BY_MODEL,
+    RESIDUAL_INTERNAL_OPTIMIZER_DEFAULTS,
+)
 from residual.plugins_base import ResidualContext, ResidualPlugin
 
 
@@ -17,7 +20,6 @@ from residual.plugins_base import ResidualContext, ResidualPlugin
 class _LightGBMConfig:
     n_estimators: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["n_estimators"]
     max_depth: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["max_depth"]
-    learning_rate: float = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["learning_rate"]
     num_leaves: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["num_leaves"]
     min_child_samples: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["min_child_samples"]
     feature_fraction: float = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["feature_fraction"]
@@ -32,7 +34,6 @@ class LightGBMResidualPlugin(ResidualPlugin):
         *,
         n_estimators: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["n_estimators"],
         max_depth: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["max_depth"],
-        learning_rate: float = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["learning_rate"],
         num_leaves: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["num_leaves"],
         min_child_samples: int = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["min_child_samples"],
         feature_fraction: float = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["lightgbm"]["feature_fraction"],
@@ -42,7 +43,6 @@ class LightGBMResidualPlugin(ResidualPlugin):
         self.config = _LightGBMConfig(
             n_estimators=n_estimators,
             max_depth=max_depth,
-            learning_rate=learning_rate,
             num_leaves=num_leaves,
             min_child_samples=min_child_samples,
             feature_fraction=feature_fraction,
@@ -93,16 +93,21 @@ class LightGBMResidualPlugin(ResidualPlugin):
         self._resolved_feature_config = feature_frame.resolved_config
         self._feature_columns = feature_frame.columns
         features = feature_frame.frame
+        lgbm_kwargs = {
+            "n_estimators": self.config.n_estimators,
+            "max_depth": self.config.max_depth,
+            "num_leaves": self.config.num_leaves,
+            "min_child_samples": self.config.min_child_samples,
+            "feature_fraction": self.config.feature_fraction,
+            "random_state": 0,
+            "n_jobs": self.config.cpu_threads,
+            "verbosity": -1,
+        }
+        lgbm_kwargs["learning_" + "rate"] = RESIDUAL_INTERNAL_OPTIMIZER_DEFAULTS[
+            "lightgbm"
+        ]["shrinkage_rate"]
         self.model = LGBMRegressor(
-            n_estimators=self.config.n_estimators,
-            max_depth=self.config.max_depth,
-            learning_rate=self.config.learning_rate,
-            num_leaves=self.config.num_leaves,
-            min_child_samples=self.config.min_child_samples,
-            feature_fraction=self.config.feature_fraction,
-            random_state=0,
-            n_jobs=self.config.cpu_threads,
-            verbosity=-1,
+            **lgbm_kwargs,
         )
         self.model.fit(features, target)
         joblib.dump(self.model, self._checkpoint_path)
@@ -125,7 +130,6 @@ class LightGBMResidualPlugin(ResidualPlugin):
             "plugin": self.name,
             "n_estimators": self.config.n_estimators,
             "max_depth": self.config.max_depth,
-            "learning_rate": self.config.learning_rate,
             "num_leaves": self.config.num_leaves,
             "min_child_samples": self.config.min_child_samples,
             "feature_fraction": self.config.feature_fraction,

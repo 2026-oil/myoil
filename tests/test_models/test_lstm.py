@@ -104,7 +104,7 @@ def test_lstm_direct_head_uses_horizon_identity():
         h=4,
         input_size=8,
         max_steps=1,
-        learning_rate=1e-3,
+        max_lr=1e-3,
         batch_size=1,
         valid_batch_size=1,
         windows_batch_size=1,

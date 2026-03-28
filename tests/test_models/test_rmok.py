@@ -20,7 +20,7 @@ def test_autormok(setup_dataset):
     my_config = AutoRMoK.get_default_config(h=12, n_series=1, backend='optuna')
     def my_config_new(trial):
         config = {**my_config(trial)}
-        config.update({'max_steps': 1, 'val_check_steps': 1, 'input_size': 12, 'learning_rate': 1e-1})
+        config.update({'max_steps': 1, 'val_check_steps': 1, 'input_size': 12, 'max_lr': 1e-1})
         return config
 
     model = AutoRMoK(h=12, n_series=1, config=my_config_new, backend='optuna', num_samples=1, cpus=1)
@@ -32,6 +32,6 @@ def test_autormok(setup_dataset):
     my_config['max_steps'] = 1
     my_config['val_check_steps'] = 1
     my_config['input_size'] = 12
-    my_config['learning_rate'] = 1e-1
+    my_config['max_lr'] = 1e-1
     model = AutoRMoK(h=12, n_series=1, config=my_config, backend='ray', num_samples=1, cpus=1)
     model.fit(dataset=setup_dataset)

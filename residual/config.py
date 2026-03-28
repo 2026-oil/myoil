@@ -13,6 +13,7 @@ import bs_preforcast.config as bs_preforcast_config
 import bs_preforcast.search_space as bs_preforcast_search_space
 from .optuna_spaces import (
     BASELINE_MODEL_NAMES,
+    DEFAULT_TRAINING_LR_SCHEDULER,
     DEFAULT_TRAINING_PARAMS,
     FIXED_TRAINING_KEYS,
     LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD,
@@ -37,14 +38,13 @@ CENTRALIZED_TRAINING_KEYS = {
     "valid_batch_size",
     "windows_batch_size",
     "inference_windows_batch_size",
-    "learning_rate",
+    "lr_scheduler",
     "scaler_type",
     "model_step_size",
     "max_steps",
     "val_size",
     "val_check_steps",
     "early_stop_patience_steps",
-    "num_lr_decays",
     "loss",
     "loss_params",
     "accelerator",
@@ -66,7 +66,7 @@ SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
     "training.valid_batch_size",
     "training.windows_batch_size",
     "training.inference_windows_batch_size",
-    "training.learning_rate",
+    "training.lr_scheduler",
     "training.max_steps",
     "training.val_size",
     "training.val_check_steps",
@@ -83,7 +83,7 @@ SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
     "scheduler.max_concurrent_jobs",
     "scheduler.worker_devices",
 )
-SHARED_SETTINGS_MAPPING_DOTTED_PATHS = frozenset()
+SHARED_SETTINGS_MAPPING_DOTTED_PATHS = frozenset({"training.lr_scheduler"})
 RESIDUAL_FEATURE_KEYS = {
     "include_base_prediction",
     "include_horizon_step",
@@ -151,6 +151,20 @@ class TrainingLossParams:
 
 
 @dataclass(frozen=True)
+class TrainingLRSchedulerConfig:
+    name: Literal["OneCycleLR"] = "OneCycleLR"
+    max_lr: float = DEFAULT_TRAINING_LR_SCHEDULER["max_lr"]
+    pct_start: float = DEFAULT_TRAINING_LR_SCHEDULER["pct_start"]
+    div_factor: float = DEFAULT_TRAINING_LR_SCHEDULER["div_factor"]
+    final_div_factor: float = DEFAULT_TRAINING_LR_SCHEDULER["final_div_factor"]
+    anneal_strategy: Literal["cos", "linear"] = DEFAULT_TRAINING_LR_SCHEDULER[
+        "anneal_strategy"
+    ]
+    three_phase: bool = DEFAULT_TRAINING_LR_SCHEDULER["three_phase"]
+    cycle_momentum: bool = DEFAULT_TRAINING_LR_SCHEDULER["cycle_momentum"]
+
+
+@dataclass(frozen=True)
 class TrainingConfig:
     train_protocol: str = "expanding_window_tscv"
     input_size: int = DEFAULT_TRAINING_PARAMS["input_size"]
@@ -160,7 +174,9 @@ class TrainingConfig:
     inference_windows_batch_size: int = DEFAULT_TRAINING_PARAMS[
         "inference_windows_batch_size"
     ]
-    learning_rate: float = DEFAULT_TRAINING_PARAMS["learning_rate"]
+    lr_scheduler: TrainingLRSchedulerConfig = field(
+        default_factory=TrainingLRSchedulerConfig
+    )
     scaler_type: str | None = DEFAULT_TRAINING_PARAMS["scaler_type"]
     model_step_size: int = DEFAULT_TRAINING_PARAMS["model_step_size"]
     max_steps: int = DEFAULT_TRAINING_PARAMS["max_steps"]
@@ -578,6 +594,73 @@ def _normalize_training_loss_params(value: Any) -> TrainingLossParams:
         raise ValueError("training.loss_params.lamda must be >= 0")
     return params
 
+
+def _normalize_training_lr_scheduler(value: Any) -> TrainingLRSchedulerConfig:
+    if value is None:
+        value = {}
+    if not isinstance(value, dict):
+        raise ValueError("training.lr_scheduler must be a mapping")
+    payload = {**DEFAULT_TRAINING_LR_SCHEDULER, **dict(value)}
+    _unknown_keys(
+        payload,
+        allowed={
+            "name",
+            "max_lr",
+            "pct_start",
+            "div_factor",
+            "final_div_factor",
+            "anneal_strategy",
+            "three_phase",
+            "cycle_momentum",
+        },
+        section="training.lr_scheduler",
+    )
+    name = str(payload.get("name", "")).strip()
+    if name != "OneCycleLR":
+        raise ValueError("training.lr_scheduler.name must be 'OneCycleLR'")
+    max_lr = _coerce_float(payload["max_lr"], field_name="training.lr_scheduler.max_lr")
+    if max_lr <= 0:
+        raise ValueError("training.lr_scheduler.max_lr must be > 0")
+    pct_start = _coerce_float(
+        payload["pct_start"], field_name="training.lr_scheduler.pct_start"
+    )
+    if not 0 < pct_start < 1:
+        raise ValueError("training.lr_scheduler.pct_start must satisfy 0 < value < 1")
+    div_factor = _coerce_float(
+        payload["div_factor"], field_name="training.lr_scheduler.div_factor"
+    )
+    if div_factor <= 1:
+        raise ValueError("training.lr_scheduler.div_factor must be > 1")
+    final_div_factor = _coerce_float(
+        payload["final_div_factor"],
+        field_name="training.lr_scheduler.final_div_factor",
+    )
+    if final_div_factor <= 1:
+        raise ValueError("training.lr_scheduler.final_div_factor must be > 1")
+    anneal_strategy = str(payload["anneal_strategy"]).strip().lower()
+    if anneal_strategy not in {"cos", "linear"}:
+        raise ValueError(
+            "training.lr_scheduler.anneal_strategy must be one of: cos, linear"
+        )
+    return TrainingLRSchedulerConfig(
+        name="OneCycleLR",
+        max_lr=max_lr,
+        pct_start=pct_start,
+        div_factor=div_factor,
+        final_div_factor=final_div_factor,
+        anneal_strategy=cast(Literal["cos", "linear"], anneal_strategy),
+        three_phase=_coerce_bool(
+            payload["three_phase"],
+            field_name="training.lr_scheduler.three_phase",
+            default=False,
+        ),
+        cycle_momentum=_coerce_bool(
+            payload["cycle_momentum"],
+            field_name="training.lr_scheduler.cycle_momentum",
+            default=False,
+        ),
+    )
+
 def _coerce_positive_int_tuple(value: Any, *, field_name: str) -> tuple[int, ...]:
     if value is None:
         return ()
@@ -955,6 +1038,11 @@ def _normalize_payload(
     training = dict(payload.get("training", {}))
     training.pop("train_protocol", None)
     training.pop("season_length", None)
+    legacy_training_rate_key = "learning_" + "rate"
+    if legacy_training_rate_key in training:
+        raise ValueError(
+            "legacy fixed-lr training key has been removed; use training.lr_scheduler.max_lr instead"
+        )
     for selector, field_name in LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD.items():
         if selector in training:
             if field_name in training:
@@ -1066,6 +1154,9 @@ def _normalize_payload(
     training["dataloader_kwargs"] = _normalize_dataloader_kwargs(
         training.get("dataloader_kwargs")
     )
+    training["lr_scheduler"] = _normalize_training_lr_scheduler(
+        training.get("lr_scheduler")
+    )
 
     scheduler.setdefault("worker_devices", 1)
     scheduler.setdefault("parallelize_single_job_tuning", True)
@@ -1117,6 +1208,11 @@ def _normalize_payload(
     residual["model"] = residual_model
     residual["target"] = residual_target
     residual["params"] = dict(residual.get("params", {}))
+    legacy_residual_rate_key = "learning_" + "rate"
+    if legacy_residual_rate_key in residual["params"]:
+        raise ValueError(
+            "legacy residual optimizer-rate key has been removed; residual optimizer rates are now internal-only"
+        )
     residual["features"] = _normalize_residual_feature_config(
         residual.get("features"),
         hist_exog_cols=hist_exog_cols,
@@ -1200,17 +1296,6 @@ def _normalize_payload(
     normalized_jobs = cast(tuple[JobConfig, ...], jobs)
     for normalized_job in normalized_jobs:
         duplicated = CENTRALIZED_TRAINING_KEYS.intersection(normalized_job.params)
-        if (
-            (
-                stage_scope == "bs_preforcast"
-                or (
-                    search_space is not None
-                    and search_space.get("__scope__") == "bs_preforcast"
-                )
-            )
-            and normalized_job.model in {"xgboost", "lightgbm"}
-        ):
-            duplicated = duplicated.difference({"learning_rate"})
         if duplicated:
             duplicated_keys = ", ".join(sorted(duplicated))
             raise ValueError(

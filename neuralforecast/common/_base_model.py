@@ -102,7 +102,7 @@ class BaseModel(pl.LightningModule):
         input_size: int,
         loss: Union[BasePointLoss, DistributionLoss, nn.Module],
         valid_loss: Union[BasePointLoss, DistributionLoss, nn.Module],
-        learning_rate: float,
+        max_lr: float,
         max_steps: int,
         val_check_steps: int,
         batch_size: int,
@@ -391,12 +391,9 @@ class BaseModel(pl.LightningModule):
             )
 
         # Optimization
-        self.learning_rate = learning_rate
+        self.max_lr = max_lr
         self.max_steps = max_steps
         self.num_lr_decays = num_lr_decays
-        self.lr_decay_steps = (
-            max(max_steps // self.num_lr_decays, 1) if self.num_lr_decays > 0 else 10e7
-        )
         self.early_stop_patience_steps = early_stop_patience_steps
         self.val_check_steps = val_check_steps
         self.windows_batch_size = windows_batch_size
@@ -623,38 +620,40 @@ class BaseModel(pl.LightningModule):
             if "lr" in optimizer_signature.parameters:
                 if "lr" in optimizer_kwargs:
                     warnings.warn(
-                        "ignoring learning rate passed in optimizer_kwargs, using the model's learning rate"
+                        "ignoring maximum learning rate passed in optimizer_kwargs, using the model's maximum learning rate"
                     )
-                optimizer_kwargs["lr"] = self.learning_rate
+                optimizer_kwargs["lr"] = self.max_lr
             optimizer = self.optimizer(params=self.parameters(), **optimizer_kwargs)
         else:
             if self.optimizer_kwargs:
                 warnings.warn(
                     "ignoring optimizer_kwargs as the optimizer is not specified"
                 )
-            optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+            optimizer = torch.optim.Adam(self.parameters(), lr=self.max_lr)
 
-        lr_scheduler = {"frequency": 1, "interval": "step"}
-        if self.lr_scheduler:
-            lr_scheduler_signature = inspect.signature(self.lr_scheduler)
-            lr_scheduler_kwargs = deepcopy(self.lr_scheduler_kwargs)
-            if "optimizer" in lr_scheduler_signature.parameters:
-                if "optimizer" in lr_scheduler_kwargs:
-                    warnings.warn(
-                        "ignoring optimizer passed in lr_scheduler_kwargs, using the model's optimizer"
-                    )
-                    del lr_scheduler_kwargs["optimizer"]
-            lr_scheduler["scheduler"] = self.lr_scheduler(
-                optimizer=optimizer, **lr_scheduler_kwargs
-            )
-        else:
-            if self.lr_scheduler_kwargs:
+        scheduler_cls = self.lr_scheduler or torch.optim.lr_scheduler.OneCycleLR
+        lr_scheduler_signature = inspect.signature(scheduler_cls)
+        lr_scheduler_kwargs = {
+            "max_lr": self.max_lr,
+            "total_steps": self.max_steps,
+            "pct_start": 0.3,
+            "div_factor": 25.0,
+            "final_div_factor": 10000.0,
+            "anneal_strategy": "cos",
+            "three_phase": False,
+            "cycle_momentum": False,
+            **deepcopy(self.lr_scheduler_kwargs),
+        }
+        if "optimizer" in lr_scheduler_signature.parameters:
+            if "optimizer" in lr_scheduler_kwargs:
                 warnings.warn(
-                    "ignoring lr_scheduler_kwargs as the lr_scheduler is not specified"
+                    "ignoring optimizer passed in lr_scheduler_kwargs, using the model's optimizer"
                 )
-            lr_scheduler["scheduler"] = torch.optim.lr_scheduler.StepLR(
-                optimizer=optimizer, step_size=self.lr_decay_steps, gamma=0.5
-            )
+                del lr_scheduler_kwargs["optimizer"]
+        lr_scheduler = {"frequency": 1, "interval": "step"}
+        lr_scheduler["scheduler"] = scheduler_cls(
+            optimizer=optimizer, **lr_scheduler_kwargs
+        )
         return {"optimizer": optimizer, "lr_scheduler": lr_scheduler}
 
     def get_test_size(self):
@@ -1908,7 +1907,7 @@ class BaseModel(pl.LightningModule):
         """Fit.
 
         The `fit` method, optimizes the neural network's weights using the
-        initialization parameters (`learning_rate`, `windows_batch_size`, ...)
+        initialization parameters (`max_lr`, `windows_batch_size`, ...)
         and the `loss` function as defined during the initialization.
         Within `fit` we use a PyTorch Lightning `Trainer` that
         inherits the initialization's `self.trainer_kwargs`, to customize

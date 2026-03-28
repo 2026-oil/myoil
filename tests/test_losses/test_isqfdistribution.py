@@ -31,7 +31,7 @@ def test_isqf_distribution_loss(show_plot=False):
                     level=[10, 20, 30, 40, 50, 60, 70, 80, 90],
                     num_pieces=1,
                 ),
-                learning_rate=1e-4,
+                max_lr=1e-4,
                 max_steps=max_steps,
                 scaler_type="robust",
                 futr_exog_list=["y_[lag12]"],

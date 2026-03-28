@@ -145,7 +145,7 @@ def test_predict_stage_univariate_tree_uses_forecaster_direct_and_list_lags(
             "lags": [1, 2, 3, 6, 12],
             "n_estimators": 8,
             "max_depth": 3,
-            "learning_rate": 0.05,
+            
         }
     )
     train_df = pd.DataFrame({"bs_a": [10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0]})

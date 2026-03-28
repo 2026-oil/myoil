@@ -7,10 +7,18 @@ dataset:
   static_exog_cols: []
 training:
   input_size: 1
-  learning_rate: 0.001
   val_check_steps: 1
   early_stop_patience_steps: -1
   loss: mse
+  lr_scheduler:
+    name: OneCycleLR
+    max_lr: 0.001
+    pct_start: 0.3
+    div_factor: 25.0
+    final_div_factor: 10000.0
+    anneal_strategy: cos
+    three_phase: false
+    cycle_momentum: false
 cv:
   horizon: 1
   step_size: 1
@@ -24,7 +32,6 @@ residual:
   params:
     n_estimators: 8
     max_depth: 2
-    learning_rate: 0.2
 jobs:
 - model: TFT
   params:

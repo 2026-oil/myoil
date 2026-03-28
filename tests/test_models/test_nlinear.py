@@ -20,7 +20,7 @@ def test_autonlinear_longer_horizon(longer_horizon_test):
             [longer_horizon_test.input_size, longer_horizon_test.input_size * 2]
         ),
         "h": None,
-        "learning_rate": tune.loguniform(1e-4, 1e-1),
+        "max_lr": tune.loguniform(1e-4, 1e-1),
         "scaler_type": tune.choice([None, "robust", "standard"]),
         "max_steps": tune.quniform(lower=2, upper=6, q=2),
         "batch_size": tune.choice([32, 64, 128, 256]),

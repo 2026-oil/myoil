@@ -70,7 +70,7 @@ def test_hint_model():
         early_stop_patience_steps=2,
         val_check_steps=1,
         scaler_type="robust",
-        learning_rate=1e-3,
+        max_lr=1e-3,
     )
     model = HINT(h=4, model=nhits, S=S, reconciliation="BottomUp")
 

@@ -37,7 +37,7 @@ class DummyUnivariate(BaseModel):
         loss=MAE(),
         valid_loss=None,
         max_steps: int = 1,
-        learning_rate: float = 0.0,  # No learning, just to test seasonal naive
+        max_lr: float = 0.0,  # No learning, just to test seasonal naive
         num_lr_decays: int = -1,
         early_stop_patience_steps: int = -1,
         val_check_steps: int = 2,
@@ -70,7 +70,7 @@ class DummyUnivariate(BaseModel):
             loss=loss,
             valid_loss=valid_loss,
             max_steps=max_steps,
-            learning_rate=learning_rate,
+            max_lr=max_lr,
             num_lr_decays=num_lr_decays,
             early_stop_patience_steps=early_stop_patience_steps,
             val_check_steps=val_check_steps,
@@ -155,7 +155,7 @@ class DummyMultivariate(BaseModel):
         loss=MAE(),
         valid_loss=None,
         max_steps: int = 1,
-        learning_rate: float = 0.0,  # No learning, just to test seasonal naive
+        max_lr: float = 0.0,  # No learning, just to test seasonal naive
         num_lr_decays: int = -1,
         early_stop_patience_steps: int = -1,
         val_check_steps: int = 2,
@@ -189,7 +189,7 @@ class DummyMultivariate(BaseModel):
             loss=loss,
             valid_loss=valid_loss,
             max_steps=max_steps,
-            learning_rate=learning_rate,
+            max_lr=max_lr,
             num_lr_decays=num_lr_decays,
             early_stop_patience_steps=early_stop_patience_steps,
             val_check_steps=val_check_steps,
@@ -266,7 +266,7 @@ class DummyRecurrent(BaseModel):
         loss=MAE(),
         valid_loss=None,
         max_steps: int = 1,
-        learning_rate: float = 0.0,  # No learning, just to naive prediction
+        max_lr: float = 0.0,  # No learning, just to naive prediction
         num_lr_decays: int = -1,
         early_stop_patience_steps: int = -1,
         val_check_steps: int = 2,
@@ -299,7 +299,7 @@ class DummyRecurrent(BaseModel):
             loss=loss,
             valid_loss=valid_loss,
             max_steps=max_steps,
-            learning_rate=learning_rate,
+            max_lr=max_lr,
             num_lr_decays=num_lr_decays,
             early_stop_patience_steps=early_stop_patience_steps,
             val_check_steps=val_check_steps,

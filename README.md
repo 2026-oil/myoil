@@ -297,7 +297,7 @@ uv run python xl_2_yaml.py reverse \
 | `valid_batch_size` | int | no | validation 배치 크기 |
 | `windows_batch_size` | int | no | training windows batch 크기 |
 | `inference_windows_batch_size` | int | no | inference windows batch 크기 |
-| `learning_rate` | float | no | 공통 learning rate |
+| `lr_scheduler` | mapping | no | OneCycleLR 공통 스케줄러 설정 |
 | `max_steps` | int | no | 최대 학습 step |
 | `val_size` | int | no | 각 fit에서 내부 validation 길이 |
 | `val_check_steps` | int | no | validation check 주기 |
@@ -382,7 +382,15 @@ training:
   valid_batch_size: 32
   windows_batch_size: 1024
   inference_windows_batch_size: 1024
-  learning_rate: 0.001
+  lr_scheduler:
+    name: OneCycleLR
+    max_lr: 0.001
+    pct_start: 0.3
+    div_factor: 25.0
+    final_div_factor: 10000.0
+    anneal_strategy: cos
+    three_phase: false
+    cycle_momentum: false
   max_steps: 1000
   val_size: 12
   val_check_steps: 100
@@ -482,7 +490,15 @@ residual:
     lookback: 8
     hidden_size: 32
     epochs: 50
-    learning_rate: 0.001
+    lr_scheduler:
+    name: OneCycleLR
+    max_lr: 0.001
+    pct_start: 0.3
+    div_factor: 25.0
+    final_div_factor: 10000.0
+    anneal_strategy: cos
+    three_phase: false
+    cycle_momentum: false
 ```
 
 스키마 예시:
@@ -501,7 +517,7 @@ class _MLPConfig:
     lookback: int = 8
     hidden_size: int = 32
     epochs: int = 50
-    learning_rate: float = 0.001
+    max_lr: float = 0.001
 
 
 class MLPResidualPlugin(ResidualPlugin):
@@ -513,13 +529,13 @@ class MLPResidualPlugin(ResidualPlugin):
         lookback: int = 8,
         hidden_size: int = 32,
         epochs: int = 50,
-        learning_rate: float = 0.001,
+        max_lr: float = 0.001,
     ):
         self.config = _MLPConfig(
             lookback=lookback,
             hidden_size=hidden_size,
             epochs=epochs,
-            learning_rate=learning_rate,
+            max_lr=max_lr,
         )
 
     def fit(self, panel_df: pd.DataFrame, context: ResidualContext) -> None:
@@ -534,7 +550,7 @@ class MLPResidualPlugin(ResidualPlugin):
             "lookback": self.config.lookback,
             "hidden_size": self.config.hidden_size,
             "epochs": self.config.epochs,
-            "learning_rate": self.config.learning_rate,
+            "max_lr": self.config.max_lr,
         }
 ```
 

@@ -4,4 +4,4 @@ models:
       type: int
 residual:
   xgboost:
-    - n_estimators
+  - n_estimators

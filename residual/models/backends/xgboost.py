@@ -8,7 +8,7 @@ import pandas as pd
 from xgboost import Booster, DMatrix, train as xgb_train
 
 from residual.features import ResidualFeatureConfig, build_residual_feature_frame
-from residual.optuna_spaces import RESIDUAL_DEFAULTS
+from residual.optuna_spaces import RESIDUAL_DEFAULTS, RESIDUAL_INTERNAL_OPTIMIZER_DEFAULTS
 from residual.plugins_base import ResidualContext, ResidualPlugin
 
 
@@ -16,7 +16,6 @@ from residual.plugins_base import ResidualContext, ResidualPlugin
 class _XGBoostConfig:
     n_estimators: int = RESIDUAL_DEFAULTS["xgboost"]["n_estimators"]
     max_depth: int = RESIDUAL_DEFAULTS["xgboost"]["max_depth"]
-    learning_rate: float = RESIDUAL_DEFAULTS["xgboost"]["learning_rate"]
     subsample: float = RESIDUAL_DEFAULTS["xgboost"]["subsample"]
     colsample_bytree: float = RESIDUAL_DEFAULTS["xgboost"]["colsample_bytree"]
     cpu_threads: int | None = None
@@ -30,7 +29,6 @@ class XGBoostResidualPlugin(ResidualPlugin):
         *,
         n_estimators: int = RESIDUAL_DEFAULTS["xgboost"]["n_estimators"],
         max_depth: int = RESIDUAL_DEFAULTS["xgboost"]["max_depth"],
-        learning_rate: float = RESIDUAL_DEFAULTS["xgboost"]["learning_rate"],
         subsample: float = RESIDUAL_DEFAULTS["xgboost"]["subsample"],
         colsample_bytree: float = RESIDUAL_DEFAULTS["xgboost"]["colsample_bytree"],
         cpu_threads: int | None = None,
@@ -39,7 +37,6 @@ class XGBoostResidualPlugin(ResidualPlugin):
         self.config = _XGBoostConfig(
             n_estimators=n_estimators,
             max_depth=max_depth,
-            learning_rate=learning_rate,
             subsample=subsample,
             colsample_bytree=colsample_bytree,
             cpu_threads=cpu_threads,
@@ -94,7 +91,7 @@ class XGBoostResidualPlugin(ResidualPlugin):
             params={
                 "objective": "reg:squarederror",
                 "max_depth": self.config.max_depth,
-                "eta": self.config.learning_rate,
+                "eta": RESIDUAL_INTERNAL_OPTIMIZER_DEFAULTS["xgboost"]["eta"],
                 "subsample": self.config.subsample,
                 "colsample_bytree": self.config.colsample_bytree,
                 "verbosity": 0,
@@ -130,7 +127,6 @@ class XGBoostResidualPlugin(ResidualPlugin):
             "plugin": self.name,
             "n_estimators": self.config.n_estimators,
             "max_depth": self.config.max_depth,
-            "learning_rate": self.config.learning_rate,
             "subsample": self.config.subsample,
             "colsample_bytree": self.config.colsample_bytree,
             "cpu_threads": self.config.cpu_threads,

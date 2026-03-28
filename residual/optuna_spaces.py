@@ -68,7 +68,6 @@ DEFAULT_RESIDUAL_PARAMS_BY_MODEL = {
     "xgboost": {
         "n_estimators": 32,
         "max_depth": 3,
-        "learning_rate": 0.1,
         "subsample": 1.0,
         "colsample_bytree": 1.0,
     },
@@ -81,11 +80,14 @@ DEFAULT_RESIDUAL_PARAMS_BY_MODEL = {
     "lightgbm": {
         "n_estimators": 64,
         "max_depth": 6,
-        "learning_rate": 0.05,
         "num_leaves": 31,
         "min_child_samples": 20,
         "feature_fraction": 1.0,
     },
+}
+RESIDUAL_INTERNAL_OPTIMIZER_DEFAULTS = {
+    "xgboost": {"eta": 0.1},
+    "lightgbm": {"shrinkage_rate": 0.05},
 }
 DEFAULT_RESIDUAL_PARAMS = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["xgboost"].copy()
 RESIDUAL_DEFAULTS = {
@@ -97,7 +99,6 @@ DEFAULT_TRAINING_PARAMS = {
     "valid_batch_size": 64,
     "windows_batch_size": 1024,
     "inference_windows_batch_size": 1024,
-    "learning_rate": 0.001,
     "scaler_type": None,
     "model_step_size": 1,
     "max_steps": 1000,
@@ -105,6 +106,16 @@ DEFAULT_TRAINING_PARAMS = {
     "val_check_steps": 100,
     "early_stop_patience_steps": -1,
     "num_lr_decays": -1,
+}
+DEFAULT_TRAINING_LR_SCHEDULER = {
+    "name": "OneCycleLR",
+    "max_lr": 0.001,
+    "pct_start": 0.3,
+    "div_factor": 25.0,
+    "final_div_factor": 10000.0,
+    "anneal_strategy": "cos",
+    "three_phase": False,
+    "cycle_momentum": False,
 }
 LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD = {"step_size": "model_step_size"}
 FIXED_TRAINING_VALUES = {
@@ -148,7 +159,6 @@ def _auto_default_param_specs(model_name: str) -> dict[str, SearchParamSpec] | N
             "hidden_size": {"type": "categorical", "choices": [64, 128, 256]},
             "dropout": {"type": "categorical", "choices": [0.0, 0.1, 0.2, 0.3, 0.5]},
             "n_head": {"type": "categorical", "choices": [4, 8]},
-            "learning_rate": {"type": "float", "low": 1e-4, "high": 1e-1, "log": True},
             "scaler_type": {"type": "categorical", "choices": [None, "robust", "standard"]},
             "batch_size": {"type": "categorical", "choices": [32, 64, 128, 256]},
             "windows_batch_size": {"type": "categorical", "choices": [128, 256, 512, 1024]},
@@ -506,8 +516,6 @@ def _normalize_training_section(
             raise ValueError(
                 f"search_space.{section}.per_model.{model_name} must define every training selector explicitly; missing: {', '.join(missing)}"
             )
-    if "learning_rate" in training["global"]:
-        return training
     return training
 
 
@@ -544,16 +552,6 @@ def normalize_search_space_payload(payload: dict[str, Any]) -> dict[str, Any]:
         )
 
     training = _normalize_training_section(payload.get("training"), section="training")
-    if "learning_rate" in training["global"]:
-        overlaps = sorted(
-            model_name for model_name, specs in models.items() if "learning_rate" in specs
-        )
-        if overlaps:
-            raise ValueError(
-                "search_space.training.global.learning_rate overlaps with model-level learning_rate selector(s): "
-                + ", ".join(overlaps)
-            )
-
     bs_preforcast_models, bs_preforcast_training = bs_preforcast_search_space.normalize_bs_preforcast_sections(
         payload,
         normalize_model_section=_normalize_model_section,

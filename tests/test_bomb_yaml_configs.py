@@ -44,7 +44,7 @@ def test_bomb_yaml_configs_follow_requested_constraints() -> None:
         assert runtime["transformations_exog"] == "diff"
         assert training["loss"] == "exloss"
         assert training["input_size"] in {48, 128}
-        assert training["learning_rate"] == 0.003
+        assert training["lr_scheduler"]["max_lr"] == 0.003
         assert training["max_steps"] == 800
         assert cv["horizon"] == 8
         assert all(job["model"] not in {"Naive", "xLSTM"} for job in jobs)
@@ -55,7 +55,7 @@ def test_bomb_yaml_configs_follow_requested_constraints() -> None:
             assert residual["model"] == "xgboost"
             assert residual["target"] in {"level", "delta"}
             assert residual["features"]["exog_sources"]["hist"] == dataset["hist_exog_cols"]
-            assert residual["params"]["learning_rate"] == 0.003
+            assert "learning_rate" not in residual["params"]
             assert residual["params"]["subsample"] == 0.5
             assert float(residual["params"]["colsample_bytree"]) == 0.9
         else:

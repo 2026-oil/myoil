@@ -44,8 +44,6 @@ class GRU(BaseModel):
         loss (PyTorch module): instantiated train loss class from [losses collection](./losses.pytorch).
         valid_loss (PyTorch module): instantiated valid loss class from [losses collection](./losses.pytorch).
         max_steps (int): maximum number of training steps.
-        learning_rate (float): Learning rate between (0, 1).
-        num_lr_decays (int): Number of learning rate decays, evenly distributed across max_steps.
         early_stop_patience_steps (int): Number of validation iterations before early stopping.
         val_check_steps (int): Number of training steps between every validation loss check.
         batch_size (int): number of different series in each batch.
@@ -61,8 +59,6 @@ class GRU(BaseModel):
         alias (str): optional,  Custom name of the model.
         optimizer (Subclass of 'torch.optim.Optimizer'): optional, user specified optimizer instead of the default choice (Adam).
         optimizer_kwargs (dict): optional, list of parameters used by the user specified optimizer.
-        lr_scheduler (Subclass of 'torch.optim.lr_scheduler.LRScheduler'): optional, user specified lr_scheduler instead of the default choice (StepLR).
-        lr_scheduler_kwargs (dict): optional, list of parameters used by the user specified lr_scheduler.
         dataloader_kwargs (dict): optional, list of parameters passed into the PyTorch Lightning dataloader by the `TimeSeriesDataLoader`.
         **trainer_kwargs (int):  keyword trainer arguments inherited from [PyTorch Lighning's trainer](https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.trainer.trainer.Trainer.html?highlight=trainer).
 
@@ -102,8 +98,6 @@ class GRU(BaseModel):
         loss=MAE(),
         valid_loss=None,
         max_steps: int = 1000,
-        learning_rate: float = 1e-3,
-        num_lr_decays: int = -1,
         early_stop_patience_steps: int = -1,
         val_check_steps: int = 100,
         batch_size=32,
@@ -119,8 +113,6 @@ class GRU(BaseModel):
         alias: Optional[str] = None,
         optimizer=None,
         optimizer_kwargs=None,
-        lr_scheduler=None,
-        lr_scheduler_kwargs=None,
         dataloader_kwargs=None,
         **trainer_kwargs
     ):
@@ -139,8 +131,6 @@ class GRU(BaseModel):
             loss=loss,
             valid_loss=valid_loss,
             max_steps=max_steps,
-            learning_rate=learning_rate,
-            num_lr_decays=num_lr_decays,
             early_stop_patience_steps=early_stop_patience_steps,
             val_check_steps=val_check_steps,
             batch_size=batch_size,
@@ -156,8 +146,6 @@ class GRU(BaseModel):
             alias=alias,
             optimizer=optimizer,
             optimizer_kwargs=optimizer_kwargs,
-            lr_scheduler=lr_scheduler,
-            lr_scheduler_kwargs=lr_scheduler_kwargs,
             dataloader_kwargs=dataloader_kwargs,
             **trainer_kwargs
         )

@@ -5,26 +5,12 @@ dataset:
   hist_exog_cols: []
   futr_exog_cols: []
   static_exog_cols: []
-training:
-  input_size: 1
-  learning_rate: 0.001
-  val_check_steps: 1
-  early_stop_patience_steps: -1
-  loss: mse
-cv:
-  horizon: 1
-  step_size: 1
-  n_windows: 2
-scheduler:
-  gpu_ids:
-  - 0
 residual:
   enabled: true
   model: lightgbm
   params:
     n_estimators: 8
     max_depth: 2
-    learning_rate: 0.1
     num_leaves: 7
     min_child_samples: 5
     feature_fraction: 1.0

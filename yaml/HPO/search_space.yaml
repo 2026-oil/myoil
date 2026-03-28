@@ -165,11 +165,6 @@ training:
       - 32
       - 64
       - 128
-    learning_rate:
-      type: float
-      low: 0.0003
-      high: 0.01
-      log: true
     scaler_type:
       type: categorical
       choices:
@@ -192,11 +187,6 @@ training:
         choices:
         - 32
         - 64
-      learning_rate:
-        type: float
-        low: 0.0005
-        high: 0.01
-        log: true
       scaler_type:
         type: categorical
         choices:
@@ -217,11 +207,6 @@ training:
         type: categorical
         choices:
         - 16
-      learning_rate:
-        type: float
-        low: 0.0003
-        high: 0.002
-        log: true
       scaler_type:
         type: categorical
         choices:
@@ -245,11 +230,6 @@ training:
         - 32
         - 64
         - 128
-      learning_rate:
-        type: float
-        low: 0.0003
-        high: 0.01
-        log: true
       scaler_type:
         type: categorical
         choices:
@@ -270,11 +250,6 @@ training:
         type: categorical
         choices:
         - 16
-      learning_rate:
-        type: float
-        low: 0.0004
-        high: 0.007
-        log: true
       scaler_type:
         type: categorical
         choices:
@@ -298,11 +273,6 @@ residual:
       low: 2
       high: 6
       step: 1
-    learning_rate:
-      type: float
-      low: 0.001
-      high: 0.3
-      log: true
     subsample:
       type: float
       low: 0.5
@@ -355,11 +325,6 @@ residual:
       - 6
       - 8
       - -1
-    learning_rate:
-      type: float
-      low: 0.001
-      high: 0.1
-      log: true
     num_leaves:
       type: categorical
       choices:
@@ -381,9 +346,9 @@ bs_preforcast_models:
     order:
       type: categorical
       choices:
-      - "[1, 0, 0]"
-      - "[1, 1, 0]"
-      - "[2, 1, 0]"
+      - '[1, 0, 0]'
+      - '[1, 1, 0]'
+      - '[2, 1, 0]'
     include_mean:
       type: categorical
       choices:
@@ -409,9 +374,9 @@ bs_preforcast_models:
     lags:
       type: categorical
       choices:
-      - "[1, 2, 3]"
-      - "[1, 2, 3, 6, 12]"
-      - "[1, 2, 3, 6, 12, 24]"
+      - '[1, 2, 3]'
+      - '[1, 2, 3, 6, 12]'
+      - '[1, 2, 3, 6, 12, 24]'
     n_estimators:
       type: categorical
       choices:
@@ -423,17 +388,13 @@ bs_preforcast_models:
       low: 2
       high: 6
       step: 1
-    learning_rate:
-      type: float
-      low: 0.01
-      high: 0.2
   lightgbm:
     lags:
       type: categorical
       choices:
-      - "[1, 2, 3]"
-      - "[1, 2, 3, 6, 12]"
-      - "[1, 2, 3, 6, 12, 24]"
+      - '[1, 2, 3]'
+      - '[1, 2, 3, 6, 12]'
+      - '[1, 2, 3, 6, 12, 24]'
     n_estimators:
       type: categorical
       choices:
@@ -446,10 +407,6 @@ bs_preforcast_models:
       - 4
       - 6
       - -1
-    learning_rate:
-      type: float
-      low: 0.01
-      high: 0.2
     num_leaves:
       type: categorical
       choices:

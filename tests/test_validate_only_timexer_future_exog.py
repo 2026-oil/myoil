@@ -56,7 +56,7 @@ def test_runtime_validate_only_accepts_timexer_future_exog(
                 "valid_batch_size": 1,
                 "windows_batch_size": 8,
                 "inference_windows_batch_size": 8,
-                "learning_rate": 0.001,
+                "lr_scheduler": {"name": "OneCycleLR", "max_lr": 0.001, "pct_start": 0.3, "div_factor": 25.0, "final_div_factor": 10000.0, "anneal_strategy": "cos", "three_phase": False, "cycle_momentum": False},
                 "max_steps": 1,
                 "val_size": 1,
                 "val_check_steps": 1,

@@ -5,6 +5,7 @@ import os
 from dataclasses import asdict, dataclass
 from typing import Any
 
+import torch
 from neuralforecast.losses.pytorch import ExLoss, MSE
 from neuralforecast.models import (
     Autoformer,
@@ -216,16 +217,26 @@ def build_model(
         "h": config.cv.horizon,
         "input_size": config.training.input_size,
         "max_steps": config.training.max_steps,
-        "learning_rate": config.training.learning_rate,
+        "max_lr": config.training.lr_scheduler.max_lr,
         "scaler_type": config.training.scaler_type,
         "step_size": config.training.model_step_size,
         "val_check_steps": config.training.val_check_steps,
-        "num_lr_decays": config.training.num_lr_decays,
         "early_stop_patience_steps": config.training.early_stop_patience_steps,
         "batch_size": config.training.batch_size,
         "valid_batch_size": config.training.valid_batch_size,
         "windows_batch_size": config.training.windows_batch_size,
         "inference_windows_batch_size": config.training.inference_windows_batch_size,
+        "lr_scheduler": torch.optim.lr_scheduler.OneCycleLR,
+        "lr_scheduler_kwargs": {
+            "max_lr": config.training.lr_scheduler.max_lr,
+            "total_steps": config.training.max_steps,
+            "pct_start": config.training.lr_scheduler.pct_start,
+            "div_factor": config.training.lr_scheduler.div_factor,
+            "final_div_factor": config.training.lr_scheduler.final_div_factor,
+            "anneal_strategy": config.training.lr_scheduler.anneal_strategy,
+            "three_phase": config.training.lr_scheduler.three_phase,
+            "cycle_momentum": config.training.lr_scheduler.cycle_momentum,
+        },
         "random_seed": config.runtime.random_seed,
         "alias": job.model,
         "enable_checkpointing": False,

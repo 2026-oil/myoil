@@ -55,7 +55,7 @@ def _search_space_payload() -> dict[str, Any]:
             "global": {
                 "input_size": {"type": "categorical", "choices": [64]},
                 "batch_size": {"type": "categorical", "choices": [32]},
-                "learning_rate": {"type": "categorical", "choices": [0.001]},
+                
                 "scaler_type": {"type": "categorical", "choices": [None]},
             },
             "per_model": {},

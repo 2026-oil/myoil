@@ -40,7 +40,7 @@ def test_dlinear_forward_uses_hist_exog():
         h=2,
         input_size=4,
         max_steps=1,
-        learning_rate=1e-3,
+        max_lr=1e-3,
         batch_size=1,
         valid_batch_size=1,
         windows_batch_size=1,
