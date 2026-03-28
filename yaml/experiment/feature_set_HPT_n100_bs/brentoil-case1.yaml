@@ -1,0 +1,42 @@
+task:
+  name: brentoil_case1_HPO
+dataset:
+  path: data/df.csv
+  target_col: Com_BrentCrudeOil
+  dt_col: dt
+  hist_exog_cols:
+  - Com_Gasoline
+  - Com_Steel
+  - Bonds_US_Spread_10Y_1Y
+  - Bonds_CHN_Spread_30Y_5Y
+  - EX_USD_BRL
+  - Com_Cheese
+  - Bonds_BRZ_Spread_10Y_1Y
+  - Com_Cu_Gold_Ratio
+  - Idx_OVX
+  - Com_Oil_Spread
+  - Com_LME_Zn_Spread
+  - Idx_CSI300
+  - Bonds_CHN_Spread_5Y_1Y
+  - Com_LME_Cu_Spread
+  - Com_LME_Pb_Spread
+  - Com_LME_Al_Spread
+  - BS_Core_Index_A
+  - BS_Core_Index_B
+  - BS_Core_Index_C
+  - BS_Core_Index_Integrated
+  futr_exog_cols: []
+  static_exog_cols: []
+runtime:
+  opt_n_trial: 100
+training:
+  dataloader_kwargs:
+    num_workers: 2
+    pin_memory: true
+    persistent_workers: true
+    prefetch_factor: 2
+scheduler:
+  parallelize_single_job_tuning: true
+residual:
+  enabled: false
+jobs: yaml/jobs/jobs_tune.yaml

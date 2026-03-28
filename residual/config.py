@@ -25,7 +25,7 @@ from .optuna_spaces import (
 )
 
 CONFIG_FILENAMES = ("config.yaml", "config.yml", "config.toml")
-SHARED_SETTINGS_RELATIVE_PATH = Path("yaml/setting.yaml")
+SHARED_SETTINGS_RELATIVE_PATH = Path("yaml/setting/setting.yaml")
 DEFAULT_MANIFEST_VERSION = "1"
 DEFAULT_ARTIFACT_SCHEMA_VERSION = "1"
 DEFAULT_EVALUATION_PROTOCOL_VERSION = "2"
@@ -61,32 +61,29 @@ LEGACY_SHARED_JOB_TRAINING_KEYS = {
 }
 SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
     "runtime.random_seed",
+    "training.input_size",
     "training.batch_size",
     "training.valid_batch_size",
     "training.windows_batch_size",
     "training.inference_windows_batch_size",
+    "training.learning_rate",
     "training.max_steps",
     "training.val_size",
-    "training.model_step_size",
-    "cv.gap",
-    "cv.overlap_eval_policy",
-    "scheduler.max_concurrent_jobs",
-    "scheduler.worker_devices",
-)
-FAMILY_SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
-    "training.input_size",
-    "training.learning_rate",
     "training.val_check_steps",
+    "training.model_step_size",
     "training.early_stop_patience_steps",
     "training.loss",
+    "cv.gap",
     "cv.horizon",
     "cv.step_size",
     "cv.n_windows",
     "cv.max_train_size",
+    "cv.overlap_eval_policy",
     "scheduler.gpu_ids",
+    "scheduler.max_concurrent_jobs",
+    "scheduler.worker_devices",
 )
 SHARED_SETTINGS_MAPPING_DOTTED_PATHS = frozenset()
-SHARED_SETTINGS_FAMILY_DEFAULTS_KEY = "family_defaults"
 RESIDUAL_FEATURE_KEYS = {
     "include_base_prediction",
     "include_horizon_step",
@@ -395,60 +392,13 @@ def _validate_shared_settings_payload(payload: Any) -> dict[str, Any]:
     if payload is None:
         return {}
     if not isinstance(payload, dict):
-        raise ValueError("yaml/setting.yaml must be a mapping")
-
-    validated = dict(payload)
-    global_payload = {
-        key: value
-        for key, value in validated.items()
-        if key != SHARED_SETTINGS_FAMILY_DEFAULTS_KEY
-    }
+        raise ValueError("yaml/setting/setting.yaml must be a mapping")
     _validate_shared_settings_fragment(
-        global_payload,
+        dict(payload),
         owned_paths=SHARED_SETTINGS_OWNED_DOTTED_PATHS,
-        section_label="yaml/setting.yaml",
+        section_label="yaml/setting/setting.yaml",
     )
-
-    family_defaults = validated.get(SHARED_SETTINGS_FAMILY_DEFAULTS_KEY)
-    if family_defaults is None:
-        return validated
-    if not isinstance(family_defaults, dict):
-        raise ValueError("yaml/setting.yaml family_defaults must be a mapping")
-    for family_name, family_payload in family_defaults.items():
-        if not isinstance(family_payload, dict):
-            raise ValueError(
-                f"yaml/setting.yaml family_defaults.{family_name} must be a mapping"
-            )
-        files_payload = family_payload.get("files")
-        family_base = {
-            key: value for key, value in family_payload.items() if key != "files"
-        }
-        _validate_shared_settings_fragment(
-            family_base,
-            owned_paths=FAMILY_SHARED_SETTINGS_OWNED_DOTTED_PATHS,
-            section_label=f"yaml/setting.yaml family_defaults.{family_name}",
-        )
-        if files_payload is None:
-            continue
-        if not isinstance(files_payload, dict):
-            raise ValueError(
-                f"yaml/setting.yaml family_defaults.{family_name}.files must be a mapping"
-            )
-        for filename, file_payload in files_payload.items():
-            if not isinstance(file_payload, dict):
-                raise ValueError(
-                    "yaml/setting.yaml "
-                    f"family_defaults.{family_name}.files.{filename} must be a mapping"
-                )
-            _validate_shared_settings_fragment(
-                file_payload,
-                owned_paths=FAMILY_SHARED_SETTINGS_OWNED_DOTTED_PATHS,
-                section_label=(
-                    "yaml/setting.yaml "
-                    f"family_defaults.{family_name}.files.{filename}"
-                ),
-            )
-    return validated
+    return dict(payload)
 
 
 def _load_shared_settings_for_yaml_app_config(
@@ -465,11 +415,18 @@ def _load_shared_settings_for_yaml_app_config(
 
 def _uses_repo_shared_settings(repo_root: Path, source_path: Path) -> bool:
     try:
-        return source_path.resolve().is_relative_to(repo_root.resolve())
+        relative_path = source_path.resolve().relative_to(repo_root.resolve())
     except AttributeError:
         source_resolved = source_path.resolve()
         repo_resolved = repo_root.resolve()
-        return str(source_resolved).startswith(str(repo_resolved) + "/")
+        if not str(source_resolved).startswith(str(repo_resolved) + "/"):
+            return False
+        relative_path = Path(str(source_resolved)[len(str(repo_resolved)) + 1 :])
+    except ValueError:
+        return False
+    return relative_path == Path("config.yaml") or (
+        bool(relative_path.parts) and relative_path.parts[0] == "yaml"
+    )
 
 
 def _overlay_shared_fragment(
@@ -492,44 +449,13 @@ def _effective_shared_settings_for_source(
     source_path: Path,
     shared_settings: dict[str, Any],
 ) -> tuple[dict[str, Any], tuple[str, ...]]:
+    del repo_root, source_path
     effective = _overlay_shared_fragment(
         {},
-        {
-            key: value
-            for key, value in shared_settings.items()
-            if key != SHARED_SETTINGS_FAMILY_DEFAULTS_KEY
-        },
+        shared_settings,
         owned_paths=SHARED_SETTINGS_OWNED_DOTTED_PATHS,
     )
-    owned_paths = list(SHARED_SETTINGS_OWNED_DOTTED_PATHS)
-    try:
-        relative_parts = source_path.resolve().relative_to(repo_root.resolve()).parts
-    except ValueError:
-        return effective, tuple(owned_paths)
-    if len(relative_parts) < 3 or relative_parts[0] != "yaml":
-        return effective, tuple(owned_paths)
-    family_name = relative_parts[1]
-    filename = relative_parts[-1]
-    family_defaults = shared_settings.get(SHARED_SETTINGS_FAMILY_DEFAULTS_KEY, {})
-    if not isinstance(family_defaults, dict):
-        return effective, tuple(owned_paths)
-    family_payload = family_defaults.get(family_name)
-    if not isinstance(family_payload, dict):
-        return effective, tuple(owned_paths)
-    effective = _overlay_shared_fragment(
-        effective,
-        {key: value for key, value in family_payload.items() if key != "files"},
-        owned_paths=FAMILY_SHARED_SETTINGS_OWNED_DOTTED_PATHS,
-    )
-    owned_paths.extend(FAMILY_SHARED_SETTINGS_OWNED_DOTTED_PATHS)
-    files_payload = family_payload.get("files")
-    if isinstance(files_payload, dict) and isinstance(files_payload.get(filename), dict):
-        effective = _overlay_shared_fragment(
-            effective,
-            files_payload[filename],
-            owned_paths=FAMILY_SHARED_SETTINGS_OWNED_DOTTED_PATHS,
-        )
-    return effective, tuple(dict.fromkeys(owned_paths))
+    return effective, SHARED_SETTINGS_OWNED_DOTTED_PATHS
 
 
 def _merge_shared_settings_into_payload(
@@ -1684,7 +1610,7 @@ def load_app_config(
         if stage_source_path.exists():
             stage_search_space_contract = search_space_contract
             if stage_search_space_contract is None:
-                candidate = (repo_root / "search_space.yaml").resolve()
+                candidate = (repo_root / "yaml/HPO/search_space.yaml").resolve()
                 if candidate.exists():
                     stage_search_space_contract = load_search_space_contract(repo_root)
             bs_preforcast_stage1 = bs_preforcast_config.load_bs_preforcast_stage1(

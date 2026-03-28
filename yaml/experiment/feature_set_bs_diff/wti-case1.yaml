@@ -1,0 +1,34 @@
+task:
+  name: wti_case1
+dataset:
+  path: data/df.csv
+  target_col: Com_CrudeOil
+  dt_col: dt
+  hist_exog_cols:
+  - Com_Gasoline
+  - Com_LME_Zn_Inv
+  - Com_OrangeJuice
+  - Com_Cheese
+  - Bonds_BRZ_1Y
+  - Idx_OVX
+  - Com_Cu_Gold_Ratio
+  - Com_LME_Sn_Inv
+  - Idx_CSI300
+  - Com_LME_Zn_Spread
+  - Bonds_CHN_Spread_5Y_2Y
+  - Com_LME_Al_Spread
+  - Bonds_CHN_Spread_2Y_1Y
+  - Com_Oil_Spread
+  - Bonds_CHN_Spread_10Y_5Y
+  - BS_Core_Index_A
+  - BS_Core_Index_B
+  - BS_Core_Index_C
+  - BS_Core_Index_Integrated
+  futr_exog_cols: []
+  static_exog_cols: []
+runtime:
+  transformations_target: diff
+  transformations_exog: diff
+residual:
+  enabled: false
+jobs: yaml/jobs/jobs_default.yaml

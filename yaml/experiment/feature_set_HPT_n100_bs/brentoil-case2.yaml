@@ -1,17 +1,27 @@
 task:
-  name: brentoil_case1_HPO
+  name: brentoil_case2_HPO
 dataset:
   path: data/df.csv
-  target_col: BS_Core_Index_Integrated
+  target_col: Com_BrentCrudeOil
   dt_col: dt
   hist_exog_cols:
-  - Idx_SnPVIX
-  - Bonds_MOVE
-  - Idx_GVZ
-  - Idx_OVX
-  - Idx_DxyUSD
+  - Com_Gasoline
   - Com_BloombergCommodity_BCOM
+  - Com_LME_Ni_Cash
+  - Com_Coal
+  - Com_Cotton
+  - Com_LME_Al_Cash
+  - Bonds_KOR_10Y
+  - Com_Barley
+  - Com_Canola
   - Com_LMEX
+  - Com_LME_Ni_Inv
+  - Com_Corn
+  - Com_Wheat
+  - BS_Core_Index_A
+  - BS_Core_Index_B
+  - BS_Core_Index_C
+  - BS_Core_Index_Integrated
   futr_exog_cols: []
   static_exog_cols: []
 runtime:

@@ -132,7 +132,7 @@ def _write_search_space(
     root: Path,
     payload: dict[str, Any] | None = None,
     *,
-    name: str = "search_space.yaml",
+    name: str = "yaml/HPO/search_space.yaml",
 ) -> Path:
     if payload is None:
         payload = {
@@ -334,7 +334,7 @@ def _payload() -> dict:
 def _main_bs_preforcast(
     *,
     enabled: bool = True,
-    config_path: str | None = "bs_preforcast.yaml",
+    config_path: str | None = "yaml/plugins/bs_preforcast.yaml",
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {"enabled": enabled}
     if config_path is not None:
@@ -432,7 +432,7 @@ def _load_search_space_strict() -> dict[str, Any]:
     )
     return cast(
         dict[str, Any],
-        yaml.load((REPO_ROOT / "search_space.yaml").read_text(), Loader=UniqueKeySafeLoader),
+        yaml.load((REPO_ROOT / "yaml/HPO/search_space.yaml").read_text(), Loader=UniqueKeySafeLoader),
     )
 
 
@@ -2268,9 +2268,9 @@ def test_default_output_root_uses_repo_name_for_repo_root_config():
 @pytest.mark.parametrize(
     ("config_path", "expected_name"),
     [
-        ("yaml/feature_set/wti-case3.yaml", "feature_set_wti_case3"),
+        ("yaml/experiment/feature_set/wti-case3.yaml", "feature_set_wti_case3"),
         (
-            "yaml/feature_set_HPT/brentoil-case3.yaml",
+            "yaml/experiment/feature_set_HPT/brentoil-case3.yaml",
             "feature_set_HPT_brentoil_case3_HPT",
         ),
     ],
@@ -2289,7 +2289,7 @@ def test_default_output_root_uses_config_parent_for_nested_repo_configs(
 def test_default_output_root_for_feature_set_residual_wti_case3_config():
     from residual.runtime import _default_output_root
 
-    loaded = load_app_config(REPO_ROOT, config_path="yaml/feature_set_residual/wti-case3.yaml")
+    loaded = load_app_config(REPO_ROOT, config_path="yaml/experiment/feature_set_residual/wti-case3.yaml")
 
     assert _default_output_root(REPO_ROOT, loaded) == (
         REPO_ROOT / "runs" / "feature_set_residual_wti_case3_residual"
@@ -2300,7 +2300,7 @@ def test_default_output_root_for_feature_set_hpt_n100_residual_wti_case3_config(
     from residual.runtime import _default_output_root
 
     loaded = load_app_config(
-        REPO_ROOT, config_path="yaml/feature_set_HPT_n100_residual/wti-case3.yaml"
+        REPO_ROOT, config_path="yaml/experiment/feature_set_HPT_n100_residual/wti-case3.yaml"
     )
 
     assert _default_output_root(REPO_ROOT, loaded) == (
@@ -3567,7 +3567,7 @@ def test_load_app_config_marks_auto_requested_and_validated_modes(tmp_path: Path
     assert loaded.config.training_search.validated_mode == "training_fixed"
     assert list(loaded.config.training_search.selected_search_params) == []
     assert loaded.normalized_payload["search_space_path"] == str(
-        (tmp_path / "search_space.yaml").resolve()
+        (tmp_path / "yaml/HPO/search_space.yaml").resolve()
     )
     assert loaded.normalized_payload["search_space_sha256"]
 
@@ -3583,7 +3583,8 @@ def test_load_app_config_normalizes_bs_preforcast_selection(tmp_path: Path):
         "2020-01-15,3,4,12,22\n",
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             _thin_plugin_stage_payload(
                 jobs=[{"model": "TFT", "params": {"hidden_size": 32}}],
@@ -3612,8 +3613,8 @@ def test_load_app_config_normalizes_bs_preforcast_selection(tmp_path: Path):
     assert loaded.config.bs_preforcast.enabled is True
     assert loaded.config.bs_preforcast.task.multivariable is True
     assert loaded.config.bs_preforcast.target_columns == ("bs_a", "bs_b")
-    assert loaded.config.bs_preforcast.config_path == "bs_preforcast.yaml"
-    assert loaded.normalized_payload["bs_preforcast"]["config_path"] == "bs_preforcast.yaml"
+    assert loaded.config.bs_preforcast.config_path == "yaml/plugins/bs_preforcast.yaml"
+    assert loaded.normalized_payload["bs_preforcast"]["config_path"] == "yaml/plugins/bs_preforcast.yaml"
 
 
 def test_load_app_config_defaults_bs_preforcast_config_path_when_enabled(
@@ -3630,7 +3631,8 @@ def test_load_app_config_defaults_bs_preforcast_config_path_when_enabled(
 """,
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             _thin_plugin_stage_payload(
                 jobs=[{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
@@ -3642,10 +3644,10 @@ def test_load_app_config_defaults_bs_preforcast_config_path_when_enabled(
     )
     _write_search_space(tmp_path, {"models": {}, "training": [], "residual": {"xgboost": ["n_estimators"]}, "bs_preforcast_models": {}, "bs_preforcast_training": []})
     loaded = load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
-    assert loaded.config.bs_preforcast.config_path == "bs_preforcast.yaml"
-    assert loaded.normalized_payload["bs_preforcast"]["config_path"] == "bs_preforcast.yaml"
+    assert loaded.config.bs_preforcast.config_path == "yaml/plugins/bs_preforcast.yaml"
+    assert loaded.normalized_payload["bs_preforcast"]["config_path"] == "yaml/plugins/bs_preforcast.yaml"
     assert loaded.bs_preforcast_stage1 is not None
-    assert loaded.bs_preforcast_stage1.source_path == (tmp_path / "bs_preforcast.yaml").resolve()
+    assert loaded.bs_preforcast_stage1.source_path == (tmp_path / "yaml/plugins/bs_preforcast.yaml").resolve()
     assert loaded.bs_preforcast_stage1.config.jobs[0].model == "DummyUnivariate"
 
 def test_load_app_config_accepts_independent_bs_preforcast_config_path(
@@ -3689,7 +3691,7 @@ def test_load_app_config_rejects_legacy_bs_preforcast_routing_keys(
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     payload["bs_preforcast"] = {
         "enabled": True,
-        "config_path": "bs_preforcast.yaml",
+        "config_path": "yaml/plugins/bs_preforcast.yaml",
         "routing": {
             "univariable_config": "yaml/legacy-univariable.yaml",
             "multivariable_config": "yaml/legacy-multivariable.yaml",
@@ -3716,7 +3718,7 @@ def test_load_app_config_rejects_inline_bs_preforcast_owner_fields(
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     payload["bs_preforcast"] = {
         "enabled": True,
-        "config_path": "bs_preforcast.yaml",
+        "config_path": "yaml/plugins/bs_preforcast.yaml",
         "using_futr_exog": True,
         "target_columns": ["bs_a"],
         "task": {"multivariable": False},
@@ -3746,7 +3748,8 @@ def test_load_app_config_rejects_routed_bs_preforcast_without_target_columns(
         "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             {
                 **_linked_bs_preforcast(target_columns=()),
@@ -3777,7 +3780,8 @@ def test_load_app_config_rejects_routed_bs_preforcast_without_owner_block(
         "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             {
                 "jobs": [
@@ -3907,7 +3911,8 @@ def test_load_app_config_loads_bs_preforcast_stage1_with_dedicated_search_space(
 """,
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(_thin_plugin_stage_payload(jobs=[{"model": "TFT", "params": {"hidden_size": 16, "n_head": 1, "attn_dropout": 0.0, "dropout": 0.0}}], target_columns=("bs_a", "bs_b")), sort_keys=False),
         encoding="utf-8",
     )
@@ -3926,7 +3931,8 @@ def test_load_app_config_rejects_invalid_linked_bs_preforcast_owner_keys(tmp_pat
         "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n2020-01-15,3,4\n",
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             {
                 "bs_preforcast": {"enabled": True, "target_columns": ["bad"]},
@@ -4204,7 +4210,7 @@ def test_load_app_config_uses_repo_root_search_space_not_config_parent(tmp_path:
 
     loaded = load_app_config(repo_root, config_path=config_path)
 
-    assert loaded.search_space_path == (repo_root / "search_space.yaml").resolve()
+    assert loaded.search_space_path == (repo_root / "yaml/HPO/search_space.yaml").resolve()
     assert list(loaded.config.jobs[0].selected_search_params) == [
         "hidden_size",
         "dropout",
@@ -4278,7 +4284,7 @@ def test_runtime_auto_mode_records_selector_provenance_and_modes(
     manifest = json.loads((output_root / "manifest" / "run_manifest.json").read_text())
 
     assert resolved["search_space_path"] == str(
-        (tmp_path / "search_space.yaml").resolve()
+        (tmp_path / "yaml/HPO/search_space.yaml").resolve()
     )
     assert resolved["jobs"][0]["requested_mode"] == "learned_auto_requested"
     assert resolved["jobs"][0]["validated_mode"] == "learned_auto"
@@ -4288,7 +4294,7 @@ def test_runtime_auto_mode_records_selector_provenance_and_modes(
     assert capability["TFT"]["validated_mode"] == "learned_auto"
     assert capability["training_search"]["validated_mode"] == "training_fixed"
     assert manifest["search_space_path"] == str(
-        (tmp_path / "search_space.yaml").resolve()
+        (tmp_path / "yaml/HPO/search_space.yaml").resolve()
     )
     assert manifest["jobs"][0]["requested_mode"] == "learned_auto_requested"
     assert manifest["jobs"][0]["validated_mode"] == "learned_auto"
@@ -4315,7 +4321,8 @@ def test_runtime_validate_only_records_bs_preforcast_metadata(
 """,
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(yaml.safe_dump(stage_payload, sort_keys=False), encoding="utf-8")
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(yaml.safe_dump(stage_payload, sort_keys=False), encoding="utf-8")
     _write_search_space(tmp_path, {"models": {}, "training": [], "residual": {"xgboost": ["n_estimators"]}, "bs_preforcast_models": {}, "bs_preforcast_training": []})
     config_path = _write_config(tmp_path, payload, ".yaml")
     from residual import runtime
@@ -4328,12 +4335,12 @@ def test_runtime_validate_only_records_bs_preforcast_metadata(
     manifest = json.loads((output_root / "manifest" / "run_manifest.json").read_text())
     assert resolved["bs_preforcast"]["enabled"] is True
     assert resolved["bs_preforcast"]["target_columns"] == ["bs_a", "bs_b"]
-    assert resolved["bs_preforcast"]["config_path"] == "bs_preforcast.yaml"
+    assert resolved["bs_preforcast"]["config_path"] == "yaml/plugins/bs_preforcast.yaml"
     assert capability["bs_preforcast"]["enabled"] is True
     assert capability["bs_preforcast"]["multivariable"] is False
-    assert capability["bs_preforcast"]["selected_config_path"] == str((tmp_path / "bs_preforcast.yaml").resolve())
+    assert capability["bs_preforcast"]["selected_config_path"] == str((tmp_path / "yaml/plugins/bs_preforcast.yaml").resolve())
     assert manifest["bs_preforcast"]["target_columns"] == ["bs_a", "bs_b"]
-    assert manifest["bs_preforcast"]["config_path"] == "bs_preforcast.yaml"
+    assert manifest["bs_preforcast"]["config_path"] == "yaml/plugins/bs_preforcast.yaml"
     assert (output_root / "bs_preforcast" / "config" / "config.resolved.json").exists()
     assert (output_root / "bs_preforcast" / "config" / "capability_report.json").exists()
     assert (output_root / "bs_preforcast" / "manifest" / "run_manifest.json").exists()
@@ -4359,7 +4366,8 @@ def test_runtime_validate_only_records_mixed_job_injection_results(
         "2020-01-15,3,4,12,22\n",
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             _thin_plugin_stage_payload(
                 jobs=[{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
@@ -4418,7 +4426,8 @@ def test_runtime_validate_only_bs_preforcast_fails_for_legacy_using_futr_exog(
         "2020-01-15,3,4,12\n",
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             _thin_plugin_stage_payload(
                 jobs=[{"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}],
@@ -4474,7 +4483,8 @@ def test_prepare_bs_preforcast_fold_inputs_routes_same_name_target_to_futr_exog(
         "2020-01-15,3,4,12\n",
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             _thin_plugin_stage_payload(
                 jobs=[
@@ -4542,7 +4552,8 @@ def test_prepare_bs_preforcast_fold_inputs_moves_overlap_target_out_of_hist_for_
         "2020-01-15,3,4,9,12\n",
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             _thin_plugin_stage_payload(
                 jobs=[
@@ -4608,7 +4619,8 @@ def test_prepare_bs_preforcast_fold_inputs_uses_same_name_lag_path_for_non_futr_
         "2020-01-15,3,4,12\n",
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             _thin_plugin_stage_payload(
                 jobs=[
@@ -4679,7 +4691,8 @@ def test_prepare_bs_preforcast_fold_inputs_missing_forecasts_fail_fast(
         "2020-01-15,3,4,12\n",
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             _thin_plugin_stage_payload(
                 jobs=[
@@ -4754,7 +4767,8 @@ def test_prepare_bs_preforcast_fold_inputs_uses_same_name_futr_path_for_timexer_
         "2020-01-15,3,4,12\n",
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             _thin_plugin_stage_payload(
                 jobs=[
@@ -4821,7 +4835,8 @@ def test_prepare_bs_preforcast_fold_inputs_auto_adds_missing_target_to_futr_exog
         "2020-01-15,3,4,12\n",
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             _thin_plugin_stage_payload(
                 jobs=[
@@ -4885,7 +4900,8 @@ def test_bs_preforcast_inline_learned_stage_surfaces_multi_gpu_resolution(
         "2020-01-15,3,4,12\n",
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             _thin_plugin_stage_payload(
                 jobs=[
@@ -4980,7 +4996,8 @@ def test_bs_preforcast_stage_baseline_job_stays_rejected(tmp_path: Path):
         "2020-01-15,3,4,12\n",
         encoding="utf-8",
     )
-    (tmp_path / "bs_preforcast.yaml").write_text(
+    (tmp_path / "yaml/plugins").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(
         yaml.safe_dump(
             _thin_plugin_stage_payload(jobs=[{"model": "Naive", "params": {}}]),
             sort_keys=False,
@@ -6163,7 +6180,7 @@ def test_package_exports_and_intentional_omissions_are_explicit():
     assert "autononstationarytransformer" not in MODEL_FILENAME_DICT
     assert "DeformableTST" in SUPPORTED_AUTO_MODEL_NAMES
     assert "DeformableTST" in MODEL_CLASSES
-    search_space = yaml.safe_load((REPO_ROOT / "search_space.yaml").read_text())
+    search_space = yaml.safe_load((REPO_ROOT / "yaml/HPO/search_space.yaml").read_text())
     assert "DeformTime" in search_space["models"]
     assert "DeepEDM" not in search_space["models"]
     assert "NonstationaryTransformer" not in search_space["models"]
@@ -6672,79 +6689,79 @@ def test_top_level_yaml_files_pin_fixed_training_controls(path: Path):
 
 
 CASE_YAML_FILES = [
-    REPO_ROOT / "yaml" / "feature_set" / "brentoil-case1.yaml",
-    REPO_ROOT / "yaml" / "feature_set" / "brentoil-case2.yaml",
-    REPO_ROOT / "yaml" / "feature_set" / "brentoil-case3.yaml",
-    REPO_ROOT / "yaml" / "feature_set" / "brentoil-case4.yaml",
-    REPO_ROOT / "yaml" / "feature_set" / "wti-case1.yaml",
-    REPO_ROOT / "yaml" / "feature_set" / "wti-case2.yaml",
-    REPO_ROOT / "yaml" / "feature_set" / "wti-case3.yaml",
-    REPO_ROOT / "yaml" / "feature_set" / "wti-case4.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set" / "brentoil-case1.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set" / "brentoil-case2.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set" / "brentoil-case3.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set" / "brentoil-case4.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set" / "wti-case1.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set" / "wti-case2.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set" / "wti-case3.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set" / "wti-case4.yaml",
 ]
 
 FEATURE_SET_RESIDUAL_YAML_FILES = [
-    REPO_ROOT / "yaml" / "feature_set_residual" / "brentoil-case1.yaml",
-    REPO_ROOT / "yaml" / "feature_set_residual" / "brentoil-case2.yaml",
-    REPO_ROOT / "yaml" / "feature_set_residual" / "brentoil-case3.yaml",
-    REPO_ROOT / "yaml" / "feature_set_residual" / "brentoil-case4.yaml",
-    REPO_ROOT / "yaml" / "feature_set_residual" / "wti-case1.yaml",
-    REPO_ROOT / "yaml" / "feature_set_residual" / "wti-case2.yaml",
-    REPO_ROOT / "yaml" / "feature_set_residual" / "wti-case3.yaml",
-    REPO_ROOT / "yaml" / "feature_set_residual" / "wti-case4.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case1.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case2.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case3.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case4.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case1.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case2.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case3.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case4.yaml",
 ]
 
 NEW_FEATURE_SET_RESIDUAL_YAML_FILES = [
-    REPO_ROOT / "yaml" / "feature_set_residual" / "brentoil-case1.yaml",
-    REPO_ROOT / "yaml" / "feature_set_residual" / "brentoil-case2.yaml",
-    REPO_ROOT / "yaml" / "feature_set_residual" / "brentoil-case4.yaml",
-    REPO_ROOT / "yaml" / "feature_set_residual" / "wti-case1.yaml",
-    REPO_ROOT / "yaml" / "feature_set_residual" / "wti-case2.yaml",
-    REPO_ROOT / "yaml" / "feature_set_residual" / "wti-case4.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case1.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case2.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "brentoil-case4.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case1.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case2.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_residual" / "wti-case4.yaml",
 ]
 
 HPT_CASE12_YAML_FILES = [
-    REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case1.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case2.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case1.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case2.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case1.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case2.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case1.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case2.yaml",
 ]
 
 HPT_YAML_FILES = [
-    REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case1.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case2.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case3.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case4.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case1.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case2.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case3.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case4.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case1.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case2.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case3.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case4.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case1.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case2.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case3.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case4.yaml",
 ]
 
 HPT_N100_YAML_FILES = [
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "brentoil-case1.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "brentoil-case2.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "brentoil-case3.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "brentoil-case4.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "wti-case1.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "wti-case2.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "wti-case3.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100" / "wti-case4.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "brentoil-case1.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "brentoil-case2.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "brentoil-case3.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "brentoil-case4.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "wti-case1.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "wti-case2.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "wti-case3.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / "wti-case4.yaml",
 ]
 
 HPT_N100_RESIDUAL_YAML_FILES = [
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "brentoil-case1.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "brentoil-case2.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "brentoil-case3.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "brentoil-case4.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "wti-case1.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "wti-case2.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "wti-case3.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual" / "wti-case4.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "brentoil-case1.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "brentoil-case2.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "brentoil-case3.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "brentoil-case4.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "wti-case1.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "wti-case2.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "wti-case3.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual" / "wti-case4.yaml",
 ]
 
 HPT_CASE3_REP_YAML_FILES = [
-    REPO_ROOT / "yaml" / "feature_set_HPT" / "brentoil-case3.yaml",
-    REPO_ROOT / "yaml" / "feature_set_HPT" / "wti-case3.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "brentoil-case3.yaml",
+    REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT" / "wti-case3.yaml",
 ]
 
 OPTUNA_CONFIG_YAML_FILES = [
@@ -6846,7 +6863,7 @@ EXPECTED_HPT_N100_MODELS = [
 ]
 
 SEARCH_SPACE_PAYLOAD = yaml.safe_load(
-    (REPO_ROOT / "search_space.yaml").read_text(encoding="utf-8")
+    (REPO_ROOT / "yaml/HPO/search_space.yaml").read_text(encoding="utf-8")
 )
 SEARCH_SPACE_MODELS_RAW = SEARCH_SPACE_PAYLOAD["models"]
 SEARCH_SPACE_MODELS = {
@@ -7171,7 +7188,7 @@ def _case_jobs_by_model(path: Path) -> dict[str, dict[str, Any]]:
 
 
 def _hpt_n100_source_path_for_residual(path: Path) -> Path:
-    return REPO_ROOT / "yaml" / "feature_set_HPT_n100" / path.name
+    return REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100" / path.name
 
 
 def _normalized_payload_without_task_and_residual(payload: dict[str, Any]) -> dict[str, Any]:
@@ -7185,31 +7202,31 @@ def _normalized_payload_without_task_and_residual(payload: dict[str, Any]) -> di
     "relative_path, expected_jobs_ref",
     [
         (
-            "yaml/feature_set/brentoil-case1.yaml",
+            "yaml/experiment/feature_set/brentoil-case1.yaml",
             [
-                "yaml/jobs_1.yaml",
-                "yaml/jobs_2.yaml",
-                "yaml/jobs_3.yaml",
-                "yaml/jobs_4.yaml",
+                "yaml/jobs/jobs_1.yaml",
+                "yaml/jobs/jobs_2.yaml",
+                "yaml/jobs/jobs_3.yaml",
+                "yaml/jobs/jobs_4.yaml",
             ],
         ),
         (
-            "yaml/feature_set_bs/brentoil-case1.yaml",
+            "yaml/experiment/feature_set_bs/brentoil-case1.yaml",
             [
-                "yaml/jobs_1.yaml",
-                "yaml/jobs_2.yaml",
-                "yaml/jobs_3.yaml",
-                "yaml/jobs_4.yaml",
+                "yaml/jobs/jobs_1.yaml",
+                "yaml/jobs/jobs_2.yaml",
+                "yaml/jobs/jobs_3.yaml",
+                "yaml/jobs/jobs_4.yaml",
             ],
         ),
-        ("yaml/feature_set_bs_diff/brentoil-case1.yaml", "yaml/jobs_default.yaml"),
-        ("yaml/feature_set_bs_exloss/brentoil-case1.yaml", "yaml/jobs_default.yaml"),
-        ("yaml/feature_set_residual/brentoil-case1.yaml", "yaml/jobs_default.yaml"),
-        ("yaml/feature_set_residual_bs/brentoil-case1.yaml", "yaml/jobs_default.yaml"),
-        ("yaml/feature_set_residual_params/brentoil-case3.yaml", "yaml/jobs_default.yaml"),
-        ("yaml/feature_set_HPT_n100_bs/brentoil-case1.yaml", "yaml/jobs_tune.yaml"),
-        ("yaml/feature_set_HPT_n100_residual/brentoil-case1.yaml", "yaml/jobs_tune.yaml"),
-        ("yaml/feature_set_residual_bs_HPT/brentoil-case1.yaml", "yaml/jobs_tune.yaml"),
+        ("yaml/experiment/feature_set_bs_diff/brentoil-case1.yaml", "yaml/jobs/jobs_default.yaml"),
+        ("yaml/experiment/feature_set_bs_exloss/brentoil-case1.yaml", "yaml/jobs/jobs_default.yaml"),
+        ("yaml/experiment/feature_set_residual/brentoil-case1.yaml", "yaml/jobs/jobs_default.yaml"),
+        ("yaml/experiment/feature_set_residual_bs/brentoil-case1.yaml", "yaml/jobs/jobs_default.yaml"),
+        ("yaml/experiment/feature_set_residual_params/brentoil-case3.yaml", "yaml/jobs/jobs_default.yaml"),
+        ("yaml/experiment/feature_set_HPT_n100_bs/brentoil-case1.yaml", "yaml/jobs/jobs_tune.yaml"),
+        ("yaml/experiment/feature_set_HPT_n100_residual/brentoil-case1.yaml", "yaml/jobs/jobs_tune.yaml"),
+        ("yaml/experiment/feature_set_residual_bs_HPT/brentoil-case1.yaml", "yaml/jobs/jobs_tune.yaml"),
     ],
 )
 def test_case_yaml_files_reference_shared_jobs_paths(
@@ -7221,12 +7238,12 @@ def test_case_yaml_files_reference_shared_jobs_paths(
 
 def test_shared_jobs_yaml_files_match_expected_contract() -> None:
     default_jobs = _resolve_case_jobs(
-        REPO_ROOT / "yaml" / "jobs_default.yaml",
-        yaml.safe_load((REPO_ROOT / "yaml" / "jobs_default.yaml").read_text(encoding="utf-8")),
+        REPO_ROOT / "yaml" / "jobs" / "jobs_default.yaml",
+        yaml.safe_load((REPO_ROOT / "yaml" / "jobs" / "jobs_default.yaml").read_text(encoding="utf-8")),
     )
     tune_jobs = _resolve_case_jobs(
-        REPO_ROOT / "yaml" / "jobs_tune.yaml",
-        yaml.safe_load((REPO_ROOT / "yaml" / "jobs_tune.yaml").read_text(encoding="utf-8")),
+        REPO_ROOT / "yaml" / "jobs" / "jobs_tune.yaml",
+        yaml.safe_load((REPO_ROOT / "yaml" / "jobs" / "jobs_tune.yaml").read_text(encoding="utf-8")),
     )
 
     assert [job["model"] for job in default_jobs] == EXPECTED_CASE_MODEL_LIST
@@ -7265,7 +7282,7 @@ def test_jobs_path_loading_keeps_inline_compatibility_and_supports_shared_files(
                     "training": {"max_steps": 1},
                     "cv": {"n_windows": 1, "step_size": 1},
                     "residual": {"enabled": False},
-                    "jobs": "yaml/jobs_default.yaml",
+                    "jobs": "yaml/jobs/jobs_default.yaml",
                 },
                 sort_keys=False,
             ),
@@ -7364,22 +7381,38 @@ def test_jobs_path_list_loading_builds_fanout_specs(tmp_path: Path) -> None:
 
 
 def test_load_app_config_auto_loads_repo_shared_settings_for_repo_yaml(tmp_path: Path) -> None:
-    (tmp_path / "yaml").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "yaml" / "setting.yaml").write_text(
+    (tmp_path / "yaml" / "setting").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml" / "setting" / "setting.yaml").write_text(
         yaml.safe_dump(
             {
                 "runtime": {"random_seed": 11},
                 "training": {
+                    "input_size": 8,
                     "batch_size": 32,
+                    "learning_rate": 0.01,
                     "valid_batch_size": 64,
                     "windows_batch_size": 128,
                     "inference_windows_batch_size": 128,
                     "max_steps": 99,
                     "val_size": 7,
+                    "val_check_steps": 5,
                     "model_step_size": 6,
+                    "early_stop_patience_steps": 4,
+                    "loss": "mse",
                 },
-                "cv": {"gap": 0, "overlap_eval_policy": "by_cutoff_mean"},
-                "scheduler": {"max_concurrent_jobs": 2, "worker_devices": 1},
+                "cv": {
+                    "gap": 0,
+                    "horizon": 2,
+                    "step_size": 2,
+                    "n_windows": 3,
+                    "max_train_size": None,
+                    "overlap_eval_policy": "by_cutoff_mean",
+                },
+                "scheduler": {
+                    "gpu_ids": [0, 1],
+                    "max_concurrent_jobs": 2,
+                    "worker_devices": 1,
+                },
             },
             sort_keys=False,
         ),
@@ -7393,9 +7426,9 @@ def test_load_app_config_auto_loads_repo_shared_settings_for_repo_yaml(tmp_path:
             {
                 "task": {"name": "shared_case"},
                 "dataset": {"path": str(dataset_path), "target_col": "y"},
-                "training": {"input_size": 8, "learning_rate": 0.01, "val_check_steps": 5},
-                "cv": {"horizon": 1, "step_size": 1, "n_windows": 2},
-                "scheduler": {"gpu_ids": [0]},
+                "training": {},
+                "cv": {},
+                "scheduler": {},
                 "residual": {"enabled": False},
                 "jobs": [{"model": "Naive", "params": {}}],
             },
@@ -7407,15 +7440,19 @@ def test_load_app_config_auto_loads_repo_shared_settings_for_repo_yaml(tmp_path:
     loaded = load_app_config(tmp_path, config_path=config_path)
 
     assert loaded.config.runtime.random_seed == 11
+    assert loaded.config.training.input_size == 8
     assert loaded.config.training.batch_size == 32
+    assert loaded.config.training.loss == "mse"
     assert loaded.config.training.model_step_size == 6
-    assert loaded.normalized_payload["shared_settings_path"].endswith("yaml/setting.yaml")
+    assert loaded.config.cv.n_windows == 3
+    assert loaded.config.scheduler.gpu_ids == (0, 1)
+    assert loaded.normalized_payload["shared_settings_path"].endswith("yaml/setting/setting.yaml")
     assert loaded.shared_settings_hash is not None
 
 
 def test_load_app_config_rejects_duplicate_repo_shared_setting_paths(tmp_path: Path) -> None:
-    (tmp_path / "yaml").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "yaml" / "setting.yaml").write_text(
+    (tmp_path / "yaml" / "setting").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml" / "setting" / "setting.yaml").write_text(
         yaml.safe_dump({"training": {"batch_size": 32}}, sort_keys=False),
         encoding="utf-8",
     )
@@ -7572,14 +7609,33 @@ def test_jobs_fanout_variant_preserves_repo_relative_dataset_resolution(
 def test_jobs_fanout_variant_preserves_shared_settings_metadata(tmp_path: Path) -> None:
     from residual.config import loaded_config_for_jobs_fanout
 
-    (tmp_path / "yaml").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "yaml" / "setting.yaml").write_text(
+    (tmp_path / "yaml" / "setting").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml" / "setting" / "setting.yaml").write_text(
         yaml.safe_dump(
             {
                 "runtime": {"random_seed": 13},
-                "training": {"batch_size": 32, "valid_batch_size": 64},
-                "cv": {"gap": 0, "overlap_eval_policy": "by_cutoff_mean"},
-                "scheduler": {"max_concurrent_jobs": 2, "worker_devices": 1},
+                "training": {
+                    "input_size": 8,
+                    "batch_size": 32,
+                    "valid_batch_size": 64,
+                    "learning_rate": 0.01,
+                    "val_check_steps": 5,
+                    "early_stop_patience_steps": 5,
+                    "loss": "mse",
+                },
+                "cv": {
+                    "gap": 0,
+                    "horizon": 1,
+                    "step_size": 1,
+                    "n_windows": 1,
+                    "max_train_size": None,
+                    "overlap_eval_policy": "by_cutoff_mean",
+                },
+                "scheduler": {
+                    "gpu_ids": [0],
+                    "max_concurrent_jobs": 2,
+                    "worker_devices": 1,
+                },
             },
             sort_keys=False,
         ),
@@ -7603,9 +7659,9 @@ def test_jobs_fanout_variant_preserves_shared_settings_metadata(tmp_path: Path) 
             {
                 "task": {"name": "fanout_case"},
                 "dataset": {"path": str(dataset_path), "target_col": "y"},
-                "training": {"input_size": 8, "learning_rate": 0.01, "max_steps": 10},
-                "cv": {"horizon": 1, "step_size": 1, "n_windows": 1},
-                "scheduler": {"gpu_ids": [0]},
+                "training": {"max_steps": 10},
+                "cv": {},
+                "scheduler": {},
                 "residual": {"enabled": False},
                 "jobs": [str(jobs_one), str(jobs_two)],
             },
@@ -7810,22 +7866,22 @@ def test_case_yaml_training_mapping_matches_expected_across_all_files():
 
 
 def test_feature_set_raw_yaml_defers_requested_training_cv_scheduler_keys_to_setting():
-    raw_payload = _load_case_yaml_raw(REPO_ROOT / "yaml" / "feature_set" / "brentoil-case1.yaml")
+    raw_payload = _load_case_yaml_raw(REPO_ROOT / "yaml" / "experiment" / "feature_set" / "brentoil-case1.yaml")
 
     assert "training" not in raw_payload
     assert "cv" not in raw_payload
     assert "scheduler" not in raw_payload
 
 
-def test_feature_set_case3_effective_scheduler_gpu_ids_comes_from_setting_override():
-    payload = _load_case_yaml(REPO_ROOT / "yaml" / "feature_set" / "brentoil-case3.yaml")
+def test_feature_set_case3_effective_scheduler_gpu_ids_comes_from_global_setting():
+    payload = _load_case_yaml(REPO_ROOT / "yaml" / "experiment" / "feature_set" / "brentoil-case3.yaml")
 
-    assert payload["scheduler"]["gpu_ids"] == [1]
+    assert payload["scheduler"]["gpu_ids"] == [0, 1]
 
 
 def test_hpt_n100_bs_raw_yaml_defers_requested_training_cv_scheduler_keys_to_setting():
     raw_payload = _load_case_yaml_raw(
-        REPO_ROOT / "yaml" / "feature_set_HPT_n100_bs" / "brentoil-case1.yaml"
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_bs" / "brentoil-case1.yaml"
     )
 
     assert "input_size" not in raw_payload["training"]
@@ -7837,17 +7893,17 @@ def test_hpt_n100_bs_raw_yaml_defers_requested_training_cv_scheduler_keys_to_set
     assert "gpu_ids" not in raw_payload["scheduler"]
 
 
-def test_hpt_n100_bs_effective_training_and_scheduler_come_from_setting():
+def test_hpt_n100_bs_effective_training_and_scheduler_come_from_global_setting():
     payload = _load_case_yaml(
-        REPO_ROOT / "yaml" / "feature_set_HPT_n100_bs" / "brentoil-case1.yaml"
+        REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_bs" / "brentoil-case1.yaml"
     )
 
     assert payload["training"]["input_size"] == 64
     assert payload["training"]["learning_rate"] == pytest.approx(0.001)
     assert payload["training"]["val_check_steps"] == 50
-    assert payload["training"]["early_stop_patience_steps"] == 3
+    assert payload["training"]["early_stop_patience_steps"] == 5
     assert payload["training"]["loss"] == "mse"
-    assert payload["cv"]["n_windows"] == 5
+    assert payload["cv"]["n_windows"] == 12
     assert payload["scheduler"]["gpu_ids"] == [0, 1]
 
 
@@ -7901,7 +7957,7 @@ def test_case_yaml_normalizes_to_fixed_modes_without_auto(path: Path):
 
 
 def test_feature_set_residual_directory_contains_expected_case_files():
-    actual = sorted(path.name for path in (REPO_ROOT / "yaml" / "feature_set_residual").glob("*.yaml"))
+    actual = sorted(path.name for path in (REPO_ROOT / "yaml" / "experiment" / "feature_set_residual").glob("*.yaml"))
 
     assert actual == FEATURE_SET_RESIDUAL_EXPECTED_FILENAMES
 
@@ -7909,7 +7965,7 @@ def test_feature_set_residual_directory_contains_expected_case_files():
 @pytest.mark.parametrize("path", FEATURE_SET_RESIDUAL_YAML_FILES, ids=lambda p: p.name)
 def test_feature_set_residual_yaml_tracks_base_case_metadata(path: Path):
     payload = _load_case_yaml(path)
-    base_payload = _load_case_yaml(REPO_ROOT / "yaml" / "feature_set" / path.name)
+    base_payload = _load_case_yaml(REPO_ROOT / "yaml" / "experiment" / "feature_set" / path.name)
 
     assert payload["task"]["name"] == f'{base_payload["task"]["name"]}_residual'
     assert payload["dataset"]["target_col"] == base_payload["dataset"]["target_col"]
@@ -7939,7 +7995,7 @@ def test_feature_set_residual_yaml_residual_block_matches_template(path: Path):
 @pytest.mark.parametrize("path", NEW_FEATURE_SET_RESIDUAL_YAML_FILES, ids=lambda p: p.name)
 def test_new_feature_set_residual_yaml_exog_sources_hist_matches_base_dataset(path: Path):
     payload = _load_case_yaml(path)
-    base_payload = _load_case_yaml(REPO_ROOT / "yaml" / "feature_set" / path.name)
+    base_payload = _load_case_yaml(REPO_ROOT / "yaml" / "experiment" / "feature_set" / path.name)
 
     assert payload["residual"]["features"]["exog_sources"]["hist"] == base_payload["dataset"]["hist_exog_cols"]
 
@@ -7949,7 +8005,7 @@ def test_feature_set_residual_yaml_default_output_root_uses_parent_dir(path: Pat
     from residual.runtime import _default_output_root
 
     loaded = load_app_config(REPO_ROOT, config_path=path)
-    base_payload = _load_case_yaml(REPO_ROOT / "yaml" / "feature_set" / path.name)
+    base_payload = _load_case_yaml(REPO_ROOT / "yaml" / "experiment" / "feature_set" / path.name)
     expected_task_name = f'{base_payload["task"]["name"]}_residual'
 
     assert _default_output_root(REPO_ROOT, loaded) == (
@@ -7960,7 +8016,7 @@ def test_feature_set_residual_yaml_default_output_root_uses_parent_dir(path: Pat
 def test_case_yaml_build_model_preserves_expected_fixed_params():
     loaded = load_app_config(
         REPO_ROOT,
-        config_path=REPO_ROOT / "yaml" / "feature_set" / "brentoil-case1.yaml",
+        config_path=REPO_ROOT / "yaml" / "experiment" / "feature_set" / "brentoil-case1.yaml",
     )
 
     for job in loaded.config.jobs:
@@ -7986,7 +8042,7 @@ def test_feature_set_hpt_case12_training_keeps_only_fixed_controls(path: Path):
 
 def test_feature_set_hpt_directory_contains_expected_case12_files():
     actual = sorted(
-        path.name for path in (REPO_ROOT / "yaml" / "feature_set_HPT").glob("*.yaml")
+        path.name for path in (REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT").glob("*.yaml")
     )
     for expected in HPT_CASE12_YAML_FILES:
         assert expected.name in actual
@@ -8028,7 +8084,7 @@ def test_feature_set_hpt_case12_preserves_metadata(path: Path):
 def test_feature_set_hpt_n100_residual_directory_contains_expected_files():
     actual = sorted(
         path.name
-        for path in (REPO_ROOT / "yaml" / "feature_set_HPT_n100_residual").glob("*.yaml")
+        for path in (REPO_ROOT / "yaml" / "experiment" / "feature_set_HPT_n100_residual").glob("*.yaml")
     )
     assert actual == sorted(path.name for path in HPT_N100_YAML_FILES)
 

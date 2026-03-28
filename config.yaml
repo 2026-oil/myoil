@@ -18,19 +18,6 @@ dataset:
   - Com_Iron_Ore
   futr_exog_cols: []
   static_exog_cols: []
-training:
-  val_check_steps: 100
-  early_stop_patience_steps: 5
-  loss: mse
-cv:
-  horizon: 12
-  step_size: 8
-  n_windows: 24
-  max_train_size: null
-scheduler:
-  gpu_ids:
-  - 0
-  - 1
 residual:
   enabled: true
   model: xgboost
