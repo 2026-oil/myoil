@@ -287,20 +287,13 @@ def _find_latest_matching_scheduler_run(
     if not runs_root.exists():
         return None
     target_config_path = loaded.source_path.resolve(strict=False)
-    resolved_runs_root = runs_root.resolve(strict=False)
-    candidates: list[tuple[float, str, Path]] = []
+    candidates: list[tuple[float, Path]] = []
     for manifest_path in runs_root.glob("*/manifest/run_manifest.json"):
         run_root = manifest_path.parents[1]
+        if run_root.is_symlink():
+            continue
         workers_root = run_root / "scheduler" / "workers"
-        if run_root.is_symlink() or workers_root.is_symlink():
-            continue
         if not workers_root.exists():
-            continue
-        resolved_run_root = run_root.resolve(strict=False)
-        if (
-            resolved_run_root != resolved_runs_root
-            and resolved_runs_root not in resolved_run_root.parents
-        ):
             continue
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -315,16 +308,11 @@ def _find_latest_matching_scheduler_run(
             continue
         if job_name not in _matching_scheduler_run_job_names(manifest):
             continue
-        candidate_mtime = max(
-            run_root.stat().st_mtime,
-            manifest_path.stat().st_mtime,
-            workers_root.stat().st_mtime,
-        )
-        candidates.append((candidate_mtime, str(run_root), run_root))
+        candidates.append((manifest_path.stat().st_mtime, run_root))
     if not candidates:
         return None
     candidates.sort()
-    return candidates[-1][2]
+    return candidates[-1][1]
 
 
 def _resolve_single_job_run_roots(
@@ -435,8 +423,10 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
         else loaded.config.bs_preforcast.config_path
     )
     payload = {}
+    caps_by_model: dict[str, Any] = {}
     for job in selected_jobs:
         caps = validate_job(job)
+        caps_by_model[job.model] = caps
         payload[job.model] = {
             **caps.__dict__,
             "requested_mode": job.requested_mode,
@@ -487,9 +477,9 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
             {
                 "model": job.model,
                 "injection_mode": (
-                    "futr_exog" if validate_job(job).supports_futr_exog else "lag_derived"
+                    "futr_exog" if caps_by_model[job.model].supports_futr_exog else "lag_derived"
                 ),
-                "supports_futr_exog": bool(validate_job(job).supports_futr_exog),
+                "supports_futr_exog": bool(caps_by_model[job.model].supports_futr_exog),
             }
             for job in selected_jobs
         ],
@@ -985,25 +975,27 @@ def _open_persistent_study(
     storage_dir = study_root / ".optuna"
     storage_path = storage_dir / f"{stage}.journal"
     study_name = _build_study_name(loaded, stage=stage, job_name=job_name)
-    for attempt in range(2):
-        storage_dir.mkdir(parents=True, exist_ok=True)
-        storage = optuna.storages.JournalStorage(
-            optuna.storages.journal.JournalFileBackend(str(storage_path))
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    storage = optuna.storages.JournalStorage(
+        optuna.storages.journal.JournalFileBackend(str(storage_path))
+    )
+    try:
+        study = optuna.create_study(
+            storage=storage,
+            study_name=study_name,
+            load_if_exists=True,
+            sampler=sampler,
+            direction=DEFAULT_OPTUNA_STUDY_DIRECTION,
         )
-        try:
-            study = optuna.create_study(
-                storage=storage,
-                study_name=study_name,
-                load_if_exists=True,
-                sampler=sampler,
-                direction=DEFAULT_OPTUNA_STUDY_DIRECTION,
-            )
-            break
-        except FileNotFoundError:
-            if attempt == 1:
-                raise
-    else:
-        raise RuntimeError("persistent Optuna study creation failed unexpectedly")
+    except FileNotFoundError:
+        storage_dir.mkdir(parents=True, exist_ok=True)
+        study = optuna.create_study(
+            storage=storage,
+            study_name=study_name,
+            load_if_exists=True,
+            sampler=sampler,
+            direction=DEFAULT_OPTUNA_STUDY_DIRECTION,
+        )
     metadata = {
         "study_name": study_name,
         "storage_backend": "journal",

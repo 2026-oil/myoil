@@ -24,7 +24,7 @@ def hist_exog_lag_feature_name(column: str) -> str:
 
 
 @dataclass(frozen=True)
-class ResidualFeatureConfig:
+class FlatResidualFeatureConfig:
     include_base_prediction: bool = True
     include_horizon_step: bool = True
     include_date_features: bool = False
@@ -39,21 +39,15 @@ class ResidualFeatureConfig:
 class ResidualFeatureFrame:
     frame: pd.DataFrame
     columns: tuple[str, ...]
-    resolved_config: ResidualFeatureConfig
+    resolved_config: FlatResidualFeatureConfig
 
 
 def _coerce_bool(value: Any, *, default: bool) -> bool:
     if value is None:
         return default
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"1", "true", "yes", "on"}:
-            return True
-        if normalized in {"0", "false", "no", "off"}:
-            return False
-    return bool(value)
+    if not isinstance(value, bool):
+        raise ValueError(f"expected bool, got {type(value).__name__}: {value!r}")
+    return value
 
 
 def _coerce_name_tuple(value: Any) -> tuple[str, ...]:
@@ -109,7 +103,7 @@ def _extract_feature_payload(source: Any) -> dict[str, Any]:
     return payload
 
 
-def resolve_residual_feature_config(source: Any = None) -> ResidualFeatureConfig:
+def resolve_residual_feature_config(source: Any = None) -> FlatResidualFeatureConfig:
     payload = _extract_feature_payload(source)
     lag_payload = _coerce_mapping(payload.get("lag_features"))
     if not lag_payload:
@@ -124,7 +118,7 @@ def resolve_residual_feature_config(source: Any = None) -> ResidualFeatureConfig
     hist = payload.get("hist", exog_payload.get("hist"))
     futr = payload.get("futr", exog_payload.get("futr"))
     static = payload.get("static", exog_payload.get("static"))
-    return ResidualFeatureConfig(
+    return FlatResidualFeatureConfig(
         include_base_prediction=_coerce_bool(
             payload.get("include_base_prediction"), default=True
         ),
@@ -181,7 +175,7 @@ def _sort_columns(panel: pd.DataFrame, group_columns: Sequence[str]) -> list[str
 
 def _build_lag_features(
     panel: pd.DataFrame,
-    config: ResidualFeatureConfig,
+    config: FlatResidualFeatureConfig,
 ) -> dict[str, pd.Series]:
     lagged: dict[str, pd.Series] = {}
     if not config.lag_sources or not config.lag_steps:

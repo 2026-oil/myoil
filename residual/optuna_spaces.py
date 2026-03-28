@@ -166,7 +166,7 @@ def _auto_default_param_specs(model_name: str) -> dict[str, SearchParamSpec] | N
         }
     try:
         import neuralforecast.auto as nf_auto
-    except Exception:
+    except ImportError:
         return None
     auto_name = f"Auto{model_name}"
     auto_cls = getattr(nf_auto, auto_name, None)
@@ -192,7 +192,6 @@ def _auto_default_param_specs(model_name: str) -> dict[str, SearchParamSpec] | N
         }:
             continue
         if value is None:
-            specs[str(key)] = {"type": "categorical", "choices": [None]}
             continue
         if isinstance(value, list) and value:
             specs[str(key)] = {"type": "categorical", "choices": deepcopy(value)}
@@ -305,12 +304,6 @@ def _normalize_param_spec(spec: Any, *, section: str, owner: str, name: str) -> 
     )
 
 
-MODEL_PARAM_REGISTRY: dict[str, dict[str, SearchParamSpec]]
-TRAINING_PARAM_REGISTRY: dict[str, SearchParamSpec]
-TRAINING_PARAM_REGISTRY_BY_MODEL: dict[str, dict[str, SearchParamSpec]]
-RESIDUAL_PARAM_REGISTRY: dict[str, dict[str, SearchParamSpec]]
-
-
 def _coerce_legacy_param_name_list(value: Any, *, section: str, owner: str) -> tuple[str, ...]:
     if not isinstance(value, list):
         raise ValueError(
@@ -323,7 +316,7 @@ def _coerce_legacy_param_name_list(value: Any, *, section: str, owner: str) -> t
 
 
 def _known_model_param_names(model_name: str) -> set[str]:
-    stage_only = globals().get("BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY") or {}
+    stage_only = BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY or {}
     if model_name in stage_only:
         return set(stage_only[model_name])
     try:
@@ -389,9 +382,11 @@ def _normalize_model_section(
         return {}
     if not isinstance(payload, dict):
         raise ValueError(f"search_space.{section} must be a mapping")
-    model_fallback = globals().get("MODEL_PARAM_REGISTRY")
-    residual_fallback = globals().get("RESIDUAL_PARAM_REGISTRY")
-    stage_only_fallback = globals().get("BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY")
+    if not _LOADING_DEFAULT_REGISTRIES:
+        _ensure_default_registries()
+    model_fallback = MODEL_PARAM_REGISTRY or None
+    residual_fallback = RESIDUAL_PARAM_REGISTRY or None
+    stage_only_fallback = BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY or None
     models = {
         str(model_name): _normalize_selector_specs(
             model_specs,
@@ -436,7 +431,9 @@ def _normalize_training_section(
     section: str,
     allowed_models: set[str] | None = None,
 ) -> dict[str, dict[str, dict[str, SearchParamSpec]]]:
-    training_global_fallback = globals().get("TRAINING_PARAM_REGISTRY")
+    if not _LOADING_DEFAULT_REGISTRIES:
+        _ensure_default_registries()
+    training_global_fallback = TRAINING_PARAM_REGISTRY or None
     supported = SUPPORTED_AUTO_MODEL_NAMES if allowed_models is None else allowed_models
     if payload is None:
         training = {"global": {}, "per_model": {}}
@@ -528,7 +525,9 @@ def normalize_search_space_payload(payload: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(
             "yaml/HPO/search_space.yaml must contain top-level sections: models and residual"
         )
-    residual_fallback = globals().get("RESIDUAL_PARAM_REGISTRY")
+    if not _LOADING_DEFAULT_REGISTRIES:
+        _ensure_default_registries()
+    residual_fallback = RESIDUAL_PARAM_REGISTRY or None
 
     models = _normalize_model_section(payload.get("models"), section="models")
 
@@ -578,20 +577,55 @@ def _default_search_space_contract() -> SearchSpaceContract:
     return load_search_space_contract(Path(__file__).resolve().parents[1])
 
 
-_DEFAULT_CONTRACT = _default_search_space_contract()
-MODEL_PARAM_REGISTRY = {
-    model_name: deepcopy(specs)
-    for model_name, specs in _DEFAULT_CONTRACT.payload["models"].items()
-}
-TRAINING_PARAM_REGISTRY = deepcopy(_DEFAULT_CONTRACT.payload["training"]["global"])
-TRAINING_PARAM_REGISTRY_BY_MODEL = {
-    model_name: deepcopy(_DEFAULT_CONTRACT.payload["training"]["per_model"][model_name])
-    for model_name in sorted(SUPPORTED_AUTO_MODEL_NAMES)
-}
-RESIDUAL_PARAM_REGISTRY = {
-    model_name: deepcopy(specs)
-    for model_name, specs in _DEFAULT_CONTRACT.payload["residual"].items()
-}
+_DEFAULT_CONTRACT: SearchSpaceContract | None = None
+_LOADING_DEFAULT_REGISTRIES = False
+MODEL_PARAM_REGISTRY: dict[str, dict[str, SearchParamSpec]] = {}
+TRAINING_PARAM_REGISTRY: dict[str, SearchParamSpec] = {}
+TRAINING_PARAM_REGISTRY_BY_MODEL: dict[str, dict[str, SearchParamSpec]] = {}
+RESIDUAL_PARAM_REGISTRY: dict[str, dict[str, SearchParamSpec]] = {}
+
+
+def _ensure_default_registries() -> None:
+    global _DEFAULT_CONTRACT, _LOADING_DEFAULT_REGISTRIES
+    global MODEL_PARAM_REGISTRY, TRAINING_PARAM_REGISTRY
+    global TRAINING_PARAM_REGISTRY_BY_MODEL, RESIDUAL_PARAM_REGISTRY
+    if _DEFAULT_CONTRACT is not None:
+        return
+    _LOADING_DEFAULT_REGISTRIES = True
+    try:
+        _DEFAULT_CONTRACT = _default_search_space_contract()
+    finally:
+        _LOADING_DEFAULT_REGISTRIES = False
+    MODEL_PARAM_REGISTRY.clear()
+    MODEL_PARAM_REGISTRY.update(
+        {
+            model_name: deepcopy(specs)
+            for model_name, specs in _DEFAULT_CONTRACT.payload["models"].items()
+        }
+    )
+    TRAINING_PARAM_REGISTRY.clear()
+    TRAINING_PARAM_REGISTRY.update(
+        deepcopy(_DEFAULT_CONTRACT.payload["training"]["global"])
+    )
+    TRAINING_PARAM_REGISTRY_BY_MODEL.clear()
+    TRAINING_PARAM_REGISTRY_BY_MODEL.update(
+        {
+            model_name: deepcopy(
+                _DEFAULT_CONTRACT.payload["training"]["per_model"][model_name]
+            )
+            for model_name in sorted(SUPPORTED_AUTO_MODEL_NAMES)
+        }
+    )
+    RESIDUAL_PARAM_REGISTRY.clear()
+    RESIDUAL_PARAM_REGISTRY.update(
+        {
+            model_name: deepcopy(specs)
+            for model_name, specs in _DEFAULT_CONTRACT.payload["residual"].items()
+        }
+    )
+
+
+_ensure_default_registries()
 
 
 def training_param_registry_for_model(
@@ -600,6 +634,7 @@ def training_param_registry_for_model(
     search_space_payload: dict[str, Any] | None = None,
     section: str = "training",
 ) -> dict[str, SearchParamSpec]:
+    _ensure_default_registries()
     if search_space_payload is None:
         if model_name is None:
             return deepcopy(TRAINING_PARAM_REGISTRY)
@@ -616,6 +651,7 @@ def training_range_source_for_model(
     search_space_payload: dict[str, Any] | None = None,
     section: str = "training",
 ) -> str:
+    _ensure_default_registries()
     if model_name is None:
         return GLOBAL_TRAINING_RANGE_SOURCE
     if search_space_payload is None:
@@ -655,6 +691,7 @@ def suggest_model_params(
     param_specs: dict[str, SearchParamSpec] | None = None,
     name_prefix: str = "",
 ) -> dict[str, Any]:
+    _ensure_default_registries()
     registry = MODEL_PARAM_REGISTRY[model_name] if param_specs is None else param_specs
     return {
         name: _suggest_from_spec(trial, f"{name_prefix}{name}", registry[name])
@@ -670,6 +707,7 @@ def suggest_residual_params(
     param_specs: dict[str, SearchParamSpec] | None = None,
     name_prefix: str = "",
 ) -> dict[str, Any]:
+    _ensure_default_registries()
     registry = RESIDUAL_PARAM_REGISTRY[model_name] if param_specs is None else param_specs
     suggested = DEFAULT_RESIDUAL_PARAMS_BY_MODEL[model_name].copy()
     for name in selected_names:

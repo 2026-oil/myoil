@@ -1,7 +1,6 @@
 import pandas as pd
 
 
- # Set up column renaming for Polars
 def assert_equal_dfs(pandas_df, polars_df):
     """Helper function to compare Pandas and Polars dataframes."""
     renamer = {"unique_id": "uid", "ds": "time", "y": "target"}

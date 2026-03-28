@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -451,24 +452,30 @@ def _overlay_shared_fragment(
     *,
     owned_paths: tuple[str, ...],
 ) -> dict[str, Any]:
-    merged = json.loads(json.dumps(base_payload))
+    merged = deepcopy(base_payload)
     for dotted_path in owned_paths:
         shared_value = _lookup_dotted_path(fragment, dotted_path)
         if shared_value is _MISSING:
             continue
-        _set_dotted_path(merged, dotted_path, json.loads(json.dumps(shared_value)))
+        _set_dotted_path(merged, dotted_path, deepcopy(shared_value))
     return merged
 
 
 def _effective_shared_settings_for_source(
-    repo_root: Path,
-    source_path: Path,
-    shared_settings: dict[str, Any],
+    shared_settings_or_repo_root: dict[str, Any] | Path,
+    source_path: Path | None = None,
+    shared_settings: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], tuple[str, ...]]:
-    del repo_root, source_path
+    if shared_settings is None:
+        shared_settings_payload = cast(
+            dict[str, Any], shared_settings_or_repo_root
+        )
+    else:
+        shared_settings_payload = shared_settings
+    del source_path
     effective = _overlay_shared_fragment(
         {},
-        shared_settings,
+        shared_settings_payload,
         owned_paths=SHARED_SETTINGS_OWNED_DOTTED_PATHS,
     )
     return effective, SHARED_SETTINGS_OWNED_DOTTED_PATHS
@@ -480,7 +487,7 @@ def _merge_shared_settings_into_payload(
     *,
     owned_paths: tuple[str, ...] = SHARED_SETTINGS_OWNED_DOTTED_PATHS,
 ) -> dict[str, Any]:
-    merged = json.loads(json.dumps(payload))
+    merged = deepcopy(payload)
     duplicates: list[str] = []
     for dotted_path in owned_paths:
         shared_value = _lookup_dotted_path(shared_settings, dotted_path)
@@ -489,7 +496,7 @@ def _merge_shared_settings_into_payload(
         if _lookup_dotted_path(merged, dotted_path) is not _MISSING:
             duplicates.append(dotted_path)
             continue
-        _set_dotted_path(merged, dotted_path, json.loads(json.dumps(shared_value)))
+        _set_dotted_path(merged, dotted_path, deepcopy(shared_value))
     if duplicates:
         raise ValueError(
             "config repeats shared setting path(s): " + ", ".join(sorted(duplicates))
@@ -934,12 +941,6 @@ def _load_document(path: Path, source_type: str) -> Any:
     return {} if payload is None else payload
 
 
-def _validate_search_space_payload(
-    payload: dict[str, Any],
-) -> dict[str, Any]:
-    return normalize_search_space_payload(payload)
-
-
 def _requested_job_mode(
     model_name: str, params: dict[str, Any]
 ) -> Literal["baseline_fixed", "learned_fixed", "learned_auto_requested"]:
@@ -1038,8 +1039,7 @@ def _normalize_payload(
     training = dict(payload.get("training", {}))
     training.pop("train_protocol", None)
     training.pop("season_length", None)
-    legacy_training_rate_key = "learning_" + "rate"
-    if legacy_training_rate_key in training:
+    if "learning_rate" in training:
         raise ValueError(
             "legacy fixed-lr training key has been removed; use training.lr_scheduler.max_lr instead"
         )
@@ -1208,8 +1208,7 @@ def _normalize_payload(
     residual["model"] = residual_model
     residual["target"] = residual_target
     residual["params"] = dict(residual.get("params", {}))
-    legacy_residual_rate_key = "learning_" + "rate"
-    if legacy_residual_rate_key in residual["params"]:
+    if "learning_rate" in residual["params"]:
         raise ValueError(
             "legacy residual optimizer-rate key has been removed; residual optimizer rates are now internal-only"
         )
@@ -1471,6 +1470,9 @@ def _resolve_jobs_reference(
         if all(isinstance(item, dict) for item in jobs_value):
             return jobs_value
         if all(isinstance(item, str) for item in jobs_value):
+            # Fanout path: load_app_config resolves multi-file jobs via
+            # _resolve_jobs_fanout_specs; here we only need the first route's
+            # jobs for _normalize_payload's validation pass.
             _, resolved_jobs = _resolve_jobs_path_reference(
                 repo_root,
                 source_path=source_path,
@@ -1561,9 +1563,7 @@ def load_app_config(
         ) = _load_shared_settings_for_yaml_app_config(repo_root)
         if shared_settings_payload is not None:
             effective_shared_settings, effective_owned_paths = (
-                _effective_shared_settings_for_source(
-                    repo_root, source_path, shared_settings_payload
-                )
+                _effective_shared_settings_for_source(shared_settings_payload)
             )
             payload = _merge_shared_settings_into_payload(
                 payload,
@@ -1657,7 +1657,7 @@ def load_app_config(
     if requested_search_space:
         search_space_contract = load_search_space_contract(repo_root)
     search_space = (
-        _validate_search_space_payload(search_space_contract.payload)
+        normalize_search_space_payload(search_space_contract.payload)
         if search_space_contract is not None
         else None
     )
@@ -1666,24 +1666,13 @@ def load_app_config(
         source_path=source_path,
         payload=payload,
     )
-    base_config = _normalize_payload(
+    config = _normalize_payload(
         payload,
         dataset_base_dir,
-        search_space=None,
-        allow_missing_search_space=True,
+        search_space=search_space,
+        allow_missing_search_space=(search_space is None),
         model_search_space_key=model_search_space_key,
         training_search_space_key=training_search_space_key,
-    )
-    config = (
-        _normalize_payload(
-            payload,
-            dataset_base_dir,
-            search_space=search_space,
-            model_search_space_key=model_search_space_key,
-            training_search_space_key=training_search_space_key,
-        )
-        if search_space is not None
-        else base_config
     )
     bs_preforcast_stage1 = None
     if config.bs_preforcast.enabled and config.bs_preforcast.config_path:
@@ -1765,7 +1754,7 @@ def loaded_config_for_jobs_fanout(
     training_search_space_key: str = "training",
 ) -> LoadedConfig:
     payload = {
-        key: json.loads(json.dumps(value))
+        key: deepcopy(value)
         for key, value in loaded.normalized_payload.items()
         if key
         in {

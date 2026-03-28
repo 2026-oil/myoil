@@ -2292,6 +2292,11 @@ def test_default_output_root_uses_repo_name_for_repo_root_config():
             "yaml/experiment/feature_set_HPT_n100_bs/brentoil-case3.yaml",
             "feature_set_HPT_n100_bs_brentoil_case3_HPO",
         ),
+        ("yaml/experiment/feature_set_bs/wti-case3.yaml", "feature_set_bs_wti_case3_bs"),
+        (
+            "yaml/experiment/feature_set_bs_preforcast/wti-case3.yaml",
+            "feature_set_bs_preforcast_wti_case3_bs_preforcast",
+        ),
     ],
 )
 def test_default_output_root_uses_config_parent_for_nested_repo_configs(
@@ -2303,28 +2308,6 @@ def test_default_output_root_uses_config_parent_for_nested_repo_configs(
     loaded = load_app_config(REPO_ROOT, config_path=config_path)
 
     assert _default_output_root(REPO_ROOT, loaded) == (REPO_ROOT / "runs" / expected_name)
-
-
-def test_default_output_root_for_feature_set_bs_wti_case3_config():
-    from residual.runtime import _default_output_root
-
-    loaded = load_app_config(REPO_ROOT, config_path="yaml/experiment/feature_set_bs/wti-case3.yaml")
-
-    assert _default_output_root(REPO_ROOT, loaded) == (
-        REPO_ROOT / "runs" / "feature_set_bs_wti_case3_bs"
-    )
-
-
-def test_default_output_root_for_feature_set_bs_preforcast_wti_case3_config():
-    from residual.runtime import _default_output_root
-
-    loaded = load_app_config(
-        REPO_ROOT, config_path="yaml/experiment/feature_set_bs_preforcast/wti-case3.yaml"
-    )
-
-    assert _default_output_root(REPO_ROOT, loaded) == (
-        REPO_ROOT / "runs" / "feature_set_bs_preforcast_wti_case3_bs_preforcast"
-    )
 
 
 def test_resolve_single_job_run_roots_prefers_latest_matching_scheduler_run(
@@ -7290,6 +7273,70 @@ def test_case_yaml_files_reference_shared_jobs_paths(
 ) -> None:
     payload = _load_case_yaml_raw(REPO_ROOT / relative_path)
     assert payload["jobs"] == expected_jobs_ref
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "expected_jobs_ref", "expected_models"),
+    [
+        (
+            "yaml/plugins/bs_preforcast_uni.yaml",
+            "yaml/jobs/bs_preforcast/bs_preforcast_jobs_uni.yaml",
+            ["xgboost", "lightgbm", "LSTM", "PatchTST", "DLinear", "NHITS", "ES", "ARIMA"],
+        ),
+        (
+            "yaml/plugins/bs_preforcast_multi.yaml",
+            "yaml/jobs/bs_preforcast/bs_preforcast_jobs_multi.yaml",
+            ["TimeXer", "TSMixerx", "Naive", "iTransformer", "LSTM"],
+        ),
+    ],
+)
+def test_bs_preforcast_plugin_yaml_routes_to_shared_jobs_files(
+    relative_path: str, expected_jobs_ref: str, expected_models: list[str]
+) -> None:
+    path = REPO_ROOT / relative_path
+    payload = _load_case_yaml_raw(path)
+
+    assert payload["jobs"] == expected_jobs_ref
+    assert [job["model"] for job in _resolve_case_jobs(path, payload["jobs"])] == expected_models
+
+
+def test_bs_preforcast_multi_jobs_yaml_matches_requested_fixed_params() -> None:
+    path = REPO_ROOT / "yaml" / "jobs" / "bs_preforcast" / "bs_preforcast_jobs_multi.yaml"
+    jobs = _resolve_case_jobs(path, yaml.safe_load(path.read_text(encoding="utf-8")))
+    params_by_model = {job["model"]: job["params"] for job in jobs}
+
+    assert params_by_model == {
+        "TimeXer": {
+            "patch_len": 8,
+            "hidden_size": 768,
+            "n_heads": 16,
+            "e_layers": 4,
+            "d_ff": 1024,
+            "factor": 4,
+            "dropout": 0.15,
+            "use_norm": True,
+        },
+        "TSMixerx": {
+            "n_block": 3,
+            "ff_dim": 64,
+            "dropout": 0.05,
+            "revin": True,
+        },
+        "Naive": {},
+        "iTransformer": {
+            "hidden_size": 64,
+            "n_heads": 4,
+            "e_layers": 2,
+            "d_ff": 192,
+            "dropout": 0.0,
+        },
+        "LSTM": {
+            "encoder_hidden_size": 64,
+            "decoder_hidden_size": 64,
+            "encoder_n_layers": 4,
+            "context_size": 8,
+        },
+    }
 
 
 def test_shared_jobs_yaml_files_match_expected_contract() -> None:

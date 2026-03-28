@@ -60,7 +60,6 @@ def test_validation_step(setup_module):
     y_hat_w_val = model.predict(dataset=dataset)
     Y_test_df['MLP'] = y_hat_w_val
 
-    pd.concat([Y_train_df, Y_test_df]).drop('unique_id', axis=1).set_index('ds').plot()
     # test no leakage with test_size and val_size
     dataset, *_ = TimeSeriesDataset.from_df(Y_df)
     model = MLP(h=12, input_size=24, step_size=1,

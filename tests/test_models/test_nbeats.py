@@ -34,8 +34,6 @@ def test_nbeats_model2(setup_data):
     y_hat = nbeats.predict(dataset=dataset)
     Y_test_df['N-BEATS'] = y_hat
 
-    # pd.concat([Y_train_df, Y_test_df]).drop('unique_id', axis=1).set_index('ds').plot()
-    #test we recover the same forecast
     y_hat2 = nbeats.predict(dataset=dataset)
     assert (y_hat == y_hat2).all()
 
@@ -59,8 +57,6 @@ def test_nbeats_model_with_validation(setup_data):
     model.fit(dataset=dataset, val_size=12)
     y_hat_w_val = model.predict(dataset=dataset)
     Y_test_df['N-BEATS'] = y_hat_w_val
-
-    # pd.concat([Y_train_df, Y_test_df]).drop('unique_id', axis=1).set_index('ds').plot()
 
     # test no leakage with test_size and val_size
     dataset, *_ = TimeSeriesDataset.from_df(Y_train_df)

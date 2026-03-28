@@ -55,7 +55,7 @@ from neuralforecast.models.xlstm_mixer import xLSTMMixer
 
 try:
     from tests.dummy.dummy_models import DummyMultivariate, DummyUnivariate
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     DummyMultivariate = DummyUnivariate = None
 
 from .config import AppConfig, JobConfig, TrainingLossParams
@@ -180,12 +180,9 @@ def resolved_strategy(config: AppConfig, devices: int | None) -> Any:
         return None
     if config.training.strategy is not None:
         return strategy_name
-    try:
-        from pytorch_lightning.strategies import DDPStrategy
+    from pytorch_lightning.strategies import DDPStrategy
 
-        return DDPStrategy(process_group_backend="gloo")
-    except Exception:
-        return "ddp"
+    return DDPStrategy(process_group_backend="gloo")
 
 
 def _resolved_dataloader_kwargs(config: AppConfig) -> dict[str, Any]:
