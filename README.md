@@ -165,6 +165,8 @@ bs_preforcast:
   config_path: yaml/plugins/bs_preforcast.yaml
 ```
 
+Python 패키지 구현은 `plugins/bs_preforcast/` 아래에 있으며, 코드 import는 `plugins.bs_preforcast...` 를 기준으로 맞춥니다.
+
 상세 설정/동작/아티팩트 설명은 별도 문서를 보세요:
 
 - `bs_preforcast.md`

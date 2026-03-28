@@ -3,6 +3,7 @@
 이 문서는 현재 저장소에서 구현된 `bs_preforcast` 설정과 동작 방식을 설명합니다.
 
 > 이름은 코드/설정과 동일하게 `bs_preforcast`로 유지합니다.
+> Python 패키지 구현 경로는 `plugins/bs_preforcast/` 이고, import 경로는 `plugins.bs_preforcast...` 입니다. YAML 설정 경로 `yaml/plugins/...` 와는 별개입니다.
 
 ---
 

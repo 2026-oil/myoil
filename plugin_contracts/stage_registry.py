@@ -37,7 +37,7 @@ def _ensure_plugins_loaded() -> None:
     if _STAGE_PLUGINS:
         return
     try:
-        import bs_preforcast.plugin  # noqa: F401  side-effect: registers plugin
+        import plugins.bs_preforcast.plugin  # noqa: F401  side-effect: registers plugin
     except ImportError:
         pass
 

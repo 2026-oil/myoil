@@ -23,7 +23,7 @@ This checkout is not just the upstream `neuralforecast` package. It is a hybrid 
 |-----------|---------|
 | `neuralforecast/` | Upstream-style forecasting package sources plus added model surfaces (see `neuralforecast/AGENTS.md`). |
 | `residual/` | Config parsing, runtime orchestration, Optuna integration, residual plugin support, and **Stage Plugin system** (see `residual/AGENTS.md`). |
-| `bs_preforcast/` | `bs_preforcast` stage plugin — registers as a `StagePlugin` via `bs_preforcast/plugin.py`; `residual/` never imports it directly. |
+| `plugins/bs_preforcast/` | `bs_preforcast` stage plugin — registers as a `StagePlugin` via `plugins/bs_preforcast/plugin.py`; `residual/` never imports it directly. |
 | `yaml/` | Experiment matrix for Brent/WTI, bomb, HPT, univariate, and ad-hoc case families (see `yaml/AGENTS.md`). |
 | `tests/` | Regression coverage for package code, residual runtime, YAML contracts, and shell helpers (see `tests/AGENTS.md`). |
 | `scripts/` | Analysis and helper utilities used around the runtime and research workflows (see `scripts/AGENTS.md`). |
@@ -59,8 +59,8 @@ This checkout is not just the upstream `neuralforecast` package. It is a hybrid 
 
 ### Internal
 - `main.py` depends on `residual/runtime.py`.
-- `residual/` depends on `neuralforecast/` model surfaces and `yaml/HPO/search_space.yaml`. It does NOT depend on `bs_preforcast/` directly; stage plugins are loaded via lazy discovery in `stage_registry.py`.
-- `bs_preforcast/` depends on `residual/config.py` (for `AppConfig`/`LoadedConfig` types) and `residual/stage_registry.py` (to register itself).
+- `residual/` depends on `neuralforecast/` model surfaces and `yaml/HPO/search_space.yaml`. It does NOT depend on `plugins/bs_preforcast/` directly; stage plugins are loaded via lazy discovery in `stage_registry.py`.
+- `plugins/bs_preforcast/` depends on `residual/config.py` (for `AppConfig`/`LoadedConfig` types) and `residual/stage_registry.py` (to register itself).
 - `tests/` includes both package-style tests and wrapper/runtime contract tests.
 
 ### External

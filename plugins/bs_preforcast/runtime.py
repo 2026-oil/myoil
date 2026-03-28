@@ -23,7 +23,7 @@ from residual.forecast_models import (
 
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return Path(__file__).resolve().parents[2]
 
 
 def _stage_root(run_root: Path) -> Path:

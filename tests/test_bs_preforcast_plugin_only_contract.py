@@ -8,7 +8,7 @@ import pytest
 import yaml
 
 from residual.config import load_app_config
-from bs_preforcast.runtime import prepare_bs_preforcast_fold_inputs
+from plugins.bs_preforcast.runtime import prepare_bs_preforcast_fold_inputs
 
 
 def _base_payload(data_path: Path) -> dict[str, object]:
@@ -185,7 +185,7 @@ def test_metadata_shell_uses_empty_run_roots_and_null_selected_jobs_path(tmp_pat
 def test_lag_derived_injection_fails_when_train_shorter_than_horizon(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import bs_preforcast.runtime as bs_runtime
+    import plugins.bs_preforcast.runtime as bs_runtime
 
     data_path = tmp_path / "data.csv"
     data_path.write_text(

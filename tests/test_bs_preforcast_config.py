@@ -6,7 +6,7 @@ import pytest
 import yaml
 
 import residual.config as residual_config
-from bs_preforcast.config import BsPreforcastConfig, BsPreforcastStageLoadedConfig
+from plugins.bs_preforcast.config import BsPreforcastConfig, BsPreforcastStageLoadedConfig
 from residual.config import load_app_config
 
 

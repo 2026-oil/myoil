@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from bs_preforcast.search_space import (
+from plugins.bs_preforcast.search_space import (
     BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY,
     SUPPORTED_BS_PREFORCAST_MODELS,
     normalize_bs_preforcast_sections,

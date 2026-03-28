@@ -9,14 +9,14 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
-import bs_preforcast.runtime as bs_runtime
+import plugins.bs_preforcast.runtime as bs_runtime
 import residual.runtime as residual_runtime
 from residual.config import JobConfig
 from residual.stage_registry import get_stage_plugin
 
 
 def test_bs_preforcast_plugin_is_registered() -> None:
-    import bs_preforcast.plugin  # noqa: F401
+    import plugins.bs_preforcast.plugin  # noqa: F401
     plugin = get_stage_plugin("bs_preforcast")
     assert plugin is not None
     assert plugin.config_key == "bs_preforcast"

@@ -17,7 +17,7 @@ class DefaultBsPreforcastPlugin:
         *,
         selected_jobs: Iterable[Any],
     ) -> str:
-        from bs_preforcast.runtime import resolve_bs_preforcast_injection_mode
+        from plugins.bs_preforcast.runtime import resolve_bs_preforcast_injection_mode
 
         return resolve_bs_preforcast_injection_mode(loaded, selected_jobs=selected_jobs)
 
@@ -30,7 +30,7 @@ class DefaultBsPreforcastPlugin:
         *,
         run_root: Path | None = None,
     ) -> tuple[LoadedConfig, pd.DataFrame, pd.DataFrame, str]:
-        from bs_preforcast.runtime import prepare_bs_preforcast_fold_inputs
+        from plugins.bs_preforcast.runtime import prepare_bs_preforcast_fold_inputs
 
         return prepare_bs_preforcast_fold_inputs(
             loaded,
@@ -52,7 +52,7 @@ class DefaultBsPreforcastPlugin:
         entrypoint_version: str,
         validate_only: bool,
     ) -> None:
-        from bs_preforcast.runtime import materialize_bs_preforcast_stage
+        from plugins.bs_preforcast.runtime import materialize_bs_preforcast_stage
 
         materialize_bs_preforcast_stage(
             loaded=loaded,
@@ -70,6 +70,6 @@ class DefaultBsPreforcastPlugin:
         repo_root: Path,
         loaded: LoadedConfig,
     ) -> LoadedConfig | None:
-        from bs_preforcast.runtime import load_bs_preforcast_stage_config
+        from plugins.bs_preforcast.runtime import load_bs_preforcast_stage_config
 
         return load_bs_preforcast_stage_config(repo_root, loaded)

@@ -6,8 +6,8 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from bs_preforcast.plugins import DefaultBsPreforcastPlugin
-from bs_preforcast.registry import (
+from plugins.bs_preforcast.plugins import DefaultBsPreforcastPlugin
+from plugins.bs_preforcast.registry import (
     PLUGIN_EXTENSION_RULES,
     available_plugins,
     get_bs_preforcast_plugin,
@@ -52,19 +52,19 @@ def test_default_bs_preforcast_plugin_delegates_authoritative_runtime_entrypoint
         return sentinel_loaded
 
     monkeypatch.setattr(
-        "bs_preforcast.runtime.resolve_bs_preforcast_injection_mode",
+        "plugins.bs_preforcast.runtime.resolve_bs_preforcast_injection_mode",
         fake_resolve,
     )
     monkeypatch.setattr(
-        "bs_preforcast.runtime.prepare_bs_preforcast_fold_inputs",
+        "plugins.bs_preforcast.runtime.prepare_bs_preforcast_fold_inputs",
         fake_prepare,
     )
     monkeypatch.setattr(
-        "bs_preforcast.runtime.materialize_bs_preforcast_stage",
+        "plugins.bs_preforcast.runtime.materialize_bs_preforcast_stage",
         fake_materialize,
     )
     monkeypatch.setattr(
-        "bs_preforcast.runtime.load_bs_preforcast_stage_config",
+        "plugins.bs_preforcast.runtime.load_bs_preforcast_stage_config",
         fake_load_stage,
     )
 

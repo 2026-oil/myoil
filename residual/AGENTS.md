@@ -30,10 +30,10 @@ This directory contains the local experiment runtime layered on top of `neuralfo
 `residual/` has **zero direct references** to any concrete stage plugin (e.g. `bs_preforcast`). All stage-specific logic is provided through the `StagePlugin` Protocol defined in `stage_plugin.py` and dispatched via `stage_registry.py`.
 
 - **Protocol**: `StagePlugin` in `stage_plugin.py` — config lifecycle, route validation, stage loading, search-space integration, runtime hooks, manifest/validation, and fanout helpers.
-- **Registry**: `stage_registry.py` — plugins register at import time; lazy discovery triggers `bs_preforcast.plugin` import on first use.
+- **Registry**: `stage_registry.py` — plugins register at import time; lazy discovery triggers `plugins.bs_preforcast.plugin` import on first use.
 - **Config fields**: `AppConfig.stage_plugin_config` (typed config from plugin), `LoadedConfig.stage_plugin_loaded` (loaded stage-1 data from plugin).
 
-Concrete implementations live in their own packages (e.g. `bs_preforcast/plugin.py`).
+Concrete implementations live in their own packages (e.g. `plugins/bs_preforcast/plugin.py`).
 
 ## For AI Agents
 

@@ -18,10 +18,10 @@ import yaml
 
 import neuralforecast.auto as nf_auto
 import neuralforecast.models as nf_models
-import bs_preforcast.runtime as bs_runtime
+import plugins.bs_preforcast.runtime as bs_runtime
 from neuralforecast.core import MODEL_FILENAME_DICT
 from residual.adapters import build_multivariate_inputs, build_univariate_inputs
-from bs_preforcast.runtime import prepare_bs_preforcast_fold_inputs
+from plugins.bs_preforcast.runtime import prepare_bs_preforcast_fold_inputs
 from residual.config import (
     TrainingOptimizerConfig,
     TrainingLossParams,
@@ -36,7 +36,7 @@ from residual.models import (
     supports_auto_mode,
 )
 from neuralforecast.losses.pytorch import ExLoss
-from bs_preforcast.search_space import SUPPORTED_BS_PREFORCAST_MODELS
+from plugins.bs_preforcast.search_space import SUPPORTED_BS_PREFORCAST_MODELS
 from residual.optuna_spaces import (
     DEFAULT_OPTUNA_NUM_TRIALS,
     EXCLUDED_AUTO_MODEL_NAMES,
@@ -5100,7 +5100,7 @@ def test_prepare_bs_preforcast_fold_inputs_missing_forecasts_fail_fast(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    import bs_preforcast.runtime as bs_runtime
+    import plugins.bs_preforcast.runtime as bs_runtime
 
     payload = _payload()
     payload["training"].update({"input_size": 2, "max_steps": 1, "val_size": 1})
@@ -5315,7 +5315,7 @@ def test_prepare_bs_preforcast_fold_inputs_auto_adds_missing_target_to_futr_exog
 def test_bs_preforcast_inline_learned_stage_surfaces_multi_gpu_resolution(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    import bs_preforcast.runtime as bs_runtime
+    import plugins.bs_preforcast.runtime as bs_runtime
 
     payload = _payload()
     payload["bs_preforcast"] = _main_bs_preforcast()

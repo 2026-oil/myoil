@@ -11,6 +11,11 @@ from typing import Any, Literal
 import optuna
 import yaml
 
+from plugins.bs_preforcast.search_space import (
+    BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY,
+    SUPPORTED_BS_PREFORCAST_MODELS,
+)
+
 SEARCH_SPACE_FILENAME = "yaml/HPO/search_space.yaml"
 BASELINE_MODEL_NAMES = {"Naive", "SeasonalNaive", "HistoricAverage"}
 EXCLUDED_AUTO_MODEL_NAMES = {"HINT"}

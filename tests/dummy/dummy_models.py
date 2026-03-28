@@ -52,6 +52,9 @@ class DummyUnivariate(BaseModel):
         alias: Optional[str] = None,
         optimizer=None,
         optimizer_kwargs=None,
+        max_lr: float = 1e-3,
+        lr_scheduler=None,
+        lr_scheduler_kwargs=None,
         dataloader_kwargs=None,
         **trainer_kwargs,
     ):
@@ -81,6 +84,9 @@ class DummyUnivariate(BaseModel):
             alias=alias,
             optimizer=optimizer,
             optimizer_kwargs=optimizer_kwargs,
+            _max_lr=max_lr,
+            _lr_scheduler_cls=lr_scheduler,
+            _lr_scheduler_kwargs=lr_scheduler_kwargs,
             dataloader_kwargs=dataloader_kwargs,
             **trainer_kwargs,
         )
@@ -162,6 +168,9 @@ class DummyMultivariate(BaseModel):
         alias: Optional[str] = None,
         optimizer=None,
         optimizer_kwargs=None,
+        max_lr: float = 1e-3,
+        lr_scheduler=None,
+        lr_scheduler_kwargs=None,
         dataloader_kwargs=None,
         **trainer_kwargs,
     ):
@@ -192,6 +201,9 @@ class DummyMultivariate(BaseModel):
             alias=alias,
             optimizer=optimizer,
             optimizer_kwargs=optimizer_kwargs,
+            _max_lr=max_lr,
+            _lr_scheduler_cls=lr_scheduler,
+            _lr_scheduler_kwargs=lr_scheduler_kwargs,
             dataloader_kwargs=dataloader_kwargs,
             **trainer_kwargs,
         )
@@ -265,6 +277,9 @@ class DummyRecurrent(BaseModel):
         alias: Optional[str] = None,
         optimizer=None,
         optimizer_kwargs=None,
+        max_lr: float = 1e-3,
+        lr_scheduler=None,
+        lr_scheduler_kwargs=None,
         dataloader_kwargs=None,
         **trainer_kwargs,
     ):
@@ -294,6 +309,9 @@ class DummyRecurrent(BaseModel):
             alias=alias,
             optimizer=optimizer,
             optimizer_kwargs=optimizer_kwargs,
+            _max_lr=max_lr,
+            _lr_scheduler_cls=lr_scheduler,
+            _lr_scheduler_kwargs=lr_scheduler_kwargs,
             dataloader_kwargs=dataloader_kwargs,
             **trainer_kwargs,
         )
