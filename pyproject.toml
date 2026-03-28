@@ -38,6 +38,7 @@ dependencies = [
     "pytorch-lightning>=2.0.0",
     "ray[train,tune]>=2.2.0",
     "optuna",
+    "pytorch-optimizer>=3.10.0",
     "utilsforecast>=0.2.3",
     "lightgbm",
     "xgboost",

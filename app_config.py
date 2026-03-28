@@ -36,6 +36,7 @@ DEFAULT_MANIFEST_VERSION = "1"
 DEFAULT_ARTIFACT_SCHEMA_VERSION = "1"
 DEFAULT_EVALUATION_PROTOCOL_VERSION = "2"
 SUPPORTED_LOSSES = {"mse", "exloss"}
+SUPPORTED_TRAINING_OPTIMIZERS = ("adamw", "ademamix", "mars", "soap")
 CENTRALIZED_TRAINING_KEYS = {
     "train_protocol",
     "input_size",
@@ -52,12 +53,14 @@ CENTRALIZED_TRAINING_KEYS = {
     "early_stop_patience_steps",
     "loss",
     "loss_params",
+    "optimizer",
     "accelerator",
     "devices",
     "strategy",
     "precision",
     "dataloader_kwargs",
 } | set(FIXED_TRAINING_KEYS)
+FORBIDDEN_JOB_PARAM_KEYS = frozenset({"optimizer", "optimizer_kwargs"})
 LEGACY_SHARED_JOB_TRAINING_KEYS = {
     "scaler_type",
     "step_size",
@@ -77,6 +80,7 @@ SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
     "training.model_step_size",
     "training.early_stop_patience_steps",
     "training.loss",
+    "training.optimizer",
     "cv.gap",
     "cv.horizon",
     "cv.step_size",
@@ -87,7 +91,9 @@ SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
     "scheduler.max_concurrent_jobs",
     "scheduler.worker_devices",
 )
-SHARED_SETTINGS_MAPPING_DOTTED_PATHS = frozenset({"training.lr_scheduler"})
+SHARED_SETTINGS_MAPPING_DOTTED_PATHS = frozenset(
+    {"training.lr_scheduler", "training.optimizer"}
+)
 RESIDUAL_FEATURE_KEYS = {
     "include_base_prediction",
     "include_horizon_step",
@@ -162,6 +168,12 @@ class TrainingLRSchedulerConfig:
 
 
 @dataclass(frozen=True)
+class TrainingOptimizerConfig:
+    name: Literal["adamw", "ademamix", "mars", "soap"] = "adamw"
+    kwargs: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class TrainingConfig:
     train_protocol: str = "expanding_window_tscv"
     input_size: int = DEFAULT_TRAINING_PARAMS["input_size"]
@@ -184,6 +196,7 @@ class TrainingConfig:
     ]
     loss: str = "mse"
     loss_params: TrainingLossParams | None = None
+    optimizer: TrainingOptimizerConfig = field(default_factory=TrainingOptimizerConfig)
     accelerator: str | None = None
     devices: int | None = None
     strategy: str | None = None
@@ -681,6 +694,38 @@ def _normalize_training_lr_scheduler(value: Any) -> TrainingLRSchedulerConfig:
             default=False,
         ),
     )
+
+
+def _normalize_training_optimizer(value: Any) -> TrainingOptimizerConfig:
+    if value is None:
+        value = {}
+    if not isinstance(value, dict):
+        raise ValueError("training.optimizer must be a mapping")
+    payload = dict(value)
+    _unknown_keys(payload, allowed={"name", "kwargs"}, section="training.optimizer")
+    name = str(payload.get("name", "adamw")).strip().lower()
+    if name not in SUPPORTED_TRAINING_OPTIMIZERS:
+        raise ValueError(
+            "training.optimizer.name must be one of: "
+            + ", ".join(SUPPORTED_TRAINING_OPTIMIZERS)
+        )
+    kwargs = payload.get("kwargs", {})
+    if kwargs is None:
+        kwargs = {}
+    if not isinstance(kwargs, dict):
+        raise ValueError("training.optimizer.kwargs must be a mapping")
+    normalized_kwargs: dict[str, Any] = {}
+    for key, item in kwargs.items():
+        if not isinstance(key, str) or not key.strip():
+            raise ValueError(
+                "training.optimizer.kwargs keys must be non-empty strings"
+            )
+        normalized_kwargs[key] = deepcopy(item)
+    return TrainingOptimizerConfig(
+        name=cast(Literal["adamw", "ademamix", "mars", "soap"], name),
+        kwargs=normalized_kwargs,
+    )
+
 
 def _coerce_positive_int_tuple(value: Any, *, field_name: str) -> tuple[int, ...]:
     if value is None:
@@ -1183,6 +1228,7 @@ def _normalize_payload(
     training["dataloader_kwargs"] = _normalize_dataloader_kwargs(
         training.get("dataloader_kwargs")
     )
+    training["optimizer"] = _normalize_training_optimizer(training.get("optimizer"))
     training["lr_scheduler"] = _normalize_training_lr_scheduler(
         training.get("lr_scheduler")
     )
@@ -1324,6 +1370,15 @@ def _normalize_payload(
         raise ValueError("jobs.model values must be unique")
     normalized_jobs = cast(tuple[JobConfig, ...], jobs)
     for normalized_job in normalized_jobs:
+        forbidden_optimizer_keys = FORBIDDEN_JOB_PARAM_KEYS.intersection(
+            normalized_job.params
+        )
+        if forbidden_optimizer_keys:
+            forbidden_keys = ", ".join(sorted(forbidden_optimizer_keys))
+            raise ValueError(
+                f"jobs[{normalized_job.model}] contains forbidden optimizer override key(s): {forbidden_keys}. "
+                "Move optimizer selection under training.optimizer."
+            )
         duplicated = CENTRALIZED_TRAINING_KEYS.intersection(normalized_job.params)
         if duplicated:
             duplicated_keys = ", ".join(sorted(duplicated))

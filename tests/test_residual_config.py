@@ -23,6 +23,7 @@ from neuralforecast.core import MODEL_FILENAME_DICT
 from residual.adapters import build_multivariate_inputs, build_univariate_inputs
 from bs_preforcast.runtime import prepare_bs_preforcast_fold_inputs
 from residual.config import (
+    TrainingOptimizerConfig,
     TrainingLossParams,
     _effective_shared_settings_for_source,
     _load_shared_settings_for_yaml_app_config,
@@ -1043,6 +1044,72 @@ def test_model_builder_applies_common_loss_and_multivariate_n_series(tmp_path: P
     assert getattr(multivariate_model, "n_series", 2) == 2
 
 
+def test_load_app_config_accepts_training_optimizer(tmp_path: Path):
+    payload = _payload()
+    payload["training"]["optimizer"] = {
+        "name": "ademamix",
+        "kwargs": {"weight_decay": 0.125},
+    }
+
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    assert loaded.config.training.optimizer == TrainingOptimizerConfig(
+        name="ademamix",
+        kwargs={"weight_decay": 0.125},
+    )
+    assert loaded.normalized_payload["training"]["optimizer"] == {
+        "name": "ademamix",
+        "kwargs": {"weight_decay": 0.125},
+    }
+
+
+@pytest.mark.parametrize(
+    ("optimizer_payload", "message"),
+    [
+        ("adamw", "training.optimizer must be a mapping"),
+        ({"name": "madeup"}, "training.optimizer.name must be one of"),
+        (
+            {"name": "adamw", "kwargs": []},
+            "training.optimizer.kwargs must be a mapping",
+        ),
+        (
+            {"name": "adamw", "kwargs": {"": 1}},
+            "training.optimizer.kwargs keys must be non-empty strings",
+        ),
+    ],
+)
+def test_load_app_config_rejects_invalid_training_optimizer(
+    tmp_path: Path, optimizer_payload: Any, message: str
+):
+    payload = _payload()
+    payload["training"]["optimizer"] = optimizer_payload
+
+    with pytest.raises(ValueError, match=message):
+        load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("optimizer", "adamw"),
+        ("optimizer_kwargs", {"weight_decay": 0.01}),
+    ],
+)
+def test_load_app_config_rejects_forbidden_job_param_optimizer_overrides(
+    tmp_path: Path, key: str, value: Any
+):
+    payload = _payload()
+    payload["jobs"][0]["params"][key] = value
+
+    with pytest.raises(
+        ValueError,
+        match="Move optimizer selection under training.optimizer",
+    ):
+        load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+
+
 def test_model_builder_passes_hist_exog_to_patchtst(tmp_path: Path):
     payload = _payload()
     payload["jobs"] = [
@@ -1514,6 +1581,32 @@ def test_build_model_clamps_devices_to_visible_worker_assignment(
     assert model.trainer_kwargs["devices"] == 1
 
 
+@pytest.mark.parametrize(
+    ("optimizer_name", "kwargs"),
+    [
+        ("adamw", {"weight_decay": 0.02}),
+        ("mars", {"mars_type": "adamw"}),
+    ],
+)
+def test_build_model_forwards_training_optimizer_configuration(
+    tmp_path: Path, optimizer_name: str, kwargs: dict[str, Any]
+):
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n2020-01-08,2,3,4\n",
+        encoding="utf-8",
+    )
+    payload = _payload()
+    payload["training"]["optimizer"] = {"name": optimizer_name, "kwargs": kwargs}
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    model = build_model(loaded.config, loaded.config.jobs[0], n_series=1)
+
+    assert issubclass(model.optimizer, torch.optim.Optimizer)
+    assert model.optimizer_kwargs == kwargs
+
+
 def test_scheduler_streams_worker_stdout_to_terminal(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1933,22 +2026,75 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
             },
         ]
     ).to_csv(residual_model_dir / "corrected_folds.csv", index=False)
+    (run_root / "models" / "ModelA" / "folds" / "fold_000").mkdir(parents=True)
+    (run_root / "models" / "ModelA" / "folds" / "fold_001").mkdir(parents=True)
+    pd.DataFrame(
+        [
+            {"global_step": 10, "train_loss": 1.0, "val_loss": 1.2},
+            {"global_step": 20, "train_loss": 0.8, "val_loss": 1.0},
+        ]
+    ).to_csv(
+        run_root
+        / "models"
+        / "ModelA"
+        / "folds"
+        / "fold_000"
+        / "loss_curve_every_10_global_steps.csv",
+        index=False,
+    )
+    pd.DataFrame(
+        [
+            {"global_step": 10, "train_loss": 0.7, "val_loss": 0.9},
+        ]
+    ).to_csv(
+        run_root
+        / "models"
+        / "ModelA"
+        / "folds"
+        / "fold_001"
+        / "loss_curve_every_10_global_steps.csv",
+        index=False,
+    )
 
     artifacts = runtime._build_summary_artifacts(run_root)
 
     leaderboard_path = run_root / "summary" / "leaderboard.csv"
+    loss_artifacts_path = run_root / "summary" / "loss_curve_artifacts.csv"
     markdown_path = run_root / "summary" / "sample.md"
     assert artifacts["leaderboard"] == str(leaderboard_path)
+    assert artifacts["loss_artifacts"] == str(loss_artifacts_path)
     assert artifacts["markdown"] == str(markdown_path)
     assert leaderboard_path.exists()
+    assert loss_artifacts_path.exists()
     assert markdown_path.exists()
     leaderboard = pd.read_csv(leaderboard_path)
+    loss_artifacts = pd.read_csv(loss_artifacts_path)
     assert leaderboard.loc[0, "rank"] == 1
     assert leaderboard.loc[0, "model"] == "ModelA_res"
     assert leaderboard["model"].tolist() == ["ModelA_res", "ModelA", "ModelB"]
     assert "mean_fold_mape" in leaderboard.columns
     assert "mean_fold_nrmse" in leaderboard.columns
     assert "mean_fold_r2" in leaderboard.columns
+    assert loss_artifacts.to_dict(orient="records") == [
+        {
+            "model": "ModelA",
+            "fold_idx": 0,
+            "sample_every_n_steps": 10,
+            "sample_count": 2,
+            "first_global_step": 10,
+            "last_global_step": 20,
+            "loss_csv_path": "models/ModelA/folds/fold_000/loss_curve_every_10_global_steps.csv",
+        },
+        {
+            "model": "ModelA",
+            "fold_idx": 1,
+            "sample_every_n_steps": 10,
+            "sample_count": 1,
+            "first_global_step": 10,
+            "last_global_step": 10,
+            "loss_csv_path": "models/ModelA/folds/fold_001/loss_curve_every_10_global_steps.csv",
+        },
+    ]
     report = markdown_path.read_text(encoding="utf-8")
     assert "# 02. 데이터 및 모델 세팅" in report
     assert "## **Case 1 | BrentCrude**" in report
@@ -2150,6 +2296,24 @@ def test_loss_curve_series_drop_sparse_validation_gaps():
     assert val_series.to_dict(orient="records") == [
         {"global_step": 1, "val_loss": 12.0},
         {"global_step": 4, "val_loss": 5.0},
+    ]
+
+
+def test_sample_loss_curve_frame_keeps_every_10_global_steps():
+    from residual import runtime
+
+    curve_frame = pd.DataFrame(
+        [
+            {"global_step": step, "train_loss": float(step), "val_loss": float(step) + 0.5}
+            for step in range(1, 26)
+        ]
+    )
+
+    sampled = runtime._sample_loss_curve_frame(curve_frame)
+
+    assert sampled.to_dict(orient="records") == [
+        {"global_step": 10, "train_loss": 10.0, "val_loss": 10.5},
+        {"global_step": 20, "train_loss": 20.0, "val_loss": 20.5},
     ]
 
 
@@ -2869,6 +3033,15 @@ def test_runtime_writes_loss_curve_images_for_residual_disabled_learned_folds(
             / f"fold_{fold_idx:03d}"
             / "loss_curve.png"
         ).exists()
+        assert (
+            output_root
+            / "models"
+            / "DummyUnivariate"
+            / "folds"
+            / f"fold_{fold_idx:03d}"
+            / "loss_curve_every_10_global_steps.csv"
+        ).exists()
+    assert (output_root / "summary" / "loss_curve_artifacts.csv").exists()
 
 
 def test_runtime_writes_loss_curve_images_for_residual_enabled_learned_folds(
@@ -2919,6 +3092,14 @@ def test_runtime_writes_loss_curve_images_for_residual_enabled_learned_folds(
         ).exists()
         assert (
             output_root
+            / "models"
+            / "DummyUnivariate"
+            / "folds"
+            / f"fold_{fold_idx:03d}"
+            / "loss_curve_every_10_global_steps.csv"
+        ).exists()
+        assert (
+            output_root
             / "residual"
             / "DummyUnivariate"
             / "folds"
@@ -2926,6 +3107,7 @@ def test_runtime_writes_loss_curve_images_for_residual_enabled_learned_folds(
             / "base_checkpoint"
             / "fit_summary.json"
         ).exists()
+    assert (output_root / "summary" / "loss_curve_artifacts.csv").exists()
 
 
 def test_baseline_models_do_not_write_loss_curve_images(tmp_path: Path):
@@ -6855,6 +7037,7 @@ EXPECTED_CASE_TRAINING = {
     "valid_batch_size": 64,
     "windows_batch_size": 1024,
     "inference_windows_batch_size": 1024,
+    "optimizer": {"name": "adamw", "kwargs": {}},
     "lr_scheduler": _onecycle_scheduler(0.001),
     "model_step_size": 8,
     "max_steps": 1000,
@@ -6948,6 +7131,7 @@ EXPECTED_HPT_CASE12_TRAINING = {
     "val_check_steps": 100,
     "early_stop_patience_steps": 5,
     "loss": "mse",
+    "optimizer": {"name": "adamw", "kwargs": {}},
     "dataloader_kwargs": {
         "num_workers": 2,
         "pin_memory": True,
@@ -7649,6 +7833,39 @@ def test_load_app_config_rejects_duplicate_repo_shared_setting_paths(tmp_path: P
     )
 
     with pytest.raises(ValueError, match="training.batch_size"):
+        load_app_config(tmp_path, config_path=config_path)
+
+
+def test_load_app_config_rejects_duplicate_repo_shared_optimizer_setting_path(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "yaml" / "setting").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml" / "setting" / "setting.yaml").write_text(
+        yaml.safe_dump(
+            {"training": {"optimizer": {"name": "adamw", "kwargs": {}}}},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    dataset_path = tmp_path / "df.csv"
+    dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
+    config_path = tmp_path / "yaml" / "case.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "dataset": {"path": str(dataset_path), "target_col": "y"},
+                "training": {"optimizer": {"name": "mars", "kwargs": {}}},
+                "cv": {"horizon": 1, "step_size": 1, "n_windows": 1},
+                "scheduler": {"gpu_ids": [0]},
+                "residual": {"enabled": False},
+                "jobs": [{"model": "Naive", "params": {}}],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="training.optimizer"):
         load_app_config(tmp_path, config_path=config_path)
 
 

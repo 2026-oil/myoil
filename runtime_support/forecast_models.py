@@ -42,6 +42,7 @@ from neuralforecast.models import (
     TimeMixer,
     TimeXer,
     TimesNet,
+    NonstationaryTransformer,
     DUET,
     VanillaTransformer,
     XLinear,
@@ -52,6 +53,7 @@ from neuralforecast.models.cmamba import CMamba
 from neuralforecast.models.mamba import Mamba
 from neuralforecast.models.smamba import SMamba
 from neuralforecast.models.xlstm_mixer import xLSTMMixer
+from plugins.optimizer import resolve_optimizer
 
 try:
     from tests.dummy.dummy_models import DummyMultivariate, DummyUnivariate
@@ -90,6 +92,7 @@ MODEL_CLASSES = {
     "DeepNPTS": DeepNPTS,
     "DeformTime": DeformTime,
     "DeformableTST": DeformableTST,
+    "NonstationaryTransformer": NonstationaryTransformer,
     "KAN": KAN,
     "TFT": TFT,
     "VanillaTransformer": VanillaTransformer,
@@ -210,6 +213,10 @@ def build_model(
             return None
         return list(values)
 
+    optimizer_resolution = resolve_optimizer(
+        config.training.optimizer.name,
+        config.training.optimizer.kwargs,
+    )
     shared_kwargs: dict[str, Any] = {
         "h": config.cv.horizon,
         "input_size": config.training.input_size,
@@ -223,6 +230,8 @@ def build_model(
         "valid_batch_size": config.training.valid_batch_size,
         "windows_batch_size": config.training.windows_batch_size,
         "inference_windows_batch_size": config.training.inference_windows_batch_size,
+        "optimizer": optimizer_resolution.optimizer_cls,
+        "optimizer_kwargs": optimizer_resolution.kwargs,
         "lr_scheduler": torch.optim.lr_scheduler.OneCycleLR,
         "lr_scheduler_kwargs": {
             "max_lr": config.training.lr_scheduler.max_lr,
