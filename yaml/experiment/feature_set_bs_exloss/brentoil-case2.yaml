@@ -26,4 +26,4 @@ dataset:
   static_exog_cols: []
 residual:
   enabled: false
-jobs: yaml/jobs/jobs_default.yaml
+jobs: yaml/jobs/main/jobs_default.yaml

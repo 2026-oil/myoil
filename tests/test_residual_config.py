@@ -7243,29 +7243,29 @@ def _normalized_payload_without_task_and_residual(payload: dict[str, Any]) -> di
         (
             "yaml/experiment/feature_set/brentoil-case1.yaml",
             [
-                "yaml/jobs/jobs_1.yaml",
-                "yaml/jobs/jobs_2.yaml",
-                "yaml/jobs/jobs_3.yaml",
-                "yaml/jobs/jobs_4.yaml",
+                "yaml/jobs/main/jobs_1.yaml",
+                "yaml/jobs/main/jobs_2.yaml",
+                "yaml/jobs/main/jobs_3.yaml",
+                "yaml/jobs/main/jobs_4.yaml",
             ],
         ),
         (
             "yaml/experiment/feature_set_bs/brentoil-case1.yaml",
             [
-                "yaml/jobs/jobs_1.yaml",
-                "yaml/jobs/jobs_2.yaml",
-                "yaml/jobs/jobs_3.yaml",
-                "yaml/jobs/jobs_4.yaml",
+                "yaml/jobs/main/jobs_1.yaml",
+                "yaml/jobs/main/jobs_2.yaml",
+                "yaml/jobs/main/jobs_3.yaml",
+                "yaml/jobs/main/jobs_4.yaml",
             ],
         ),
-        ("yaml/experiment/feature_set_bs_diff/brentoil-case1.yaml", "yaml/jobs/jobs_default.yaml"),
-        ("yaml/experiment/feature_set_bs_exloss/brentoil-case1.yaml", "yaml/jobs/jobs_default.yaml"),
-        ("yaml/experiment/feature_set_residual/brentoil-case1.yaml", "yaml/jobs/jobs_default.yaml"),
-        ("yaml/experiment/feature_set_residual_bs/brentoil-case1.yaml", "yaml/jobs/jobs_default.yaml"),
-        ("yaml/experiment/feature_set_residual_params/brentoil-case3.yaml", "yaml/jobs/jobs_default.yaml"),
-        ("yaml/experiment/feature_set_HPT_n100_bs/brentoil-case1.yaml", "yaml/jobs/jobs_tune.yaml"),
-        ("yaml/experiment/feature_set_HPT_n100_residual/brentoil-case1.yaml", "yaml/jobs/jobs_tune.yaml"),
-        ("yaml/experiment/feature_set_residual_bs_HPT/brentoil-case1.yaml", "yaml/jobs/jobs_tune.yaml"),
+        ("yaml/experiment/feature_set_bs_diff/brentoil-case1.yaml", "yaml/jobs/main/jobs_default.yaml"),
+        ("yaml/experiment/feature_set_bs_exloss/brentoil-case1.yaml", "yaml/jobs/main/jobs_default.yaml"),
+        ("yaml/experiment/feature_set_residual/brentoil-case1.yaml", "yaml/jobs/main/jobs_default.yaml"),
+        ("yaml/experiment/feature_set_residual_bs/brentoil-case1.yaml", "yaml/jobs/main/jobs_default.yaml"),
+        ("yaml/experiment/feature_set_residual_params/brentoil-case3.yaml", "yaml/jobs/main/jobs_default.yaml"),
+        ("yaml/experiment/feature_set_HPT_n100_bs/brentoil-case1.yaml", "yaml/jobs/main/jobs_tune.yaml"),
+        ("yaml/experiment/feature_set_HPT_n100_residual/brentoil-case1.yaml", "yaml/jobs/main/jobs_tune.yaml"),
+        ("yaml/experiment/feature_set_residual_bs_HPT/brentoil-case1.yaml", "yaml/jobs/main/jobs_tune.yaml"),
     ],
 )
 def test_case_yaml_files_reference_shared_jobs_paths(
@@ -7341,12 +7341,12 @@ def test_bs_preforcast_multi_jobs_yaml_matches_requested_fixed_params() -> None:
 
 def test_shared_jobs_yaml_files_match_expected_contract() -> None:
     default_jobs = _resolve_case_jobs(
-        REPO_ROOT / "yaml" / "jobs" / "jobs_default.yaml",
-        yaml.safe_load((REPO_ROOT / "yaml" / "jobs" / "jobs_default.yaml").read_text(encoding="utf-8")),
+        REPO_ROOT / "yaml" / "jobs" / "main" / "jobs_default.yaml",
+        yaml.safe_load((REPO_ROOT / "yaml" / "jobs" / "main" / "jobs_default.yaml").read_text(encoding="utf-8")),
     )
     tune_jobs = _resolve_case_jobs(
-        REPO_ROOT / "yaml" / "jobs" / "jobs_tune.yaml",
-        yaml.safe_load((REPO_ROOT / "yaml" / "jobs" / "jobs_tune.yaml").read_text(encoding="utf-8")),
+        REPO_ROOT / "yaml" / "jobs" / "main" / "jobs_tune.yaml",
+        yaml.safe_load((REPO_ROOT / "yaml" / "jobs" / "main" / "jobs_tune.yaml").read_text(encoding="utf-8")),
     )
 
     assert [job["model"] for job in default_jobs] == EXPECTED_CASE_MODEL_LIST
@@ -7385,7 +7385,7 @@ def test_jobs_path_loading_keeps_inline_compatibility_and_supports_shared_files(
                     "training": {"max_steps": 1},
                     "cv": {"n_windows": 1, "step_size": 1},
                     "residual": {"enabled": False},
-                    "jobs": "yaml/jobs/jobs_default.yaml",
+                    "jobs": "yaml/jobs/main/jobs_default.yaml",
                 },
                 sort_keys=False,
             ),

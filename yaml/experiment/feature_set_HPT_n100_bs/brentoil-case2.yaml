@@ -36,4 +36,4 @@ scheduler:
   parallelize_single_job_tuning: true
 residual:
   enabled: false
-jobs: yaml/jobs/jobs_tune.yaml
+jobs: yaml/jobs/main/jobs_tune.yaml

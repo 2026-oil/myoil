@@ -18,7 +18,7 @@ dataset:
 residual:
   enabled: false
 jobs:
-- yaml/jobs/jobs_1.yaml
-- yaml/jobs/jobs_2.yaml
-- yaml/jobs/jobs_3.yaml
-- yaml/jobs/jobs_4.yaml
+- yaml/jobs/main/jobs_1.yaml
+- yaml/jobs/main/jobs_2.yaml
+- yaml/jobs/main/jobs_3.yaml
+- yaml/jobs/main/jobs_4.yaml
