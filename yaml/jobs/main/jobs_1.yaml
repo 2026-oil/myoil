@@ -1,12 +1,12 @@
 - model: TimeXer
   params:
     patch_len: 8
-    hidden_size: 768
-    n_heads: 16
-    e_layers: 4
-    d_ff: 1024
-    factor: 4
-    dropout: 0.15
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 2
+    d_ff: 128
+    factor: 1
+    dropout: 0.05
     use_norm: true
 - model: TSMixerx
   params:

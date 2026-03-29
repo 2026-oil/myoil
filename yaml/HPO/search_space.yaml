@@ -117,35 +117,30 @@ models:
     hidden_size:
       type: categorical
       choices:
-      - 256
-      - 512
-      - 768
+      - 64
     n_heads:
       type: categorical
       choices:
-      - 16
-      - 32
+      - 4
     e_layers:
       type: categorical
       choices:
-      - 4
-      - 8
+      - 2
     d_ff:
       type: categorical
       choices:
-      - 512
-      - 1024
+      - 128
     factor:
       type: categorical
       choices:
-      - 4
-      - 8
+      - 1
     dropout:
       type: categorical
       choices:
+      - 0.05
       - 0.1
+      - 0.15
       - 0.2
-      - 0.3
     use_norm:
       type: categorical
       choices:

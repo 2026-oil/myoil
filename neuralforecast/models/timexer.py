@@ -187,6 +187,18 @@ class TimeXer(BaseModel):
         False  # If the model produces forecasts recursively (True) or direct (False)
     )
 
+    @staticmethod
+    def _validate_patch_geometry(input_size: int, patch_len: int) -> None:
+        if patch_len <= 0:
+            raise ValueError(
+                f"TimeXer patch_len must be positive, got patch_len={patch_len}."
+            )
+        if input_size % patch_len != 0:
+            raise ValueError(
+                "TimeXer requires patch_len to evenly divide input_size; "
+                f"got input_size={input_size}, patch_len={patch_len}."
+            )
+
     def __init__(
         self,
         h,
@@ -265,6 +277,7 @@ class TimeXer(BaseModel):
         self.factor = factor
         self.patch_len = patch_len
         self.use_norm = use_norm
+        self._validate_patch_geometry(input_size=self.input_size, patch_len=self.patch_len)
         self.patch_num = int(input_size // self.patch_len)
 
         # Architecture
@@ -325,10 +338,10 @@ class TimeXer(BaseModel):
             # Normalization from Non-stationary Transformer
             means = x_enc.mean(1, keepdim=True).detach()
             x_enc = x_enc - means
-            stdev = torch.sqrt(
-                torch.var(x_enc, dim=1, keepdim=True, unbiased=False) + 1e-5
-            )
-            x_enc /= stdev
+            variance = torch.var(x_enc, dim=1, keepdim=True, unbiased=False)
+            stdev = torch.sqrt(variance + 1e-5)
+            scale = torch.where(variance < 1e-5, torch.ones_like(stdev), stdev)
+            x_enc /= scale
 
         _, _, N = x_enc.shape
 
@@ -349,7 +362,7 @@ class TimeXer(BaseModel):
         if self.use_norm:
             # De-Normalization from Non-stationary Transformer
             dec_out = dec_out * (
-                stdev[:, 0, :]
+                scale[:, 0, :]
                 .unsqueeze(1)
                 .repeat(1, self.h * self.loss.outputsize_multiplier, 1)
             )

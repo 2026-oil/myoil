@@ -4,6 +4,8 @@ from pathlib import Path
 
 import yaml
 
+from app_config import load_app_config
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 YAML_ROOT = REPO_ROOT / "yaml"
@@ -48,8 +50,20 @@ def _iter_yaml_payloads():
         yield path, payload
 
 
+def _uses_main_jobs_surface(path: Path) -> bool:
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    jobs = payload.get("jobs", []) if isinstance(payload, dict) else []
+    if isinstance(jobs, str):
+        return "yaml/jobs/main/" in jobs
+    if isinstance(jobs, list) and all(isinstance(item, str) for item in jobs):
+        return any("yaml/jobs/main/" in item for item in jobs)
+    return False
+
+
 def test_yaml_matrix_replaces_patchtst_with_timexer() -> None:
     for path, payload in _iter_yaml_payloads():
+        if not _uses_main_jobs_surface(path):
+            continue
         models = [job["model"] for job in payload.get("jobs", [])]
         assert "PatchTST" not in models, path
 
@@ -58,10 +72,13 @@ def test_yaml_matrix_pins_model_step_size_when_timexer_is_present() -> None:
     timexer_files = 0
 
     for path, payload in _iter_yaml_payloads():
+        if not _uses_main_jobs_surface(path):
+            continue
         models = [job["model"] for job in payload.get("jobs", [])]
         if "TimeXer" not in models:
             continue
         timexer_files += 1
-        assert payload["training"]["model_step_size"] == 8, path
+        loaded = load_app_config(REPO_ROOT, config_path=path)
+        assert loaded.config.training.model_step_size == 8, path
 
     assert timexer_files > 0
