@@ -7,12 +7,16 @@ from __future__ import annotations
 
 from dataclasses import asdict, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
 from . import config as _cfg
 from . import search_space as _ss
+from neuralforecast.models.bs_preforcast_catalog import (
+    BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY,
+    SUPPORTED_BS_PREFORCAST_MODELS,
+)
 
 if TYPE_CHECKING:
     from residual.config import AppConfig, LoadedConfig
@@ -172,10 +176,10 @@ class BsPreforcastStagePlugin:
     # ------------------------------------------------------------------
 
     def supported_models(self) -> set[str]:
-        return _ss.SUPPORTED_BS_PREFORCAST_MODELS
+        return SUPPORTED_BS_PREFORCAST_MODELS
 
     def stage_only_param_registry(self) -> dict[str, dict[str, dict[str, Any]]]:
-        return _ss.BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY
+        return BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY
 
     def normalize_search_space_sections(
         self,
