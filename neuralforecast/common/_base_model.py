@@ -30,6 +30,18 @@ from neuralforecast.tsdataset import (
 from ..losses.pytorch import BasePointLoss, DistributionLoss
 from ..utils import get_indexer_raise_missing
 
+
+class _MinStepsEarlyStopping(EarlyStopping):
+    def __init__(self, *args, min_steps_before_early_stop: int = 0, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.min_steps_before_early_stop = max(0, int(min_steps_before_early_stop))
+
+    def _run_early_stopping_check(self, trainer: "pl.Trainer") -> None:
+        if trainer.global_step < self.min_steps_before_early_stop:
+            return
+        super()._run_early_stopping_check(trainer)
+
+
 DISTRIBUTION_LOSSES = (
     losses.DistributionLoss,
     losses.PMM,
@@ -117,6 +129,7 @@ class BaseModel(pl.LightningModule):
         inference_input_size: Union[int, None] = None,
         step_size: int = 1,
         early_stop_patience_steps: int = -1,
+        min_steps_before_early_stop: int = 0,
         scaler_type: str = "identity",
         futr_exog_list: Union[List, None] = None,
         hist_exog_list: Union[List, None] = None,
@@ -298,8 +311,10 @@ class BaseModel(pl.LightningModule):
             if "callbacks" not in trainer_kwargs:
                 trainer_kwargs["callbacks"] = []
             trainer_kwargs["callbacks"].append(
-                EarlyStopping(
-                    monitor="ptl/val_loss", patience=early_stop_patience_steps
+                _MinStepsEarlyStopping(
+                    monitor="ptl/val_loss",
+                    patience=early_stop_patience_steps,
+                    min_steps_before_early_stop=min_steps_before_early_stop,
                 )
             )
         # Add GPU accelerator if available
@@ -394,6 +409,7 @@ class BaseModel(pl.LightningModule):
         self.max_steps = max_steps
         self.early_stop_patience_steps = early_stop_patience_steps
         self.val_check_steps = val_check_steps
+        self.min_steps_before_early_stop = max(0, int(min_steps_before_early_stop))
         self.windows_batch_size = windows_batch_size
         self.step_size = step_size
         self._best_val_metric: float | None = None
@@ -708,6 +724,8 @@ class BaseModel(pl.LightningModule):
 
     def _update_best_val_state(self, avg_loss: float) -> None:
         if not math.isfinite(avg_loss):
+            return
+        if self.global_step < self.min_steps_before_early_stop:
             return
         if self._best_val_metric is None or avg_loss < self._best_val_metric:
             self._best_val_metric = float(avg_loss)

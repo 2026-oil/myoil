@@ -368,16 +368,17 @@ class TestDummyUnivariate:
         )
 
     def test_tracks_and_restores_best_validation_state(self):
-        model = DummyUnivariate(h=2, input_size=4)
+        model = DummyUnivariate(h=2, input_size=4, min_steps_before_early_stop=50)
 
         with torch.no_grad():
             model.w.fill_(1.0)
         model._trainer = SimpleNamespace(global_step=10)
         model._update_best_val_state(0.8)
+        assert model._best_val_state_dict is None
 
         with torch.no_grad():
             model.w.fill_(2.5)
-        model._trainer = SimpleNamespace(global_step=20)
+        model._trainer = SimpleNamespace(global_step=60)
         model._update_best_val_state(0.3)
 
         with torch.no_grad():
@@ -387,5 +388,5 @@ class TestDummyUnivariate:
 
         assert restored is True
         assert model._best_val_metric == pytest.approx(0.3)
-        assert model._best_val_global_step == 20
+        assert model._best_val_global_step == 60
         assert model.w.detach().item() == pytest.approx(2.5)

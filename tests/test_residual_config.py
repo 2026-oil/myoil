@@ -1359,6 +1359,7 @@ def test_model_builder_propagates_centralized_training_controls(tmp_path: Path):
             "scaler_type": "standard",
             "model_step_size": 3,
             "val_check_steps": 7,
+            "min_steps_before_early_stop": 13,
             "early_stop_patience_steps": 11,
         }
     )
@@ -1392,6 +1393,7 @@ def test_model_builder_propagates_centralized_training_controls(tmp_path: Path):
         assert model.hparams.scaler_type == "standard"
         assert model.hparams.step_size == 3
         assert model.hparams.val_check_steps == 7
+        assert model.hparams.min_steps_before_early_stop == 13
         assert model.hparams.early_stop_patience_steps == 11
 
 
@@ -7248,6 +7250,7 @@ EXPECTED_CASE_TRAINING = {
     "max_steps": 1000,
     "val_size": 8,
     "val_check_steps": 20,
+    "min_steps_before_early_stop": 500,
     "early_stop_patience_steps": 3,
     "loss": "mse",
 }
@@ -7334,6 +7337,7 @@ EXPECTED_HPT_CASE12_TRAINING = {
     "max_steps": 1000,
     "val_size": 8,
     "val_check_steps": 100,
+    "min_steps_before_early_stop": 500,
     "early_stop_patience_steps": 5,
     "loss": "mse",
     "optimizer": {"name": "adamw", "kwargs": {}},
@@ -8688,6 +8692,7 @@ def test_hpt_n100_bs_effective_training_and_scheduler_come_from_global_setting()
     assert payload["training"]["input_size"] == 64
     assert payload["training"]["lr_scheduler"]["max_lr"] == pytest.approx(0.001)
     assert payload["training"]["val_check_steps"] == 20
+    assert payload["training"]["min_steps_before_early_stop"] == 500
     assert payload["training"]["early_stop_patience_steps"] == 3
     assert payload["training"]["loss"] == "mse"
     assert payload["cv"]["n_windows"] == 6

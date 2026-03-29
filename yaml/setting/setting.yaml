@@ -7,8 +7,9 @@ training:
   windows_batch_size: 1024
   inference_windows_batch_size: 1024
   max_steps: 2000
-  val_size: 8
+  val_size: 24
   val_check_steps: 20
+  min_steps_before_early_stop: 500
   model_step_size: 8
   early_stop_patience_steps: 3
   loss: mse

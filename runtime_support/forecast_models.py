@@ -238,6 +238,7 @@ def build_model(
         "scaler_type": config.training.scaler_type,
         "step_size": config.training.model_step_size,
         "val_check_steps": config.training.val_check_steps,
+        "min_steps_before_early_stop": config.training.min_steps_before_early_stop,
         "early_stop_patience_steps": config.training.early_stop_patience_steps,
         "batch_size": config.training.batch_size,
         "valid_batch_size": config.training.valid_batch_size,

@@ -57,6 +57,7 @@ CENTRALIZED_TRAINING_KEYS = {
     "max_steps",
     "val_size",
     "val_check_steps",
+    "min_steps_before_early_stop",
     "early_stop_patience_steps",
     "loss",
     "loss_params",
@@ -84,6 +85,7 @@ SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
     "training.max_steps",
     "training.val_size",
     "training.val_check_steps",
+    "training.min_steps_before_early_stop",
     "training.model_step_size",
     "training.early_stop_patience_steps",
     "training.loss",
@@ -198,6 +200,9 @@ class TrainingConfig:
     max_steps: int = DEFAULT_TRAINING_PARAMS["max_steps"]
     val_size: int = DEFAULT_TRAINING_PARAMS["val_size"]
     val_check_steps: int = DEFAULT_TRAINING_PARAMS["val_check_steps"]
+    min_steps_before_early_stop: int = DEFAULT_TRAINING_PARAMS[
+        "min_steps_before_early_stop"
+    ]
     early_stop_patience_steps: int = DEFAULT_TRAINING_PARAMS[
         "early_stop_patience_steps"
     ]

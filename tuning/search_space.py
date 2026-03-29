@@ -109,6 +109,7 @@ DEFAULT_TRAINING_PARAMS = {
     "max_steps": 1000,
     "val_size": 8,
     "val_check_steps": 100,
+    "min_steps_before_early_stop": 0,
     "early_stop_patience_steps": -1,
 }
 DEFAULT_TRAINING_LR_SCHEDULER = {
