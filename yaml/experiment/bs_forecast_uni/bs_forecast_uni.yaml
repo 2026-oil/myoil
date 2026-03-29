@@ -14,4 +14,4 @@ jobs:
   params: {}
 bs_preforcast:
   enabled: true
-  config_path: yaml/plugins/bs_preforcast_uni.yaml
+  config_path: yaml/jobs/bs_preforcast/bs_preforcast_uni.yaml
