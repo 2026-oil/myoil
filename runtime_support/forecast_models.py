@@ -56,11 +56,6 @@ from neuralforecast.models.smamba import SMamba
 from neuralforecast.models.xlstm_mixer import xLSTMMixer
 from plugins.optimizer import resolve_optimizer
 
-try:
-    from tests.dummy.dummy_models import DummyMultivariate, DummyUnivariate
-except ImportError:  # pragma: no cover
-    DummyMultivariate = DummyUnivariate = None
-
 from app_config import AppConfig, JobConfig, TrainingLossParams
 from tuning.search_space import (
     BASELINE_MODEL_NAMES,
@@ -125,10 +120,6 @@ MODEL_CLASSES = {
     "RMoK": RMoK,
     "XLinear": XLinear,
 }
-if DummyUnivariate is not None:
-    MODEL_CLASSES["DummyUnivariate"] = DummyUnivariate
-if DummyMultivariate is not None:
-    MODEL_CLASSES["DummyMultivariate"] = DummyMultivariate
 
 
 def resolve_loss(

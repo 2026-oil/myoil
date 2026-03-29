@@ -2721,20 +2721,17 @@ def _run_single_job(
         (models_dir / "training_best_params.json").write_text(
             json.dumps(best_training_params, indent=2), encoding="utf-8"
         )
-        (models_dir / "optuna_study_summary.json").write_text(
-            json.dumps(study_summary, indent=2), encoding="utf-8"
-        )
-        (models_dir / "training_optuna_study_summary.json").write_text(
+        study_summary_path = models_dir / "optuna_study_summary.json"
+        study_summary_path.write_text(
             json.dumps(study_summary, indent=2), encoding="utf-8"
         )
         _update_manifest_artifacts(
             manifest_path,
             job_name=job.model,
             model_best_params_path=models_dir / "best_params.json",
-            model_study_summary_path=models_dir / "optuna_study_summary.json",
+            model_study_summary_path=study_summary_path,
             training_best_params_path=models_dir / "training_best_params.json",
-            training_study_summary_path=models_dir
-            / "training_optuna_study_summary.json",
+            training_study_summary_path=study_summary_path,
             training_range_source=training_range_source_for_model(
                 effective_job.model,
                 search_space_payload=loaded.search_space_payload,

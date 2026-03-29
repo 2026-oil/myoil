@@ -36,10 +36,7 @@ def _ensure_plugins_loaded() -> None:
     """
     if _STAGE_PLUGINS:
         return
-    try:
-        import plugins.bs_preforcast.plugin  # noqa: F401  side-effect: registers plugin
-    except ImportError:
-        pass
+    import plugins.bs_preforcast.plugin  # noqa: F401  side-effect: registers plugin
 
 
 def get_stage_plugin_for_payload(payload: dict[str, Any]) -> StagePlugin | None:

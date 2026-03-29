@@ -6163,7 +6163,7 @@ def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
             output_root
             / "models"
             / "TFT"
-            / "training_optuna_study_summary.json"
+            / "optuna_study_summary.json"
         ).read_text(encoding="utf-8")
     )
     training_best = json.loads(
