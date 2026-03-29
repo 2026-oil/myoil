@@ -1453,7 +1453,7 @@ def _resolve_relative_config_reference(
     return repo_candidate
 
 
-def _load_jobs_from_path(jobs_path: Path) -> list[dict[str, Any]]:
+def _load_jobs_from_path(jobs_path: Path) -> list[Any]:
     suffix = jobs_path.suffix.lower()
     if suffix == ".toml":
         jobs_source_type = "toml"
@@ -1484,7 +1484,7 @@ def _resolve_jobs_path_reference(
     *,
     source_path: Path,
     jobs_value: str,
-) -> tuple[Path, list[dict[str, Any]]]:
+) -> tuple[Path, list[Any]]:
     jobs_path = _resolve_relative_config_reference(
         repo_root,
         source_path,
@@ -1493,6 +1493,53 @@ def _resolve_jobs_path_reference(
     if not jobs_path.exists():
         raise FileNotFoundError(f"jobs route does not exist: {jobs_path}")
     return jobs_path, _load_jobs_from_path(jobs_path)
+
+
+def _jobs_fanout_specs_from_reference(
+    repo_root: Path,
+    *,
+    source_path: Path,
+    reference: str,
+    seen_route_slugs: set[str],
+) -> list[JobsFanoutSpec]:
+    resolved_path, jobs_payload = _resolve_jobs_path_reference(
+        repo_root,
+        source_path=source_path,
+        jobs_value=reference,
+    )
+    if all(isinstance(job, dict) for job in jobs_payload):
+        route_slug = resolved_path.stem
+        if route_slug in seen_route_slugs:
+            raise ValueError(
+                "jobs path list must produce unique filename stems; "
+                f"duplicate stem: {route_slug}"
+            )
+        seen_route_slugs.add(route_slug)
+        return [
+            JobsFanoutSpec(
+                reference=reference,
+                resolved_path=resolved_path,
+                route_slug=route_slug,
+                jobs_payload=tuple(dict(job) for job in jobs_payload),
+            )
+        ]
+    if all(isinstance(job, str) for job in jobs_payload):
+        nested_specs: list[JobsFanoutSpec] = []
+        for nested_reference in jobs_payload:
+            assert isinstance(nested_reference, str)
+            nested_specs.extend(
+                _jobs_fanout_specs_from_reference(
+                    repo_root,
+                    source_path=resolved_path,
+                    reference=nested_reference,
+                    seen_route_slugs=seen_route_slugs,
+                )
+            )
+        return nested_specs
+    raise ValueError(
+        "jobs route must resolve to either inline job mappings or repo-relative "
+        f"path strings: {resolved_path}"
+    )
 
 
 def _resolve_jobs_fanout_specs(
@@ -1515,24 +1562,12 @@ def _resolve_jobs_fanout_specs(
     seen_route_slugs: set[str] = set()
     for reference in jobs_value:
         assert isinstance(reference, str)
-        resolved_path, jobs_payload = _resolve_jobs_path_reference(
-            repo_root,
-            source_path=source_path,
-            jobs_value=reference,
-        )
-        route_slug = resolved_path.stem
-        if route_slug in seen_route_slugs:
-            raise ValueError(
-                "jobs path list must produce unique filename stems; "
-                f"duplicate stem: {route_slug}"
-            )
-        seen_route_slugs.add(route_slug)
-        specs.append(
-            JobsFanoutSpec(
+        specs.extend(
+            _jobs_fanout_specs_from_reference(
+                repo_root,
+                source_path=source_path,
                 reference=reference,
-                resolved_path=resolved_path,
-                route_slug=route_slug,
-                jobs_payload=tuple(dict(job) for job in jobs_payload),
+                seen_route_slugs=seen_route_slugs,
             )
         )
     return tuple(specs)

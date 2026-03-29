@@ -20,9 +20,9 @@ import neuralforecast.auto as nf_auto
 import neuralforecast.models as nf_models
 import plugins.bs_preforcast.runtime as bs_runtime
 from neuralforecast.core import MODEL_FILENAME_DICT
-from residual.adapters import build_multivariate_inputs, build_univariate_inputs
+from runtime_support.adapters import build_multivariate_inputs, build_univariate_inputs
 from plugins.bs_preforcast.runtime import prepare_bs_preforcast_fold_inputs
-from residual.config import (
+from app_config import (
     TrainingOptimizerConfig,
     TrainingLossParams,
     _effective_shared_settings_for_source,
@@ -30,14 +30,14 @@ from residual.config import (
     _merge_shared_settings_into_payload,
     load_app_config,
 )
-from residual.models import (
+from runtime_support.forecast_models import (
     MODEL_CLASSES,
     build_model,
     supports_auto_mode,
 )
 from neuralforecast.losses.pytorch import ExLoss
 from plugins.bs_preforcast.search_space import SUPPORTED_BS_PREFORCAST_MODELS
-from residual.optuna_spaces import (
+from tuning.search_space import (
     DEFAULT_OPTUNA_NUM_TRIALS,
     EXCLUDED_AUTO_MODEL_NAMES,
     FIXED_TRAINING_KEYS,
@@ -52,9 +52,9 @@ from residual.optuna_spaces import (
     optuna_num_trials,
     training_range_source_for_model,
 )
-from residual.plugins_base import ResidualContext, ResidualPlugin
-from residual.progress import PROGRESS_EVENT_PREFIX
-from residual.scheduler import (
+from plugins.residual.base import ResidualContext, ResidualPlugin
+from runtime_support.progress import PROGRESS_EVENT_PREFIX
+from runtime_support.scheduler import (
     build_device_groups,
     build_launch_plan,
     build_tuning_launch_plan,
@@ -501,7 +501,7 @@ def _thin_plugin_stage_payload(
 
 
 def _residual_defaults_map() -> dict[str, dict[str, Any]]:
-    from residual import optuna_spaces as residual_spaces
+    import tuning.search_space as residual_spaces
 
     for attr_name in (
         "DEFAULT_RESIDUAL_PARAMS_BY_MODEL",
@@ -512,13 +512,13 @@ def _residual_defaults_map() -> dict[str, dict[str, Any]]:
         value = getattr(residual_spaces, attr_name, None)
         if value is not None:
             return cast(dict[str, dict[str, Any]], value)
-    pytest.fail("residual.optuna_spaces must expose a per-model defaults map")
+    pytest.fail("tuning.search_space must expose a per-model defaults map")
     raise AssertionError("unreachable")
 
 
 def _import_build_residual_plugin():
     try:
-        from residual.registry import build_residual_plugin as builder
+        from plugins.residual import build_residual_plugin as builder
     except ModuleNotFoundError as exc:
         if exc.name in {"lightgbm", "xgboost", "sklearn"}:
             pytest.skip(f"optional dependency missing: {exc.name}")
@@ -962,8 +962,8 @@ def test_load_app_config_allows_explicit_empty_residual_hist_exog_override(
 def test_manifest_and_capability_report_include_residual_feature_visibility(
     tmp_path: Path,
 ):
-    from residual import runtime
-    from residual.manifest import build_manifest
+    import runtime_support.runner as runtime
+    from runtime_support.manifest import build_manifest
 
     payload = _payload()
     payload["dataset"]["futr_exog_cols"] = ["futr_a"]
@@ -1611,9 +1611,9 @@ def test_scheduler_respects_max_concurrent_jobs(
             state["active"] -= 1
             return 0
 
-    monkeypatch.setattr("residual.scheduler.subprocess.Popen", FakePopen)
+    monkeypatch.setattr("runtime_support.scheduler.subprocess.Popen", FakePopen)
     monkeypatch.setattr(
-        "residual.scheduler._worker_command",
+        "runtime_support.scheduler._worker_command",
         lambda *_args, **_kwargs: ["python", "fake_worker.py"],
     )
 
@@ -1749,9 +1749,9 @@ def test_scheduler_streams_worker_stdout_to_terminal(
             self._completed = True
             return 0
 
-    monkeypatch.setattr("residual.scheduler.subprocess.Popen", FakePopen)
+    monkeypatch.setattr("runtime_support.scheduler.subprocess.Popen", FakePopen)
     monkeypatch.setattr(
-        "residual.scheduler._worker_command",
+        "runtime_support.scheduler._worker_command",
         lambda *_args, **_kwargs: ["python", "fake_worker.py"],
     )
 
@@ -1795,9 +1795,9 @@ def test_scheduler_finalize_recreates_missing_worker_root(
                 worker_root.rmdir()
             return 7
 
-    monkeypatch.setattr("residual.scheduler.subprocess.Popen", FakePopen)
+    monkeypatch.setattr("runtime_support.scheduler.subprocess.Popen", FakePopen)
     monkeypatch.setattr(
-        "residual.scheduler._worker_command",
+        "runtime_support.scheduler._worker_command",
         lambda *_args, **_kwargs: ["python", "fake_worker.py"],
     )
 
@@ -1818,7 +1818,7 @@ def test_open_persistent_study_retries_after_file_not_found(
     loaded = load_app_config(
         tmp_path, config_path=_write_config(tmp_path, _payload(), ".yaml")
     )
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     calls = {"count": 0}
     real_create_study = runtime.optuna.create_study
@@ -1856,7 +1856,7 @@ def test_runtime_executes_single_job_with_dummy_model(tmp_path: Path):
     (tmp_path / "data.csv").write_text(data, encoding="utf-8")
     config_path = _write_config(tmp_path, payload, ".yaml")
 
-    from residual.runtime import main as runtime_main
+    from runtime_support.runner import main as runtime_main
 
     output_root = tmp_path / "run"
     code = runtime_main(
@@ -1895,7 +1895,7 @@ def test_runtime_logs_model_and_fold_progress_to_stdout(
     (tmp_path / "data.csv").write_text(data, encoding="utf-8")
     config_path = _write_config(tmp_path, payload, ".yaml")
 
-    from residual.runtime import main as runtime_main
+    from runtime_support.runner import main as runtime_main
 
     output_root = tmp_path / "run_progress"
     code = runtime_main(
@@ -1935,7 +1935,7 @@ def test_runtime_logs_fold_errors_to_stdout(
     (tmp_path / "data.csv").write_text(data, encoding="utf-8")
     config_path = _write_config(tmp_path, payload, ".yaml")
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     def _boom(*_args, **_kwargs):
         raise RuntimeError("synthetic failure")
@@ -1961,7 +1961,7 @@ def test_runtime_logs_fold_errors_to_stdout(
 
 
 def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     run_root = tmp_path / "summary_run"
     cv_dir = run_root / "cv"
@@ -2207,7 +2207,7 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
 
 
 def test_summary_builder_leaves_missing_report_values_blank(tmp_path: Path):
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     run_root = tmp_path / "blank_summary"
     cv_dir = run_root / "cv"
@@ -2254,7 +2254,7 @@ def test_summary_builder_leaves_missing_report_values_blank(tmp_path: Path):
 
 
 def test_compute_metrics_includes_range_normalized_nrmse_and_r2():
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     metrics = runtime._compute_metrics(
         pd.Series([1.0, 2.0, 3.0]),
@@ -2269,7 +2269,7 @@ def test_compute_metrics_includes_range_normalized_nrmse_and_r2():
 def test_runtime_skip_summary_env_suppresses_summary_artifacts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    from residual.runtime import main as runtime_main
+    from runtime_support.runner import main as runtime_main
 
     payload = _payload()
     payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
@@ -2305,7 +2305,7 @@ def test_runtime_skip_summary_env_suppresses_summary_artifacts(
 
 
 def test_runtime_smoke_writes_summary_artifacts_for_dummy_model(tmp_path: Path):
-    from residual.runtime import main as runtime_main
+    from runtime_support.runner import main as runtime_main
 
     payload = _payload()
     payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
@@ -2350,7 +2350,7 @@ def test_runtime_smoke_writes_summary_artifacts_for_dummy_model(tmp_path: Path):
 
 
 def test_trajectory_frame_contains_train_and_val_series():
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     nf = SimpleNamespace(
         models=[
@@ -2371,7 +2371,7 @@ def test_trajectory_frame_contains_train_and_val_series():
 
 
 def test_loss_curve_series_drop_sparse_validation_gaps():
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     curve_frame = pd.DataFrame(
         [
@@ -2397,7 +2397,7 @@ def test_loss_curve_series_drop_sparse_validation_gaps():
 
 
 def test_sample_loss_curve_frame_keeps_every_10_global_steps():
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     curve_frame = pd.DataFrame(
         [
@@ -2415,7 +2415,7 @@ def test_sample_loss_curve_frame_keeps_every_10_global_steps():
 
 
 def test_configure_loss_curve_axis_uses_log_base10_ticks():
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     matplotlib = pytest.importorskip("matplotlib")
     matplotlib.use("Agg")
@@ -2454,7 +2454,7 @@ def test_build_tscv_splits_uses_configured_step_size(tmp_path: Path):
         tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
     )
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     splits = runtime._build_tscv_splits(12, loaded.config.cv)
 
@@ -2480,7 +2480,7 @@ def test_runtime_outer_cv_cutoffs_follow_step_size(tmp_path: Path):
     (tmp_path / "data.csv").write_text(data, encoding="utf-8")
     config_path = _write_config(tmp_path, payload, ".yaml")
 
-    from residual.runtime import main as runtime_main
+    from runtime_support.runner import main as runtime_main
 
     output_root = tmp_path / "run_step_size_outer_cv"
     code = runtime_main(
@@ -2518,7 +2518,7 @@ def test_runtime_uses_config_parent_and_task_name_for_default_run_directory(
     (tmp_path / "data.csv").write_text(data, encoding="utf-8")
     config_path = _write_config(tmp_path, payload, ".yaml")
 
-    from residual.runtime import main as runtime_main
+    from runtime_support.runner import main as runtime_main
 
     code = runtime_main(["--config", str(config_path), "--jobs", "DummyUnivariate"])
 
@@ -2539,7 +2539,7 @@ def test_runtime_uses_config_parent_and_task_name_for_default_run_directory(
 
 
 def test_default_output_root_uses_repo_name_for_repo_root_config(tmp_path: Path):
-    from residual.runtime import _default_output_root
+    from runtime_support.runner import _default_output_root
 
     repo_root = tmp_path / "neuralforecast"
     repo_root.mkdir(parents=True)
@@ -2579,7 +2579,7 @@ def test_default_output_root_uses_config_parent_for_nested_repo_configs(
     config_path: str,
     expected_name: str,
 ):
-    from residual.runtime import _default_output_root
+    from runtime_support.runner import _default_output_root
 
     loaded = load_app_config(REPO_ROOT, config_path=config_path)
 
@@ -2626,7 +2626,7 @@ def test_resolve_single_job_run_roots_prefers_latest_matching_scheduler_run(
     os.utime(run_new / "manifest" / "run_manifest.json", (200, 200))
     os.utime(run_new / "scheduler" / "workers", (200, 200))
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     selected_jobs = runtime._selected_jobs(loaded, ["DummyUnivariate"])
     resolved = runtime._resolve_single_job_run_roots(
@@ -2670,7 +2670,7 @@ def test_resolve_single_job_run_roots_falls_back_to_default_without_match(
         job_names=["DummyUnivariate"],
     )
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     selected_jobs = runtime._selected_jobs(loaded, ["DummyUnivariate"])
     resolved = runtime._resolve_single_job_run_roots(
@@ -2713,7 +2713,7 @@ def test_resolve_single_job_run_roots_preserves_explicit_output_root(
         job_names=["DummyUnivariate"],
     )
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     explicit_root = tmp_path / "custom_output_root"
     selected_jobs = runtime._selected_jobs(loaded, ["DummyUnivariate"])
@@ -2756,7 +2756,7 @@ def test_resolve_single_job_run_roots_does_not_reuse_scheduler_run_for_validate_
         job_names=["DummyUnivariate"],
     )
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     selected_jobs = runtime._selected_jobs(loaded, ["DummyUnivariate"])
     resolved = runtime._resolve_single_job_run_roots(
@@ -2804,7 +2804,7 @@ def test_resolve_single_job_run_roots_ignores_symlinked_scheduler_run(
     runs_root.mkdir(parents=True, exist_ok=True)
     (runs_root / "linked_run").symlink_to(external_run, target_is_directory=True)
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     selected_jobs = runtime._selected_jobs(loaded, ["DummyUnivariate"])
     resolved = runtime._resolve_single_job_run_roots(
@@ -2829,7 +2829,7 @@ def test_runtime_infers_freq_when_omitted(tmp_path: Path):
         encoding="utf-8",
     )
     config_path = _write_config(tmp_path, payload, ".yaml")
-    import residual.runtime as runtime
+    import runtime_support.runner as runtime
 
     loaded = load_app_config(tmp_path, config_path=config_path)
     import pandas as pd
@@ -2962,7 +2962,7 @@ def test_runtime_generates_per_fold_residual_artifacts_with_dummy_model(tmp_path
     (tmp_path / "data.csv").write_text(data, encoding="utf-8")
     config_path = _write_config(tmp_path, payload, ".yaml")
 
-    from residual.runtime import main as runtime_main
+    from runtime_support.runner import main as runtime_main
 
     output_root = tmp_path / "run_resid"
     code = runtime_main(
@@ -3007,7 +3007,7 @@ def test_runtime_generates_per_fold_residual_artifacts_with_dummy_model(tmp_path
 def test_runtime_diff_preserves_raw_scale_for_baseline_learned_artifacts(
     tmp_path: Path,
 ):
-    from residual.runtime import main as runtime_main
+    from runtime_support.runner import main as runtime_main
 
     data = (
         "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n"
@@ -3053,7 +3053,7 @@ def test_runtime_diff_preserves_raw_scale_for_baseline_learned_artifacts(
 def test_runtime_diff_residual_enabled_skips_short_backcast_history_without_crash(
     tmp_path: Path,
 ):
-    from residual.runtime import main as runtime_main
+    from runtime_support.runner import main as runtime_main
 
     payload = _payload()
     payload["runtime"]["transformations_target"] = "diff"
@@ -3119,8 +3119,8 @@ def test_runtime_writes_loss_curve_images_for_residual_disabled_learned_folds(
     (tmp_path / "data.csv").write_text(data, encoding="utf-8")
     config_path = _write_config(tmp_path, payload, ".yaml")
 
-    from residual.runtime import main as runtime_main
-    import residual.runtime as runtime
+    from runtime_support.runner import main as runtime_main
+    import runtime_support.runner as runtime
 
     class _FakeNF:
         def __init__(self, model_name: str, target_col: str):
@@ -3230,8 +3230,8 @@ def test_runtime_writes_loss_curve_images_for_residual_enabled_learned_folds(
     (tmp_path / "data.csv").write_text(data, encoding="utf-8")
     config_path = _write_config(tmp_path, payload, ".yaml")
 
-    from residual.runtime import main as runtime_main
-    import residual.runtime as runtime
+    from runtime_support.runner import main as runtime_main
+    import runtime_support.runner as runtime
 
     class _FakeNF:
         def __init__(self, model_name: str, target_col: str):
@@ -3341,7 +3341,7 @@ def test_baseline_models_do_not_write_loss_curve_images(tmp_path: Path):
     (tmp_path / "data.csv").write_text(data, encoding="utf-8")
     config_path = _write_config(tmp_path, payload, ".yaml")
 
-    from residual.runtime import main as runtime_main
+    from runtime_support.runner import main as runtime_main
 
     output_root = tmp_path / "run_baseline"
     code = runtime_main(
@@ -3406,7 +3406,7 @@ class _CheckpointResidualPlugin(ResidualPlugin):
 def test_apply_residual_plugin_uses_fold_local_backcasts_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     plugin_log: list[_RecordingLog] = []
 
@@ -3484,7 +3484,7 @@ def test_apply_residual_plugin_uses_fold_local_backcasts_only(
 def test_fold_panels_include_selected_residual_exog_sources(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     payload = _payload()
     payload["cv"].update({"horizon": 2, "step_size": 1, "n_windows": 1, "gap": 0})
@@ -3590,7 +3590,7 @@ def test_fold_panels_include_selected_residual_exog_sources(
 def test_runtime_residual_checkpoint_contract_extends_to_all_supported_models(
     path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     payload = _load_case_yaml(path)
     loaded = load_app_config(REPO_ROOT, config_path=path)
@@ -3668,7 +3668,7 @@ def test_runtime_residual_checkpoint_contract_extends_to_all_supported_models(
 
 
 def test_build_residual_target_preserves_level_mode_parity():
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     panel = pd.DataFrame(
         {
@@ -3686,7 +3686,7 @@ def test_build_residual_target_preserves_level_mode_parity():
 
 
 def test_build_residual_target_delta_resets_per_cutoff_and_preserves_row_order():
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     panel = pd.DataFrame(
         {
@@ -3707,7 +3707,7 @@ def test_build_residual_target_delta_resets_per_cutoff_and_preserves_row_order()
 
 
 def test_reconstruct_corrected_forecast_delta_uses_grouped_cumsum_and_preserves_row_order():
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     panel = pd.DataFrame(
         {
@@ -3727,7 +3727,7 @@ def test_reconstruct_corrected_forecast_delta_uses_grouped_cumsum_and_preserves_
 
 
 def test_reconstruct_corrected_forecast_level_mode_parity():
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     panel = pd.DataFrame(
         {
@@ -3833,7 +3833,7 @@ def test_runtime_skips_residual_artifacts_for_baseline_models(tmp_path: Path):
     (tmp_path / "data.csv").write_text(data, encoding="utf-8")
     config_path = _write_config(tmp_path, payload, ".yaml")
 
-    from residual.runtime import main as runtime_main
+    from runtime_support.runner import main as runtime_main
 
     output_root = tmp_path / "run_baseline"
     code = runtime_main(
@@ -4680,7 +4680,7 @@ def test_runtime_auto_mode_records_selector_provenance_and_modes(
     config_path = _write_config(tmp_path, payload, ".yaml")
     _write_search_space(tmp_path)
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
     monkeypatch.setenv("NEURALFORECAST_OPTUNA_NUM_TRIALS", "1")
@@ -4751,7 +4751,7 @@ def test_runtime_validate_only_records_bs_preforcast_metadata(
     (tmp_path / "yaml/plugins/bs_preforcast.yaml").write_text(yaml.safe_dump(stage_payload, sort_keys=False), encoding="utf-8")
     _write_search_space(tmp_path, {"models": {}, "training": [], "residual": {"xgboost": ["n_estimators"]}, "bs_preforcast_models": {}, "bs_preforcast_training": []})
     config_path = _write_config(tmp_path, payload, ".yaml")
-    from residual import runtime
+    import runtime_support.runner as runtime
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
     output_root = tmp_path / "run_bs_preforcast_validate"
     code = runtime.main(["--config", str(config_path), "--jobs", "DummyUnivariate", "--output-root", str(output_root), "--validate-only"])
@@ -4815,7 +4815,7 @@ def test_runtime_validate_only_records_mixed_job_injection_results(
     )
     config_path = _write_config(tmp_path, payload, ".yaml")
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
 
@@ -4875,7 +4875,7 @@ def test_runtime_validate_only_bs_preforcast_fails_for_legacy_using_futr_exog(
     )
     config_path = _write_config(tmp_path, payload, ".yaml")
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
 
@@ -5462,7 +5462,7 @@ def test_runtime_auto_mode_prefers_yaml_opt_n_trial_over_env(
     config_path = _write_config(tmp_path, payload, ".yaml")
     _write_search_space(tmp_path)
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
     monkeypatch.setenv("NEURALFORECAST_OPTUNA_NUM_TRIALS", "1")
@@ -5510,7 +5510,7 @@ def test_runtime_main_parallelizes_single_auto_job_tuning(
     config_path = _write_config(tmp_path, payload, ".yaml")
     _write_search_space(tmp_path, {"models": {"TFT": ["hidden_size"]}, "training": [], "residual": {}})
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     called: dict[str, Any] = {}
 
@@ -5564,7 +5564,7 @@ def test_runtime_main_does_not_recurse_parallel_tuning_inside_worker(
         {"models": {"TFT": ["hidden_size"]}, "training": [], "residual": {}},
     )
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     called = {"count": 0}
 
@@ -5615,7 +5615,7 @@ def test_runtime_main_reuses_scheduler_worker_root_and_parent_summary_for_auto_j
         {"models": {"TFT": ["hidden_size"]}, "training": [], "residual": {}},
     )
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     worker_root = tmp_path / "matched_run" / "scheduler" / "workers" / "TFT"
     summary_root = tmp_path / "matched_run"
@@ -5694,7 +5694,7 @@ def test_runtime_auto_mode_can_prune_from_first_fold(
         },
     )
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     should_prune_steps: list[int] = []
 
@@ -5778,7 +5778,7 @@ def test_runtime_auto_mode_can_prune_from_first_fold(
 def test_residual_auto_mode_can_prune_from_first_fold(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     payload = _payload()
     payload["residual"] = {"enabled": True, "model": "xgboost", "params": {}}
@@ -5887,7 +5887,7 @@ def test_runtime_auto_mode_catches_recoverable_trial_failures(
         },
     )
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     def _fake_fit_and_predict_fold(
         loaded,
@@ -5984,7 +5984,7 @@ def test_runtime_auto_mode_resumes_persistent_study_budget(
         },
     )
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     def _fake_fit_and_predict_fold(
         loaded,
@@ -6097,7 +6097,7 @@ def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
         },
     )
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     calls: list[dict[str, Any]] = []
 
@@ -6195,7 +6195,7 @@ def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
 def test_update_manifest_artifacts_tracks_training_range_source_per_job(
     tmp_path: Path,
 ):
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     manifest_path = tmp_path / "run_manifest.json"
     manifest_path.write_text(
@@ -6252,7 +6252,7 @@ def test_effective_config_pins_val_size_to_horizon_for_training_auto(tmp_path: P
         },
     )
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     loaded = load_app_config(tmp_path, config_path=config_path)
     effective = runtime._effective_config(loaded, {"batch_size": 123})
@@ -6281,7 +6281,7 @@ def test_effective_config_maps_training_model_step_size_override_for_training_au
         },
     )
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     loaded = load_app_config(tmp_path, config_path=config_path)
     effective = runtime._effective_config(loaded, {"model_step_size": 5})
@@ -6740,7 +6740,7 @@ def test_should_use_multivariate_for_no_exog_multivariate_model(tmp_path: Path):
         tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
     )
 
-    import residual.runtime as runtime
+    import runtime_support.runner as runtime
 
     assert runtime._should_use_multivariate(loaded, loaded.config.jobs[0]) is True
 
@@ -6769,7 +6769,7 @@ def test_should_use_univariate_adapter_for_multivariate_model_with_native_exog(
         tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
     )
 
-    import residual.runtime as runtime
+    import runtime_support.runner as runtime
 
     assert runtime._should_use_multivariate(loaded, loaded.config.jobs[0]) is False
 
@@ -6800,7 +6800,7 @@ def test_should_use_univariate_adapter_for_timexer_with_native_future_exog(
         tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
     )
 
-    import residual.runtime as runtime
+    import runtime_support.runner as runtime
 
     assert runtime._should_use_multivariate(loaded, loaded.config.jobs[0]) is False
     model = build_model(loaded.config, loaded.config.jobs[0], n_series=1)
@@ -6875,7 +6875,7 @@ def test_runtime_executes_multivariate_model_without_hist_exog(
     (tmp_path / "data.csv").write_text(data, encoding="utf-8")
     config_path = _write_config(tmp_path, payload, ".yaml")
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
     monkeypatch.setenv("NEURALFORECAST_OPTUNA_NUM_TRIALS", "1")
@@ -6921,7 +6921,7 @@ def test_runtime_single_job_rerun_prunes_stale_model_artifacts_and_rebuilds_summ
     config_path = _write_config(tmp_path, payload, ".yaml")
     _write_search_space(tmp_path)
 
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     def _write_metrics_and_forecasts(
         root: Path,
@@ -7970,7 +7970,7 @@ def test_jobs_path_loading_rejects_missing_or_malformed_shared_files(tmp_path: P
 
 
 def test_jobs_path_list_loading_builds_fanout_specs(tmp_path: Path) -> None:
-    from residual.config import loaded_config_for_jobs_fanout
+    from app_config import loaded_config_for_jobs_fanout
 
     dataset_path = tmp_path / "df.csv"
     dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
@@ -8019,6 +8019,48 @@ def test_jobs_path_list_loading_builds_fanout_specs(tmp_path: Path) -> None:
     assert [job.model for job in first_variant.config.jobs] == ["Naive"]
     assert [job.model for job in second_variant.config.jobs] == ["DummyUnivariate"]
     assert second_variant.active_jobs_route_slug == "jobs_2"
+
+
+def test_jobs_path_list_loading_expands_nested_catalog_routes() -> None:
+    from app_config import loaded_config_for_jobs_fanout
+
+    loaded = load_app_config(
+        REPO_ROOT,
+        config_path=REPO_ROOT
+        / "yaml"
+        / "experiment"
+        / "bs_forecast_uni"
+        / "bs_forecast_uni.yaml",
+    )
+
+    assert tuple(spec.route_slug for spec in loaded.jobs_fanout_specs) == (
+        "xgboost",
+        "lightgbm",
+        "lstm",
+        "patchtst",
+        "dlinear",
+        "nhits",
+        "es",
+        "arima",
+    )
+    first_variant = loaded_config_for_jobs_fanout(
+        REPO_ROOT, loaded, loaded.jobs_fanout_specs[0]
+    )
+    last_variant = loaded_config_for_jobs_fanout(
+        REPO_ROOT, loaded, loaded.jobs_fanout_specs[-1]
+    )
+
+    assert [job.model for job in loaded.config.jobs] == ["Naive"]
+    assert [job.model for job in first_variant.config.jobs] == ["Naive"]
+    assert [job.model for job in last_variant.config.jobs] == ["Naive"]
+    assert [job.model for job in first_variant.stage_plugin_loaded.config.jobs] == [
+        "xgboost"
+    ]
+    assert [job.model for job in last_variant.stage_plugin_loaded.config.jobs] == [
+        "ARIMA"
+    ]
+    assert first_variant.active_jobs_route_slug == "xgboost"
+    assert last_variant.active_jobs_route_slug == "arima"
 
 
 def test_load_app_config_auto_loads_repo_shared_settings_for_repo_yaml(tmp_path: Path) -> None:
@@ -8275,8 +8317,8 @@ def test_jobs_path_list_rejects_duplicate_route_stems(tmp_path: Path) -> None:
 
 
 def test_default_output_root_appends_jobs_fanout_slug(tmp_path: Path) -> None:
-    from residual.config import loaded_config_for_jobs_fanout
-    from residual.runtime import _default_output_root
+    from app_config import loaded_config_for_jobs_fanout
+    from runtime_support.runner import _default_output_root
 
     dataset_path = tmp_path / "df.csv"
     dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
@@ -8317,7 +8359,7 @@ def test_default_output_root_appends_jobs_fanout_slug(tmp_path: Path) -> None:
 def test_jobs_fanout_variant_preserves_repo_relative_dataset_resolution(
     tmp_path: Path,
 ) -> None:
-    from residual.config import loaded_config_for_jobs_fanout
+    from app_config import loaded_config_for_jobs_fanout
 
     dataset_dir = tmp_path / "data"
     dataset_dir.mkdir(parents=True, exist_ok=True)
@@ -8363,7 +8405,7 @@ def test_jobs_fanout_variant_preserves_repo_relative_dataset_resolution(
 
 
 def test_jobs_fanout_variant_preserves_shared_settings_metadata(tmp_path: Path) -> None:
-    from residual.config import loaded_config_for_jobs_fanout
+    from app_config import loaded_config_for_jobs_fanout
 
     (tmp_path / "yaml" / "setting").mkdir(parents=True, exist_ok=True)
     (tmp_path / "yaml" / "setting" / "setting.yaml").write_text(
@@ -8438,7 +8480,7 @@ def test_jobs_fanout_variant_preserves_shared_settings_metadata(tmp_path: Path) 
 def test_runtime_validate_only_fans_out_jobs_path_list(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     dataset_path = tmp_path / "df.csv"
     dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
@@ -8493,7 +8535,7 @@ def test_runtime_validate_only_fans_out_jobs_path_list(
 def test_runtime_rejects_output_root_for_jobs_path_list(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     dataset_path = tmp_path / "df.csv"
     dataset_path.write_text("unique_id,dt,y\nA,2024-01-01,1\n", encoding="utf-8")
@@ -8547,7 +8589,7 @@ def test_runtime_rejects_output_root_for_jobs_path_list(
 def test_runtime_execution_fans_out_jobs_path_list(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     dataset_path = tmp_path / "df.csv"
     dataset_path.write_text(
@@ -8756,7 +8798,7 @@ def test_new_feature_set_residual_yaml_exog_sources_hist_matches_base_dataset(pa
 
 @pytest.mark.parametrize("path", FEATURE_SET_RESIDUAL_YAML_FILES, ids=lambda p: p.name)
 def test_feature_set_residual_yaml_default_output_root_uses_parent_dir(path: Path):
-    from residual.runtime import _default_output_root
+    from runtime_support.runner import _default_output_root
 
     loaded = load_app_config(REPO_ROOT, config_path=path)
     base_payload = _load_case_yaml(REPO_ROOT / "yaml" / "experiment" / "feature_set" / path.name)
@@ -8991,7 +9033,7 @@ def _residual_target_panel(rows: list[dict[str, object]]) -> pd.DataFrame:
 
 
 def test_build_residual_target_delta_matches_horizon_differences():
-    from residual.runtime import build_residual_target
+    from runtime_support.runner import build_residual_target
 
     panel = _residual_target_panel(
         [
@@ -9031,7 +9073,7 @@ def test_build_residual_target_delta_matches_horizon_differences():
 
 
 def test_build_residual_target_delta_does_not_leak_across_fold_and_cutoff_groups():
-    from residual.runtime import build_residual_target
+    from runtime_support.runner import build_residual_target
 
     panel = _residual_target_panel(
         [
@@ -9098,7 +9140,7 @@ def test_build_residual_target_delta_does_not_leak_across_fold_and_cutoff_groups
 
 
 def test_runtime_diff_inverse_reconstruction_uses_anchor_and_cumsum():
-    from residual.runtime import _FoldDiffContext, _restore_prediction_series
+    from runtime_support.runner import _FoldDiffContext, _restore_prediction_series
 
     restored = _restore_prediction_series(
         pd.Series([1.0, 2.0, 3.0]),
@@ -9130,7 +9172,7 @@ def test_runtime_target_diff_only_transforms_target_channel_in_multivariate_inpu
         tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
     )
 
-    import residual.runtime as runtime
+    import runtime_support.runner as runtime
 
     train_df = pd.read_csv(tmp_path / "data.csv").iloc[:3].reset_index(drop=True)
     diff_context = runtime._build_fold_diff_context(loaded, train_df)
@@ -9176,7 +9218,7 @@ def test_runtime_exog_diff_only_transforms_hist_exog_channel_in_multivariate_inp
         tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
     )
 
-    import residual.runtime as runtime
+    import runtime_support.runner as runtime
 
     train_df = pd.read_csv(tmp_path / "data.csv").iloc[:3].reset_index(drop=True)
     diff_context = runtime._build_fold_diff_context(loaded, train_df)
@@ -9223,7 +9265,7 @@ def test_runtime_target_and_exog_diff_transform_both_channels_in_multivariate_in
         tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
     )
 
-    import residual.runtime as runtime
+    import runtime_support.runner as runtime
 
     train_df = pd.read_csv(tmp_path / "data.csv").iloc[:3].reset_index(drop=True)
     diff_context = runtime._build_fold_diff_context(loaded, train_df)
@@ -9246,7 +9288,7 @@ def test_runtime_target_and_exog_diff_transform_both_channels_in_multivariate_in
 def test_apply_residual_plugin_writes_residual_target_to_diagnostics(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     class _ZeroResidualPlugin(ResidualPlugin):
         name = "zero"
@@ -9343,7 +9385,7 @@ def test_apply_residual_plugin_writes_residual_target_to_diagnostics(
 def test_runtime_main_joint_auto_mode_records_residual_best_params(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     payload = _payload()
     payload["runtime"]["opt_n_trial"] = 2
@@ -9502,7 +9544,7 @@ def test_runtime_main_joint_auto_mode_records_residual_best_params(
 def test_apply_residual_plugin_uses_override_params_without_running_residual_study(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     class _ZeroResidualPlugin(ResidualPlugin):
         name = "zero"
@@ -9603,7 +9645,7 @@ def test_apply_residual_plugin_uses_override_params_without_running_residual_stu
 def test_apply_residual_plugin_prefers_yaml_opt_n_trial_over_env(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     class _ZeroResidualPlugin(ResidualPlugin):
         name = "zero"
@@ -9724,7 +9766,7 @@ def test_apply_residual_plugin_prefers_yaml_opt_n_trial_over_env(
 def test_apply_residual_plugin_writes_feature_visibility_metadata(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     class _ZeroResidualPlugin(ResidualPlugin):
         name = "zero"
