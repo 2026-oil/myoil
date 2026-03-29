@@ -2328,6 +2328,25 @@ def test_trajectory_frame_contains_train_and_val_series():
     ]
 
 
+def test_trajectory_frame_accepts_direct_curve_frame_carrier():
+    import runtime_support.runner as runtime
+
+    carrier = SimpleNamespace(
+        curve_frame=pd.DataFrame(
+            [
+                {"global_step": 3, "train_loss": 0.5},
+                {"global_step": 1, "train_loss": 0.9, "val_loss": np.nan},
+            ]
+        )
+    )
+
+    frame = runtime._trajectory_frame(carrier)
+
+    assert frame["global_step"].tolist() == [1, 3]
+    assert frame["train_loss"].tolist() == [0.9, 0.5]
+    assert frame["val_loss"].isna().all()
+
+
 def test_loss_curve_series_drop_sparse_validation_gaps():
     import runtime_support.runner as runtime
 
@@ -4678,17 +4697,23 @@ def test_runtime_validate_only_accepts_top_level_direct_models(
 
 
 @pytest.mark.parametrize(
-    ("model_name", "params"),
+    ("model_name", "params", "expect_loss_curves"),
     (
-        ("ARIMA", {"order": [1, 1, 0], "include_mean": True, "include_drift": False}),
-        ("xgboost", {"lags": [1, 2, 3], "n_estimators": 16, "max_depth": 2}),
+        (
+            "ARIMA",
+            {"order": [1, 1, 0], "include_mean": True, "include_drift": False},
+            False,
+        ),
+        ("xgboost", {"lags": [1, 2, 3], "n_estimators": 16, "max_depth": 2}, True),
+        ("lightgbm", {"lags": [1, 2, 3], "n_estimators": 16, "max_depth": 2}, True),
     ),
 )
-def test_runtime_executes_top_level_direct_models_without_loss_curves(
+def test_runtime_executes_top_level_direct_models_with_expected_loss_curve_behavior(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     model_name: str,
     params: dict[str, Any],
+    expect_loss_curves: bool,
 ):
     payload = _payload()
     payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
@@ -4706,9 +4731,21 @@ def test_runtime_executes_top_level_direct_models_without_loss_curves(
     )
     config_path = _write_config(tmp_path, payload, ".yaml")
     import runtime_support.runner as runtime
+    from neuralforecast.models.bs_preforcast_direct import DirectPredictionResult
 
     def _fake_predict(_stage_loaded, _job, *, target_column, train_df, future_df):
-        return [float(train_df[target_column].iloc[-1])] * len(future_df)
+        predictions = [float(train_df[target_column].iloc[-1])] * len(future_df)
+        if not expect_loss_curves:
+            return predictions
+        return DirectPredictionResult(
+            predictions=predictions,
+            curve_frame=pd.DataFrame(
+                [
+                    {"global_step": 1, "train_loss": 1.0, "val_loss": np.nan},
+                    {"global_step": 10, "train_loss": 0.5, "val_loss": np.nan},
+                ]
+            ),
+        )
 
     monkeypatch.setattr(runtime, "predict_univariate_direct", _fake_predict)
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
@@ -4728,7 +4765,18 @@ def test_runtime_executes_top_level_direct_models_without_loss_curves(
     )
     assert (output_root / "cv" / f"{model_name}_forecasts.csv").exists()
     assert (output_root / "cv" / f"{model_name}_metrics_by_cutoff.csv").exists()
-    assert not any((output_root / "models" / model_name).rglob("loss_curve.png"))
+    loss_curve_paths = list((output_root / "models" / model_name).rglob("loss_curve.png"))
+    sampled_curve_paths = list(
+        (output_root / "models" / model_name).rglob("loss_curve_every_10_global_steps.csv")
+    )
+    if expect_loss_curves:
+        assert loss_curve_paths
+        assert sampled_curve_paths
+        summary_artifacts = pd.read_csv(output_root / "summary" / "loss_curve_artifacts.csv")
+        assert model_name in summary_artifacts["model"].tolist()
+    else:
+        assert not loss_curve_paths
+        assert not sampled_curve_paths
 
 
 def test_runtime_validate_only_rejects_residual_enabled_top_level_direct_models(

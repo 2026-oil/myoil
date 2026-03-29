@@ -74,6 +74,7 @@ from runtime_support.scheduler import (
     run_parallel_jobs,
 )
 from neuralforecast.models.bs_preforcast_direct import (
+    DirectPredictionResult,
     normalized_direct_job_params,
     predict_univariate_direct,
 )
@@ -99,6 +100,11 @@ DEFAULT_SAMPLE_STRUCTURE = {
 }
 class _OptunaTrialFailure(RuntimeError):
     """Recoverable per-trial failure that should not abort the whole study."""
+
+
+@dataclass(frozen=True)
+class _CurveFrameCarrier:
+    curve_frame: pd.DataFrame
 
 
 def _now_iso() -> str:
@@ -669,7 +675,7 @@ def _fit_and_predict_fold(
     test_idx: list[int],
     params_override: dict[str, Any] | None = None,
     training_override: dict[str, Any] | None = None,
-) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, NeuralForecast | None]:
+) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, Any | None]:
     effective_loaded = loaded
     dt_col = loaded.config.dataset.dt_col
     target_col = loaded.config.dataset.target_col
@@ -695,13 +701,19 @@ def _fit_and_predict_fold(
             job,
             params=normalized_direct_job_params(job.model, merged_params),
         )
-        prediction_values = predict_univariate_direct(
+        direct_result = predict_univariate_direct(
             stage_loaded,
             direct_job,
             target_column=target_col,
             train_df=transformed_train_df,
             future_df=future_df,
         )
+        prediction_values = direct_result
+        curve_source: Any | None = None
+        if isinstance(direct_result, DirectPredictionResult):
+            prediction_values = direct_result.predictions
+            if direct_result.curve_frame is not None and not direct_result.curve_frame.empty:
+                curve_source = _CurveFrameCarrier(direct_result.curve_frame.copy())
         target_predictions = pd.DataFrame(
             {
                 "unique_id": [target_col] * len(future_df),
@@ -716,7 +728,7 @@ def _fit_and_predict_fold(
         )
         target_actuals = future_df[target_col].reset_index(drop=True)
         train_end_ds = pd.to_datetime(train_df[dt_col].iloc[-1])
-        return target_predictions, target_actuals, train_end_ds, train_df, None
+        return target_predictions, target_actuals, train_end_ds, train_df, curve_source
     adapter_inputs = _build_adapter_inputs(
         effective_loaded,
         transformed_train_df,
@@ -2451,7 +2463,39 @@ def _learned_fold_artifact_dir(run_root: Path, model_name: str, fold_idx: int) -
     return run_root / "models" / model_name / "folds" / f"fold_{fold_idx:03d}"
 
 
-def _trajectory_frame(nf: NeuralForecast) -> pd.DataFrame:
+def _normalize_curve_frame(curve_frame: pd.DataFrame) -> pd.DataFrame:
+    if curve_frame.empty:
+        return pd.DataFrame(columns=["global_step", "train_loss", "val_loss"])
+    normalized = curve_frame.copy()
+    if "global_step" not in normalized.columns:
+        raise ValueError("loss curve frame must contain a global_step column")
+    if "train_loss" not in normalized.columns:
+        raise ValueError("loss curve frame must contain a train_loss column")
+    if "val_loss" not in normalized.columns:
+        normalized["val_loss"] = np.nan
+    normalized["global_step"] = pd.to_numeric(
+        normalized["global_step"], errors="coerce"
+    )
+    normalized["train_loss"] = pd.to_numeric(
+        normalized["train_loss"], errors="coerce"
+    )
+    normalized["val_loss"] = pd.to_numeric(normalized["val_loss"], errors="coerce")
+    normalized = normalized.dropna(subset=["global_step"]).copy()
+    normalized["global_step"] = normalized["global_step"].astype(int)
+    return normalized[["global_step", "train_loss", "val_loss"]].sort_values(
+        "global_step", kind="stable"
+    ).reset_index(drop=True)
+
+
+def _trajectory_frame(nf: Any) -> pd.DataFrame:
+    if nf is None:
+        return pd.DataFrame()
+    if isinstance(nf, pd.DataFrame):
+        return _normalize_curve_frame(nf)
+    if hasattr(nf, "curve_frame"):
+        curve_frame = getattr(nf, "curve_frame")
+        if isinstance(curve_frame, pd.DataFrame):
+            return _normalize_curve_frame(curve_frame)
     models = getattr(nf, "models", None)
     if not models:
         return pd.DataFrame()
@@ -2463,9 +2507,10 @@ def _trajectory_frame(nf: NeuralForecast) -> pd.DataFrame:
 
     train_frame = pd.DataFrame(train_points, columns=["global_step", "train_loss"])
     val_frame = pd.DataFrame(val_points, columns=["global_step", "val_loss"])
-    return train_frame.merge(val_frame, on="global_step", how="outer").sort_values(
+    merged = train_frame.merge(val_frame, on="global_step", how="outer").sort_values(
         "global_step", kind="stable"
     )
+    return _normalize_curve_frame(merged)
 
 
 def _loss_curve_series(

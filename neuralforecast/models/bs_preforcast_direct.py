@@ -1,12 +1,18 @@
 from __future__ import annotations
 
-from dataclasses import replace
-from typing import Any
+from dataclasses import dataclass, replace
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
 
 from .bs_preforcast_catalog import is_direct_stage_model
+
+
+@dataclass(frozen=True)
+class DirectPredictionResult:
+    predictions: list[float]
+    curve_frame: pd.DataFrame | None = None
 
 
 def _parse_direct_model_literal(
@@ -75,6 +81,123 @@ def _coerce_tree_lags(value: Any) -> int | list[int]:
 
 def _max_lag(lags: int | list[int]) -> int:
     return lags if isinstance(lags, int) else max(lags)
+
+
+def _build_tree_regressor(model_name: str, params: dict[str, Any]) -> Any:
+    resolved_params = dict(params)
+    if model_name == "xgboost":
+        from xgboost import XGBRegressor
+
+        return XGBRegressor(
+            n_estimators=int(resolved_params.pop("n_estimators", 32)),
+            max_depth=int(resolved_params.pop("max_depth", 3)),
+            learning_rate=0.1,
+            objective="reg:squarederror",
+            n_jobs=1,
+            verbosity=0,
+            **resolved_params,
+        )
+
+    from lightgbm import LGBMRegressor
+
+    return LGBMRegressor(
+        n_estimators=int(resolved_params.pop("n_estimators", 64)),
+        max_depth=int(resolved_params.pop("max_depth", -1)),
+        learning_rate=0.05,
+        verbosity=-1,
+        **resolved_params,
+    )
+
+
+def _resolve_tree_history_metric(
+    model_name: str,
+    training_loss: str,
+) -> tuple[str, Callable[[float], float]]:
+    normalized_loss = training_loss.lower()
+    if normalized_loss != "mse":
+        raise ValueError(
+            "bs_preforcast tree loss curves currently support only training.loss=mse"
+        )
+    if model_name == "xgboost":
+        return "rmse", lambda value: float(value) ** 2
+    return "l2", float
+
+
+def _extract_tree_history_frame(
+    estimator: Any,
+    *,
+    model_name: str,
+    training_loss: str,
+) -> pd.DataFrame:
+    metric_name, postprocess = _resolve_tree_history_metric(model_name, training_loss)
+    raw_history: list[float]
+    if model_name == "xgboost":
+        evals_result = estimator.evals_result()
+        dataset_history = next(iter(evals_result.values()), {})
+        raw_history = list(dataset_history.get(metric_name, []))
+    else:
+        evals_result = getattr(estimator, "evals_result_", {})
+        dataset_history = next(iter(evals_result.values()), {})
+        raw_history = list(dataset_history.get(metric_name, []))
+    if not raw_history:
+        return pd.DataFrame(columns=["global_step", "train_loss", "val_loss"])
+    return pd.DataFrame(
+        {
+            "global_step": np.arange(1, len(raw_history) + 1, dtype=int),
+            "train_loss": [postprocess(value) for value in raw_history],
+            "val_loss": [np.nan] * len(raw_history),
+        }
+    )
+
+
+def _build_tree_curve_frame(
+    forecaster: Any,
+    series: pd.Series,
+    *,
+    model_name: str,
+    training_loss: str,
+) -> pd.DataFrame:
+    from sklearn.base import clone
+
+    X_train, y_train = forecaster.create_train_X_y(y=series)
+    step_frames: list[pd.DataFrame] = []
+    metric_name, _ = _resolve_tree_history_metric(model_name, training_loss)
+    for step in forecaster.steps:
+        X_step, y_step = forecaster.filter_train_X_y_for_step(
+            step=int(step),
+            X_train=X_train,
+            y_train=y_train,
+            remove_suffix=True,
+        )
+        estimator = clone(forecaster.estimator)
+        fit_kwargs: dict[str, Any] = {"eval_set": [(X_step, y_step)]}
+        if model_name == "xgboost":
+            estimator.set_params(eval_metric=metric_name)
+            fit_kwargs["verbose"] = False
+        else:
+            fit_kwargs["eval_metric"] = metric_name
+            fit_kwargs["eval_names"] = ["training"]
+        estimator.fit(X_step, y_step, **fit_kwargs)
+        step_frame = _extract_tree_history_frame(
+            estimator,
+            model_name=model_name,
+            training_loss=training_loss,
+        )
+        if step_frame.empty:
+            continue
+        step_frame["step"] = int(step)
+        step_frames.append(step_frame)
+    if not step_frames:
+        return pd.DataFrame(columns=["global_step", "train_loss", "val_loss"])
+    combined = pd.concat(step_frames, ignore_index=True)
+    aggregated = (
+        combined.groupby("global_step", as_index=False)
+        .agg(train_loss=("train_loss", "mean"))
+        .sort_values("global_step", kind="stable")
+        .reset_index(drop=True)
+    )
+    aggregated["val_loss"] = np.nan
+    return aggregated[["global_step", "train_loss", "val_loss"]]
 
 
 def normalized_direct_job_params(
@@ -201,7 +324,7 @@ def predict_univariate_tree(
     train_df: pd.DataFrame,
     future_df: pd.DataFrame,
     model_name: str,
-) -> list[float]:
+) -> DirectPredictionResult:
     from skforecast.direct import ForecasterDirect
 
     raw_lags = job.params.get("lags", stage_loaded.config.training.input_size)
@@ -218,39 +341,28 @@ def predict_univariate_tree(
         raise ValueError(
             "bs_preforcast tree-stage learning_rate is no longer configurable; scheduler and optimizer-rate defaults are internal-only"
         )
-    if model_name == "xgboost":
-        from xgboost import XGBRegressor
-
-        regressor = XGBRegressor(
-            n_estimators=int(params.pop("n_estimators", 32)),
-            max_depth=int(params.pop("max_depth", 3)),
-            learning_rate=0.1,
-            objective="reg:squarederror",
-            n_jobs=1,
-            verbosity=0,
-            **params,
-        )
-    else:
-        from lightgbm import LGBMRegressor
-
-        regressor = LGBMRegressor(
-            n_estimators=int(params.pop("n_estimators", 64)),
-            max_depth=int(params.pop("max_depth", -1)),
-            learning_rate=0.05,
-            verbosity=-1,
-            **params,
-        )
+    regressor = _build_tree_regressor(model_name, params)
     forecaster = ForecasterDirect(
         regressor=regressor,
         steps=len(future_df),
         lags=lags,
     )
+    series = train_df[target_column].astype(float).reset_index(drop=True)
     forecaster.fit(
-        y=train_df[target_column].astype(float).reset_index(drop=True),
+        y=series,
         suppress_warnings=True,
     )
     predictions = forecaster.predict(steps=list(range(1, len(future_df) + 1)))
-    return [float(value) for value in predictions.to_list()]
+    curve_frame = _build_tree_curve_frame(
+        forecaster,
+        series,
+        model_name=model_name,
+        training_loss=stage_loaded.config.training.loss,
+    )
+    return DirectPredictionResult(
+        predictions=[float(value) for value in predictions.to_list()],
+        curve_frame=curve_frame,
+    )
 
 
 def predict_univariate_direct(
@@ -260,7 +372,7 @@ def predict_univariate_direct(
     target_column: str,
     train_df: pd.DataFrame,
     future_df: pd.DataFrame,
-) -> list[float]:
+) -> list[float] | DirectPredictionResult:
     if job.model == "ARIMA":
         return predict_univariate_arima(
             stage_loaded,
