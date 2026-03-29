@@ -473,12 +473,6 @@ def _resolve_shared_settings_reference(
 def _uses_repo_shared_settings(repo_root: Path, source_path: Path) -> bool:
     try:
         relative_path = source_path.resolve().relative_to(repo_root.resolve())
-    except AttributeError:
-        source_resolved = source_path.resolve()
-        repo_resolved = repo_root.resolve()
-        if not str(source_resolved).startswith(str(repo_resolved) + "/"):
-            return False
-        relative_path = Path(str(source_resolved)[len(str(repo_resolved)) + 1 :])
     except ValueError:
         return False
     return bool(relative_path.parts) and relative_path.parts[0] == "yaml"

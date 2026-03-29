@@ -23,13 +23,5 @@ def available_plugins() -> tuple[str, ...]:
 
 
 def get_bs_preforcast_plugin(name: str = "default") -> DefaultBsPreforcastPlugin:
-    try:
-        factory = _PLUGIN_REGISTRY[name.lower()]
-    except KeyError as exc:  # pragma: no cover - defensive
-        raise ValueError(f"Unsupported bs_preforcast plugin: {name}") from exc
-    plugin = factory()
-    if not isinstance(plugin, DefaultBsPreforcastPlugin):  # pragma: no cover - defensive
-        raise TypeError(
-            f"Registered bs_preforcast plugin {name!r} did not produce a DefaultBsPreforcastPlugin-compatible instance"
-        )
-    return plugin
+    factory = _PLUGIN_REGISTRY[name.lower()]
+    return factory()

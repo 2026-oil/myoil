@@ -35,13 +35,8 @@ def _load_torch_radam() -> type[torch.optim.Optimizer]:
 
 
 def _load_pytorch_optimizer(name: str) -> type[torch.optim.Optimizer]:
-    try:
-        import pytorch_optimizer
-    except ImportError as exc:  # pragma: no cover - exercised in integration/runtime only
-        raise ImportError(
-            "pytorch-optimizer is required for training.optimizer "
-            f"name '{name}'. Install project dependencies first."
-        ) from exc
+    import pytorch_optimizer
+
     optimizer_cls = getattr(pytorch_optimizer, name, None)
     if optimizer_cls is None:
         raise ImportError(

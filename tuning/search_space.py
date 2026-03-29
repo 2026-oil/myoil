@@ -165,10 +165,8 @@ def _auto_default_param_specs(model_name: str) -> dict[str, SearchParamSpec] | N
             "windows_batch_size": {"type": "categorical", "choices": [128, 256, 512, 1024]},
             "input_size_multiplier": {"type": "categorical", "choices": [1, 2, 3, 4, 5]},
         }
-    try:
-        import neuralforecast.auto as nf_auto
-    except ImportError:
-        return None
+    import neuralforecast.auto as nf_auto
+
     auto_name = f"Auto{model_name}"
     auto_cls = getattr(nf_auto, auto_name, None)
     default_config = getattr(auto_cls, "default_config", None)
