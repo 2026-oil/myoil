@@ -16,6 +16,7 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 import neuralforecast.losses.pytorch as losses
@@ -301,7 +302,6 @@ class BaseModel(pl.LightningModule):
                     monitor="ptl/val_loss", patience=early_stop_patience_steps
                 )
             )
-
         # Add GPU accelerator if available
         if trainer_kwargs.get("accelerator", None) is None:
             if torch.cuda.is_available():
@@ -396,6 +396,9 @@ class BaseModel(pl.LightningModule):
         self.val_check_steps = val_check_steps
         self.windows_batch_size = windows_batch_size
         self.step_size = step_size
+        self._best_val_metric: float | None = None
+        self._best_val_global_step: int | None = None
+        self._best_val_state_dict: dict[str, object] | None = None
 
         # If the model does not support exogenous, it can't support exclude_insample_y
         if exclude_insample_y and not (
@@ -510,6 +513,7 @@ class BaseModel(pl.LightningModule):
                 **trainer_kwargs,
             )
             trainer.fit(model=model, datamodule=datamodule)
+            model._restore_best_val_state()
             model.metrics = trainer.callback_metrics
             model.__dict__.pop("_trainer", None)
             return model
@@ -591,11 +595,13 @@ class BaseModel(pl.LightningModule):
         val_check_interval = min(self.val_check_steps, self.max_steps)
         self.trainer_kwargs["val_check_interval"] = int(val_check_interval)
         self.trainer_kwargs["check_val_every_n_epoch"] = None
+        self._maybe_add_best_checkpoint_callback()
 
         if is_local:
             model = self
             trainer = pl.Trainer(**model.trainer_kwargs)
             trainer.fit(model, datamodule=datamodule)
+            model._restore_best_val_state()
             model.metrics = trainer.callback_metrics
             model.__dict__.pop("_trainer", None)
         else:
@@ -673,7 +679,49 @@ class BaseModel(pl.LightningModule):
             sync_dist=True,
         )
         self.valid_trajectories.append((self.global_step, avg_loss))
+        self._update_best_val_state(avg_loss)
         self.validation_step_outputs.clear()  # free memory (compute `avg_loss` per epoch)
+
+    def _maybe_add_best_checkpoint_callback(self) -> None:
+        if not self.trainer_kwargs.get("enable_checkpointing", None) or self.val_size == 0:
+            return
+        callbacks = self.trainer_kwargs.setdefault("callbacks", [])
+        if any(isinstance(cb, ModelCheckpoint) for cb in callbacks):
+            return
+        callbacks.append(
+            ModelCheckpoint(
+                monitor="ptl/val_loss",
+                mode="min",
+                save_top_k=1,
+                save_last=False,
+            )
+        )
+
+    def _snapshot_state_dict(self):
+        snapshot = {}
+        for key, value in self.state_dict().items():
+            if torch.is_tensor(value):
+                snapshot[key] = value.detach().cpu().clone()
+            else:
+                snapshot[key] = deepcopy(value)
+        return snapshot
+
+    def _update_best_val_state(self, avg_loss: float) -> None:
+        if not math.isfinite(avg_loss):
+            return
+        if self._best_val_metric is None or avg_loss < self._best_val_metric:
+            self._best_val_metric = float(avg_loss)
+            self._best_val_global_step = int(self.global_step)
+            self._best_val_state_dict = self._snapshot_state_dict()
+
+    def _restore_best_val_state(self) -> bool:
+        if self._best_val_state_dict is None:
+            return False
+        if "assign" in inspect.signature(self.load_state_dict).parameters:
+            self.load_state_dict(self._best_val_state_dict, strict=True, assign=True)
+        else:
+            self.load_state_dict(self._best_val_state_dict, strict=True)
+        return True
 
     def save(self, path):
         with fsspec.open(path, "wb") as f:

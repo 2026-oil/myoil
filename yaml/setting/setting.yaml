@@ -6,11 +6,11 @@ training:
   valid_batch_size: 64
   windows_batch_size: 1024
   inference_windows_batch_size: 1024
-  max_steps: 1000
+  max_steps: 2000
   val_size: 8
-  val_check_steps: 50
+  val_check_steps: 20
   model_step_size: 8
-  early_stop_patience_steps: 5
+  early_stop_patience_steps: 3
   loss: mse
   optimizer:
     name: adamw

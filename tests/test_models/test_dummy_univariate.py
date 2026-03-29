@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 import pytest
+import torch
+from types import SimpleNamespace
 
 from neuralforecast import NeuralForecast
 from neuralforecast.common._base_model import DISTRIBUTION_LOSSES, MULTIQUANTILE_LOSSES
@@ -343,6 +345,7 @@ class TestDummyUnivariate:
                 ]
             ),
         )
+
         np.testing.assert_almost_equal(
             forecasts[
                 forecasts[TimeSeriesDatasetEnum.UniqueId]
@@ -363,3 +366,26 @@ class TestDummyUnivariate:
                 ]
             ),
         )
+
+    def test_tracks_and_restores_best_validation_state(self):
+        model = DummyUnivariate(h=2, input_size=4)
+
+        with torch.no_grad():
+            model.w.fill_(1.0)
+        model._trainer = SimpleNamespace(global_step=10)
+        model._update_best_val_state(0.8)
+
+        with torch.no_grad():
+            model.w.fill_(2.5)
+        model._trainer = SimpleNamespace(global_step=20)
+        model._update_best_val_state(0.3)
+
+        with torch.no_grad():
+            model.w.fill_(9.0)
+
+        restored = model._restore_best_val_state()
+
+        assert restored is True
+        assert model._best_val_metric == pytest.approx(0.3)
+        assert model._best_val_global_step == 20
+        assert model.w.detach().item() == pytest.approx(2.5)
