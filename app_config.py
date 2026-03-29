@@ -35,7 +35,14 @@ DEFAULT_MANIFEST_VERSION = "1"
 DEFAULT_ARTIFACT_SCHEMA_VERSION = "1"
 DEFAULT_EVALUATION_PROTOCOL_VERSION = "2"
 SUPPORTED_LOSSES = {"mse", "exloss"}
-SUPPORTED_TRAINING_OPTIMIZERS = ("adamw", "ademamix", "mars", "soap")
+SUPPORTED_TRAINING_OPTIMIZERS = (
+    "adamw",
+    "ademamix",
+    "mars",
+    "soap",
+    "rmsprop",
+    "radam",
+)
 CENTRALIZED_TRAINING_KEYS = {
     "train_protocol",
     "input_size",
@@ -168,7 +175,7 @@ class TrainingLRSchedulerConfig:
 
 @dataclass(frozen=True)
 class TrainingOptimizerConfig:
-    name: Literal["adamw", "ademamix", "mars", "soap"] = "adamw"
+    name: Literal["adamw", "ademamix", "mars", "soap", "rmsprop", "radam"] = "adamw"
     kwargs: dict[str, Any] = field(default_factory=dict)
 
 
@@ -720,7 +727,9 @@ def _normalize_training_optimizer(value: Any) -> TrainingOptimizerConfig:
             )
         normalized_kwargs[key] = deepcopy(item)
     return TrainingOptimizerConfig(
-        name=cast(Literal["adamw", "ademamix", "mars", "soap"], name),
+        name=cast(
+            Literal["adamw", "ademamix", "mars", "soap", "rmsprop", "radam"], name
+        ),
         kwargs=normalized_kwargs,
     )
 

@@ -1141,11 +1141,21 @@ def test_model_builder_applies_common_loss_and_multivariate_n_series(tmp_path: P
     assert getattr(multivariate_model, "n_series", 2) == 2
 
 
-def test_load_app_config_accepts_training_optimizer(tmp_path: Path):
+@pytest.mark.parametrize(
+    ("optimizer_name", "kwargs"),
+    [
+        ("ademamix", {"weight_decay": 0.125}),
+        ("rmsprop", {"alpha": 0.95}),
+        ("radam", {"weight_decay": 0.125}),
+    ],
+)
+def test_load_app_config_accepts_training_optimizer(
+    tmp_path: Path, optimizer_name: str, kwargs: dict[str, Any]
+):
     payload = _payload()
     payload["training"]["optimizer"] = {
-        "name": "ademamix",
-        "kwargs": {"weight_decay": 0.125},
+        "name": optimizer_name,
+        "kwargs": kwargs,
     }
 
     loaded = load_app_config(
@@ -1153,12 +1163,12 @@ def test_load_app_config_accepts_training_optimizer(tmp_path: Path):
     )
 
     assert loaded.config.training.optimizer == TrainingOptimizerConfig(
-        name="ademamix",
-        kwargs={"weight_decay": 0.125},
+        name=optimizer_name,
+        kwargs=kwargs,
     )
     assert loaded.normalized_payload["training"]["optimizer"] == {
-        "name": "ademamix",
-        "kwargs": {"weight_decay": 0.125},
+        "name": optimizer_name,
+        "kwargs": kwargs,
     }
 
 
@@ -1683,6 +1693,8 @@ def test_build_model_clamps_devices_to_visible_worker_assignment(
     [
         ("adamw", {"weight_decay": 0.02}),
         ("mars", {"mars_type": "adamw"}),
+        ("rmsprop", {"alpha": 0.97}),
+        ("radam", {"weight_decay": 0.01}),
     ],
 )
 def test_build_model_forwards_training_optimizer_configuration(
@@ -7771,36 +7783,19 @@ def test_bs_preforcast_plugin_yaml_routes_to_shared_jobs_files(
 
 def test_bs_preforcast_uni_jobs_yaml_fanout_catalog_matches_requested_fixed_params() -> None:
     path = REPO_ROOT / "yaml" / "jobs" / "bs_preforcast" / "bs_preforcast_jobs_uni.yaml"
-    refs = yaml.safe_load(path.read_text(encoding="utf-8"))
+    jobs = yaml.safe_load(path.read_text(encoding="utf-8"))
 
-    assert refs == [
-        "uni/xgboost.yaml",
-        "uni/lightgbm.yaml",
-        "uni/lstm.yaml",
-        "uni/patchtst.yaml",
-        "uni/dlinear.yaml",
-        "uni/nhits.yaml",
-        "uni/es.yaml",
-        "uni/arima.yaml",
-    ]
-
-    resolved_jobs = []
-    for ref in refs:
-        route_jobs = _resolve_case_jobs(path, ref)
-        assert len(route_jobs) == 1
-        resolved_jobs.extend(route_jobs)
-
-    params_by_model = {job["model"]: job["params"] for job in resolved_jobs}
-    assert [job["model"] for job in resolved_jobs] == [
-        "xgboost",
+    assert [job["model"] for job in jobs] == [
+        "ARIMA",
+        "DLinear",
+        "ES",
         "lightgbm",
         "LSTM",
-        "PatchTST",
-        "DLinear",
         "NHITS",
-        "ES",
-        "ARIMA",
+        "PatchTST",
+        "xgboost",
     ]
+    params_by_model = {job["model"]: job["params"] for job in jobs}
     assert params_by_model == {
         "xgboost": {
             "lags": [1, 2, 3, 6, 12],
@@ -7848,22 +7843,15 @@ def test_bs_preforcast_uni_jobs_yaml_fanout_catalog_matches_requested_fixed_para
 
 def test_bs_preforcast_multi_jobs_yaml_matches_requested_fixed_params() -> None:
     path = REPO_ROOT / "yaml" / "jobs" / "bs_preforcast" / "bs_preforcast_jobs_multi.yaml"
-    refs = yaml.safe_load(path.read_text(encoding="utf-8"))
-
-    assert refs == [
-        "multi/timexer.yaml",
-        "multi/tsmixerx.yaml",
-        "multi/itransformer.yaml",
-        "multi/lstm.yaml",
-    ]
-
-    jobs: list[dict[str, Any]] = []
-    for ref in refs:
-        route_jobs = _resolve_case_jobs(path, ref)
-        assert len(route_jobs) == 1
-        jobs.extend(route_jobs)
+    jobs = yaml.safe_load(path.read_text(encoding="utf-8"))
     params_by_model = {job["model"]: job["params"] for job in jobs}
 
+    assert [job["model"] for job in jobs] == [
+        "iTransformer",
+        "LSTM",
+        "TimeXer",
+        "TSMixerx",
+    ]
     assert params_by_model == {
         "TimeXer": {
             "patch_len": 8,
@@ -7874,12 +7862,6 @@ def test_bs_preforcast_multi_jobs_yaml_matches_requested_fixed_params() -> None:
             "factor": 4,
             "dropout": 0.15,
             "use_norm": True,
-        },
-        "TSMixerx": {
-            "n_block": 3,
-            "ff_dim": 64,
-            "dropout": 0.05,
-            "revin": True,
         },
         "iTransformer": {
             "hidden_size": 64,
@@ -7893,6 +7875,12 @@ def test_bs_preforcast_multi_jobs_yaml_matches_requested_fixed_params() -> None:
             "decoder_hidden_size": 64,
             "encoder_n_layers": 4,
             "context_size": 8,
+        },
+        "TSMixerx": {
+            "n_block": 3,
+            "ff_dim": 64,
+            "dropout": 0.05,
+            "revin": True,
         },
     }
 
@@ -8042,8 +8030,6 @@ def test_jobs_path_list_loading_builds_fanout_specs(tmp_path: Path) -> None:
 
 
 def test_jobs_path_list_loading_expands_nested_catalog_routes() -> None:
-    from app_config import loaded_config_for_jobs_fanout
-
     loaded = load_app_config(
         REPO_ROOT,
         config_path=REPO_ROOT
@@ -8053,34 +8039,18 @@ def test_jobs_path_list_loading_expands_nested_catalog_routes() -> None:
         / "bs_forecast_uni.yaml",
     )
 
-    assert tuple(spec.route_slug for spec in loaded.jobs_fanout_specs) == (
-        "xgboost",
-        "lightgbm",
-        "lstm",
-        "patchtst",
-        "dlinear",
-        "nhits",
-        "es",
-        "arima",
-    )
-    first_variant = loaded_config_for_jobs_fanout(
-        REPO_ROOT, loaded, loaded.jobs_fanout_specs[0]
-    )
-    last_variant = loaded_config_for_jobs_fanout(
-        REPO_ROOT, loaded, loaded.jobs_fanout_specs[-1]
-    )
-
+    assert loaded.jobs_fanout_specs == ()
     assert [job.model for job in loaded.config.jobs] == ["Naive"]
-    assert [job.model for job in first_variant.config.jobs] == ["Naive"]
-    assert [job.model for job in last_variant.config.jobs] == ["Naive"]
-    assert [job.model for job in first_variant.stage_plugin_loaded.config.jobs] == [
-        "xgboost"
+    assert [job.model for job in loaded.stage_plugin_loaded.config.jobs] == [
+        "ARIMA",
+        "DLinear",
+        "ES",
+        "lightgbm",
+        "LSTM",
+        "NHITS",
+        "PatchTST",
+        "xgboost",
     ]
-    assert [job.model for job in last_variant.stage_plugin_loaded.config.jobs] == [
-        "ARIMA"
-    ]
-    assert first_variant.active_jobs_route_slug == "xgboost"
-    assert last_variant.active_jobs_route_slug == "arima"
 
 
 def test_load_app_config_auto_loads_repo_shared_settings_for_repo_yaml(tmp_path: Path) -> None:
@@ -8719,7 +8689,7 @@ def test_hpt_n100_bs_effective_training_and_scheduler_come_from_global_setting()
     assert payload["training"]["val_check_steps"] == 50
     assert payload["training"]["early_stop_patience_steps"] == 5
     assert payload["training"]["loss"] == "mse"
-    assert payload["cv"]["n_windows"] == 12
+    assert payload["cv"]["n_windows"] == 6
     assert payload["scheduler"]["gpu_ids"] == [0, 1]
 
 

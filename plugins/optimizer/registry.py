@@ -26,6 +26,14 @@ def _load_torch_adamw() -> type[torch.optim.Optimizer]:
     return torch.optim.AdamW
 
 
+def _load_torch_rmsprop() -> type[torch.optim.Optimizer]:
+    return torch.optim.RMSprop
+
+
+def _load_torch_radam() -> type[torch.optim.Optimizer]:
+    return torch.optim.RAdam
+
+
 def _load_pytorch_optimizer(name: str) -> type[torch.optim.Optimizer]:
     try:
         import pytorch_optimizer
@@ -53,6 +61,8 @@ _REGISTRY: dict[str, _OptimizerSpec] = {
     "soap": _OptimizerSpec(
         loader=lambda: _load_pytorch_optimizer("SOAP"), default_kwargs={}
     ),
+    "rmsprop": _OptimizerSpec(loader=_load_torch_rmsprop, default_kwargs={}),
+    "radam": _OptimizerSpec(loader=_load_torch_radam, default_kwargs={}),
 }
 
 

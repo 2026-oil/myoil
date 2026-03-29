@@ -11,7 +11,14 @@ from plugins.optimizer import (
 
 
 def test_available_optimizers_matches_expected_registry() -> None:
-    assert available_optimizers() == ("adamw", "ademamix", "mars", "soap")
+    assert available_optimizers() == (
+        "adamw",
+        "ademamix",
+        "mars",
+        "soap",
+        "rmsprop",
+        "radam",
+    )
 
 
 @pytest.mark.parametrize("name", available_optimizers())
@@ -20,6 +27,23 @@ def test_resolve_optimizer_returns_optimizer_subclass(name: str) -> None:
 
     assert resolved.name == name
     assert issubclass(resolved.optimizer_cls, torch.optim.Optimizer)
+    assert resolved.kwargs == {}
+
+
+@pytest.mark.parametrize(
+    ("name", "optimizer_cls"),
+    [
+        ("rmsprop", torch.optim.RMSprop),
+        ("radam", torch.optim.RAdam),
+    ],
+)
+def test_resolve_optimizer_returns_expected_native_torch_optimizer(
+    name: str, optimizer_cls: type[torch.optim.Optimizer]
+) -> None:
+    resolved = resolve_optimizer(name, {})
+
+    assert resolved.optimizer_cls is optimizer_cls
+    assert resolved.default_kwargs == {}
     assert resolved.kwargs == {}
 
 
