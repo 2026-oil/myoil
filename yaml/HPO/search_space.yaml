@@ -42,15 +42,15 @@ models:
     encoder_hidden_size:
       type: categorical
       choices:
-      - 256
-      - 512
-      - 768
+      - 96
+      - 128
+      - 160
     encoder_n_layers:
       type: categorical
       choices:
+      - 2
+      - 3
       - 4
-      - 6
-      - 8
     inference_input_size:
       type: categorical
       choices:
@@ -67,14 +67,14 @@ models:
     decoder_hidden_size:
       type: categorical
       choices:
-      - 256
-      - 512
-      - 768
+      - 96
+      - 128
+      - 160
     decoder_layers:
       type: categorical
       choices:
+      - 1
       - 2
-      - 4
     context_size:
       type: categorical
       choices:
@@ -85,34 +85,35 @@ models:
     hidden_size:
       type: categorical
       choices:
-      - 256
-      - 512
-      - 768
+      - 64
+      - 128
+      - 160
     n_heads:
       type: categorical
       choices:
-      - 16
-      - 32
+      - 4
+      - 8
     e_layers:
       type: categorical
       choices:
+      - 2
+      - 3
       - 4
-      - 8
     d_ff:
       type: categorical
       choices:
-      - 1024
-      - 2048
+      - 256
+      - 512
     d_layers:
       type: categorical
       choices:
-      - 4
-      - 8
+      - 1
+      - 2
     factor:
       type: categorical
       choices:
+      - 1
       - 4
-      - 8
     dropout:
       type: categorical
       choices:
@@ -128,14 +129,15 @@ models:
     n_block:
       type: categorical
       choices:
+      - 3
       - 4
-      - 8
+      - 6
     ff_dim:
       type: categorical
       choices:
-      - 256
-      - 512
-      - 1024
+      - 96
+      - 128
+      - 192
     dropout:
       type: categorical
       choices:
@@ -157,22 +159,28 @@ models:
       type: categorical
       choices:
       - 64
+      - 96
+      - 128
     n_heads:
       type: categorical
       choices:
       - 4
+      - 8
     e_layers:
       type: categorical
       choices:
       - 2
+      - 3
     d_ff:
       type: categorical
       choices:
       - 128
+      - 256
     factor:
       type: categorical
       choices:
       - 1
+      - 4
     dropout:
       type: categorical
       choices:
@@ -188,9 +196,9 @@ models:
     hidden_size:
       type: categorical
       choices:
-      - 64
+      - 96
       - 128
-      - 256
+      - 160
     dropout:
       type: categorical
       choices:
@@ -206,15 +214,14 @@ models:
     conv_hidden_size:
       type: categorical
       choices:
-      - 64
+      - 96
       - 128
-      - 256
+      - 160
     encoder_layers:
       type: categorical
       choices:
       - 1
       - 2
-      - 3
     decoder_layers:
       type: categorical
       choices:
