@@ -44,7 +44,9 @@ from tuning.search_space import (
     MODEL_PARAM_REGISTRY,
     RESIDUAL_PARAM_REGISTRY,
     SUPPORTED_AUTO_MODEL_NAMES,
+    SUPPORTED_MODEL_AUTO_MODEL_NAMES,
     SUPPORTED_RESIDUAL_MODELS,
+    SUPPORTED_TOP_LEVEL_DIRECT_MODEL_NAMES,
     TRAINING_PARAM_REGISTRY,
     TRAINING_PARAM_REGISTRY_BY_MODEL,
     suggest_training_params,
@@ -287,29 +289,6 @@ def _write_yaml_payload(path: Path, payload: dict[str, Any]) -> Path:
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     return path
 
-
-def _write_scheduler_run_manifest(
-    run_root: Path,
-    *,
-    config_source_path: Path,
-    job_names: list[str],
-    resolved_hash: str | None = None,
-) -> Path:
-    manifest_path = run_root / "manifest" / "run_manifest.json"
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    (run_root / "scheduler" / "workers").mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(
-        json.dumps(
-            {
-                "config_source_path": str(config_source_path.resolve()),
-                "config_resolved_sha256": resolved_hash,
-                "jobs": [{"model": name} for name in job_names],
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-    return manifest_path
 
 
 def _payload() -> dict:
@@ -1821,41 +1800,6 @@ def test_scheduler_finalize_recreates_missing_worker_root(
     assert json.loads(summary_path.read_text(encoding="utf-8"))["returncode"] == 7
 
 
-def test_open_persistent_study_retries_after_file_not_found(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
-    (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n", encoding="utf-8"
-    )
-    loaded = load_app_config(
-        tmp_path, config_path=_write_config(tmp_path, _payload(), ".yaml")
-    )
-    import runtime_support.runner as runtime
-
-    calls = {"count": 0}
-    real_create_study = runtime.optuna.create_study
-
-    def flaky_create_study(*args, **kwargs):
-        calls["count"] += 1
-        if calls["count"] == 1:
-            raise FileNotFoundError("simulated missing journal lock path")
-        return real_create_study(*args, **kwargs)
-
-    monkeypatch.setattr(runtime.optuna, "create_study", flaky_create_study)
-
-    study, metadata = runtime._open_persistent_study(
-        tmp_path / "models" / "iTransformer",
-        loaded=loaded,
-        stage="main-search",
-        job_name="iTransformer",
-        sampler=optuna.samplers.RandomSampler(seed=7),
-    )
-
-    assert calls["count"] == 2
-    assert study.study_name == metadata["study_name"]
-    assert Path(metadata["storage_path"]).exists()
-
-
 def test_runtime_executes_single_job_with_dummy_model(tmp_path: Path):
     payload = _payload()
     payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
@@ -2598,11 +2542,9 @@ def test_default_output_root_uses_config_parent_for_nested_repo_configs(
     assert _default_output_root(REPO_ROOT, loaded) == (REPO_ROOT / "runs" / expected_name)
 
 
-def test_resolve_single_job_run_roots_prefers_latest_matching_scheduler_run(
-    tmp_path: Path,
-):
+def test_resolve_run_roots_uses_default_output_root(tmp_path: Path):
     payload = _payload()
-    payload["task"] = {"name": "pytest_task_scheduler_reuse"}
+    payload["task"] = {"name": "pytest_task_run_roots"}
     payload["jobs"] = [
         {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
     ]
@@ -2617,93 +2559,17 @@ def test_resolve_single_job_run_roots_prefers_latest_matching_scheduler_run(
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     loaded = load_app_config(tmp_path, config_path=config_path)
 
-    run_old = tmp_path / "runs" / "old_run"
-    run_new = tmp_path / "runs" / "new_run"
-    _write_scheduler_run_manifest(
-        run_old,
-        config_source_path=config_path,
-        job_names=["DummyUnivariate"],
-        resolved_hash=loaded.resolved_hash,
-    )
-    _write_scheduler_run_manifest(
-        run_new,
-        config_source_path=config_path,
-        job_names=["DummyUnivariate"],
-        resolved_hash=loaded.resolved_hash,
-    )
-    os.utime(run_old, (100, 100))
-    os.utime(run_old / "manifest" / "run_manifest.json", (100, 100))
-    os.utime(run_old / "scheduler" / "workers", (100, 100))
-    os.utime(run_new, (200, 200))
-    os.utime(run_new / "manifest" / "run_manifest.json", (200, 200))
-    os.utime(run_new / "scheduler" / "workers", (200, 200))
-
     import runtime_support.runner as runtime
 
-    selected_jobs = runtime._selected_jobs(loaded, ["DummyUnivariate"])
-    resolved = runtime._resolve_single_job_run_roots(
-        tmp_path,
-        loaded,
-        selected_jobs,
-        output_root=None,
-        internal_stage="full",
-    )
-
-    assert resolved["run_root"] == (
-        run_new / "scheduler" / "workers" / "DummyUnivariate"
-    )
-    assert resolved["summary_root"] == run_new
-    assert resolved["force_prune"] is True
-
-
-def test_resolve_single_job_run_roots_falls_back_to_default_without_match(
-    tmp_path: Path,
-):
-    payload = _payload()
-    payload["task"] = {"name": "pytest_task_scheduler_reuse_fallback"}
-    payload["jobs"] = [
-        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
-    ]
-    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
-        encoding="utf-8",
-    )
-    config_dir = tmp_path / "yaml"
-    config_dir.mkdir(parents=True, exist_ok=True)
-    config_path = config_dir / "case.yaml"
-    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
-    loaded = load_app_config(tmp_path, config_path=config_path)
-
-    unmatched_run = tmp_path / "runs" / "other_run"
-    _write_scheduler_run_manifest(
-        unmatched_run,
-        config_source_path=tmp_path / "yaml" / "other.yaml",
-        job_names=["DummyUnivariate"],
-    )
-
-    import runtime_support.runner as runtime
-
-    selected_jobs = runtime._selected_jobs(loaded, ["DummyUnivariate"])
-    resolved = runtime._resolve_single_job_run_roots(
-        tmp_path,
-        loaded,
-        selected_jobs,
-        output_root=None,
-        internal_stage="full",
-    )
-
+    resolved = runtime._resolve_run_roots(tmp_path, loaded, output_root=None)
     expected_root = runtime._default_output_root(tmp_path, loaded)
     assert resolved["run_root"] == expected_root
     assert resolved["summary_root"] == expected_root
-    assert resolved["force_prune"] is False
 
 
-def test_resolve_single_job_run_roots_preserves_explicit_output_root(
-    tmp_path: Path,
-):
+def test_resolve_run_roots_preserves_explicit_output_root(tmp_path: Path):
     payload = _payload()
-    payload["task"] = {"name": "pytest_task_scheduler_reuse_explicit"}
+    payload["task"] = {"name": "pytest_task_run_roots_explicit"}
     payload["jobs"] = [
         {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
     ]
@@ -2717,120 +2583,15 @@ def test_resolve_single_job_run_roots_preserves_explicit_output_root(
     config_path = config_dir / "case.yaml"
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     loaded = load_app_config(tmp_path, config_path=config_path)
-
-    matched_run = tmp_path / "runs" / "matched_run"
-    _write_scheduler_run_manifest(
-        matched_run,
-        config_source_path=config_path,
-        job_names=["DummyUnivariate"],
-    )
 
     import runtime_support.runner as runtime
 
     explicit_root = tmp_path / "custom_output_root"
-    selected_jobs = runtime._selected_jobs(loaded, ["DummyUnivariate"])
-    resolved = runtime._resolve_single_job_run_roots(
-        tmp_path,
-        loaded,
-        selected_jobs,
-        output_root=str(explicit_root),
-        internal_stage="full",
+    resolved = runtime._resolve_run_roots(
+        tmp_path, loaded, output_root=str(explicit_root)
     )
-
     assert resolved["run_root"] == explicit_root
     assert resolved["summary_root"] == explicit_root
-    assert resolved["force_prune"] is False
-
-
-def test_resolve_single_job_run_roots_does_not_reuse_scheduler_run_for_validate_only(
-    tmp_path: Path,
-):
-    payload = _payload()
-    payload["task"] = {"name": "pytest_task_scheduler_reuse_validate_only"}
-    payload["jobs"] = [
-        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
-    ]
-    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
-        encoding="utf-8",
-    )
-    config_dir = tmp_path / "yaml"
-    config_dir.mkdir(parents=True, exist_ok=True)
-    config_path = config_dir / "case.yaml"
-    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
-    loaded = load_app_config(tmp_path, config_path=config_path)
-
-    matched_run = tmp_path / "runs" / "matched_run"
-    _write_scheduler_run_manifest(
-        matched_run,
-        config_source_path=config_path,
-        job_names=["DummyUnivariate"],
-    )
-
-    import runtime_support.runner as runtime
-
-    selected_jobs = runtime._selected_jobs(loaded, ["DummyUnivariate"])
-    resolved = runtime._resolve_single_job_run_roots(
-        tmp_path,
-        loaded,
-        selected_jobs,
-        output_root=None,
-        internal_stage="full",
-        validate_only=True,
-    )
-
-    expected_root = runtime._default_output_root(tmp_path, loaded)
-    assert resolved["run_root"] == expected_root
-    assert resolved["summary_root"] == expected_root
-    assert resolved["force_prune"] is False
-
-
-def test_resolve_single_job_run_roots_ignores_symlinked_scheduler_run(
-    tmp_path: Path,
-):
-    payload = _payload()
-    payload["task"] = {"name": "pytest_task_scheduler_symlink_guard"}
-    payload["jobs"] = [
-        {"model": "DummyUnivariate", "params": {"start_padding_enabled": True}}
-    ]
-    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
-    (tmp_path / "data.csv").write_text(
-        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
-        encoding="utf-8",
-    )
-    config_dir = tmp_path / "yaml"
-    config_dir.mkdir(parents=True, exist_ok=True)
-    config_path = config_dir / "case.yaml"
-    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
-    loaded = load_app_config(tmp_path, config_path=config_path)
-
-    external_run = tmp_path / "external_run"
-    _write_scheduler_run_manifest(
-        external_run,
-        config_source_path=config_path,
-        job_names=["DummyUnivariate"],
-        resolved_hash=loaded.resolved_hash,
-    )
-    runs_root = tmp_path / "runs"
-    runs_root.mkdir(parents=True, exist_ok=True)
-    (runs_root / "linked_run").symlink_to(external_run, target_is_directory=True)
-
-    import runtime_support.runner as runtime
-
-    selected_jobs = runtime._selected_jobs(loaded, ["DummyUnivariate"])
-    resolved = runtime._resolve_single_job_run_roots(
-        tmp_path,
-        loaded,
-        selected_jobs,
-        output_root=None,
-        internal_stage="full",
-    )
-
-    expected_root = runtime._default_output_root(tmp_path, loaded)
-    assert resolved["run_root"] == expected_root
-    assert resolved["summary_root"] == expected_root
-    assert resolved["force_prune"] is False
 
 
 def test_runtime_infers_freq_when_omitted(tmp_path: Path):
@@ -5664,11 +5425,10 @@ def test_runtime_main_reuses_scheduler_worker_root_and_parent_summary_for_auto_j
     )
     monkeypatch.setattr(
         runtime,
-        "_resolve_single_job_run_roots",
+        "_resolve_run_roots",
         lambda *_args, **_kwargs: {
             "run_root": worker_root,
             "summary_root": summary_root,
-            "force_prune": True,
         },
     )
     monkeypatch.setattr(runtime, "_should_parallelize_single_job_tuning", lambda *_args, **_kwargs: False)
@@ -5698,7 +5458,7 @@ def test_runtime_main_reuses_scheduler_worker_root_and_parent_summary_for_auto_j
     assert called["manifest_path"] == worker_root / "manifest" / "run_manifest.json"
     assert called["job_name"] == "TFT"
     assert called["main_stage"] == "full"
-    assert called["prunes"] == [(worker_root, "TFT")]
+    assert called["prunes"] == []
     assert called["summary_roots"] == [summary_root]
 
 
@@ -6327,19 +6087,25 @@ def test_supported_auto_model_matrix_matches_registry_and_yaml():
     learned_model_classes = {
         model_name for model_name in MODEL_CLASSES if not model_name.startswith("Dummy")
     }
-    learned_registry_models = set(MODEL_PARAM_REGISTRY)
+    model_auto_registry_models = set(MODEL_PARAM_REGISTRY)
+    expected_model_auto_models = set(EXPECTED_REPO_AUTO_MODELS)
+    expected_training_auto_models = set(SUPPORTED_AUTO_MODEL_NAMES)
     assert "HINT" not in SUPPORTED_AUTO_MODEL_NAMES
     assert SUPPORTED_AUTO_MODEL_NAMES == learned_model_classes
-    assert learned_registry_models == set(EXPECTED_REPO_AUTO_MODELS)
-    assert set(search_space["models"]) == set(EXPECTED_REPO_AUTO_MODELS)
-    assert set(TRAINING_PARAM_REGISTRY_BY_MODEL) == SUPPORTED_AUTO_MODEL_NAMES
-    assert set(search_space["training"]["per_model"]) == set(EXPECTED_REPO_AUTO_MODELS)
+    assert set(SUPPORTED_TOP_LEVEL_DIRECT_MODEL_NAMES) == set(EXPECTED_TOP_LEVEL_DIRECT_MODELS)
+    assert set(SUPPORTED_MODEL_AUTO_MODEL_NAMES) == (
+        learned_model_classes | set(EXPECTED_TOP_LEVEL_DIRECT_MODELS)
+    )
+    assert model_auto_registry_models == expected_model_auto_models
+    assert set(search_space["models"]) == expected_model_auto_models
+    assert set(TRAINING_PARAM_REGISTRY_BY_MODEL) == expected_training_auto_models
+    assert set(search_space["training"]["per_model"]) == expected_training_auto_models
     assert all(
         set(TRAINING_PARAM_REGISTRY_BY_MODEL[model_name])
         == set(search_space["training"]["per_model"][model_name])
         == set(TRAINING_PARAM_REGISTRY)
         == set(search_space["training"]["global"])
-        for model_name in EXPECTED_REPO_AUTO_MODELS
+        for model_name in SUPPORTED_AUTO_MODEL_NAMES
     )
     assert tuple(search_space["training"]["global"]) == tuple(TRAINING_PARAM_REGISTRY)
     assert set(search_space["residual"]) == {"xgboost", "randomforest", "lightgbm"}
@@ -6697,6 +6463,10 @@ def test_supports_auto_mode_expands_to_newly_added_models():
         "SMamba",
         "CMamba",
         "xLSTMMixer",
+        "ARIMA",
+        "ES",
+        "xgboost",
+        "lightgbm",
     ):
         assert supports_auto_mode(model_name) is True
     assert supports_auto_mode("DeepEDM") is False
@@ -7414,12 +7184,24 @@ SEARCH_SPACE_RESIDUAL = {
     for model_name, specs in SEARCH_SPACE_RESIDUAL_RAW.items()
 }
 
-EXPECTED_REPO_AUTO_MODELS = [
+EXPECTED_TOP_LEVEL_DIRECT_MODELS = [
+    "ARIMA",
+    "ES",
+    "xgboost",
+    "lightgbm",
+]
+
+EXPECTED_REPO_TRAINING_AUTO_MODELS = [
     "LSTM",
     "iTransformer",
     "TSMixerx",
     "TimeXer",
     "NonstationaryTransformer",
+]
+
+EXPECTED_REPO_AUTO_MODELS = [
+    *EXPECTED_REPO_TRAINING_AUTO_MODELS,
+    *EXPECTED_TOP_LEVEL_DIRECT_MODELS,
 ]
 
 EXPECTED_REPO_AUTO_SELECTORS = {
@@ -7465,6 +7247,28 @@ EXPECTED_REPO_AUTO_SELECTORS = {
         "conv_hidden_size",
         "encoder_layers",
         "decoder_layers",
+    ],
+    "ARIMA": [
+        "order",
+        "include_mean",
+        "include_drift",
+    ],
+    "ES": [
+        "trend",
+        "damped_trend",
+    ],
+    "xgboost": [
+        "lags",
+        "n_estimators",
+        "max_depth",
+    ],
+    "lightgbm": [
+        "lags",
+        "n_estimators",
+        "max_depth",
+        "num_leaves",
+        "min_child_samples",
+        "feature_fraction",
     ],
 }
 EXPECTED_REPO_TRAINING_SELECTORS = [
@@ -9005,7 +8809,7 @@ def test_repo_search_space_updates_requested_auto_selectors_only():
 
     assert SEARCH_SPACE_TRAINING == EXPECTED_REPO_TRAINING_SELECTORS
     assert set(EXCLUDED_REPO_TRAINING_SELECTORS).isdisjoint(SEARCH_SPACE_TRAINING)
-    assert set(SEARCH_SPACE_TRAINING_PER_MODEL) == set(EXPECTED_REPO_AUTO_MODELS)
+    assert set(SEARCH_SPACE_TRAINING_PER_MODEL) == set(EXPECTED_REPO_TRAINING_AUTO_MODELS)
     assert set(FIXED_TRAINING_KEYS).isdisjoint(SEARCH_SPACE_TRAINING)
     assert "step_size" not in SEARCH_SPACE_TRAINING
     assert "early_stop_patience_steps" not in SEARCH_SPACE_TRAINING

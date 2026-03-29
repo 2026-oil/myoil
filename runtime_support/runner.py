@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 from dataclasses import dataclass, replace
 from decimal import Decimal, ROUND_HALF_UP
 import fcntl
@@ -11,6 +12,7 @@ import shutil
 from tempfile import TemporaryDirectory
 from typing import Any, Sequence
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 import numpy as np
 import optuna
@@ -23,23 +25,32 @@ from plugin_contracts.stage_registry import get_active_stage_plugin
 from app_config import (
     JobConfig,
     LoadedConfig,
-    load_app_config,  # noqa: F401 - re-exported for residual.runtime compatibility/tests
+    load_app_config,  # noqa: F401 - re-exported for bootstrap/tests
     loaded_config_for_jobs_fanout,  # noqa: F401 - compatibility export
 )
-from runtime_support.features import build_residual_feature_frame, hist_exog_lag_feature_name
+from plugins.residual import build_residual_plugin
+from plugins.residual.base import ResidualContext
+from plugins.residual.features import (
+    build_residual_feature_frame,
+    hist_exog_lag_feature_name,
+)
 from runtime_support.manifest import (
     build_manifest,
     residual_active_feature_columns,
     residual_feature_policy_payload,
     write_manifest,
 )
-from runtime_support.forecast_models import BASELINE_MODEL_NAMES, build_model, validate_job
-from residual.models import build_residual_plugin
+from runtime_support.forecast_models import (
+    BASELINE_MODEL_NAMES,
+    build_model,
+    is_direct_top_level_model,
+    validate_job,
+)
 from tuning import (
     DEFAULT_RESIDUAL_PARAMS_BY_MODEL,
     DEFAULT_OPTUNA_STUDY_DIRECTION,
     RESIDUAL_DEFAULTS,
-    SUPPORTED_AUTO_MODEL_NAMES,
+    SUPPORTED_MODEL_AUTO_MODEL_NAMES,
     SUPPORTED_RESIDUAL_MODELS,
     LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD,
     build_optuna_sampler,
@@ -51,7 +62,6 @@ from tuning import (
     training_param_registry_for_model,
     training_range_source_for_model,
 )
-from residual.plugins_base import ResidualContext
 from runtime_support.progress import (
     ConsoleProgressRenderer,
     ModelProgressState,
@@ -62,6 +72,10 @@ from runtime_support.scheduler import (
     build_launch_plan,
     build_tuning_launch_plan,
     run_parallel_jobs,
+)
+from neuralforecast.models.bs_preforcast_direct import (
+    normalized_direct_job_params,
+    predict_univariate_direct,
 )
 
 ENTRYPOINT_VERSION = "neuralforecast-residual-v1"
@@ -208,12 +222,6 @@ class _ProgressLogger:
             self._renderer.close()
 
 
-def build_parser() -> argparse.ArgumentParser:
-    from main import build_parser as bootstrap_build_parser
-
-    return bootstrap_build_parser()
-
-
 def _selected_jobs(loaded: LoadedConfig, names: list[str] | None):
     if not names:
         return list(loaded.config.jobs)
@@ -250,97 +258,17 @@ def _default_output_root(repo_root: Path, loaded: LoadedConfig) -> Path:
     return repo_root / "runs" / (safe_name or "validation")
 
 
-def _matching_scheduler_run_job_names(manifest: dict[str, Any]) -> set[str]:
-    jobs_payload = manifest.get("jobs")
-    if not isinstance(jobs_payload, list):
-        return set()
-    names: set[str] = set()
-    for item in jobs_payload:
-        if not isinstance(item, dict):
-            continue
-        model_name = item.get("model")
-        if isinstance(model_name, str) and model_name.strip():
-            names.add(model_name)
-    return names
-
-
-def _find_latest_matching_scheduler_run(
+def _resolve_run_roots(
     repo_root: Path,
     loaded: LoadedConfig,
-    *,
-    job_name: str,
-) -> Path | None:
-    runs_root = repo_root / "runs"
-    if not runs_root.exists():
-        return None
-    target_config_path = loaded.source_path.resolve(strict=False)
-    candidates: list[tuple[float, Path]] = []
-    for manifest_path in runs_root.glob("*/manifest/run_manifest.json"):
-        run_root = manifest_path.parents[1]
-        if run_root.is_symlink():
-            continue
-        workers_root = run_root / "scheduler" / "workers"
-        if not workers_root.exists():
-            continue
-        try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        config_source = manifest.get("config_source_path")
-        if not isinstance(config_source, str) or not config_source.strip():
-            continue
-        if Path(config_source).resolve(strict=False) != target_config_path:
-            continue
-        if manifest.get("config_resolved_sha256") != loaded.resolved_hash:
-            continue
-        if job_name not in _matching_scheduler_run_job_names(manifest):
-            continue
-        candidates.append((manifest_path.stat().st_mtime, run_root))
-    if not candidates:
-        return None
-    candidates.sort()
-    return candidates[-1][1]
-
-
-def _resolve_single_job_run_roots(
-    repo_root: Path,
-    loaded: LoadedConfig,
-    selected_jobs: Sequence[JobConfig],
     *,
     output_root: str | None,
-    internal_stage: str,
-    validate_only: bool = False,
-) -> dict[str, Any]:
+) -> dict[str, Path]:
     if output_root is not None:
         explicit_root = Path(output_root)
-        return {
-            "run_root": explicit_root,
-            "summary_root": explicit_root,
-            "force_prune": False,
-        }
+        return {"run_root": explicit_root, "summary_root": explicit_root}
     default_root = _default_output_root(repo_root, loaded)
-    if validate_only or internal_stage != "full" or len(selected_jobs) != 1:
-        return {
-            "run_root": default_root,
-            "summary_root": default_root,
-            "force_prune": False,
-        }
-    matched_run_root = _find_latest_matching_scheduler_run(
-        repo_root,
-        loaded,
-        job_name=selected_jobs[0].model,
-    )
-    if matched_run_root is None:
-        return {
-            "run_root": default_root,
-            "summary_root": default_root,
-            "force_prune": False,
-        }
-    return {
-        "run_root": matched_run_root / "scheduler" / "workers" / selected_jobs[0].model,
-        "summary_root": matched_run_root,
-        "force_prune": True,
-    }
+    return {"run_root": default_root, "summary_root": default_root}
 
 
 def _remove_existing_artifact(path: Path) -> None:
@@ -408,12 +336,17 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
     caps_by_model: dict[str, Any] = {}
     for job in selected_jobs:
         caps = validate_job(job)
+        if loaded.config.residual.enabled and is_direct_top_level_model(job.model):
+            raise ValueError(
+                "Top-level direct models do not yet support residual-enabled runs; "
+                "disable residual or use a learned top-level model / bs_preforcast path."
+            )
         caps_by_model[job.model] = caps
         payload[job.model] = {
             **caps.__dict__,
             "requested_mode": job.requested_mode,
             "validated_mode": job.validated_mode,
-            "supports_auto": job.model in SUPPORTED_AUTO_MODEL_NAMES,
+            "supports_auto": job.model in SUPPORTED_MODEL_AUTO_MODEL_NAMES,
             "search_space_entry_found": bool(job.selected_search_params),
             "selected_search_params": list(job.selected_search_params),
             "unknown_search_params": [],
@@ -736,7 +669,7 @@ def _fit_and_predict_fold(
     test_idx: list[int],
     params_override: dict[str, Any] | None = None,
     training_override: dict[str, Any] | None = None,
-) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, NeuralForecast]:
+) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, NeuralForecast | None]:
     effective_loaded = loaded
     dt_col = loaded.config.dataset.dt_col
     target_col = loaded.config.dataset.target_col
@@ -755,6 +688,35 @@ def _fit_and_predict_fold(
     effective_config = _effective_config(effective_loaded, training_override)
     diff_context = _build_fold_diff_context(effective_loaded, train_df)
     transformed_train_df = _transform_training_frame(train_df, diff_context)
+    if is_direct_top_level_model(job.model):
+        stage_loaded = SimpleNamespace(config=effective_loaded.config)
+        merged_params = {**job.params, **(params_override or {})}
+        direct_job = replace(
+            job,
+            params=normalized_direct_job_params(job.model, merged_params),
+        )
+        prediction_values = predict_univariate_direct(
+            stage_loaded,
+            direct_job,
+            target_column=target_col,
+            train_df=transformed_train_df,
+            future_df=future_df,
+        )
+        target_predictions = pd.DataFrame(
+            {
+                "unique_id": [target_col] * len(future_df),
+                "ds": pd.to_datetime(future_df[dt_col]).reset_index(drop=True),
+                job.model: prediction_values,
+            }
+        )
+        target_predictions = _restore_target_predictions(
+            target_predictions,
+            prediction_col=job.model,
+            diff_context=diff_context,
+        )
+        target_actuals = future_df[target_col].reset_index(drop=True)
+        train_end_ds = pd.to_datetime(train_df[dt_col].iloc[-1])
+        return target_predictions, target_actuals, train_end_ds, train_df, None
     adapter_inputs = _build_adapter_inputs(
         effective_loaded,
         transformed_train_df,
@@ -884,6 +846,12 @@ def _score_main_trial_with_residual(
         fold_idx,
     )
     if backcast_panel.empty:
+        logging.getLogger(__name__).warning(
+            "backcast panel is empty for fold %d of %s; "
+            "falling back to direct MAPE instead of residual-corrected MAPE",
+            fold_idx,
+            job.model,
+        )
         return _compute_metrics(target_actuals, target_predictions[job.model])["MAPE"]
     eval_panel = _build_fold_eval_panel(
         loaded,
@@ -952,23 +920,13 @@ def _open_persistent_study(
     storage = optuna.storages.JournalStorage(
         optuna.storages.journal.JournalFileBackend(str(storage_path))
     )
-    try:
-        study = optuna.create_study(
-            storage=storage,
-            study_name=study_name,
-            load_if_exists=True,
-            sampler=sampler,
-            direction=DEFAULT_OPTUNA_STUDY_DIRECTION,
-        )
-    except FileNotFoundError:
-        storage_dir.mkdir(parents=True, exist_ok=True)
-        study = optuna.create_study(
-            storage=storage,
-            study_name=study_name,
-            load_if_exists=True,
-            sampler=sampler,
-            direction=DEFAULT_OPTUNA_STUDY_DIRECTION,
-        )
+    study = optuna.create_study(
+        storage=storage,
+        study_name=study_name,
+        load_if_exists=True,
+        sampler=sampler,
+        direction=DEFAULT_OPTUNA_STUDY_DIRECTION,
+    )
     metadata = {
         "study_name": study_name,
         "storage_backend": "journal",
@@ -2206,41 +2164,7 @@ def _load_summary_config(run_root: Path) -> dict[str, Any]:
 
 
 def _load_sample_structure() -> dict[str, str]:
-    sample_path = Path(__file__).resolve().parents[1] / "sample.md"
-    if not sample_path.exists():
-        return dict(DEFAULT_SAMPLE_STRUCTURE)
-
-    lines = sample_path.read_text(encoding="utf-8").splitlines()
-
-    def _find_line(prefix: str, default: str) -> str:
-        for line in lines:
-            if line.strip().startswith(prefix):
-                return line.rstrip()
-        return default
-
-    def _find_contains(snippet: str, default: str) -> str:
-        for line in lines:
-            if snippet in line:
-                return line.rstrip()
-        return default
-
-    return {
-        "section_setup": _find_line("# 02.", DEFAULT_SAMPLE_STRUCTURE["section_setup"]),
-        "setup_intro": _find_contains(
-            "hist_exog_cols만 남기고", DEFAULT_SAMPLE_STRUCTURE["setup_intro"]
-        ),
-        "section_design": _find_line("# 03.", DEFAULT_SAMPLE_STRUCTURE["section_design"]),
-        "section_results": _find_line("# 04.", DEFAULT_SAMPLE_STRUCTURE["section_results"]),
-        "section_results_detail": _find_line(
-            "### 04-01.", DEFAULT_SAMPLE_STRUCTURE["section_results_detail"]
-        ),
-        "results_intro": _find_contains(
-            "leaderboard", DEFAULT_SAMPLE_STRUCTURE["results_intro"]
-        ),
-        "section_model_tables": _find_line(
-            "### 각 모형별 Table", DEFAULT_SAMPLE_STRUCTURE["section_model_tables"]
-        ),
-    }
+    return dict(DEFAULT_SAMPLE_STRUCTURE)
 
 
 def _display_target_name(target_col: str | None) -> str:
@@ -2593,8 +2517,10 @@ def _write_loss_curve_artifact(
     model_name: str,
     fold_idx: int,
     *,
-    nf: NeuralForecast,
+    nf: NeuralForecast | None,
 ) -> Path | None:
+    if nf is None:
+        return None
     curve_frame = _trajectory_frame(nf)
     if curve_frame.empty:
         return None
@@ -3106,19 +3032,16 @@ def _run_single_job_with_parallel_tuning(
     return results
 
 
-def _run_loaded_config(
+def run_loaded_config(
     repo_root: Path,
     loaded: LoadedConfig,
     args: argparse.Namespace,
 ) -> dict[str, Any]:
     selected_jobs = _selected_jobs(loaded, args.jobs)
-    resolved_roots = _resolve_single_job_run_roots(
+    resolved_roots = _resolve_run_roots(
         repo_root,
         loaded,
-        selected_jobs,
         output_root=args.output_root,
-        internal_stage=args.internal_stage,
-        validate_only=args.validate_only,
     )
     paths = _build_resolved_artifacts(repo_root, loaded, resolved_roots["run_root"])
     _validate_jobs(loaded, selected_jobs, paths["capability_path"])
@@ -3156,7 +3079,7 @@ def _run_loaded_config(
                 manifest_path=paths["manifest_path"],
             )
         else:
-            if resolved_roots["force_prune"] or _should_prune_model_run_artifacts(
+            if _should_prune_model_run_artifacts(
                 selected_jobs[0], main_stage=args.internal_stage
             ):
                 _prune_model_run_artifacts(paths["run_root"], selected_jobs[0].model)
@@ -3230,15 +3153,8 @@ def _run_loaded_config(
     }
 
 
-def run_loaded_config(
-    repo_root: Path,
-    loaded: LoadedConfig,
-    args: argparse.Namespace,
-) -> dict[str, Any]:
-    return _run_loaded_config(repo_root, loaded, args)
-
-
 def main(argv: Sequence[str] | None = None) -> int:
-    import main as bootstrap_main
+    """CLI entry point used by tests to invoke the runner without venv bootstrap."""
+    from main import _run_cli
 
-    return bootstrap_main._run_cli(argv, repo_root=Path(__file__).resolve().parents[1])
+    return _run_cli(argv, repo_root=Path(__file__).resolve().parents[1])
