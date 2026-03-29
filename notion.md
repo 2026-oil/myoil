@@ -2,9 +2,9 @@
 
 ---
 
-`feature_set_bs` 실험 결과를 기준으로, 블랙스완 지수(BS_Core_Index_A/B/C/Integrated)를 포함한 feature set이 케이스별·타깃별로 어떤 성능 차이를 보였는지 정리한다.
+`feature_set_bs` 실험 결과를 기준으로, 블랙스완 지수(BS_Core_Index_A/B/C/Integrated)를 포함한 feature set이 케이스별·타깃별로 어떤 성능 차이를 보였는지 현재 `runs/feature_set_*` 및 `runs/feature_set_bs_*` 산출물 기준으로 다시 정리한다.
 
-**케이스별 평균 성능**, **타깃별 유효 feature set**, **모델별 일관성**을 함께 확인한다.
+본 문서는 **`feature_set_bs` 중심 보고서**를 유지하되, 각 표와 해석에는 대응하는 `feature_set` 결과를 비교 기준으로 함께 반영한다.
 
 # 02. 데이터 및 모델 세팅
 
@@ -12,11 +12,12 @@
 
 - **예측 타깃:** WTI / Brent Oil (F) Weekly Avg
 - **예측 단위:** 주간 예측
-- **평가 구조:** 12개 rolling TSCV(h=8, step=8, gap=0)
-- **overlap_eval_policy:** by_cutoff_mean
-- **loss:** mse
+- **평가 구조:** 6개 rolling TSCV(h=8, step=8, gap=0)
+- **overlap_eval_policy:** `by_cutoff_mean`
+- **loss:** `mse`
 - **residual:** 비활성화 (`residual.enabled: false`)
 - **실험 모델군:** TimeXer / TSMixerx / Naive / iTransformer / LSTM
+- **jobs fan-out:** 각 케이스는 `jobs_1 ~ jobs_4` 네 개 route로 실행되며, 본 문서의 모델 행은 해당 route들의 현재 leaderboard를 모델 기준으로 평균한 값이다.
 
 ## 02-01. 케이스별 hist_exog_cols
 
@@ -24,9 +25,7 @@
 
 - **Case 1**
 - 
-    
     ```yaml
-    ...
     hist_exog_cols:
       - Com_Gasoline
       - Com_Steel
@@ -48,14 +47,11 @@
       - BS_Core_Index_B
       - BS_Core_Index_C
       - BS_Core_Index_Integrated
-    ...
     ```
-    
+
 - **Case 2**
 - 
-    
     ```yaml
-    ...
     hist_exog_cols:
       - Com_Gasoline
       - Com_BloombergCommodity_BCOM
@@ -74,14 +70,11 @@
       - BS_Core_Index_B
       - BS_Core_Index_C
       - BS_Core_Index_Integrated
-    ...
     ```
-    
+
 - **Case 3**
 - 
-    
     ```yaml
-    ...
     hist_exog_cols:
       - Com_Gasoline
       - Com_BloombergCommodity_BCOM
@@ -95,14 +88,11 @@
       - BS_Core_Index_B
       - BS_Core_Index_C
       - BS_Core_Index_Integrated
-    ...
     ```
-    
+
 - **Case 4**
 - 
-    
     ```yaml
-    ...
     hist_exog_cols:
       - Com_Gasoline
       - Com_BloombergCommodity_BCOM
@@ -124,16 +114,13 @@
       - BS_Core_Index_B
       - BS_Core_Index_C
       - BS_Core_Index_Integrated
-    ...
     ```
-    
+
 ### **WTI**
 
 - **Case 1**
 - 
-    
     ```yaml
-    ...
     hist_exog_cols:
       - Com_Gasoline
       - Com_LME_Zn_Inv
@@ -154,14 +141,11 @@
       - BS_Core_Index_B
       - BS_Core_Index_C
       - BS_Core_Index_Integrated
-    ...
     ```
-    
+
 - **Case 2**
 - 
-    
     ```yaml
-    ...
     hist_exog_cols:
       - Com_Gasoline
       - Com_BloombergCommodity_BCOM
@@ -183,14 +167,11 @@
       - BS_Core_Index_B
       - BS_Core_Index_C
       - BS_Core_Index_Integrated
-    ...
     ```
-    
+
 - **Case 3**
 - 
-    
     ```yaml
-    ...
     hist_exog_cols:
       - Com_Gasoline
       - Com_BloombergCommodity_BCOM
@@ -204,14 +185,11 @@
       - BS_Core_Index_B
       - BS_Core_Index_C
       - BS_Core_Index_Integrated
-    ...
     ```
-    
+
 - **Case 4**
 - 
-    
     ```yaml
-    ...
     hist_exog_cols:
       - Com_Gasoline
       - Com_BloombergCommodity_BCOM
@@ -236,57 +214,59 @@
       - BS_Core_Index_B
       - BS_Core_Index_C
       - BS_Core_Index_Integrated
-    ...
     ```
-    
+
 # 03. 실험 설계 및 적용
 
 ---
 
 - 각 타깃(BrentCrude, WTI)을 독립적인 forecasting 문제로 학습 및 평가했다.
-- 각 케이스는 **hist_exog_cols 구성만 다르고**, 모델군과 평가 구조는 동일하게 유지했다.
-- 공통 평가 설정은 **12개 rolling TSCV(h=8, step=8, gap=0)** 이다.
-- `leaderboard.csv` 기준으로 각 모델의 평균 Fold 성능(MAPE, nRMSE, MAE, R2)을 정리했다.
+- 각 케이스는 **hist_exog_cols 구성만 다르고**, 모델군과 공통 training/CV 설정은 동일하게 유지했다.
+- 각 케이스는 `jobs_1 ~ jobs_4` 네 개 route로 fan-out 되며, route별로 동일한 모델군을 서로 다른 하이퍼파라미터로 실행한다.
+- `04-01`의 케이스 평균은 현재 `runs/*_jobs_*`의 모델 평균을 기준으로 계산했다.
+- `04-02`, `04-03`의 모델 행은 각 케이스/모델에 대해 `jobs_1 ~ jobs_4` leaderboard 값을 평균한 대표값이다.
 
 # 04. 실험(모델링) 결과
 
 ### 인사이트
 
-- BrentCrude는 **Case 1**이 가장 낮은 평균 MAPE(7.47%)를 기록했고, Case 2~4는 7.67%~7.71% 범위에 모였다.
-- WTI는 **Case 2**가 가장 낮은 평균 MAPE(7.63%)를 기록했으며, Case 1의 평균 MAPE(10.36%)가 전체 평균을 가장 크게 끌어올렸다.
-- 학습 모델만 기준으로 보면 BrentCrude에서는 **iTransformer**(평균 MAPE 6.86%)가 가장 안정적이었고, WTI에서는 **iTransformer**(평균 MAPE 7.60%)가 가장 낮았다.
-- 두 타깃 모두 **Naive**가 nRMSE 기준 최상위였고, **TimeXer**는 BrentCrude Case 3(11.42%)와 WTI Case 1(15.81%)에서 큰 오차를 보였다.
+- `feature_set_bs` 기준 BrentCrude의 최저 케이스 평균 MAPE는 **Case 3 (7.02%)**였다.
+- `feature_set_bs` 기준 WTI의 최저 케이스 평균 MAPE는 **Case 2 (7.74%)**였다.
+- 케이스 평균 기준 가장 큰 개선은 **WTI Case 2 (-0.23%p)**, 가장 큰 악화는 **WTI Case 1 (+0.36%p)**였다.
+- 학습 모델만 놓고 보면 `feature_set_bs`에서 BrentCrude는 **LSTM (6.11%)**, WTI는 **LSTM (6.10%)**가 가장 낮은 평균 MAPE를 기록했다.
 
 ## 04-01. 케이스별 평균 성능 비교
 
 | Case | 구분 | Target | Mean MAPE | △ MAPE | Mean nRMSE | Mean MAE | Mean R2 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Case 1 | 적용전 (`feature_set`) | BrentCrude | 7.56% |  | 1.07 | 5.51 | -25.89 |
-|  | 적용후 (`feature_set_bs`) | BrentCrude | 7.47% | -0.09% | 1.03 | 5.45 | -19.14 |
-| Case 2 | 적용전 (`feature_set`) | BrentCrude | 8.22% |  | 1.14 | 5.96 | -19.72 |
-|  | 적용후 (`feature_set_bs`) | BrentCrude | 7.70% | -0.52% | 1.06 | 5.58 | -18.73 |
-| Case 3 | 적용전 (`feature_set`) | BrentCrude | 7.54% |  | 1.10 | 5.50 | -19.48 |
-|  | 적용후 (`feature_set_bs`) | BrentCrude | 7.71% | +0.16% | 1.12 | 5.59 | -21.40 |
-| Case 4 | 적용전 (`feature_set`) | BrentCrude | 7.66% |  | 1.07 | 5.60 | -19.10 |
-|  | 적용후 (`feature_set_bs`) | BrentCrude | 7.67% | +0.01% | 1.05 | 5.57 | -15.95 |
-| Case 1 | 적용전 (`feature_set`) | WTI | 10.72% |  | 1.35 | 7.29 | -22.99 |
-|  | 적용후 (`feature_set_bs`) | WTI | 10.36% | -0.35% | 1.40 | 7.07 | -29.37 |
-| Case 2 | 적용전 (`feature_set`) | WTI | 8.92% |  | 1.22 | 6.15 | -18.03 |
-|  | 적용후 (`feature_set_bs`) | WTI | 7.63% | -1.29% | 1.05 | 5.28 | -13.75 |
-| Case 3 | 적용전 (`feature_set`) | WTI | 8.98% |  | 1.18 | 6.20 | -19.98 |
-|  | 적용후 (`feature_set_bs`) | WTI | 8.28% | -0.70% | 1.17 | 5.72 | -19.95 |
-| Case 4 | 적용전 (`feature_set`) | WTI | 8.12% |  | 1.11 | 5.57 | -16.23 |
-|  | 적용후 (`feature_set_bs`) | WTI | 8.45% | +0.33% | 1.17 | 5.82 | -22.15 |
+| Case 1 | 적용전 (`feature_set`) | BrentCrude | 8.73% |  | 1.27 | 6.08 | -42.63 |
+|  | 적용후 (`feature_set_bs`) | BrentCrude | 8.64% | -0.09% | 1.24 | 6.02 | -37.63 |
+| Case 2 | 적용전 (`feature_set`) | BrentCrude | 7.15% |  | 0.94 | 5.06 | -13.47 |
+|  | 적용후 (`feature_set_bs`) | BrentCrude | 7.32% | +0.17% | 1.03 | 5.15 | -19.59 |
+| Case 3 | 적용전 (`feature_set`) | BrentCrude | 6.91% |  | 0.92 | 4.89 | -12.30 |
+|  | 적용후 (`feature_set_bs`) | BrentCrude | 7.02% | +0.11% | 0.97 | 4.96 | -13.85 |
+| Case 4 | 적용전 (`feature_set`) | BrentCrude | 6.98% |  | 0.91 | 4.95 | -11.25 |
+|  | 적용후 (`feature_set_bs`) | BrentCrude | 7.23% | +0.25% | 0.99 | 5.10 | -17.61 |
+| Case 1 | 적용전 (`feature_set`) | WTI | 9.87% |  | 1.42 | 6.53 | -32.87 |
+|  | 적용후 (`feature_set_bs`) | WTI | 10.23% | +0.36% | 1.54 | 6.75 | -44.02 |
+| Case 2 | 적용전 (`feature_set`) | WTI | 7.97% |  | 1.15 | 5.31 | -17.37 |
+|  | 적용후 (`feature_set_bs`) | WTI | 7.74% | -0.23% | 1.15 | 5.16 | -17.20 |
+| Case 3 | 적용전 (`feature_set`) | WTI | 7.72% |  | 1.14 | 5.15 | -17.07 |
+|  | 적용후 (`feature_set_bs`) | WTI | 7.76% | +0.03% | 1.17 | 5.16 | -17.40 |
+| Case 4 | 적용전 (`feature_set`) | WTI | 7.97% |  | 1.13 | 5.31 | -16.32 |
+|  | 적용후 (`feature_set_bs`) | WTI | 7.84% | -0.13% | 1.17 | 5.21 | -18.28 |
 
 **BrentCrude.**
 
-- 타깃 평균 MAPE는 `feature_set` 7.74%에서 `feature_set_bs` 7.64%로 0.11%p 낮아졌다.
-- 케이스별로는 Case 2 개선폭(-0.52%p)이 가장 컸고, Case 3(+0.16%p)와 Case 4(+0.01%p)는 악화됐다.
+- `feature_set_bs` 기준 타깃 평균 MAPE는 7.55%이고, 최저 케이스는 Case 3(7.02% )였다.
+- baseline 대비 평균 MAPE 변화는 +0.11%였고, 개선 케이스는 Case 1였다.
+- 가장 큰 악화는 Case 4에서 나타났고, 해당 케이스의 ΔMAPE는 +0.25%였다.
 
 **WTI.**
 
-- 타깃 평균 MAPE는 `feature_set` 9.19%에서 `feature_set_bs` 8.68%로 0.50%p 낮아졌다.
-- 개선은 Case 2(-1.29%p), Case 3(-0.70%p), Case 1(-0.35%p)에 나타났고, Case 4(+0.33%p)는 악화됐다.
+- `feature_set_bs` 기준 타깃 평균 MAPE는 8.39%이고, 최저 케이스는 Case 2(7.74% )였다.
+- baseline 대비 평균 MAPE 변화는 +0.01%였고, 개선 케이스는 Case 2, Case 4였다.
+- 가장 큰 악화는 Case 1에서 나타났고, 해당 케이스의 ΔMAPE는 +0.36%였다.
 
 ## 04-02. 케이스별 세부 결과
 
@@ -294,89 +274,105 @@
 
 | Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Naive | 5.40% | 0.69 | 3.98 | -6.17 |
-| 2 | TimeXer | 6.40% | 0.94 | 4.64 | -13.56 |
-| 3 | iTransformer | 7.69% | 1.03 | 5.59 | -14.07 |
-| 4 | LSTM | 8.57% | 1.10 | 6.48 | -15.15 |
-| 5 | TSMixerx | 9.31% | 1.40 | 6.54 | -46.74 |
-| Mean |  | 7.47% | 1.03 | 5.45 | -19.14 |
+| 1 | Naive | 6.00% | 0.78 | 4.36 | -9.52 |
+| 2 | LSTM | 6.07% | 0.85 | 4.24 | -9.79 |
+| 3 | TimeXer | 6.45% | 0.85 | 4.56 | -8.84 |
+| 4 | iTransformer | 8.14% | 1.01 | 5.79 | -12.61 |
+| 5 | TSMixerx | 16.56% | 2.73 | 11.16 | -147.38 |
+| Mean |  | 8.64% | 1.24 | 6.02 | -37.63 |
+
+- baseline 대비 케이스 평균 ΔMAPE는 -0.09%였다.
 
 ### **Case 2 | BrentCrude**
 
 | Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Naive | 5.40% | 0.69 | 3.98 | -6.17 |
-| 2 | iTransformer | 6.50% | 0.92 | 4.75 | -12.10 |
-| 3 | LSTM | 8.54% | 1.08 | 6.46 | -14.85 |
-| 4 | TSMixerx | 7.85% | 1.24 | 5.58 | -36.65 |
-| 5 | TimeXer | 10.20% | 1.37 | 7.13 | -23.87 |
-| Mean |  | 7.70% | 1.06 | 5.58 | -18.73 |
+| 1 | Naive | 6.00% | 0.78 | 4.36 | -9.52 |
+| 2 | LSTM | 6.08% | 0.85 | 4.24 | -9.85 |
+| 3 | iTransformer | 6.98% | 0.91 | 4.99 | -11.19 |
+| 4 | TimeXer | 7.29% | 0.93 | 5.15 | -10.63 |
+| 5 | TSMixerx | 10.25% | 1.69 | 7.00 | -56.76 |
+| Mean |  | 7.32% | 1.03 | 5.15 | -19.59 |
+
+- baseline 대비 케이스 평균 ΔMAPE는 +0.17%였다.
 
 ### **Case 3 | BrentCrude**
 
 | Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Naive | 5.40% | 0.69 | 3.98 | -6.17 |
-| 2 | iTransformer | 6.59% | 0.96 | 4.85 | -13.51 |
-| 3 | TSMixerx | 6.55% | 0.96 | 4.74 | -14.29 |
-| 4 | LSTM | 8.57% | 1.09 | 6.48 | -14.97 |
-| 5 | TimeXer | 11.42% | 1.91 | 7.88 | -58.06 |
-| Mean |  | 7.71% | 1.12 | 5.59 | -21.40 |
+| 1 | Naive | 6.00% | 0.78 | 4.36 | -9.52 |
+| 2 | LSTM | 6.23% | 0.88 | 4.35 | -10.34 |
+| 3 | iTransformer | 6.92% | 0.93 | 4.95 | -11.49 |
+| 4 | TimeXer | 7.41% | 0.95 | 5.23 | -11.70 |
+| 5 | TSMixerx | 8.54% | 1.29 | 5.91 | -26.21 |
+| Mean |  | 7.02% | 0.97 | 4.96 | -13.85 |
+
+- baseline 대비 케이스 평균 ΔMAPE는 +0.11%였다.
 
 ### **Case 4 | BrentCrude**
 
 | Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Naive | 5.40% | 0.69 | 3.98 | -6.17 |
-| 2 | TSMixerx | 6.19% | 0.83 | 4.54 | -9.93 |
-| 3 | iTransformer | 6.65% | 0.95 | 4.83 | -12.48 |
-| 4 | LSTM | 8.60% | 1.10 | 6.49 | -15.24 |
-| 5 | TimeXer | 11.50% | 1.71 | 8.01 | -35.92 |
-| Mean |  | 7.67% | 1.05 | 5.57 | -15.95 |
+| 1 | Naive | 6.00% | 0.78 | 4.36 | -9.52 |
+| 2 | LSTM | 6.07% | 0.85 | 4.24 | -9.80 |
+| 3 | iTransformer | 7.07% | 0.92 | 5.05 | -10.76 |
+| 4 | TimeXer | 7.27% | 0.92 | 5.14 | -10.37 |
+| 5 | TSMixerx | 9.74% | 1.48 | 6.73 | -47.61 |
+| Mean |  | 7.23% | 0.99 | 5.10 | -17.61 |
+
+- baseline 대비 케이스 평균 ΔMAPE는 +0.25%였다.
 
 ### **Case 1 | WTI**
 
 | Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Naive | 5.75% | 0.76 | 4.04 | -7.90 |
-| 2 | iTransformer | 7.35% | 0.95 | 5.11 | -10.77 |
-| 3 | LSTM | 9.36% | 1.06 | 6.76 | -14.84 |
-| 4 | TSMixerx | 13.54% | 2.04 | 9.03 | -70.63 |
-| 5 | TimeXer | 15.81% | 2.18 | 10.40 | -42.71 |
-| Mean |  | 10.36% | 1.40 | 7.07 | -29.37 |
+| 1 | LSTM | 6.09% | 0.83 | 4.06 | -8.71 |
+| 2 | Naive | 6.34% | 0.96 | 4.36 | -12.95 |
+| 3 | iTransformer | 8.05% | 1.09 | 5.41 | -13.51 |
+| 4 | TimeXer | 10.13% | 1.47 | 6.67 | -24.16 |
+| 5 | TSMixerx | 20.53% | 3.37 | 13.23 | -160.78 |
+| Mean |  | 10.23% | 1.54 | 6.75 | -44.02 |
+
+- baseline 대비 케이스 평균 ΔMAPE는 +0.36%였다.
 
 ### **Case 2 | WTI**
 
 | Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Naive | 5.75% | 0.76 | 4.04 | -7.90 |
-| 2 | TSMixerx | 6.64% | 0.93 | 4.58 | -11.35 |
-| 3 | iTransformer | 7.63% | 1.05 | 5.26 | -13.95 |
-| 4 | LSTM | 9.36% | 1.07 | 6.76 | -14.87 |
-| 5 | TimeXer | 8.78% | 1.43 | 5.78 | -20.69 |
-| Mean |  | 7.63% | 1.05 | 5.28 | -13.75 |
+| 1 | LSTM | 6.04% | 0.84 | 4.02 | -8.77 |
+| 2 | Naive | 6.34% | 0.96 | 4.36 | -12.95 |
+| 3 | TimeXer | 8.64% | 1.19 | 5.72 | -15.15 |
+| 4 | iTransformer | 8.64% | 1.27 | 5.73 | -18.48 |
+| 5 | TSMixerx | 9.03% | 1.48 | 5.94 | -30.63 |
+| Mean |  | 7.74% | 1.15 | 5.16 | -17.20 |
+
+- baseline 대비 케이스 평균 ΔMAPE는 -0.23%였다.
 
 ### **Case 3 | WTI**
 
 | Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Naive | 5.75% | 0.76 | 4.04 | -7.90 |
-| 2 | LSTM | 9.29% | 1.07 | 6.72 | -14.84 |
-| 3 | iTransformer | 7.93% | 1.16 | 5.45 | -17.43 |
-| 4 | TSMixerx | 7.73% | 1.18 | 5.26 | -21.33 |
-| 5 | TimeXer | 10.72% | 1.65 | 7.15 | -38.26 |
-| Mean |  | 8.28% | 1.17 | 5.72 | -19.95 |
+| 1 | LSTM | 6.25% | 0.91 | 4.16 | -9.65 |
+| 2 | Naive | 6.34% | 0.96 | 4.36 | -12.95 |
+| 3 | TimeXer | 8.61% | 1.19 | 5.69 | -15.24 |
+| 4 | iTransformer | 8.06% | 1.25 | 5.35 | -17.79 |
+| 5 | TSMixerx | 9.52% | 1.56 | 6.21 | -31.39 |
+| Mean |  | 7.76% | 1.17 | 5.16 | -17.40 |
+
+- baseline 대비 케이스 평균 ΔMAPE는 +0.03%였다.
 
 ### **Case 4 | WTI**
 
 | Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Naive | 5.75% | 0.76 | 4.04 | -7.90 |
-| 2 | iTransformer | 7.49% | 1.01 | 5.17 | -12.35 |
-| 3 | TSMixerx | 7.33% | 1.05 | 4.99 | -15.36 |
-| 4 | LSTM | 9.31% | 1.06 | 6.73 | -14.62 |
-| 5 | TimeXer | 12.37% | 1.98 | 8.19 | -60.51 |
-| Mean |  | 8.45% | 1.17 | 5.82 | -22.15 |
+| 1 | LSTM | 6.01% | 0.85 | 4.00 | -8.85 |
+| 2 | Naive | 6.34% | 0.96 | 4.36 | -12.95 |
+| 3 | TimeXer | 8.48% | 1.17 | 5.62 | -14.50 |
+| 4 | iTransformer | 8.68% | 1.29 | 5.76 | -19.10 |
+| 5 | TSMixerx | 9.68% | 1.61 | 6.29 | -36.01 |
+| Mean |  | 7.84% | 1.17 | 5.21 | -18.28 |
+
+- baseline 대비 케이스 평균 ΔMAPE는 -0.13%였다.
 
 ## 04-03. 블랙스완 적용 후 모형별 통합 Table
 
@@ -386,51 +382,51 @@
 
 | Case | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- |
-| Case 1 | 5.40% | 0.69 | 3.98 | -6.17 |
-| Case 2 | 5.40% | 0.69 | 3.98 | -6.17 |
-| Case 3 | 5.40% | 0.69 | 3.98 | -6.17 |
-| Case 4 | 5.40% | 0.69 | 3.98 | -6.17 |
-| Average | 5.40% | 0.69 | 3.98 | -6.17 |
+| Case 1 | 6.00% | 0.78 | 4.36 | -9.52 |
+| Case 2 | 6.00% | 0.78 | 4.36 | -9.52 |
+| Case 3 | 6.00% | 0.78 | 4.36 | -9.52 |
+| Case 4 | 6.00% | 0.78 | 4.36 | -9.52 |
+| Average | 6.00% | 0.78 | 4.36 | -9.52 |
 
 ### **TimeXer**
 
 | Case | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- |
-| Case 1 | 6.34% | 0.90 | 4.59 | -11.13 |
-| Case 2 | 7.14% | 1.00 | 5.15 | -14.14 |
-| Case 3 | 7.04% | 0.99 | 5.09 | -13.28 |
-| Case 4 | 7.46% | 1.04 | 5.37 | -15.50 |
-| Average | 7.00% | 0.99 | 5.05 | -13.51 |
+| Case 1 | 6.45% | 0.85 | 4.56 | -8.84 |
+| Case 2 | 7.29% | 0.93 | 5.15 | -10.63 |
+| Case 3 | 7.41% | 0.95 | 5.23 | -11.70 |
+| Case 4 | 7.27% | 0.92 | 5.14 | -10.37 |
+| Average | 7.10% | 0.91 | 5.02 | -10.38 |
 
 ### **TSMixerx**
 
 | Case | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- |
-| Case 1 | 9.31% | 1.40 | 6.54 | -46.74 |
-| Case 2 | 7.85% | 1.24 | 5.58 | -36.65 |
-| Case 3 | 6.55% | 0.96 | 4.74 | -14.29 |
-| Case 4 | 6.19% | 0.83 | 4.54 | -9.93 |
-| Average | 7.47% | 1.11 | 5.35 | -26.91 |
+| Case 1 | 16.56% | 2.73 | 11.16 | -147.38 |
+| Case 2 | 10.25% | 1.69 | 7.00 | -56.76 |
+| Case 3 | 8.54% | 1.29 | 5.91 | -26.21 |
+| Case 4 | 9.74% | 1.48 | 6.73 | -47.61 |
+| Average | 11.27% | 1.80 | 7.70 | -69.49 |
 
 ### **iTransformer**
 
 | Case | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- |
-| Case 1 | 6.63% | 0.90 | 4.79 | -11.84 |
-| Case 2 | 6.10% | 0.88 | 4.45 | -11.72 |
-| Case 3 | 5.94% | 0.86 | 4.37 | -9.99 |
-| Case 4 | 6.31% | 0.91 | 4.59 | -11.73 |
-| Average | 6.24% | 0.89 | 4.55 | -11.32 |
+| Case 1 | 8.14% | 1.01 | 5.79 | -12.61 |
+| Case 2 | 6.98% | 0.91 | 4.99 | -11.19 |
+| Case 3 | 6.92% | 0.93 | 4.95 | -11.49 |
+| Case 4 | 7.07% | 0.92 | 5.05 | -10.76 |
+| Average | 7.28% | 0.94 | 5.19 | -11.51 |
 
 ### **LSTM**
 
 | Case | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- |
-| Case 1 | 8.52% | 1.08 | 6.44 | -14.87 |
-| Case 2 | 8.86% | 1.10 | 6.66 | -15.03 |
-| Case 3 | 8.53% | 1.08 | 6.45 | -14.86 |
-| Case 4 | 7.85% | 1.00 | 5.89 | -13.32 |
-| Average | 8.44% | 1.07 | 6.36 | -14.52 |
+| Case 1 | 6.07% | 0.85 | 4.24 | -9.79 |
+| Case 2 | 6.08% | 0.85 | 4.24 | -9.85 |
+| Case 3 | 6.23% | 0.88 | 4.35 | -10.34 |
+| Case 4 | 6.07% | 0.85 | 4.24 | -9.80 |
+| Average | 6.11% | 0.86 | 4.27 | -9.95 |
 
 ## **WTI**
 
@@ -438,104 +434,117 @@
 
 | Case | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- |
-| Case 1 | 5.75% | 0.76 | 4.04 | -7.90 |
-| Case 2 | 5.75% | 0.76 | 4.04 | -7.90 |
-| Case 3 | 5.75% | 0.76 | 4.04 | -7.90 |
-| Case 4 | 5.75% | 0.76 | 4.04 | -7.90 |
-| Average | 5.75% | 0.76 | 4.04 | -7.90 |
+| Case 1 | 6.34% | 0.96 | 4.36 | -12.95 |
+| Case 2 | 6.34% | 0.96 | 4.36 | -12.95 |
+| Case 3 | 6.34% | 0.96 | 4.36 | -12.95 |
+| Case 4 | 6.34% | 0.96 | 4.36 | -12.95 |
+| Average | 6.34% | 0.96 | 4.36 | -12.95 |
 
 ### **TimeXer**
 
 | Case | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- |
-| Case 1 | 7.52% | 1.06 | 5.11 | -15.38 |
-| Case 2 | 7.68% | 1.06 | 5.21 | -15.09 |
-| Case 3 | 7.59% | 1.05 | 5.16 | -14.39 |
-| Case 4 | 7.22% | 1.00 | 4.90 | -13.24 |
-| Average | 7.50% | 1.04 | 5.10 | -14.52 |
+| Case 1 | 10.13% | 1.47 | 6.67 | -24.16 |
+| Case 2 | 8.64% | 1.19 | 5.72 | -15.15 |
+| Case 3 | 8.61% | 1.19 | 5.69 | -15.24 |
+| Case 4 | 8.48% | 1.17 | 5.62 | -14.50 |
+| Average | 8.97% | 1.26 | 5.93 | -17.26 |
 
 ### **TSMixerx**
 
 | Case | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- |
-| Case 1 | 13.54% | 2.04 | 9.03 | -70.63 |
-| Case 2 | 6.64% | 0.93 | 4.58 | -11.35 |
-| Case 3 | 7.73% | 1.18 | 5.26 | -21.33 |
-| Case 4 | 7.33% | 1.05 | 4.99 | -15.36 |
-| Average | 8.81% | 1.30 | 5.96 | -29.67 |
+| Case 1 | 20.53% | 3.37 | 13.23 | -160.78 |
+| Case 2 | 9.03% | 1.48 | 5.94 | -30.63 |
+| Case 3 | 9.52% | 1.56 | 6.21 | -31.39 |
+| Case 4 | 9.68% | 1.61 | 6.29 | -36.01 |
+| Average | 12.19% | 2.01 | 7.92 | -64.70 |
 
 ### **iTransformer**
 
 | Case | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- |
-| Case 1 | 7.25% | 0.98 | 4.98 | -12.38 |
-| Case 2 | 7.65% | 1.11 | 5.23 | -17.47 |
-| Case 3 | 7.45% | 1.06 | 5.11 | -14.95 |
-| Case 4 | 7.68% | 1.11 | 5.23 | -17.18 |
-| Average | 7.51% | 1.07 | 5.14 | -15.49 |
+| Case 1 | 8.05% | 1.09 | 5.41 | -13.51 |
+| Case 2 | 8.64% | 1.27 | 5.73 | -18.48 |
+| Case 3 | 8.06% | 1.25 | 5.35 | -17.79 |
+| Case 4 | 8.68% | 1.29 | 5.76 | -19.10 |
+| Average | 8.36% | 1.22 | 5.56 | -17.22 |
 
 ### **LSTM**
 
 | Case | MAPE | nRMSE | MAE | R2 |
 | --- | --- | --- | --- | --- |
-| Case 1 | 9.34% | 1.06 | 6.75 | -14.62 |
-| Case 2 | 8.08% | 0.95 | 5.77 | -12.50 |
-| Case 3 | 6.90% | 0.85 | 4.82 | -9.57 |
-| Case 4 | 8.32% | 0.97 | 5.95 | -12.76 |
-| Average | 8.16% | 0.96 | 5.82 | -12.36 |
+| Case 1 | 6.09% | 0.83 | 4.06 | -8.71 |
+| Case 2 | 6.04% | 0.84 | 4.02 | -8.77 |
+| Case 3 | 6.25% | 0.91 | 4.16 | -9.65 |
+| Case 4 | 6.01% | 0.85 | 4.00 | -8.85 |
+| Average | 6.10% | 0.86 | 4.06 | -9.00 |
 
 # 05. 결과 분석 및 얻게 된 인사이트
 
 ---
 
-**타깃 평균 요약표**
+**타깃 평균 요약표 (`feature_set_bs` 기준)**
 
 | 구분 | Mean MAPE | Mean nRMSE | Mean MAE | Mean R2 |
 | --- | --- | --- | --- | --- |
-| BrentCrude 평균 | 6.91% | 0.95 | 5.06 | -14.48 |
-| WTI 평균 | 7.55% | 1.03 | 5.21 | -15.99 |
-| 전체 평균 | 7.23% | 0.99 | 5.13 | -15.24 |
+| BrentCrude 평균 | 7.55% | 1.06 | 5.31 | -22.17 |
+| WTI 평균 | 8.39% | 1.26 | 5.57 | -24.23 |
+| 전체 평균 | 7.97% | 1.16 | 5.44 | -23.20 |
 
-BrentCrude는 평균적으로 6.91%의 MAPE를 보였고, Case 3~4 구간에서 성능이 가장 안정화됐다. 모델 단위로는 iTransformer와 TimeXer가 Naive 다음으로 낮은 평균 오차를 유지했다.
+BrentCrude는 `feature_set_bs` 기준 평균 MAPE 7.55%를 기록했고, baseline 대비 변화는 +0.11%였다. 케이스 단위로는 Case 1만 개선됐고, Case 4의 악화 폭이 가장 컸다.
 
-WTI는 평균적으로 7.55%의 MAPE를 보였으며, Case 2~4는 비슷한 수준으로 수렴했지만 Case 1의 TSMixerx 급등이 전체 평균을 악화시켰다. WTI 학습 모델 중에는 TimeXer와 iTransformer의 평균 MAPE가 가장 낮고 서로 거의 비슷했다.
+WTI는 `feature_set_bs` 기준 평균 MAPE 8.39%를 기록했고, baseline 대비 변화는 +0.01%였다. 개선은 Case 2와 Case 4에서 관찰됐지만, Case 1의 악화가 전체 평균을 다시 끌어올렸다.
 
-공통적으로 Naive가 가장 낮은 nRMSE를 보였기 때문에, 후속 실험에서는 학습 모델이 Naive 대비 어떤 구간에서 추가 가치를 만드는지 구간 단위로 점검할 필요가 있다. 또한 TSMixerx는 일부 케이스에서 개선 여지가 보였지만 변동성이 크므로 하이퍼파라미터 또는 입력 feature 구성 재점검이 필요하다.
+학습 모델 기준으로는 BrentCrude와 WTI 모두 LSTM이 가장 낮은 평균 MAPE를 보였고(각각 6.11%, 6.10%), TimeXer/iTransformer는 중간권, TSMixerx는 케이스별 변동성이 가장 컸다.
+
+Naive는 두 타깃 모두 가장 낮은 평균 오차를 유지했기 때문에, 후속 실험에서는 BS 지표가 학습 모델에만 추가 가치를 만든 구간이 어디인지 fold 또는 route 단위로 더 세분해서 보는 것이 필요하다.
 
 # 06. 향후 Action Plan
 
 ---
 
-- BrentCrude는 Case 3~4 feature 구성을 우선 후보로 삼아 HPO 실험을 확장한다.
-- WTI는 Case 2~4를 중심으로 재검증하되, Case 1에서 크게 흔들린 TSMixerx/TimeXer 입력 구성을 우선 점검한다.
-- Naive 대비 학습 모델의 우위가 드러나는 구간을 fold 단위로 다시 확인해, 모델별 강·약세 구간을 분리 분석한다.
+- BrentCrude는 BS 추가가 현재 평균 기준으로 Case 1에서만 개선됐으므로, 후속 실험은 Case 1의 BS feature 유지 여부와 Case 2~4의 route별 악화 원인 분리를 우선한다.
+- WTI는 Case 2와 Case 4에서만 개선이 확인됐으므로, 해당 두 케이스를 중심으로 BS 지표의 기여도를 재검증한다.
+- LSTM은 두 타깃 모두 학습 모델 중 가장 낮은 평균 MAPE를 보였으므로, HPO 또는 추가 feature 실험의 우선순위를 높인다.
+- TSMixerx는 jobs route별 편차가 커서 평균값이 크게 흔들리므로, route별 하이퍼파라미터 민감도 점검을 별도 분석으로 분리한다.
 
 # Appendix. 공통 설정 및 모델 파라미터
 
 ---
 
-- 공통적으로 `residual.enabled: false` 상태의 `feature_set_bs` 실험이다.
-- 모든 케이스의 모델 구성은 동일하고, case 차이는 주로 `hist_exog_cols`에 있다.
-- 아래 설정은 현재 top-level `runs/feature_set_bs_*_case*_bs/config/config.resolved.json`에서 확인한 실제 공통 하이퍼파라미터다.
+- 현재 문서는 `feature_set_bs` 실행을 중심으로 작성했지만, 비교값은 대응하는 `feature_set` run을 함께 사용했다.
+- 모든 케이스의 공통 Training/CV 설정은 `runs/feature_set_bs_brentoil_case1_bs_jobs_1/config/config.resolved.json` 등 최신 resolved config에서 확인했다.
+- Jobs 설정은 공통 한 벌이 아니라 `jobs_1 ~ jobs_4` 네 개 route로 fan-out 된다.
 
 ## A-1. 공통 Training 설정
 
 ```yaml
 train_protocol: expanding_window_tscv
 input_size: 64
-season_length: 52
 batch_size: 32
 valid_batch_size: 64
 windows_batch_size: 1024
 inference_windows_batch_size: 1024
-learning_rate: 0.001
+optimizer:
+  name: adamw
+  kwargs: {}
+lr_scheduler:
+  name: OneCycleLR
+  max_lr: 0.001
+  pct_start: 0.3
+  div_factor: 25.0
+  final_div_factor: 10000.0
+  anneal_strategy: cos
+  three_phase: false
+  cycle_momentum: false
 scaler_type: null
 model_step_size: 8
-max_steps: 1000
-val_size: 8
-val_check_steps: 50
-early_stop_patience_steps: 5
-num_lr_decays: -1
+max_steps: 2000
+val_size: 24
+val_check_steps: 20
+min_steps_before_early_stop: 500
+early_stop_patience_steps: 3
 loss: mse
 ```
 
@@ -544,7 +553,7 @@ loss: mse
 ```yaml
 horizon: 8
 step_size: 8
-n_windows: 12
+n_windows: 6
 gap: 0
 max_train_size: null
 overlap_eval_policy: by_cutoff_mean
@@ -552,22 +561,62 @@ overlap_eval_policy: by_cutoff_mean
 
 ## A-3. 블랙스완 적용 후 공통 Jobs 설정
 
+현재 `feature_set` / `feature_set_bs` 케이스는 아래 네 개 jobs route를 공통으로 참조한다.
+
+### `jobs_1.yaml`
+
+```yaml
+- model: TimeXer
+  params:
+    patch_len: 8
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 2
+    d_ff: 128
+    factor: 1
+    dropout: 0.05
+    use_norm: true
+- model: TSMixerx
+  params:
+    n_block: 3
+    ff_dim: 64
+    dropout: 0.05
+    revin: true
+- model: Naive
+  params: {}
+- model: iTransformer
+  params:
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 2
+    d_ff: 192
+    dropout: 0.0
+- model: LSTM
+  params:
+    encoder_hidden_size: 64
+    decoder_hidden_size: 64
+    encoder_n_layers: 4
+    context_size: 8
+```
+
+### `jobs_2.yaml`
+
 ```yaml
 - model: TimeXer
   params:
     patch_len: 16
-    hidden_size: 768
-    n_heads: 16
-    e_layers: 4
-    d_ff: 1024
-    factor: 8
-    dropout: 0.2
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 2
+    d_ff: 128
+    factor: 1
+    dropout: 0.1
     use_norm: true
 - model: TSMixerx
   params:
     n_block: 2
     ff_dim: 64
-    dropout: 0.1
+    dropout: 0.10
     revin: true
 - model: Naive
   params: {}
@@ -577,11 +626,83 @@ overlap_eval_policy: by_cutoff_mean
     n_heads: 4
     e_layers: 2
     d_ff: 256
-    dropout: 0.0
+    dropout: 0.05
 - model: LSTM
   params:
     encoder_hidden_size: 64
     decoder_hidden_size: 64
     encoder_n_layers: 4
     context_size: 10
+```
+
+### `jobs_3.yaml`
+
+```yaml
+- model: TimeXer
+  params:
+    patch_len: 8
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 2
+    d_ff: 128
+    factor: 1
+    dropout: 0.15
+    use_norm: true
+- model: TSMixerx
+  params:
+    n_block: 2
+    ff_dim: 96
+    dropout: 0.10
+    revin: true
+- model: Naive
+  params: {}
+- model: iTransformer
+  params:
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 3
+    d_ff: 256
+    dropout: 0.0
+- model: LSTM
+  params:
+    encoder_hidden_size: 64
+    decoder_hidden_size: 64
+    encoder_n_layers: 3
+    context_size: 16
+```
+
+### `jobs_4.yaml`
+
+```yaml
+- model: TimeXer
+  params:
+    patch_len: 16
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 2
+    d_ff: 128
+    factor: 1
+    dropout: 0.2
+    use_norm: true
+- model: TSMixerx
+  params:
+    n_block: 3
+    ff_dim: 64
+    dropout: 0.25
+    revin: true
+- model: Naive
+  params: {}
+- model: iTransformer
+  params:
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 2
+    d_ff: 384
+    dropout: 0.15
+- model: LSTM
+  params:
+    encoder_hidden_size: 64
+    decoder_hidden_size: 64
+    encoder_n_layers: 4
+    context_size: 12
 ```
