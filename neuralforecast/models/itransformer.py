@@ -67,7 +67,7 @@ class iTransformer(BaseModel):
     """
 
     # Class attributes
-    EXOGENOUS_FUTR = False
+    EXOGENOUS_FUTR = True
     EXOGENOUS_HIST = True
     EXOGENOUS_STAT = False
     MULTIVARIATE = True
@@ -158,6 +158,11 @@ class iTransformer(BaseModel):
         self.enc_embedding = DataEmbedding_inverted(
             input_size, self.hidden_size, self.dropout
         )
+        self.futr_exog_embedding = (
+            nn.Linear(input_size + h, self.hidden_size)
+            if self.futr_exog_size > 0
+            else None
+        )
 
         self.encoder = TransEncoder(
             [
@@ -207,15 +212,15 @@ class iTransformer(BaseModel):
         )
         return (hist_exog - means) / stdev
 
-    def forecast(self, x_enc, x_mark_enc=None):
+    def forecast(self, x_enc, x_mark_enc=None, futr_exog=None):
         if self.use_norm:
             # Normalization from Non-stationary Transformer
             means = x_enc.mean(1, keepdim=True).detach()
             x_enc = x_enc - means
-            stdev = torch.sqrt(
-                torch.var(x_enc, dim=1, keepdim=True, unbiased=False) + 1e-5
-            )
-            x_enc /= stdev
+            variance = torch.var(x_enc, dim=1, keepdim=True, unbiased=False)
+            stdev = torch.sqrt(variance + 1e-5)
+            scale = torch.where(variance < 1e-5, torch.ones_like(stdev), stdev)
+            x_enc /= scale
 
         _, _, N = x_enc.shape  # B L N
         # B: batch_size;       E: hidden_size;
@@ -227,6 +232,13 @@ class iTransformer(BaseModel):
         enc_out = self.enc_embedding(
             x_enc, x_mark_enc
         )  # covariates (e.g timestamp) can be also embedded as tokens
+
+        if self.futr_exog_embedding is not None and futr_exog is not None:
+            futr_exog_tokens = futr_exog.permute(0, 3, 1, 2).reshape(
+                futr_exog.shape[0], -1, self.input_size + self.h
+            )
+            futr_exog_tokens = self.futr_exog_embedding(futr_exog_tokens)
+            enc_out = torch.cat([enc_out, futr_exog_tokens], dim=1)
 
         # B N E -> B N E                (B L E -> B L E in the vanilla Transformer)
         # the dimensions of embedded time series has been inverted, and then processed by native attn, layernorm and ffn modules
@@ -240,7 +252,7 @@ class iTransformer(BaseModel):
         if self.use_norm:
             # De-Normalization from Non-stationary Transformer
             dec_out = dec_out * (
-                stdev[:, 0, :]
+                scale[:, 0, :]
                 .unsqueeze(1)
                 .repeat(1, self.h * self.loss.outputsize_multiplier, 1)
             )
@@ -255,9 +267,11 @@ class iTransformer(BaseModel):
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]
         hist_exog = windows_batch["hist_exog"]
+        futr_exog = windows_batch.get("futr_exog")
 
         self._check_finite("insample_y", insample_y)
         self._check_finite("hist_exog", hist_exog)
+        self._check_finite("futr_exog", futr_exog)
         hist_exog = self._normalize_hist_exog(hist_exog)
         self._check_finite("hist_exog_normalized", hist_exog)
 
@@ -268,7 +282,22 @@ class iTransformer(BaseModel):
             )
             self._check_finite("x_mark_enc", x_mark_enc)
 
-        y_pred = self.forecast(insample_y, x_mark_enc=x_mark_enc)
+        futr_exog_tokens = None
+        if (
+            self.futr_exog_embedding is not None
+            and futr_exog is not None
+            and futr_exog.shape[1] > 0
+        ):
+            futr_exog_tokens = futr_exog
+
+        if futr_exog_tokens is None:
+            y_pred = self.forecast(insample_y, x_mark_enc=x_mark_enc)
+        else:
+            y_pred = self.forecast(
+                insample_y,
+                x_mark_enc=x_mark_enc,
+                futr_exog=futr_exog_tokens,
+            )
         self._check_finite("y_pred", y_pred)
         if self.hist_exog_size > 0:
             y_pred = y_pred[:, :, : self.n_series]
