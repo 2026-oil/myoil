@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING, Any
 from .search_space import rewrite_search_space_error, stage_search_space_payload
 
 if TYPE_CHECKING:
-    from residual.config import AppConfig, LoadedConfig, SearchSpaceContract
+    from app_config import AppConfig, LoadedConfig
+    from tuning.search_space import SearchSpaceContract
 
 BS_PREFORCAST_MAIN_KEYS = {
     "enabled",
@@ -162,7 +163,7 @@ def _resolve_plugin_jobs_payload(
     stage_source_path: Path,
     jobs_value: Any,
 ) -> tuple[list[dict[str, Any]], tuple[Any, ...]]:
-    from residual.config import (
+    from app_config import (
         _load_document,
         _resolve_jobs_fanout_specs,
         _resolve_jobs_path_reference,
@@ -230,7 +231,7 @@ def load_bs_preforcast_stage1(
     bs_preforcast: BsPreforcastConfig,
     search_space_contract: SearchSpaceContract | None,
 ) -> BsPreforcastStageLoadedConfig:
-    from residual.config import (
+    from app_config import (
         _coerce_bool,
         _coerce_name_tuple,
         _hash_text,

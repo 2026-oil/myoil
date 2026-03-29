@@ -54,12 +54,12 @@ uv run python main.py --validate-only --config yaml/experiment/feature_set/brent
 현재 실행 진입점은 루트의 `main.py`입니다.
 
 - 엔트리포인트: `main.py`
-- 실제 런타임: `residual/runtime.py`
+- 실제 런타임: `runtime_support/runner.py`
 
 역할:
 
 - 프로젝트 가상환경 Python으로 bootstrap
-- 이후 `residual.runtime.main()`으로 제어 전달
+- 이후 `runtime_support.runner.main()`으로 제어 전달
 
 즉, 사용자는 아래처럼 실행하면 됩니다.
 
@@ -175,111 +175,6 @@ Python 패키지 구현은 `plugins/bs_preforcast/` 아래에 있으며, 코드 
 - `yaml/jobs/bs_preforcast/bs_preforcast_jobs_multi.yaml` (multivariable stage1 fanout catalog; 실제 단일 stage job은 `yaml/jobs/bs_preforcast/multi/*.yaml`)
 
 ---
-
-## 3.5 Excel 템플릿으로 YAML 만들기
-
-직접 YAML을 손으로 수정하기 어렵다면 루트의 `xl_2_yaml.py`를 사용할 수 있습니다.
-
-핵심 기능:
-
-- 빈 Excel 템플릿 생성
-- Excel workbook -> `yaml/<family>/...` YAML 자동 생성
-- 생성 직후 내부 runtime validate-only helper 경로(`load_app_config` + job/adapter validation) 수행
-- 기존 YAML -> Excel workbook 역변환
-
-지원 family(현재 템플릿 dropdown 기준):
-
-- `feature_set`
-- `feature_set_HPT`
-- `feature_set_HPT_c3`
-- `feature_set_HPT_n100`
-- `feature_set_residual`
-- `bomb`
-- `bomb_trans`
-- `univar`
-- `blackswan`
-- `jaeho_feature_set`
-
-### 템플릿 생성
-
-```bash
-cd neuralforecast
-uv run python xl_2_yaml.py template /tmp/nf-template.xlsx
-```
-
-### Excel -> YAML 생성
-
-```bash
-cd neuralforecast
-uv run python xl_2_yaml.py /tmp/nf-template.xlsx
-```
-
-또는 명시적으로:
-
-```bash
-cd neuralforecast
-uv run python xl_2_yaml.py generate /tmp/nf-template.xlsx
-```
-
-특정 catalog row만 생성하고 싶으면:
-
-```bash
-cd neuralforecast
-uv run python xl_2_yaml.py generate /tmp/nf-template.xlsx --catalog-id cfg1 --catalog-id cfg2
-```
-
-기본 동작:
-
-- `Catalog.family`는 지원 family 목록에 있어야만 합니다.
-- `Catalog.family` + `file_target`/`config_stem`으로 최종 경로 결정
-- 출력은 `yaml/<family>/...` 아래로 자동 배치
-- 충돌 경로는 fail-fast
-- 임시 staging 후 내부 runtime validation이 모두 통과해야 최종 경로로 promote
-
-### YAML -> Excel 역변환
-
-```bash
-cd neuralforecast
-uv run python xl_2_yaml.py reverse yaml/experiment/feature_set/wti-case3.yaml --output /tmp/wti-case3.xlsx
-```
-
-여러 YAML도 한 workbook으로 역변환할 수 있습니다.
-
-```bash
-cd neuralforecast
-uv run python xl_2_yaml.py reverse \
-  yaml/experiment/feature_set/wti-case3.yaml \
-  yaml/experiment/feature_set/brentoil-case3.yaml \
-  --output /tmp/case3-batch.xlsx
-```
-
-### workbook schema 요약
-
-필수 core sheet:
-
-- `Catalog`
-- `Task`
-- `Dataset`
-- `Runtime`
-- `Training`
-- `CV`
-- `Scheduler`
-- `Residual`
-- `Jobs`
-- `SearchSpace`
-
-추가 adapter sheet:
-
-- `Adapter.<family>` 형태
-
-중요 규칙:
-
-- `Catalog` 한 row가 최종 YAML 1개를 뜻합니다.
-- 다른 sheet row는 모두 `catalog_id`로 `Catalog` row에 귀속됩니다.
-- `Jobs`는 동일 `catalog_id` 아래 여러 row를 가질 수 있습니다.
-- adapter override는 allowlist 밖 field를 수정할 수 없습니다.
-- reverse conversion은 adapter provenance를 복원하지 않고, 확인 가능한 YAML 의미를 core sheet 기준으로 정규화합니다.
-- blank cell은 기본적으로 "omit" 의미이고, 명시적으로 적은 default 값은 재생성 시 유지됩니다.
 
 ## 4. app config 설정표
 
@@ -446,16 +341,16 @@ jobs:
 
 ## 6. residual 관리
 
-residual 관련 코드는 `residual/` 아래에 모여 있습니다.
+residual plugin 관련 코드는 `plugins/residual/`에, 중립 런타임 코드는 `runtime_support/`와 `app_config.py`에 나뉘어 있습니다.
 
 주요 파일:
 
-- `residual/config.py`: YAML/TOML을 typed config로 정규화
-- `residual/adapters.py`: `fit_df`, `futr_df`, `static_df`, `channel_map` 생성
-- `residual/models.py`: 모델 capability 검증 및 공통 설정 적용
-- `residual/manifest.py`: manifest / provenance 기록
-- `residual/scheduler.py`: GPU lane 계획 및 subprocess worker 실행
-- `residual/runtime.py`: 전체 실행 진입점
+- `app_config.py`: YAML/TOML을 typed config로 정규화
+- `runtime_support/adapters.py`: `fit_df`, `futr_df`, `static_df`, `channel_map` 생성
+- `runtime_support/forecast_models.py` / `plugins/residual/registry.py`: 모델 capability 검증 및 residual backend 선택
+- `runtime_support/manifest.py`: manifest / provenance 기록
+- `runtime_support/scheduler.py`: GPU lane 계획 및 subprocess worker 실행
+- `runtime_support/runner.py`: 전체 실행 진입점
 
 현재 residual 평가는 별도 holdout 없이 **config-driven TSCV fold**만 사용합니다.
 
@@ -486,13 +381,13 @@ manifest에 기록되는 대표 항목:
 
 핵심 수정 지점:
 
-1. `residual/plugins/<new_model>.py`
+1. `plugins/residual/backends/<new_model>.py`
    - 새 `ResidualPlugin` 구현 추가
-2. `residual/plugins/__init__.py`
+2. `plugins/residual/backends/__init__.py`
    - 새 플러그인 export
-3. `residual/registry.py`
+3. `plugins/residual/registry.py`
    - `config.residual.model` 값에 따라 플러그인 선택
-4. `residual/config.py`
+4. `app_config.py`
    - `SUPPORTED_RESIDUAL_MODELS`에 새 이름 추가
 
 설정 예시:
@@ -515,7 +410,7 @@ from typing import Any
 
 import pandas as pd
 
-from residual.plugins_base import ResidualContext, ResidualPlugin
+from plugins.residual.base import ResidualContext, ResidualPlugin
 
 
 @dataclass(frozen=True)
@@ -620,7 +515,7 @@ uv run python main.py --config yaml/experiment/feature_set/brentoil-case1.yaml
 - 설정 중심: 명시적 `--config` / `--config-path` / `--config-toml`
 - 공통 loss: `training.loss = mse`
 - CV 방식: **expanding-window TS-CV**
-- residual 관리 중심: `residual/`
+- residual plugin 관리 중심: `plugins/residual/`
 - multi-job 실행: scheduler가 GPU lane 분배
 - 각 worker는 `devices=1`만 사용
 

@@ -5,7 +5,7 @@ from typing import Any, Iterable
 
 import pandas as pd
 
-from residual.config import JobConfig, LoadedConfig
+from app_config import JobConfig, LoadedConfig
 
 
 class DefaultBsPreforcastPlugin:

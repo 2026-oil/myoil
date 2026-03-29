@@ -69,7 +69,7 @@ def _run_cli(
     *,
     repo_root: Path | None = None,
 ) -> int:
-    from residual import runtime as runtime_module
+    import runtime_support.runner as runtime_module
 
     parser = build_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from residual import runtime
+import runtime_support.runner as runtime
 
 
 def _write_yaml(path: Path, payload: dict) -> Path:

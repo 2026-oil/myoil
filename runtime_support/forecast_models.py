@@ -50,6 +50,7 @@ from neuralforecast.models import (
     xLSTM,
 )
 from neuralforecast.models.cmamba import CMamba
+from neuralforecast.models.bs_preforcast_catalog import DIRECT_STAGE_MODEL_NAMES
 from neuralforecast.models.mamba import Mamba
 from neuralforecast.models.smamba import SMamba
 from neuralforecast.models.xlstm_mixer import xLSTMMixer
@@ -61,7 +62,10 @@ except ImportError:  # pragma: no cover
     DummyMultivariate = DummyUnivariate = None
 
 from app_config import AppConfig, JobConfig, TrainingLossParams
-from residual.optuna_spaces import BASELINE_MODEL_NAMES, SUPPORTED_AUTO_MODEL_NAMES
+from tuning.search_space import (
+    BASELINE_MODEL_NAMES,
+    SUPPORTED_MODEL_AUTO_MODEL_NAMES,
+)
 
 
 @dataclass(frozen=True)
@@ -141,6 +145,8 @@ def resolve_loss(
 def capabilities_for(model_name: str) -> ModelCapabilities:
     if model_name in BASELINE_MODEL_NAMES:
         return ModelCapabilities(model_name, False, False, False, False, False)
+    if model_name in DIRECT_STAGE_MODEL_NAMES:
+        return ModelCapabilities(model_name, False, False, False, False, False)
     model_cls = MODEL_CLASSES[model_name]
     return ModelCapabilities(
         name=model_name,
@@ -153,7 +159,11 @@ def capabilities_for(model_name: str) -> ModelCapabilities:
 
 
 def validate_job(job: JobConfig) -> ModelCapabilities:
-    if job.model not in MODEL_CLASSES and job.model not in BASELINE_MODEL_NAMES:
+    if (
+        job.model not in MODEL_CLASSES
+        and job.model not in BASELINE_MODEL_NAMES
+        and job.model not in DIRECT_STAGE_MODEL_NAMES
+    ):
         raise ValueError(f"Unsupported model: {job.model}")
     return capabilities_for(job.model)
 
@@ -204,6 +214,10 @@ def build_model(
         raise ValueError(
             f"{job.model} is a baseline model and is not built via neuralforecast model constructors"
         )
+    if job.model in DIRECT_STAGE_MODEL_NAMES:
+        raise ValueError(
+            f"{job.model} is a direct top-level model and must run via the dedicated direct runtime path"
+        )
     model_cls = MODEL_CLASSES[job.model]
 
     def _configured_exog_list(
@@ -221,7 +235,6 @@ def build_model(
         "h": config.cv.horizon,
         "input_size": config.training.input_size,
         "max_steps": config.training.max_steps,
-        "max_lr": config.training.lr_scheduler.max_lr,
         "scaler_type": config.training.scaler_type,
         "step_size": config.training.model_step_size,
         "val_check_steps": config.training.val_check_steps,
@@ -232,17 +245,6 @@ def build_model(
         "inference_windows_batch_size": config.training.inference_windows_batch_size,
         "optimizer": optimizer_resolution.optimizer_cls,
         "optimizer_kwargs": optimizer_resolution.kwargs,
-        "lr_scheduler": torch.optim.lr_scheduler.OneCycleLR,
-        "lr_scheduler_kwargs": {
-            "max_lr": config.training.lr_scheduler.max_lr,
-            "total_steps": config.training.max_steps,
-            "pct_start": config.training.lr_scheduler.pct_start,
-            "div_factor": config.training.lr_scheduler.div_factor,
-            "final_div_factor": config.training.lr_scheduler.final_div_factor,
-            "anneal_strategy": config.training.lr_scheduler.anneal_strategy,
-            "three_phase": config.training.lr_scheduler.three_phase,
-            "cycle_momentum": config.training.lr_scheduler.cycle_momentum,
-        },
         "random_seed": config.runtime.random_seed,
         "alias": job.model,
         "enable_checkpointing": False,
@@ -280,6 +282,28 @@ def build_model(
     if caps.requires_n_series:
         shared_kwargs["n_series"] = 1 if n_series is None else n_series
     signature = inspect.signature(model_cls.__init__)
+    scheduler_kwargs = {
+        "max_lr": config.training.lr_scheduler.max_lr,
+        "total_steps": config.training.max_steps,
+        "pct_start": config.training.lr_scheduler.pct_start,
+        "div_factor": config.training.lr_scheduler.div_factor,
+        "final_div_factor": config.training.lr_scheduler.final_div_factor,
+        "anneal_strategy": config.training.lr_scheduler.anneal_strategy,
+        "three_phase": config.training.lr_scheduler.three_phase,
+        "cycle_momentum": config.training.lr_scheduler.cycle_momentum,
+    }
+    if "max_lr" in signature.parameters:
+        shared_kwargs["max_lr"] = config.training.lr_scheduler.max_lr
+    else:
+        shared_kwargs["_max_lr"] = config.training.lr_scheduler.max_lr
+    if "lr_scheduler" in signature.parameters:
+        shared_kwargs["lr_scheduler"] = torch.optim.lr_scheduler.OneCycleLR
+    else:
+        shared_kwargs["_lr_scheduler_cls"] = torch.optim.lr_scheduler.OneCycleLR
+    if "lr_scheduler_kwargs" in signature.parameters:
+        shared_kwargs["lr_scheduler_kwargs"] = scheduler_kwargs
+    else:
+        shared_kwargs["_lr_scheduler_kwargs"] = scheduler_kwargs
     accepts_var_kwargs = any(
         p.kind == inspect.Parameter.VAR_KEYWORD
         for p in signature.parameters.values()
@@ -288,8 +312,15 @@ def build_model(
     for key, value in {**shared_kwargs, **job.params, **(params_override or {})}.items():
         if key in signature.parameters or accepts_var_kwargs:
             accepted[key] = value
-    return model_cls(**accepted)
+    model = model_cls(**accepted)
+    if hasattr(model, "hparams"):
+        model.hparams["max_lr"] = config.training.lr_scheduler.max_lr
+    return model
 
 
 def supports_auto_mode(model_name: str) -> bool:
-    return model_name in SUPPORTED_AUTO_MODEL_NAMES
+    return model_name in SUPPORTED_MODEL_AUTO_MODEL_NAMES
+
+
+def is_direct_top_level_model(model_name: str) -> bool:
+    return model_name in DIRECT_STAGE_MODEL_NAMES

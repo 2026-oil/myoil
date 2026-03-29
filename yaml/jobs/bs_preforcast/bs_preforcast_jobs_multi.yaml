@@ -1,4 +1,29 @@
-- multi/timexer.yaml
-- multi/tsmixerx.yaml
-- multi/itransformer.yaml
-- multi/lstm.yaml
+- model: iTransformer
+  params:
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 2
+    d_ff: 192
+    dropout: 0.0
+- model: LSTM
+  params:
+    encoder_hidden_size: 64
+    decoder_hidden_size: 64
+    encoder_n_layers: 4
+    context_size: 8
+- model: TimeXer
+  params:
+    patch_len: 8
+    hidden_size: 768
+    n_heads: 16
+    e_layers: 4
+    d_ff: 1024
+    factor: 4
+    dropout: 0.15
+    use_norm: true
+- model: TSMixerx
+  params:
+    n_block: 3
+    ff_dim: 64
+    dropout: 0.05
+    revin: true

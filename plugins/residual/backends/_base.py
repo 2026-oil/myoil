@@ -7,8 +7,11 @@ from typing import Any
 
 import pandas as pd
 
-from residual.features import FlatResidualFeatureConfig, build_residual_feature_frame
-from residual.plugins_base import ResidualContext, ResidualPlugin
+from plugins.residual.base import ResidualContext, ResidualPlugin
+from plugins.residual.features import (
+    FlatResidualFeatureConfig,
+    build_residual_feature_frame,
+)
 
 
 class BaseResidualPlugin(ResidualPlugin):

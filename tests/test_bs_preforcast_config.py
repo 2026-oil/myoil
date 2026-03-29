@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-import residual.config as residual_config
+import app_config as residual_config
 from plugins.bs_preforcast.config import BsPreforcastConfig, BsPreforcastStageLoadedConfig
-from residual.config import load_app_config
+from app_config import load_app_config
 
 
 def _base_payload(data_path: Path) -> dict[str, object]:
@@ -156,28 +156,18 @@ def test_load_app_config_builds_stage_jobs_fanout_specs_from_uni_catalog(
 
     loaded = load_app_config(repo_root, config_path=config_path)
 
-    assert [spec.route_slug for spec in loaded.jobs_fanout_specs] == [
-        "xgboost",
-        "lightgbm",
-        "lstm",
-        "patchtst",
-        "dlinear",
-        "nhits",
-        "es",
-        "arima",
-    ]
-    assert [spec.stage_jobs_reference for spec in loaded.jobs_fanout_specs] == [
-        "yaml/jobs/bs_preforcast/uni/xgboost.yaml",
-        "yaml/jobs/bs_preforcast/uni/lightgbm.yaml",
-        "yaml/jobs/bs_preforcast/uni/lstm.yaml",
-        "yaml/jobs/bs_preforcast/uni/patchtst.yaml",
-        "yaml/jobs/bs_preforcast/uni/dlinear.yaml",
-        "yaml/jobs/bs_preforcast/uni/nhits.yaml",
-        "yaml/jobs/bs_preforcast/uni/es.yaml",
-        "yaml/jobs/bs_preforcast/uni/arima.yaml",
-    ]
+    assert loaded.jobs_fanout_specs == ()
     assert [job.model for job in loaded.config.jobs] == ["Naive"]
-    assert [job.model for job in loaded.stage_plugin_loaded.config.jobs] == ["xgboost"]
+    assert [job.model for job in loaded.stage_plugin_loaded.config.jobs] == [
+        "ARIMA",
+        "DLinear",
+        "ES",
+        "lightgbm",
+        "LSTM",
+        "NHITS",
+        "PatchTST",
+        "xgboost",
+    ]
     assert loaded.stage_plugin_loaded is not None
     assert loaded.stage_plugin_loaded.source_path == (
         repo_root / "yaml" / "plugins" / "bs_preforcast_uni.yaml"
@@ -215,20 +205,14 @@ def test_load_app_config_builds_stage_jobs_fanout_specs_from_multi_catalog(
 
     loaded = load_app_config(repo_root, config_path=config_path)
 
-    assert [spec.route_slug for spec in loaded.jobs_fanout_specs] == [
-        "timexer",
-        "tsmixerx",
-        "itransformer",
-        "lstm",
-    ]
-    assert [spec.stage_jobs_reference for spec in loaded.jobs_fanout_specs] == [
-        "yaml/jobs/bs_preforcast/multi/timexer.yaml",
-        "yaml/jobs/bs_preforcast/multi/tsmixerx.yaml",
-        "yaml/jobs/bs_preforcast/multi/itransformer.yaml",
-        "yaml/jobs/bs_preforcast/multi/lstm.yaml",
-    ]
+    assert loaded.jobs_fanout_specs == ()
     assert [job.model for job in loaded.config.jobs] == ["Naive"]
-    assert [job.model for job in loaded.stage_plugin_loaded.config.jobs] == ["TimeXer"]
+    assert [job.model for job in loaded.stage_plugin_loaded.config.jobs] == [
+        "iTransformer",
+        "LSTM",
+        "TimeXer",
+        "TSMixerx",
+    ]
     assert loaded.stage_plugin_loaded is not None
     assert loaded.stage_plugin_loaded.source_path == (
         repo_root / "yaml" / "plugins" / "bs_preforcast_multi.yaml"

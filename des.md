@@ -17,7 +17,7 @@ uv run python main.py --config baseline-wti.yaml
 실제로는 아래처럼 동작한다.
 
 1. `main.py`가 먼저 `.venv` 파이썬으로 재실행(re-exec)한다.
-2. `residual.runtime.main()`으로 진입한다.
+2. `runtime_support.runner.main()`으로 진입한다.
 3. `baseline-wti.yaml`을 읽고 `yaml/HPO/search_space.yaml`도 함께 읽는다.
 4. `task.name=baseline_wti`를 기준으로 기본 출력 경로를 `runs/baseline_wti`로 잡는다.
 5. 전체 job 23개를 정규화한다.
@@ -115,13 +115,13 @@ uv run python main.py --config baseline-wti.yaml
 
 의도는 다음과 같다.
 - 로컬 패키지 import 보장
-- `residual.*`, `neuralforecast.*` import 안정화
+- `runtime_support.*`, `plugins.residual.*`, `neuralforecast.*` import 안정화
 
 ### 4-3. 실제 진입점 전환
 그 뒤 실제 로직은 다음으로 넘어간다.
 
 ```python
-from residual.runtime import main as residual_main
+from runtime_support.runner import main as residual_main
 return residual_main(args)
 ```
 
@@ -129,7 +129,7 @@ return residual_main(args)
 
 ---
 
-## 5. CLI 파싱: `residual.runtime.main()`
+## 5. CLI 파싱: `runtime_support.runner.main()`
 
 런타임은 아래 인자를 받는다.
 
@@ -757,7 +757,7 @@ main.py
   ↓
 필요 시 .venv/bin/python 으로 re-exec
   ↓
-residual.runtime.main()
+runtime_support.runner.main()
   ↓
 baseline-wti.yaml 로드
   ↓
@@ -814,13 +814,14 @@ worker별 main.py --jobs <MODEL> 재호출
 
 ### 코드
 - `main.py`
-- `residual/config.py`
-- `residual/runtime.py`
-- `residual/scheduler.py`
-- `residual/models.py`
-- `residual/adapters.py`
-- `residual/manifest.py`
-- `residual/optuna_spaces.py`
+- `app_config.py`
+- `runtime_support/runner.py`
+- `runtime_support/scheduler.py`
+- `runtime_support/forecast_models.py`
+- `plugins/residual/registry.py`
+- `runtime_support/adapters.py`
+- `runtime_support/manifest.py`
+- `tuning/search_space.py`
 
 ### 현재 확인한 런타임 아티팩트
 - `runs/baseline_wti/manifest/run_manifest.json`

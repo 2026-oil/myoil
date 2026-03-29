@@ -11,10 +11,7 @@ from typing import Any, Literal
 import optuna
 import yaml
 
-from plugins.bs_preforcast.search_space import (
-    BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY,
-    SUPPORTED_BS_PREFORCAST_MODELS,
-)
+from neuralforecast.models.bs_preforcast_catalog import DIRECT_STAGE_MODEL_NAMES
 
 SEARCH_SPACE_FILENAME = "yaml/HPO/search_space.yaml"
 BASELINE_MODEL_NAMES = {"Naive", "SeasonalNaive", "HistoricAverage"}
@@ -65,6 +62,10 @@ SUPPORTED_AUTO_MODEL_NAMES = {
     "RMoK",
     "XLinear",
 }
+SUPPORTED_TOP_LEVEL_DIRECT_MODEL_NAMES = set(DIRECT_STAGE_MODEL_NAMES)
+SUPPORTED_MODEL_AUTO_MODEL_NAMES = (
+    SUPPORTED_AUTO_MODEL_NAMES | SUPPORTED_TOP_LEVEL_DIRECT_MODEL_NAMES
+)
 SUPPORTED_RESIDUAL_MODELS = {"xgboost", "randomforest", "lightgbm"}
 DEFAULT_OPTUNA_NUM_TRIALS = 20
 DEFAULT_OPTUNA_STUDY_DIRECTION = "minimize"
@@ -419,7 +420,9 @@ def _normalize_model_section(
         )
         for model_name, model_specs in payload.items()
     }
-    supported = SUPPORTED_AUTO_MODEL_NAMES if allowed_models is None else allowed_models
+    supported = (
+        SUPPORTED_MODEL_AUTO_MODEL_NAMES if allowed_models is None else allowed_models
+    )
     unknown_models = sorted(set(models).difference(supported))
     if unknown_models:
         raise ValueError(

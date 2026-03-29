@@ -7,7 +7,7 @@ from plugins.bs_preforcast.search_space import (
     SUPPORTED_BS_PREFORCAST_MODELS,
     normalize_bs_preforcast_sections,
 )
-from residual.optuna_spaces import (
+from tuning.search_space import (
     BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY as LEGACY_STAGE_ONLY_PARAM_REGISTRY,
     SUPPORTED_BS_PREFORCAST_MODELS as LEGACY_SUPPORTED_BS_PREFORCAST_MODELS,
 )

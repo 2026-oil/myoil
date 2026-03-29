@@ -6,19 +6,19 @@ It is intentionally evidence-first so lane integration can compare the merged ru
 ## Current code evidence
 
 ### Config surface is not wired yet
-- `residual/config.py:87-90` — `RuntimeConfig` currently exposes only `random_seed` and `opt_n_trial`.
-- `residual/config.py:737-769` — `_normalize_payload()` reads `runtime` but only validates `opt_n_trial`; there is no `runtime.transformations` validation or unset-omission path.
-- `residual/config.py:994-1008` — `load_app_config()` hashes `config.to_dict()` directly, so omission stability for `runtime.transformations` is not yet implemented.
+- `app_config.py:87-90` — `RuntimeConfig` currently exposes only `random_seed` and `opt_n_trial`.
+- `app_config.py:737-769` — `_normalize_payload()` reads `runtime` but only validates `opt_n_trial`; there is no `runtime.transformations` validation or unset-omission path.
+- `app_config.py:994-1008` — `load_app_config()` hashes `config.to_dict()` directly, so omission stability for `runtime.transformations` is not yet implemented.
 
 ### Runtime still operates on raw targets end-to-end
-- `residual/runtime.py:442-477` — `_fit_and_predict_fold()` trains and predicts from raw `train_df` / `future_df` with no fold-local diff transform or inverse reconstruction.
-- `residual/runtime.py:1324-1361` — `_baseline_cross_validation()` predicts directly from the raw history (`history.iloc[-1]`, seasonal tail, or mean), so baseline diff-space forecasting is not present.
-- `residual/runtime.py:595-714` — `_tune_main_job()` scores Optuna trials directly on raw predictions from `_fit_and_predict_fold()`.
-- `residual/runtime.py:841-852` and `residual/adapters.py:71-117` — multivariate input building still forwards raw target and exogenous channels together; target-only differencing is not wired.
+- `runtime_support/runner.py:442-477` — `_fit_and_predict_fold()` trains and predicts from raw `train_df` / `future_df` with no fold-local diff transform or inverse reconstruction.
+- `runtime_support/runner.py:1324-1361` — `_baseline_cross_validation()` predicts directly from the raw history (`history.iloc[-1]`, seasonal tail, or mean), so baseline diff-space forecasting is not present.
+- `runtime_support/runner.py:595-714` — `_tune_main_job()` scores Optuna trials directly on raw predictions from `_fit_and_predict_fold()`.
+- `runtime_support/runner.py:841-852` and `runtime_support/adapters.py:71-117` — multivariate input building still forwards raw target and exogenous channels together; target-only differencing is not wired.
 
 ### Residual path is currently isolated from transformation logic
-- `residual/runtime.py:997-1128` — `_build_fold_eval_panel()` / `_build_fold_backcast_panel()` derive residual panels from raw `y` and `y_hat_base` values.
-- `residual/runtime.py:1724-1824` — `_apply_residual_plugin()` persists corrected residual artifacts from those raw-scale panels.
+- `runtime_support/runner.py:997-1128` — `_build_fold_eval_panel()` / `_build_fold_backcast_panel()` derive residual panels from raw `y` and `y_hat_base` values.
+- `runtime_support/runner.py:1724-1824` — `_apply_residual_plugin()` persists corrected residual artifacts from those raw-scale panels.
 
 ## Existing review evidence already present
 
@@ -48,7 +48,7 @@ It is intentionally evidence-first so lane integration can compare the merged ru
 Run these checks after lane 1/2/3 changes are merged:
 
 ```bash
-uvx ruff check residual/config.py residual/runtime.py tests/test_residual_config.py
+uvx ruff check app_config.py runtime_support/runner.py tests/test_residual_config.py
 uv run pytest tests/test_residual_config.py::test_summary_builder_writes_leaderboard_and_last_fold_plots
 uv run pytest tests/test_residual_config.py::test_runtime_generates_per_fold_residual_artifacts_with_dummy_model
 uv run pytest tests/test_residual_config.py::test_runtime_skips_residual_artifacts_for_baseline_models
@@ -62,7 +62,7 @@ Then add the planned `runtime.transformations`-specific selectors from the ralpl
 
 
 ## Verification snapshot (2026-03-22)
-- `uvx ruff check residual/config.py residual/runtime.py tests/test_residual_config.py` → PASS
+- `uvx ruff check app_config.py runtime_support/runner.py tests/test_residual_config.py` → PASS
 - `uv run pytest tests/test_residual_config.py::test_summary_builder_writes_leaderboard_and_last_fold_plots` → PASS functionally, but default repo coverage gate fails on single-test invocation (`total 19% < fail-under=80`)
 - `uv run pytest --no-cov tests/test_residual_config.py::test_summary_builder_writes_leaderboard_and_last_fold_plots` → PASS
 - `uv run pytest --no-cov tests/test_residual_config.py::test_runtime_generates_per_fold_residual_artifacts_with_dummy_model` → PASS

@@ -11,8 +11,8 @@ from app_config import (
     DEFAULT_MANIFEST_VERSION,
     LoadedConfig,
 )
-from runtime_support.features import hist_exog_lag_feature_name
 from plugin_contracts.stage_registry import get_active_stage_plugin
+from plugins.residual.features import hist_exog_lag_feature_name
 
 
 def _coerce_mapping(value: Any) -> dict[str, Any]:

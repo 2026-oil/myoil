@@ -3751,6 +3751,56 @@ def test_load_app_config_marks_auto_requested_and_validated_modes(tmp_path: Path
     assert loaded.normalized_payload["search_space_sha256"]
 
 
+@pytest.mark.parametrize(
+    ("model_name", "selectors"),
+    (
+        ("ARIMA", ["order", "include_mean", "include_drift"]),
+        ("ES", ["trend", "damped_trend"]),
+        ("xgboost", ["lags", "n_estimators", "max_depth"]),
+        (
+            "lightgbm",
+            [
+                "lags",
+                "n_estimators",
+                "max_depth",
+                "num_leaves",
+                "min_child_samples",
+                "feature_fraction",
+            ],
+        ),
+    ),
+)
+def test_load_app_config_direct_auto_models_keep_training_search_fixed(
+    tmp_path: Path, model_name: str, selectors: list[str]
+):
+    payload = _payload()
+    payload["jobs"] = [{"model": model_name, "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {model_name: selectors},
+            "training": ["input_size", "model_step_size"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    job = loaded.config.jobs[0]
+    assert job.requested_mode == "learned_auto_requested"
+    assert job.validated_mode == "learned_auto"
+    assert list(job.selected_search_params) == selectors
+    assert loaded.config.training_search.requested_mode == "training_fixed"
+    assert loaded.config.training_search.validated_mode == "training_fixed"
+    assert list(loaded.config.training_search.selected_search_params) == []
+
+
 def test_load_app_config_normalizes_bs_preforcast_selection(tmp_path: Path):
     payload = _payload()
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
@@ -4567,6 +4617,153 @@ def test_runtime_validate_only_records_bs_preforcast_metadata(
     assert (output_root / "bs_preforcast" / "artifacts" / "bs_preforcast_forecasts.csv").exists()
     assert resolved["bs_preforcast"]["job_injection_results"] == [{"model": "DummyUnivariate", "injection_mode": "futr_exog", "supports_futr_exog": True}]
     assert manifest["bs_preforcast"]["job_injection_results"] == [{"model": "DummyUnivariate", "injection_mode": "futr_exog", "supports_futr_exog": True}]
+
+@pytest.mark.parametrize(
+    ("model_name", "params"),
+    (
+        ("ARIMA", {"order": [1, 1, 0], "include_mean": True, "include_drift": False}),
+        ("ES", {"trend": "add", "damped_trend": False}),
+        ("xgboost", {"lags": [1, 2, 3], "n_estimators": 16, "max_depth": 2}),
+        (
+            "lightgbm",
+            {
+                "lags": [1, 2, 3],
+                "n_estimators": 32,
+                "max_depth": 4,
+                "num_leaves": 15,
+                "min_child_samples": 10,
+            },
+        ),
+    ),
+)
+def test_runtime_validate_only_accepts_top_level_direct_models(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    model_name: str,
+    params: dict[str, Any],
+):
+    payload = _payload()
+    payload["jobs"] = [{"model": model_name, "params": params}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    import runtime_support.runner as runtime
+
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    output_root = tmp_path / f"run_validate_{model_name}"
+    assert (
+        runtime.main(
+            [
+                "--config",
+                str(config_path),
+                "--jobs",
+                model_name,
+                "--output-root",
+                str(output_root),
+                "--validate-only",
+            ]
+        )
+        == 0
+    )
+    capability = json.loads(
+        (output_root / "config" / "capability_report.json").read_text()
+    )
+    assert capability[model_name]["validation_error"] is None
+    assert capability[model_name]["supports_auto"] is True
+
+
+@pytest.mark.parametrize(
+    ("model_name", "params"),
+    (
+        ("ARIMA", {"order": [1, 1, 0], "include_mean": True, "include_drift": False}),
+        ("xgboost", {"lags": [1, 2, 3], "n_estimators": 16, "max_depth": 2}),
+    ),
+)
+def test_runtime_executes_top_level_direct_models_without_loss_curves(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    model_name: str,
+    params: dict[str, Any],
+):
+    payload = _payload()
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
+    payload["training"].update({"input_size": 3, "max_steps": 1, "val_size": 1})
+    payload["jobs"] = [{"model": model_name, "params": params}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n"
+        "2020-01-01,1,2\n"
+        "2020-01-08,2,3\n"
+        "2020-01-15,3,4\n"
+        "2020-01-22,4,5\n"
+        "2020-01-29,5,6\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    import runtime_support.runner as runtime
+
+    def _fake_predict(_stage_loaded, _job, *, target_column, train_df, future_df):
+        return [float(train_df[target_column].iloc[-1])] * len(future_df)
+
+    monkeypatch.setattr(runtime, "predict_univariate_direct", _fake_predict)
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    output_root = tmp_path / f"run_direct_{model_name}"
+    assert (
+        runtime.main(
+            [
+                "--config",
+                str(config_path),
+                "--jobs",
+                model_name,
+                "--output-root",
+                str(output_root),
+            ]
+        )
+        == 0
+    )
+    assert (output_root / "cv" / f"{model_name}_forecasts.csv").exists()
+    assert (output_root / "cv" / f"{model_name}_metrics_by_cutoff.csv").exists()
+    assert not any((output_root / "models" / model_name).rglob("loss_curve.png"))
+
+
+def test_runtime_validate_only_rejects_residual_enabled_top_level_direct_models(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    payload = _payload()
+    payload["jobs"] = [{"model": "ARIMA", "params": {"order": [1, 1, 0]}}]
+    payload["residual"] = {
+        "enabled": True,
+        "model": "xgboost",
+        "params": {"n_estimators": 8, "max_depth": 2},
+    }
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    import runtime_support.runner as runtime
+
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    output_root = tmp_path / "run_validate_direct_residual"
+    with pytest.raises(
+        ValueError,
+        match="Top-level direct models do not yet support residual-enabled runs",
+    ):
+        runtime.main(
+            [
+                "--config",
+                str(config_path),
+                "--jobs",
+                "ARIMA",
+                "--output-root",
+                str(output_root),
+                "--validate-only",
+            ]
+        )
+
 
 def test_runtime_validate_only_records_mixed_job_injection_results(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -6089,7 +6286,7 @@ def test_supported_auto_model_matrix_matches_registry_and_yaml():
     }
     model_auto_registry_models = set(MODEL_PARAM_REGISTRY)
     expected_model_auto_models = set(EXPECTED_REPO_AUTO_MODELS)
-    expected_training_auto_models = set(SUPPORTED_AUTO_MODEL_NAMES)
+    expected_training_auto_models = set(EXPECTED_REPO_TRAINING_AUTO_MODELS)
     assert "HINT" not in SUPPORTED_AUTO_MODEL_NAMES
     assert SUPPORTED_AUTO_MODEL_NAMES == learned_model_classes
     assert set(SUPPORTED_TOP_LEVEL_DIRECT_MODEL_NAMES) == set(EXPECTED_TOP_LEVEL_DIRECT_MODELS)
@@ -6098,14 +6295,14 @@ def test_supported_auto_model_matrix_matches_registry_and_yaml():
     )
     assert model_auto_registry_models == expected_model_auto_models
     assert set(search_space["models"]) == expected_model_auto_models
-    assert set(TRAINING_PARAM_REGISTRY_BY_MODEL) == expected_training_auto_models
+    assert set(TRAINING_PARAM_REGISTRY_BY_MODEL) == set(SUPPORTED_AUTO_MODEL_NAMES)
     assert set(search_space["training"]["per_model"]) == expected_training_auto_models
     assert all(
         set(TRAINING_PARAM_REGISTRY_BY_MODEL[model_name])
         == set(search_space["training"]["per_model"][model_name])
         == set(TRAINING_PARAM_REGISTRY)
         == set(search_space["training"]["global"])
-        for model_name in SUPPORTED_AUTO_MODEL_NAMES
+        for model_name in EXPECTED_REPO_TRAINING_AUTO_MODELS
     )
     assert tuple(search_space["training"]["global"]) == tuple(TRAINING_PARAM_REGISTRY)
     assert set(search_space["residual"]) == {"xgboost", "randomforest", "lightgbm"}

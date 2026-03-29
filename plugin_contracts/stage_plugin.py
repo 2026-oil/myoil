@@ -1,8 +1,8 @@
 """Generic stage-plugin protocol for pre-main-stage execution pipelines.
 
-residual/ has zero knowledge of any concrete stage plugin (e.g. bs_preforcast).
+The runtime has zero knowledge of any concrete stage plugin (e.g. bs_preforcast).
 All stage-specific behaviour is provided through this protocol and dispatched
-via :mod:`residual.stage_registry`.
+via :mod:`plugin_contracts.stage_registry`.
 """
 from __future__ import annotations
 

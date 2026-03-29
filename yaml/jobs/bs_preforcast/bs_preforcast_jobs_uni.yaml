@@ -1,8 +1,41 @@
-- uni/xgboost.yaml
-- uni/lightgbm.yaml
-- uni/lstm.yaml
-- uni/patchtst.yaml
-- uni/dlinear.yaml
-- uni/nhits.yaml
-- uni/es.yaml
-- uni/arima.yaml
+- model: ARIMA
+  params:
+    order: [1, 1, 0]
+    include_mean: true
+    include_drift: false
+- model: DLinear
+  params:
+    moving_avg_window: 3
+- model: ES
+  params:
+    trend: add
+    damped_trend: false
+- model: lightgbm
+  params:
+    lags: [1, 2, 3, 6, 12]
+    n_estimators: 96
+    max_depth: 6
+    num_leaves: 31
+    min_child_samples: 20
+- model: LSTM
+  params:
+    encoder_hidden_size: 64
+    decoder_hidden_size: 64
+    encoder_n_layers: 4
+    context_size: 8
+- model: NHITS
+  params:
+    mlp_units: [[32, 32], [32, 32], [32, 32]]
+- model: PatchTST
+  params:
+    hidden_size: 16
+    n_heads: 4
+    encoder_layers: 2
+    patch_len: 4
+- model: xgboost
+  params:
+    lags: [1, 2, 3, 6, 12]
+    n_estimators: 64
+    max_depth: 4
+    subsample: 1.0
+    colsample_bytree: 1.0

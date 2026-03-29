@@ -3,22 +3,17 @@ from __future__ import annotations
 from dataclasses import asdict, is_dataclass
 from typing import Any
 
-from tuning.search_space import DEFAULT_RESIDUAL_PARAMS_BY_MODEL
-from residual.plugins_base import (
-    PluginDefinition,
-    PluginRegistry,
-    ResidualPlugin,
-)
-
+from plugins.residual.base import PluginDefinition, PluginRegistry, ResidualPlugin
 from plugins.residual.backends import (
     LightGBMResidualPlugin,
     RandomForestResidualPlugin,
     XGBoostResidualPlugin,
 )
+from tuning.search_space import DEFAULT_RESIDUAL_PARAMS_BY_MODEL
 
 BACKEND_PLUGIN_CATEGORY = "backend"
 PLUGIN_EXTENSION_RULES = (
-    "Add residual backends under residual/models/backends/ and register them here.",
+    "Add residual backends under plugins/residual/backends/ and register them here.",
     "Residual registry is backend-only; bs_preforcast has its own top-level registry.",
 )
 

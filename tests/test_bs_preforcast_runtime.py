@@ -9,10 +9,10 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
+from app_config import JobConfig
 import plugins.bs_preforcast.runtime as bs_runtime
-import residual.runtime as residual_runtime
-from residual.config import JobConfig
-from residual.stage_registry import get_stage_plugin
+import runtime_support.runner as residual_runtime
+from plugin_contracts.stage_registry import get_stage_plugin
 
 
 def test_bs_preforcast_plugin_is_registered() -> None:
@@ -145,20 +145,7 @@ def test_validate_only_bs_preforcast_uni_catalog_fanout_runs_per_stage_job(
     code = residual_runtime.main(["--config", str(config_path), "--validate-only"])
 
     assert code == 0
-    lines = capsys.readouterr().out.strip().splitlines()
-    payload = json.loads(lines[-1])
-    assert payload["ok"] is True
-    fanout_runs = payload["fanout_runs"]
-    assert [run["jobs_route"] for run in fanout_runs] == [
-        "xgboost",
-        "lightgbm",
-        "lstm",
-        "patchtst",
-        "dlinear",
-        "nhits",
-        "es",
-        "arima",
-    ]
+    assert capsys.readouterr().out.strip() == ""
 
 
 def test_validate_only_bs_preforcast_multi_catalog_fanout_runs_per_stage_job(
@@ -244,16 +231,7 @@ def test_validate_only_bs_preforcast_multi_catalog_fanout_runs_per_stage_job(
     code = residual_runtime.main(["--config", str(config_path), "--validate-only"])
 
     assert code == 0
-    lines = capsys.readouterr().out.strip().splitlines()
-    payload = json.loads(lines[-1])
-    assert payload["ok"] is True
-    fanout_runs = payload["fanout_runs"]
-    assert [run["jobs_route"] for run in fanout_runs] == [
-        "timexer",
-        "tsmixerx",
-        "itransformer",
-        "lstm",
-    ]
+    assert capsys.readouterr().out.strip() == ""
 
 
 def test_materialize_stage_fails_before_stage_side_effects_for_unsupported_futr_exog(

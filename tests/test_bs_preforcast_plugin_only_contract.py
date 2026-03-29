@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 import yaml
 
-from residual.config import load_app_config
+from app_config import load_app_config
 from plugins.bs_preforcast.runtime import prepare_bs_preforcast_fold_inputs
 
 
@@ -169,7 +169,7 @@ def test_plugin_only_yaml_rejects_learned_auto_and_training_auto(tmp_path: Path)
 def test_metadata_shell_uses_empty_run_roots_and_null_selected_jobs_path(tmp_path: Path) -> None:
     fixture_path = Path("tests/fixtures/bs_preforcast_runtime_smoke.yaml")
     output_root = tmp_path / "validate"
-    from residual import runtime
+    import runtime_support.runner as runtime
 
     code = runtime.main(["--config", str(fixture_path), "--validate-only", "--output-root", str(output_root)])
     assert code == 0

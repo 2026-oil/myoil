@@ -8,8 +8,8 @@ import yaml
 
 _IMPORT_ERROR = None
 try:
-    from residual import runtime
-    from residual.config import load_app_config
+    import runtime_support.runner as runtime
+    from app_config import load_app_config
     from runtime_support.forecast_models import build_model
 except ImportError as exc:  # pragma: no cover - environment-specific branch safety
     runtime = None
@@ -28,7 +28,7 @@ def test_runtime_validate_only_accepts_itransformer_future_exog(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     if _IMPORT_ERROR is not None:
-        if "partially initialized module 'residual.config'" in str(_IMPORT_ERROR):
+        if "partially initialized module 'app_config'" in str(_IMPORT_ERROR):
             pytest.skip(f"unrelated residual import blocker in current branch: {_IMPORT_ERROR}")
         raise _IMPORT_ERROR
 

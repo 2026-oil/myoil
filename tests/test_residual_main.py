@@ -13,7 +13,7 @@ import main as bootstrap_main
 def test_main_loads_config_and_dispatches_without_reexec_and_preserves_pythonpath(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    import residual.runtime as runtime
+    import runtime_support.runner as runtime
 
     calls: dict[str, object] = {}
     workspace_root = str(bootstrap_main.WORKSPACE_ROOT)
@@ -82,7 +82,7 @@ def test_main_requires_explicit_config(
 def test_main_passes_setting_override_to_load_app_config(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import residual.runtime as runtime
+    import runtime_support.runner as runtime
 
     calls: dict[str, object] = {}
     monkeypatch.setenv(bootstrap_main._BOOTSTRAP_ENV, '1')
@@ -126,7 +126,7 @@ def test_main_passes_setting_override_to_load_app_config(
 def test_runtime_main_delegates_back_to_bootstrap_main(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import residual.runtime as runtime
+    import runtime_support.runner as runtime
 
     calls: dict[str, object] = {}
 
@@ -142,13 +142,13 @@ def test_runtime_main_delegates_back_to_bootstrap_main(
     assert calls['kwargs']['repo_root'] == Path(runtime.__file__).resolve().parents[1]
 
 
-def test_residual_shims_expose_bootstrap_owned_contracts() -> None:
+def test_bootstrap_owned_contracts_expose_direct_runtime_modules() -> None:
     import app_config
-    import residual.config as residual_config
-    import residual.stage_plugin as residual_stage_plugin
-    import residual.stage_registry as residual_stage_registry
+    import app_config as residual_config
     from plugin_contracts.stage_plugin import StagePlugin
     from plugin_contracts.stage_registry import get_active_stage_plugin
+    import plugin_contracts.stage_plugin as residual_stage_plugin
+    import plugin_contracts.stage_registry as residual_stage_registry
 
     assert residual_config.load_app_config is app_config.load_app_config
     assert residual_stage_plugin.StagePlugin is StagePlugin

@@ -3,7 +3,7 @@ import yaml
 import neuralforecast.auto as nf_auto
 import neuralforecast.models as nf_models
 from neuralforecast.core import MODEL_FILENAME_DICT
-from residual.models import MODEL_CLASSES, supports_auto_mode
+from runtime_support.forecast_models import MODEL_CLASSES, supports_auto_mode
 
 
 def test_new_model_support_matrix_is_explicit():

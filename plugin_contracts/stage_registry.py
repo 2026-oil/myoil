@@ -1,7 +1,7 @@
-"""Global registry for :class:`~residual.stage_plugin.StagePlugin` instances.
+"""Global registry for :class:`~plugin_contracts.stage_plugin.StagePlugin` instances.
 
 Concrete stage plugins (e.g. ``bs_preforcast``) register themselves at import
-time so that ``residual/`` never references them directly.
+time so that the runtime never references them directly.
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def _ensure_plugins_loaded() -> None:
 
     Called once during config loading so that plugins registered via their
     package ``__init__`` are available without requiring an explicit import
-    at the top of ``residual/``.
+    in the runtime bootstrap path.
     """
     if _STAGE_PLUGINS:
         return

@@ -26,6 +26,7 @@ from tuning.search_space import (
     SearchSpaceContract,
     load_search_space_contract,
     normalize_search_space_payload,
+    SUPPORTED_MODEL_AUTO_MODEL_NAMES,
     SUPPORTED_AUTO_MODEL_NAMES,
     SUPPORTED_RESIDUAL_MODELS,
 )
@@ -1037,7 +1038,7 @@ def _normalize_job(
     supported_auto_models = (
         stage_plugin.supported_models()
         if stage_plugin is not None
-        else SUPPORTED_AUTO_MODEL_NAMES
+        else SUPPORTED_MODEL_AUTO_MODEL_NAMES
     )
     requested_mode = _requested_job_mode(model_name, params)
     validated_mode: Literal["baseline_fixed", "learned_fixed", "learned_auto"]
@@ -1389,7 +1390,11 @@ def _normalize_payload(
                 "Move these settings under training."
             )
     training_selected = ()
-    if any(job.validated_mode == "learned_auto" for job in jobs):
+    if any(
+        job.validated_mode == "learned_auto"
+        and job.model in SUPPORTED_AUTO_MODEL_NAMES
+        for job in jobs
+    ):
         training_search_payload = None
         if search_space is not None:
             training_search_payload = search_space.get(training_search_space_key)

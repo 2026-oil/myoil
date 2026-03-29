@@ -9,16 +9,16 @@ from typing import Any, Iterable
 import pandas as pd
 from neuralforecast import NeuralForecast
 
-from residual.adapters import build_multivariate_inputs, build_univariate_inputs
-from residual.config import JobConfig, LoadedConfig
-from residual.manifest import build_manifest, write_manifest
-from residual.forecast_models import (
+from app_config import JobConfig, LoadedConfig
+from runtime_support.adapters import build_multivariate_inputs, build_univariate_inputs
+from runtime_support.forecast_models import (
     BASELINE_MODEL_NAMES,
     build_model,
     resolved_devices,
     resolved_strategy_name,
     validate_job,
 )
+from runtime_support.manifest import build_manifest, write_manifest
 from neuralforecast.models.bs_preforcast_catalog import is_direct_stage_model
 from neuralforecast.models.bs_preforcast_direct import (
     normalized_direct_job_params,

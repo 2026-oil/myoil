@@ -6,7 +6,7 @@ from .plugins import DefaultBsPreforcastPlugin
 
 PLUGIN_EXTENSION_RULES = (
     "Add bs_preforcast implementations under bs_preforcast/plugins/ and register them here.",
-    "Keep this registry separate from residual.models.registry.",
+    "Keep this registry separate from plugins.residual.",
 )
 
 _PLUGIN_REGISTRY: dict[str, Callable[[], object]] = {
