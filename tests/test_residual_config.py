@@ -4358,6 +4358,26 @@ def test_load_app_config_rejects_invalid_linked_bs_preforcast_owner_keys(tmp_pat
         load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
 
 
+def test_load_app_config_rejects_list_route_for_bs_preforcast_config_path(tmp_path: Path):
+    payload = _payload()
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    payload["bs_preforcast"] = _main_bs_preforcast()
+    payload["bs_preforcast"]["config_path"] = "yaml/jobs/bs_preforcast_jobs_uni.yaml"
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n2020-01-15,3,4\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "yaml").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/jobs/bs_preforcast_jobs_uni.yaml").parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "yaml/jobs/bs_preforcast_jobs_uni.yaml").write_text(
+        yaml.safe_dump(["uni/arima.yaml"], sort_keys=False),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="config_path must resolve to a mapping"):
+        load_app_config(tmp_path, config_path=_write_config(tmp_path, payload, ".yaml"))
+
+
 def test_load_app_config_accepts_training_search_space_section(tmp_path: Path):
     payload = _payload()
     payload["jobs"] = [{"model": "TFT", "params": {}}]

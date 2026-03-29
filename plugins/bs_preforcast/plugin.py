@@ -1,7 +1,7 @@
 """StagePlugin implementation for bs_preforcast.
 
-Registers itself with :mod:`residual.stage_registry` on import so that
-``residual/`` never needs a direct reference to ``bs_preforcast``.
+Registers itself with :mod:`plugin_contracts.stage_registry` on import so that
+the runtime never needs a direct reference to ``bs_preforcast``.
 """
 from __future__ import annotations
 
@@ -19,12 +19,12 @@ from neuralforecast.models.bs_preforcast_catalog import (
 )
 
 if TYPE_CHECKING:
-    from residual.config import AppConfig, LoadedConfig
-    from residual.optuna_spaces import SearchSpaceContract
+    from app_config import AppConfig, LoadedConfig
+    from tuning.search_space import SearchSpaceContract
 
 
 class BsPreforcastStagePlugin:
-    """Concrete :class:`~residual.stage_plugin.StagePlugin` for bs_preforcast."""
+    """Concrete :class:`~plugin_contracts.stage_plugin.StagePlugin` for bs_preforcast."""
 
     # ------------------------------------------------------------------
     # Identity
@@ -84,7 +84,7 @@ class BsPreforcastStagePlugin:
     ) -> dict[str, Any] | None:
         if not self.is_enabled(config):
             return None
-        from residual.config import (
+        from app_config import (
             _resolve_relative_config_reference,
         )
 
@@ -102,6 +102,12 @@ class BsPreforcastStagePlugin:
             "toml" if stage_source_path.suffix.lower() == ".toml" else "yaml"
         )
         stage_raw_payload = load_document(stage_source_path, stage_source_type)
+        if not isinstance(stage_raw_payload, dict):
+            raise ValueError(
+                "bs_preforcast config_path must resolve to a mapping with top-level "
+                "bs_preforcast/jobs keys; got "
+                f"{type(stage_raw_payload).__name__} from {stage_source_path}"
+            )
         if stage_raw_payload.get("bs_preforcast") in (None, {}):
             raise ValueError(
                 "bs_preforcast routed YAML must define a top-level bs_preforcast block"
@@ -358,6 +364,6 @@ class BsPreforcastStagePlugin:
 
 _plugin = BsPreforcastStagePlugin()
 
-from residual.stage_registry import register_stage_plugin  # noqa: E402
+from plugin_contracts.stage_registry import register_stage_plugin  # noqa: E402
 
 register_stage_plugin(_plugin)
