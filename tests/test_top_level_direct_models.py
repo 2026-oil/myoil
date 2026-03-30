@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,7 @@ import yaml
 from app_config import load_app_config
 from neuralforecast.models.bs_preforcast_direct import (
     _resolve_tree_history_metric,
+    _sanitize_structural_warmup_exog_rows,
     predict_univariate_tree,
 )
 from runtime_support.forecast_models import validate_job
@@ -247,10 +249,11 @@ def test_predict_univariate_tree_uses_hist_exog_features(
     captured: dict[str, pd.DataFrame | list[float] | int | list[int] | None] = {}
 
     class _FakeForecasterDirect:
-        def __init__(self, *, regressor, steps, lags):
-            del regressor
+        def __init__(self, *, estimator, steps, lags):
+            del estimator
             self.steps = list(range(1, steps + 1))
             captured["lags"] = lags
+            captured["constructor_param"] = "estimator"
 
         def fit(self, y, exog=None, suppress_warnings=True):
             del suppress_warnings
@@ -301,11 +304,15 @@ def test_predict_univariate_tree_uses_hist_exog_features(
     assert result.predictions == [101.0, 102.0]
     fit_exog = captured["fit_exog"]
     predict_exog = captured["predict_exog"]
+    assert captured["constructor_param"] == "estimator"
     assert isinstance(fit_exog, pd.DataFrame)
     assert isinstance(predict_exog, pd.DataFrame)
     assert fit_exog.columns.tolist() == ["hist_a_lag_1", "hist_a_lag_2"]
     assert predict_exog.columns.tolist() == ["hist_a_lag_1", "hist_a_lag_2"]
-    assert fit_exog.iloc[2:].reset_index(drop=True).to_dict(orient="records") == [
+    assert not fit_exog.isna().any().any()
+    assert fit_exog.to_dict(orient="records") == [
+        {"hist_a_lag_1": 10.0, "hist_a_lag_2": 10.0},
+        {"hist_a_lag_1": 10.0, "hist_a_lag_2": 10.0},
         {"hist_a_lag_1": 20.0, "hist_a_lag_2": 10.0},
         {"hist_a_lag_1": 30.0, "hist_a_lag_2": 20.0},
     ]
@@ -313,6 +320,39 @@ def test_predict_univariate_tree_uses_hist_exog_features(
         {"hist_a_lag_1": 40.0, "hist_a_lag_2": 30.0},
         {"hist_a_lag_1": 50.0, "hist_a_lag_2": 40.0},
     ]
+
+
+def test_tree_warmup_sanitization_preserves_effective_supervised_matrix() -> None:
+    from skforecast.direct import ForecasterDirect
+    from skforecast.exceptions import MissingValuesWarning
+    from sklearn.linear_model import LinearRegression
+
+    series = pd.Series([1.0, 2.0, 3.0, 4.0], dtype=float)
+    raw_exog = pd.DataFrame(
+        {
+            "hist_a_lag_1": [float("nan"), 10.0, 20.0, 30.0],
+            "hist_a_lag_2": [float("nan"), float("nan"), 10.0, 20.0],
+        }
+    )
+    sanitized_exog = _sanitize_structural_warmup_exog_rows(raw_exog, max_lag=2)
+    assert sanitized_exog is not None
+    assert not sanitized_exog.isna().any().any()
+    forecaster = ForecasterDirect(
+        estimator=LinearRegression(),
+        steps=1,
+        lags=[1, 2],
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=MissingValuesWarning)
+        raw_X_train, raw_y_train = forecaster.create_train_X_y(y=series, exog=raw_exog)
+    sanitized_X_train, sanitized_y_train = forecaster.create_train_X_y(
+        y=series,
+        exog=sanitized_exog,
+    )
+    pd.testing.assert_frame_equal(raw_X_train, sanitized_X_train)
+    assert raw_y_train.keys() == sanitized_y_train.keys()
+    for step_key in raw_y_train:
+        pd.testing.assert_series_equal(raw_y_train[step_key], sanitized_y_train[step_key])
 
 
 def test_validate_only_rejects_residual_enabled_top_level_direct_models(tmp_path: Path) -> None:

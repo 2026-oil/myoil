@@ -2236,6 +2236,11 @@ def _format_report_metric(value: float | int | None, *, percentage: bool = False
     return _round_half_up(numeric)
 
 
+def _markdown_table_cell(value: object) -> str:
+    text = "" if value is None else str(value)
+    return " ".join(text.splitlines()).replace("|", "\\|")
+
+
 def _build_summary_markdown(run_root: Path, leaderboard: pd.DataFrame) -> Path:
     summary_dir = run_root / "summary"
     summary_dir.mkdir(parents=True, exist_ok=True)
@@ -2268,12 +2273,12 @@ def _build_summary_markdown(run_root: Path, leaderboard: pd.DataFrame) -> Path:
                 "| "
                 + " | ".join(
                     [
-                        str(row.get("rank", "")) if row.get("rank") is not None else "",
-                        str(row.get("model", "") or ""),
-                        _format_report_metric(row.get("mean_fold_mape"), percentage=True),
-                        _format_report_metric(row.get("mean_fold_nrmse")),
-                        _format_report_metric(row.get("mean_fold_mae")),
-                        _format_report_metric(row.get("mean_fold_r2")),
+                        _markdown_table_cell(row.get("rank", "")) if row.get("rank") is not None else "",
+                        _markdown_table_cell(row.get("model", "") or ""),
+                        _markdown_table_cell(_format_report_metric(row.get("mean_fold_mape"), percentage=True)),
+                        _markdown_table_cell(_format_report_metric(row.get("mean_fold_nrmse"))),
+                        _markdown_table_cell(_format_report_metric(row.get("mean_fold_mae"))),
+                        _markdown_table_cell(_format_report_metric(row.get("mean_fold_r2"))),
                     ]
                 )
                 + " |"
@@ -2294,11 +2299,11 @@ def _build_summary_markdown(run_root: Path, leaderboard: pd.DataFrame) -> Path:
                         "    | "
                         + " | ".join(
                             [
-                                case_title,
-                                _format_report_metric(row.get("mean_fold_mape"), percentage=True),
-                                _format_report_metric(row.get("mean_fold_nrmse")),
-                                _format_report_metric(row.get("mean_fold_mae")),
-                                _format_report_metric(row.get("mean_fold_r2")),
+                                _markdown_table_cell(case_title),
+                                _markdown_table_cell(_format_report_metric(row.get("mean_fold_mape"), percentage=True)),
+                                _markdown_table_cell(_format_report_metric(row.get("mean_fold_nrmse"))),
+                                _markdown_table_cell(_format_report_metric(row.get("mean_fold_mae"))),
+                                _markdown_table_cell(_format_report_metric(row.get("mean_fold_r2"))),
                             ]
                         )
                         + " |",

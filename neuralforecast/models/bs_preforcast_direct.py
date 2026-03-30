@@ -141,6 +141,29 @@ def _build_hist_exog_feature_frames(
     return train_exog, future_exog
 
 
+def _sanitize_structural_warmup_exog_rows(
+    exog: pd.DataFrame | None,
+    *,
+    max_lag: int,
+) -> pd.DataFrame | None:
+    if exog is None or exog.empty or max_lag < 1:
+        return exog
+    sanitized = exog.copy()
+    warmup_end = min(max_lag, len(sanitized))
+    warmup_index = sanitized.index[:warmup_end]
+    for column in sanitized.columns:
+        warmup_values = sanitized.loc[warmup_index, column]
+        if not warmup_values.isna().any():
+            continue
+        non_missing = sanitized[column].dropna()
+        if non_missing.empty:
+            raise ValueError(
+                "direct tree models require lagged hist exog values beyond the warm-up window"
+            )
+        sanitized.loc[warmup_index, column] = warmup_values.fillna(non_missing.iloc[0])
+    return sanitized
+
+
 def _build_tree_regressor(model_name: str, params: dict[str, Any]) -> Any:
     resolved_params = dict(params)
     if model_name == "xgboost":
@@ -406,7 +429,7 @@ def predict_univariate_tree(
         )
     regressor = _build_tree_regressor(model_name, params)
     forecaster = ForecasterDirect(
-        regressor=regressor,
+        estimator=regressor,
         steps=len(future_df),
         lags=lags,
     )
@@ -415,6 +438,10 @@ def predict_univariate_tree(
         future_df=future_df,
         hist_exog_cols=stage_loaded.config.dataset.hist_exog_cols,
         lags=lags,
+    )
+    train_exog = _sanitize_structural_warmup_exog_rows(
+        train_exog,
+        max_lag=max_lag,
     )
     series = train_df[target_column].astype(float).reset_index(drop=True)
     forecaster.fit(

@@ -2242,6 +2242,7 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
     assert "| Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |" in report
     assert "| 1 | ModelA_res | 3.00% | 0.06 | 0.30 | 0.97 |" in report
     assert "| 2 | ModelA | 7.50% | 0.18 | 0.75 | 0.85 |" in report
+    assert "| Case 1 \\| BrentCrude | 3.00% | 0.06 | 0.30 | 0.97 |" in report
     assert "hist_exog_cols:" in report
     assert (run_root / "summary" / "last_fold_all_models.png").exists()
     assert (run_root / "summary" / "last_fold_top3.png").exists()
@@ -2295,6 +2296,7 @@ def test_summary_builder_leaves_missing_report_values_blank(tmp_path: Path):
     report = Path(artifacts["markdown"]).read_text(encoding="utf-8")
     assert "## **Case 9 | WTI**" in report
     assert "| 1 | ModelA | 10.00% |  | 1.00 |  |" in report
+    assert "| Case 9 \\| WTI | 10.00% |  | 1.00 |  |" in report
 
 
 def test_compute_metrics_includes_range_normalized_nrmse_and_r2():
