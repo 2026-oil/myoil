@@ -1,4 +1,4 @@
-<!-- Generated: 2026-03-23 | Updated: 2026-03-28 -->
+<!-- Generated: 2026-03-23 | Updated: 2026-03-30 -->
 
 # neuralforecast
 
@@ -39,6 +39,7 @@ This checkout is not just the upstream `neuralforecast` package. It is a hybrid 
 - Default to `uv run ...` for Python execution, tests, and validation.
 - Treat this repo as a config-driven experiment harness layered on top of the library package; changes often need package code, residual runtime code, and YAML/test parity together.
 - Preserve the current wrapper contract: `main.py` is the operator entrypoint, while the real scheduler/runtime lives under `runtime_support/`.
+- When writing code in this repository, do not design or add fallback paths; if execution reaches a would-be fallback case, fail fast with an explicit error instead of silently degrading behavior.
 - When adding or retiring model support, check shared surfaces together: `neuralforecast/models/__init__.py`, `neuralforecast/auto.py`, `neuralforecast/core.py`, `runtime_support/forecast_models.py`, `plugins/residual/registry.py`, `tuning/search_space.py`, `yaml/HPO/search_space.yaml`, and the relevant tests.
 - When changing residual behavior, keep config validation, plugin registry, runtime manifests, and validate-only smoke fixtures aligned.
 - **Stage plugins** (e.g. `bs_preforcast`) are managed exclusively in their own packages. The runtime dispatches to them via the `StagePlugin` Protocol in `plugin_contracts/stage_plugin.py` and the registry in `plugin_contracts/stage_registry.py`. Do NOT add direct `bs_preforcast` imports to shared runtime modules.

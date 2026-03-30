@@ -1,0 +1,16 @@
+- model: xgboost
+  params:
+    lags: [1, 2, 3, 4, 8, 12, 26, 52]
+    n_estimators: 128
+    max_depth: 4
+    subsample: 0.8
+    colsample_bytree: 0.8
+
+- model: lightgbm
+  params:
+    lags: [1, 2, 3, 4, 8, 12, 26, 52]
+    n_estimators: 128
+    max_depth: 4
+    num_leaves: 15
+    min_child_samples: 20
+    feature_fraction: 0.8

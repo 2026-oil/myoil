@@ -13,6 +13,7 @@ configs=(
   "yaml/experiment/feature_set/wti-case2.yaml"
   "yaml/experiment/feature_set/brentoil-case1.yaml"
   "yaml/experiment/feature_set/wti-case1.yaml"
+
   "yaml/experiment/feature_set_bs/brentoil-case3.yaml"
   "yaml/experiment/feature_set_bs/wti-case3.yaml"
   "yaml/experiment/feature_set_bs/brentoil-case4.yaml"
@@ -21,6 +22,15 @@ configs=(
   "yaml/experiment/feature_set_bs/wti-case2.yaml"
   "yaml/experiment/feature_set_bs/brentoil-case1.yaml"
   "yaml/experiment/feature_set_bs/wti-case1.yaml"
+
+  "yaml/experiment/feature_set_bs_futr_only_Int/brentoil-case3.yaml"
+  "yaml/experiment/feature_set_bs_futr_only_Int/wti-case3.yaml"
+  "yaml/experiment/feature_set_bs_futr_only_Int/brentoil-case4.yaml"
+  "yaml/experiment/feature_set_bs_futr_only_Int/wti-case4.yaml"
+  "yaml/experiment/feature_set_bs_futr_only_Int/brentoil-case2.yaml"
+  "yaml/experiment/feature_set_bs_futr_only_Int/wti-case2.yaml"
+  "yaml/experiment/feature_set_bs_futr_only_Int/brentoil-case1.yaml"
+  "yaml/experiment/feature_set_bs_futr_only_Int/wti-case1.yaml"
 )
 
 if [[ -n "${NF_ALL_LIMIT:-}" ]]; then

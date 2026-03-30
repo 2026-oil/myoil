@@ -1,0 +1,24 @@
+task:
+  name: wti_case3_bs
+dataset:
+  path: data/df.csv
+  target_col: Com_CrudeOil
+  dt_col: dt
+  hist_exog_cols:
+  - Com_Gasoline
+  - Com_BloombergCommodity_BCOM
+  - Com_LME_Ni_Cash
+  - Com_Coal
+  - Com_LME_Al_Cash
+  - Com_LMEX
+  - Bonds_KOR_10Y
+  - Com_LME_Ni_Inv
+  futr_exog_cols: [BS_Core_Index_Integrated]
+  static_exog_cols: []
+residual:
+  enabled: false
+jobs:
+- yaml/jobs/main/jobs_1.yaml
+- yaml/jobs/main/jobs_2.yaml
+- yaml/jobs/main/jobs_3.yaml
+- yaml/jobs/main/jobs_4.yaml

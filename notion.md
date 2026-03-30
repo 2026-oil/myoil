@@ -25,196 +25,31 @@
 
 - **Case 1**
 - 
-    ```yaml
-    hist_exog_cols:
-      - Com_Gasoline
-      - Com_Steel
-      - Bonds_US_Spread_10Y_1Y
-      - Bonds_CHN_Spread_30Y_5Y
-      - EX_USD_BRL
-      - Com_Cheese
-      - Bonds_BRZ_Spread_10Y_1Y
-      - Com_Cu_Gold_Ratio
-      - Idx_OVX
-      - Com_Oil_Spread
-      - Com_LME_Zn_Spread
-      - Idx_CSI300
-      - Bonds_CHN_Spread_5Y_1Y
-      - Com_LME_Cu_Spread
-      - Com_LME_Pb_Spread
-      - Com_LME_Al_Spread
-      - BS_Core_Index_A
-      - BS_Core_Index_B
-      - BS_Core_Index_C
-      - BS_Core_Index_Integrated
-    ```
-
+    - `hist_exog_cols: - Com_Gasoline - Com_Steel - Bonds_US_Spread_10Y_1Y - Bonds_CHN_Spread_30Y_5Y - EX_USD_BRL - Com_Cheese - Bonds_BRZ_Spread_10Y_1Y - Com_Cu_Gold_Ratio - Idx_OVX - Com_Oil_Spread - Com_LME_Zn_Spread - Idx_CSI300 - Bonds_CHN_Spread_5Y_1Y - Com_LME_Cu_Spread - Com_LME_Pb_Spread - Com_LME_Al_Spread - BS_Core_Index_A - BS_Core_Index_B - BS_Core_Index_C - BS_Core_Index_Integrated`
 - **Case 2**
 - 
-    ```yaml
-    hist_exog_cols:
-      - Com_Gasoline
-      - Com_BloombergCommodity_BCOM
-      - Com_LME_Ni_Cash
-      - Com_Coal
-      - Com_Cotton
-      - Com_LME_Al_Cash
-      - Bonds_KOR_10Y
-      - Com_Barley
-      - Com_Canola
-      - Com_LMEX
-      - Com_LME_Ni_Inv
-      - Com_Corn
-      - Com_Wheat
-      - BS_Core_Index_A
-      - BS_Core_Index_B
-      - BS_Core_Index_C
-      - BS_Core_Index_Integrated
-    ```
-
+    - `hist_exog_cols: - Com_Gasoline - Com_BloombergCommodity_BCOM - Com_LME_Ni_Cash - Com_Coal - Com_Cotton - Com_LME_Al_Cash - Bonds_KOR_10Y - Com_Barley - Com_Canola - Com_LMEX - Com_LME_Ni_Inv - Com_Corn - Com_Wheat - BS_Core_Index_A - BS_Core_Index_B - BS_Core_Index_C - BS_Core_Index_Integrated`
 - **Case 3**
 - 
-    ```yaml
-    hist_exog_cols:
-      - Com_Gasoline
-      - Com_BloombergCommodity_BCOM
-      - Com_LME_Ni_Cash
-      - Com_Coal
-      - Com_LME_Al_Cash
-      - Bonds_KOR_10Y
-      - Com_LMEX
-      - Com_LME_Ni_Inv
-      - BS_Core_Index_A
-      - BS_Core_Index_B
-      - BS_Core_Index_C
-      - BS_Core_Index_Integrated
-    ```
-
+    - `hist_exog_cols: - Com_Gasoline - Com_BloombergCommodity_BCOM - Com_LME_Ni_Cash - Com_Coal - Com_LME_Al_Cash - Bonds_KOR_10Y - Com_LMEX - Com_LME_Ni_Inv - BS_Core_Index_A - BS_Core_Index_B - BS_Core_Index_C - BS_Core_Index_Integrated`
 - **Case 4**
 - 
-    ```yaml
-    hist_exog_cols:
-      - Com_Gasoline
-      - Com_BloombergCommodity_BCOM
-      - Com_LME_Ni_Cash
-      - Com_Coal
-      - Com_Cotton
-      - Com_LME_Al_Cash
-      - Bonds_KOR_10Y
-      - Com_Barley
-      - Com_Canola
-      - Com_LMEX
-      - Com_LME_Ni_Inv
-      - Com_Corn
-      - Com_Wheat
-      - Com_NaturalGas
-      - Idx_OVX
-      - Com_Gold
-      - BS_Core_Index_A
-      - BS_Core_Index_B
-      - BS_Core_Index_C
-      - BS_Core_Index_Integrated
-    ```
+    - `hist_exog_cols: - Com_Gasoline - Com_BloombergCommodity_BCOM - Com_LME_Ni_Cash - Com_Coal - Com_Cotton - Com_LME_Al_Cash - Bonds_KOR_10Y - Com_Barley - Com_Canola - Com_LMEX - Com_LME_Ni_Inv - Com_Corn - Com_Wheat - Com_NaturalGas - Idx_OVX - Com_Gold - BS_Core_Index_A - BS_Core_Index_B - BS_Core_Index_C - BS_Core_Index_Integrated`
 
 ### **WTI**
 
 - **Case 1**
 - 
-    ```yaml
-    hist_exog_cols:
-      - Com_Gasoline
-      - Com_LME_Zn_Inv
-      - Com_OrangeJuice
-      - Com_Cheese
-      - Bonds_BRZ_1Y
-      - Idx_OVX
-      - Com_Cu_Gold_Ratio
-      - Com_LME_Sn_Inv
-      - Idx_CSI300
-      - Com_LME_Zn_Spread
-      - Bonds_CHN_Spread_5Y_2Y
-      - Com_LME_Al_Spread
-      - Bonds_CHN_Spread_2Y_1Y
-      - Com_Oil_Spread
-      - Bonds_CHN_Spread_10Y_5Y
-      - BS_Core_Index_A
-      - BS_Core_Index_B
-      - BS_Core_Index_C
-      - BS_Core_Index_Integrated
-    ```
-
+    - `hist_exog_cols: - Com_Gasoline - Com_LME_Zn_Inv - Com_OrangeJuice - Com_Cheese - Bonds_BRZ_1Y - Idx_OVX - Com_Cu_Gold_Ratio - Com_LME_Sn_Inv - Idx_CSI300 - Com_LME_Zn_Spread - Bonds_CHN_Spread_5Y_2Y - Com_LME_Al_Spread - Bonds_CHN_Spread_2Y_1Y - Com_Oil_Spread - Bonds_CHN_Spread_10Y_5Y - BS_Core_Index_A - BS_Core_Index_B - BS_Core_Index_C - BS_Core_Index_Integrated`
 - **Case 2**
 - 
-    ```yaml
-    hist_exog_cols:
-      - Com_Gasoline
-      - Com_BloombergCommodity_BCOM
-      - Com_LME_Ni_Cash
-      - Com_Coal
-      - Com_Canola
-      - Com_Cotton
-      - Com_LME_Al_Cash
-      - Com_LMEX
-      - Bonds_KOR_10Y
-      - Com_PalmOil
-      - Com_Barley
-      - Com_Corn
-      - Com_Oat
-      - Com_Wheat
-      - Com_Soybeans
-      - Com_LME_Ni_Inv
-      - BS_Core_Index_A
-      - BS_Core_Index_B
-      - BS_Core_Index_C
-      - BS_Core_Index_Integrated
-    ```
-
+    - `hist_exog_cols: - Com_Gasoline - Com_BloombergCommodity_BCOM - Com_LME_Ni_Cash - Com_Coal - Com_Canola - Com_Cotton - Com_LME_Al_Cash - Com_LMEX - Bonds_KOR_10Y - Com_PalmOil - Com_Barley - Com_Corn - Com_Oat - Com_Wheat - Com_Soybeans - Com_LME_Ni_Inv - BS_Core_Index_A - BS_Core_Index_B - BS_Core_Index_C - BS_Core_Index_Integrated`
 - **Case 3**
 - 
-    ```yaml
-    hist_exog_cols:
-      - Com_Gasoline
-      - Com_BloombergCommodity_BCOM
-      - Com_LME_Ni_Cash
-      - Com_Coal
-      - Com_LME_Al_Cash
-      - Com_LMEX
-      - Bonds_KOR_10Y
-      - Com_LME_Ni_Inv
-      - BS_Core_Index_A
-      - BS_Core_Index_B
-      - BS_Core_Index_C
-      - BS_Core_Index_Integrated
-    ```
-
+    - `hist_exog_cols: - Com_Gasoline - Com_BloombergCommodity_BCOM - Com_LME_Ni_Cash - Com_Coal - Com_LME_Al_Cash - Com_LMEX - Bonds_KOR_10Y - Com_LME_Ni_Inv - BS_Core_Index_A - BS_Core_Index_B - BS_Core_Index_C - BS_Core_Index_Integrated`
 - **Case 4**
 - 
-    ```yaml
-    hist_exog_cols:
-      - Com_Gasoline
-      - Com_BloombergCommodity_BCOM
-      - Com_LME_Ni_Cash
-      - Com_Coal
-      - Com_Canola
-      - Com_Cotton
-      - Com_LME_Al_Cash
-      - Com_LMEX
-      - Bonds_KOR_10Y
-      - Com_PalmOil
-      - Com_Barley
-      - Com_Corn
-      - Com_Oat
-      - Com_Wheat
-      - Com_Soybeans
-      - Com_LME_Ni_Inv
-      - Com_NaturalGas
-      - Idx_OVX
-      - Com_Gold
-      - BS_Core_Index_A
-      - BS_Core_Index_B
-      - BS_Core_Index_C
-      - BS_Core_Index_Integrated
-    ```
+    - `hist_exog_cols: - Com_Gasoline - Com_BloombergCommodity_BCOM - Com_LME_Ni_Cash - Com_Coal - Com_Canola - Com_Cotton - Com_LME_Al_Cash - Com_LMEX - Bonds_KOR_10Y - Com_PalmOil - Com_Barley - Com_Corn - Com_Oat - Com_Wheat - Com_Soybeans - Com_LME_Ni_Inv - Com_NaturalGas - Idx_OVX - Com_Gold - BS_Core_Index_A - BS_Core_Index_B - BS_Core_Index_C - BS_Core_Index_Integrated`
 
 # 03. 실험 설계 및 적용
 
@@ -280,7 +115,6 @@
 | 4 | iTransformer | 8.14% | 1.01 | 5.79 | -12.61 |
 | 5 | TSMixerx | 16.56% | 2.73 | 11.16 | -147.38 |
 | Mean |  | 8.64% | 1.24 | 6.02 | -37.63 |
-
 - baseline 대비 케이스 평균 ΔMAPE는 -0.09%였다.
 
 ### **Case 2 | BrentCrude**
@@ -293,7 +127,6 @@
 | 4 | TimeXer | 7.29% | 0.93 | 5.15 | -10.63 |
 | 5 | TSMixerx | 10.25% | 1.69 | 7.00 | -56.76 |
 | Mean |  | 7.32% | 1.03 | 5.15 | -19.59 |
-
 - baseline 대비 케이스 평균 ΔMAPE는 +0.17%였다.
 
 ### **Case 3 | BrentCrude**
@@ -306,7 +139,6 @@
 | 4 | TimeXer | 7.41% | 0.95 | 5.23 | -11.70 |
 | 5 | TSMixerx | 8.54% | 1.29 | 5.91 | -26.21 |
 | Mean |  | 7.02% | 0.97 | 4.96 | -13.85 |
-
 - baseline 대비 케이스 평균 ΔMAPE는 +0.11%였다.
 
 ### **Case 4 | BrentCrude**
@@ -319,7 +151,6 @@
 | 4 | TimeXer | 7.27% | 0.92 | 5.14 | -10.37 |
 | 5 | TSMixerx | 9.74% | 1.48 | 6.73 | -47.61 |
 | Mean |  | 7.23% | 0.99 | 5.10 | -17.61 |
-
 - baseline 대비 케이스 평균 ΔMAPE는 +0.25%였다.
 
 ### **Case 1 | WTI**
@@ -332,7 +163,6 @@
 | 4 | TimeXer | 10.13% | 1.47 | 6.67 | -24.16 |
 | 5 | TSMixerx | 20.53% | 3.37 | 13.23 | -160.78 |
 | Mean |  | 10.23% | 1.54 | 6.75 | -44.02 |
-
 - baseline 대비 케이스 평균 ΔMAPE는 +0.36%였다.
 
 ### **Case 2 | WTI**
@@ -345,7 +175,6 @@
 | 4 | iTransformer | 8.64% | 1.27 | 5.73 | -18.48 |
 | 5 | TSMixerx | 9.03% | 1.48 | 5.94 | -30.63 |
 | Mean |  | 7.74% | 1.15 | 5.16 | -17.20 |
-
 - baseline 대비 케이스 평균 ΔMAPE는 -0.23%였다.
 
 ### **Case 3 | WTI**
@@ -358,7 +187,6 @@
 | 4 | iTransformer | 8.06% | 1.25 | 5.35 | -17.79 |
 | 5 | TSMixerx | 9.52% | 1.56 | 6.21 | -31.39 |
 | Mean |  | 7.76% | 1.17 | 5.16 | -17.40 |
-
 - baseline 대비 케이스 평균 ΔMAPE는 +0.03%였다.
 
 ### **Case 4 | WTI**
@@ -371,7 +199,6 @@
 | 4 | iTransformer | 8.68% | 1.29 | 5.76 | -19.10 |
 | 5 | TSMixerx | 9.68% | 1.61 | 6.29 | -36.01 |
 | Mean |  | 7.84% | 1.17 | 5.21 | -18.28 |
-
 - baseline 대비 케이스 평균 ΔMAPE는 -0.13%였다.
 
 ## 04-03. 블랙스완 적용 후 모형별 통합 Table

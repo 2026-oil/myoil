@@ -1,0 +1,13 @@
+dataset:
+  path: data/df.csv
+  target_col: Com_BrentCrudeOil
+  dt_col: dt
+  hist_exog_cols: []
+  futr_exog_cols: []
+  static_exog_cols: []
+
+residual:
+  enabled: false
+
+jobs:
+  - yaml/jobs/main/tree.yaml

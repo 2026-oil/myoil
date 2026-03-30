@@ -1,5 +1,5 @@
 task:
-  name: wti_case4_HPO
+  name: wti_case2_bs
 dataset:
   path: data/df.csv
   target_col: Com_CrudeOil
@@ -21,25 +21,12 @@ dataset:
   - Com_Wheat
   - Com_Soybeans
   - Com_LME_Ni_Inv
-  - Com_NaturalGas
-  - Idx_OVX
-  - Com_Gold
-  - BS_Core_Index_A
-  - BS_Core_Index_B
-  - BS_Core_Index_C
-  - BS_Core_Index_Integrated
-  futr_exog_cols: []
+  futr_exog_cols: [BS_Core_Index_Integrated]
   static_exog_cols: []
-runtime:
-  opt_n_trial: 100
-training:
-  dataloader_kwargs:
-    num_workers: 2
-    pin_memory: true
-    persistent_workers: true
-    prefetch_factor: 2
-scheduler:
-  parallelize_single_job_tuning: true
 residual:
   enabled: false
-jobs: yaml/jobs/main/jobs_tune.yaml
+jobs:
+- yaml/jobs/main/jobs_1.yaml
+- yaml/jobs/main/jobs_2.yaml
+- yaml/jobs/main/jobs_3.yaml
+- yaml/jobs/main/jobs_4.yaml
