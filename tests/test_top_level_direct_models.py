@@ -8,7 +8,10 @@ import pytest
 import yaml
 
 from app_config import load_app_config
-from neuralforecast.models.bs_preforcast_direct import predict_univariate_tree
+from neuralforecast.models.bs_preforcast_direct import (
+    _resolve_tree_history_metric,
+    predict_univariate_tree,
+)
 from runtime_support.forecast_models import validate_job
 import runtime_support.runner as runtime
 
@@ -328,3 +331,32 @@ def test_validate_only_rejects_residual_enabled_top_level_direct_models(tmp_path
         match="Top-level direct models do not yet support residual-enabled runs",
     ):
         runtime.main(["--validate-only", "--config", str(config_path)])
+
+
+@pytest.mark.parametrize(
+    ("model_name", "training_loss", "expected_metric", "expected_postprocess"),
+    [
+        ("xgboost", "mse", "rmse", 4.0),
+        ("lightgbm", "mse", "l2", 2.0),
+        ("xgboost", "mae", "mae", 2.0),
+        ("lightgbm", "mae", "l1", 2.0),
+    ],
+)
+def test_tree_history_metric_supports_shared_mse_and_mae_settings(
+    model_name: str,
+    training_loss: str,
+    expected_metric: str,
+    expected_postprocess: float,
+) -> None:
+    metric_name, postprocess = _resolve_tree_history_metric(model_name, training_loss)
+
+    assert metric_name == expected_metric
+    assert postprocess(2.0) == expected_postprocess
+
+
+def test_tree_history_metric_rejects_unsupported_losses() -> None:
+    with pytest.raises(
+        ValueError,
+        match=r"support only training\.loss in \{mse, mae\}",
+    ):
+        _resolve_tree_history_metric("xgboost", "exloss")

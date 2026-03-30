@@ -172,13 +172,17 @@ def _resolve_tree_history_metric(
     training_loss: str,
 ) -> tuple[str, Callable[[float], float]]:
     normalized_loss = training_loss.lower()
-    if normalized_loss != "mse":
-        raise ValueError(
-            "bs_preforcast tree loss curves currently support only training.loss=mse"
-        )
-    if model_name == "xgboost":
-        return "rmse", lambda value: float(value) ** 2
-    return "l2", float
+    if normalized_loss == "mse":
+        if model_name == "xgboost":
+            return "rmse", lambda value: float(value) ** 2
+        return "l2", float
+    if normalized_loss == "mae":
+        if model_name == "xgboost":
+            return "mae", float
+        return "l1", float
+    raise ValueError(
+        "bs_preforcast tree loss curves currently support only training.loss in {mse, mae}"
+    )
 
 
 def _extract_tree_history_frame(
