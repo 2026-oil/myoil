@@ -6,11 +6,11 @@
   params: {}
 - model: lightgbm
   params: {} 
-- model: LSTM
-  params: {}
-- model: NHITS
-  params: {}
-- model: PatchTST
-  params: {}
 - model: xgboost
   params: {}
+# - model: LSTM
+#   params: {}
+# - model: NHITS
+#   params: {}
+# - model: PatchTST
+#   params: {}

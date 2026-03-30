@@ -9,9 +9,4 @@ dataset:
   static_exog_cols: []
 residual:
   enabled: false
-jobs:
-- model: Naive
-  params: {}
-bs_preforcast:
-  enabled: true
-  config_path: yaml/jobs/bs_preforcast/bs_preforcast_uni.yaml
+jobs: yaml/jobs/bs_preforcast/bs_preforcast_jobs_uni.yaml

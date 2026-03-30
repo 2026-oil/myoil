@@ -1,4 +1,43 @@
 models:
+  PatchTST:
+    hidden_size:
+      type: categorical
+      choices:
+        - 16
+    n_heads:
+      type: categorical
+      choices:
+        - 4
+    encoder_layers:
+      type: categorical
+      choices:
+        - 2
+    patch_len:
+      type: categorical
+      choices:
+        - 4
+  NHITS:
+      mlp_units:
+        type: categorical
+        choices:
+        - - - 32
+            - 32
+          - - 32
+            - 32
+          - - 32
+            - 32
+        - - - 64
+            - 64
+          - - 64
+            - 64
+          - - 64
+            - 64
+  DLinear:
+    moving_avg:
+      type: categorical
+      choices:
+      - 25
+      - 51
   LSTM:
     encoder_hidden_size:
       type: categorical
@@ -208,7 +247,7 @@ models:
     trend:
       type: categorical
       choices:
-      - null
+      - standard
       - add
     damped_trend:
       type: categorical
@@ -308,7 +347,7 @@ training:
     scaler_type:
       type: categorical
       choices:
-      - null
+      - standard
     model_step_size:
       type: categorical
       choices:
@@ -330,7 +369,7 @@ training:
       scaler_type:
         type: categorical
         choices:
-        - null
+        - standard
       model_step_size:
         type: categorical
         choices:
@@ -350,7 +389,7 @@ training:
       scaler_type:
         type: categorical
         choices:
-        - null
+        - standard
       model_step_size:
         type: categorical
         choices:
@@ -373,7 +412,7 @@ training:
       scaler_type:
         type: categorical
         choices:
-        - null
+        - standard
       model_step_size:
         type: categorical
         choices:
@@ -393,7 +432,7 @@ training:
       scaler_type:
         type: categorical
         choices:
-        - null
+        - standard
       model_step_size:
         type: categorical
         choices:
@@ -415,7 +454,7 @@ training:
       scaler_type:
         type: categorical
         choices:
-        - null
+        - standard
       model_step_size:
         type: categorical
         choices:
@@ -458,7 +497,7 @@ residual:
       - 6
       - 8
       - 12
-      - null
+      - standard
     min_samples_leaf:
       type: categorical
       choices:
@@ -531,7 +570,7 @@ bs_preforcast_models:
     trend:
       type: categorical
       choices:
-      - null
+      - standard
       - add
     damped_trend:
       type: categorical
@@ -656,22 +695,6 @@ bs_preforcast_models:
       - 16
       - 32
       - 64
-  NHITS:
-    mlp_units:
-      type: categorical
-      choices:
-      - - - 32
-          - 32
-        - - 32
-          - 32
-        - - 32
-          - 32
-      - - - 64
-          - 64
-        - - 64
-          - 64
-        - - 64
-          - 64
   TSMixerx:
     n_block:
       type: categorical
@@ -770,7 +793,7 @@ bs_preforcast_training:
     scaler_type:
       type: categorical
       choices:
-      - null
+      - standard
     model_step_size:
       type: categorical
       choices:
@@ -792,7 +815,7 @@ bs_preforcast_training:
       scaler_type:
         type: categorical
         choices:
-        - null
+        - standard
       model_step_size:
         type: categorical
         choices:
@@ -812,7 +835,7 @@ bs_preforcast_training:
       scaler_type:
         type: categorical
         choices:
-        - null
+        - standard
       model_step_size:
         type: categorical
         choices:
