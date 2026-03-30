@@ -20,9 +20,6 @@ dataset:
   - Bonds_CHN_Spread_2Y_1Y
   - Com_Oil_Spread
   - Bonds_CHN_Spread_10Y_5Y
-  - BS_Core_Index_A
-  - BS_Core_Index_B
-  - BS_Core_Index_C
   - BS_Core_Index_Integrated
   futr_exog_cols: []
   static_exog_cols: []

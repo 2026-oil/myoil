@@ -29,6 +29,7 @@ from app_config import (
     _load_shared_settings_for_yaml_app_config,
     _merge_shared_settings_into_payload,
     load_app_config,
+    resolve_config_path,
 )
 from runtime_support.forecast_models import (
     MODEL_CLASSES,
@@ -2623,6 +2624,24 @@ def test_load_app_config_requires_explicit_path():
         match="config path is required; pass --config/--config-path or --config-toml",
     ):
         load_app_config(REPO_ROOT)
+
+
+@pytest.mark.parametrize(
+    "config_path",
+    [
+        r"yaml\experiment\bs_forecast_multi\bs_forecast_multi.yaml",
+        "yamlexperimentbs_forecast_multibs_forecast_multi.yaml",
+    ],
+)
+def test_resolve_config_path_accepts_windows_style_or_bash_consumed_yaml_paths(
+    config_path: str,
+):
+    resolved_path, source_type = resolve_config_path(REPO_ROOT, config_path=config_path)
+
+    assert resolved_path == (
+        REPO_ROOT / "yaml/experiment/bs_forecast_multi/bs_forecast_multi.yaml"
+    )
+    assert source_type == "yaml"
 
 
 @pytest.mark.parametrize(

@@ -1073,13 +1073,44 @@ def resolve_config_path(
     config_path: str | Path | None = None,
     config_toml_path: str | Path | None = None,
 ) -> tuple[Path, str]:
+    def _normalize_explicit_path(path_like: str | Path) -> Path:
+        raw_text = str(path_like)
+        normalized_text = raw_text.replace("\\", "/")
+        candidate = Path(normalized_text)
+        if candidate.is_absolute():
+            return candidate
+        if "/" in normalized_text:
+            return candidate
+        repo_candidate = repo_root / candidate
+        if repo_candidate.exists():
+            return candidate
+        suffix = candidate.suffix.lower()
+        if suffix not in {".yaml", ".yml", ".toml"}:
+            return candidate
+        matches = [
+            resolved.relative_to(repo_root)
+            for resolved in repo_root.rglob(f"*{suffix}")
+            if resolved.is_file()
+            and resolved.relative_to(repo_root).as_posix().replace("/", "")
+            == normalized_text
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            raise FileNotFoundError(
+                "Config path matched multiple repo files after shell path normalization; "
+                "use forward slashes or quote the path explicitly: "
+                f"{raw_text} -> {matches}"
+            )
+        return candidate
+
     if config_toml_path is not None:
-        path = Path(config_toml_path)
+        path = _normalize_explicit_path(config_toml_path)
         if not path.is_absolute():
             path = repo_root / path
         return path, "toml"
     if config_path is not None:
-        path = Path(config_path)
+        path = _normalize_explicit_path(config_path)
         if not path.is_absolute():
             path = repo_root / path
         suffix = path.suffix.lower()

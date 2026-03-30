@@ -21,9 +21,6 @@ dataset:
   - Com_NaturalGas
   - Idx_OVX
   - Com_Gold
-  - BS_Core_Index_A
-  - BS_Core_Index_B
-  - BS_Core_Index_C
   - BS_Core_Index_Integrated
   futr_exog_cols: []
   static_exog_cols: []
