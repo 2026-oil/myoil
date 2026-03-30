@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 import torch
-from neuralforecast.losses.pytorch import ExLoss, MSE
+from neuralforecast.losses.pytorch import ExLoss, MSE, _weighted_mean
 from neuralforecast.models import (
     Autoformer,
     BiTCN,
@@ -74,6 +74,55 @@ class ModelCapabilities:
     single_device_only: bool = True
 
 
+class ForecastL1Loss(torch.nn.L1Loss):
+    """NeuralForecast-compatible adapter around torch.nn.L1Loss.
+
+    Uses torch.nn.L1Loss(reduction="none") for the elementwise absolute error,
+    then applies the same mask / horizon weighting contract expected by the
+    forecasting runtime.
+    """
+
+    def __init__(self, horizon_weight=None):
+        super().__init__(reduction="none")
+        if horizon_weight is not None:
+            horizon_weight = torch.Tensor(horizon_weight.flatten())
+        self.horizon_weight = horizon_weight
+        self.outputsize_multiplier = 1
+        self.output_names = [""]
+        self.is_distribution_output = False
+
+    def domain_map(self, y_hat: torch.Tensor) -> torch.Tensor:
+        return y_hat
+
+    def _compute_weights(self, y: torch.Tensor, mask: torch.Tensor | None) -> torch.Tensor:
+        if mask is None:
+            mask = torch.ones_like(y)
+
+        if self.horizon_weight is None:
+            weights = torch.ones_like(mask)
+        else:
+            assert mask.shape[1] == len(
+                self.horizon_weight
+            ), "horizon_weight must have same length as Y"
+            weights = self.horizon_weight.clone()
+            weights = weights[None, :, None].to(mask.device)
+            weights = torch.ones_like(mask, device=mask.device) * weights
+
+        return weights * mask
+
+    def forward(
+        self,
+        y: torch.Tensor,
+        y_hat: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        y_insample: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        del y_insample
+        losses = super().forward(y_hat, y)
+        weights = self._compute_weights(y=y, mask=mask)
+        return _weighted_mean(losses=losses, weights=weights)
+
+
 MODEL_CLASSES = {
     "RNN": RNN,
     "GRU": GRU,
@@ -126,6 +175,8 @@ def resolve_loss(
     name: str, *, loss_params: TrainingLossParams | None = None
 ) -> Any:
     normalized = name.lower()
+    if normalized == "mae":
+        return ForecastL1Loss()
     if normalized == "mse":
         return MSE()
     if normalized == "exloss":

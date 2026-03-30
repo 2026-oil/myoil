@@ -760,6 +760,22 @@ def test_load_app_config_accepts_exloss_params(tmp_path: Path):
     }
 
 
+def test_load_app_config_accepts_mae_loss(tmp_path: Path):
+    payload = _payload()
+    payload["training"]["loss"] = "mae"
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a,chan_b\n2020-01-01,1,2,3\n",
+        encoding="utf-8",
+    )
+
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    assert loaded.config.training.loss == "mae"
+    assert "loss_params" not in loaded.normalized_payload["training"]
+
+
 @pytest.mark.parametrize(
     ("loss_params", "message"),
     [
@@ -1221,6 +1237,24 @@ def test_model_builder_passes_hist_exog_to_patchtst(tmp_path: Path):
 
     assert model.hist_exog_list == ["hist_a"]
     assert model.hist_exog_size == 1
+
+
+def test_build_model_uses_mae_training_loss(tmp_path: Path):
+    payload = _payload()
+    payload["training"]["loss"] = "mae"
+    payload["jobs"] = [{"model": "TFT", "params": {"hidden_size": 32}}]
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n2020-01-08,2,3\n",
+        encoding="utf-8",
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    model = build_model(loaded.config, loaded.config.jobs[0])
+
+    assert isinstance(model.loss, torch.nn.L1Loss)
+    assert isinstance(model.valid_loss, torch.nn.L1Loss)
 
 
 def test_model_builder_patchtst_forecasts_target_only_with_hist_exog(tmp_path: Path):
@@ -2542,8 +2576,8 @@ def test_load_app_config_requires_explicit_path():
     [
         ("yaml/experiment/feature_set/wti-case3.yaml", "feature_set_wti_case3"),
         (
-            "yaml/experiment/feature_set_HPT_n100_bs/brentoil-case3.yaml",
-            "feature_set_HPT_n100_bs_brentoil_case3_HPO",
+            "yaml/experiment/feature_set_bs_futr_only_Int/brentoil-case3.yaml",
+            "feature_set_bs_futr_only_Int_brentoil_case3_bs",
         ),
         ("yaml/experiment/feature_set_bs/wti-case3.yaml", "feature_set_bs_wti_case3_bs"),
         (
@@ -7287,20 +7321,20 @@ OPTUNA_CONFIG_YAML_FILES = [
 ]
 
 EXPECTED_CASE_TRAINING = {
-    "input_size": 64,
+    "input_size": 96,
     "batch_size": 32,
     "valid_batch_size": 64,
     "windows_batch_size": 1024,
     "inference_windows_batch_size": 1024,
     "optimizer": {"name": "adamw", "kwargs": {}},
     "lr_scheduler": _onecycle_scheduler(0.001),
-    "model_step_size": 8,
-    "max_steps": 1000,
-    "val_size": 8,
+    "model_step_size": 1,
+    "max_steps": 2000,
+    "val_size": 16,
     "val_check_steps": 20,
     "min_steps_before_early_stop": 500,
     "early_stop_patience_steps": 3,
-    "loss": "mse",
+    "loss": "mae",
 }
 
 EXPECTED_CASE_MODEL_PARAMS = {
