@@ -8,6 +8,8 @@ import pytest
 import yaml
 
 from app_config import load_app_config
+from neuralforecast.models.bs_preforcast_direct import predict_univariate_tree
+from runtime_support.forecast_models import validate_job
 import runtime_support.runner as runtime
 
 
@@ -152,6 +154,10 @@ def test_validate_only_repro_config_accepts_top_level_direct_models(tmp_path: Pa
         assert capability[model_name]["validated_mode"] == "learned_fixed"
         assert capability[model_name]["validation_error"] is None
         assert capability[model_name]["supports_auto"] is True
+    assert capability["ARIMA"]["supports_hist_exog"] is False
+    assert capability["ES"]["supports_hist_exog"] is False
+    assert capability["xgboost"]["supports_hist_exog"] is True
+    assert capability["lightgbm"]["supports_hist_exog"] is True
     assert capability["residual"]["validated_mode"] == "residual_disabled"
 
 
@@ -191,6 +197,119 @@ def test_fit_and_predict_fold_uses_direct_runtime_lane(monkeypatch: pytest.Monke
     assert str(train_end_ds) == "2020-01-15 00:00:00"
     assert train_df["target"].tolist() == [1, 2, 3]
     assert nf is None
+
+
+@pytest.mark.parametrize("model_name", ["xgboost", "lightgbm"])
+def test_direct_tree_models_advertise_hist_exog_support(
+    tmp_path: Path,
+    model_name: str,
+) -> None:
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = ["hist_a"]
+    payload["jobs"] = [{"model": model_name, "params": {"lags": [1, 2]}}]
+    _write_data(tmp_path)
+    config_path = _write_config(tmp_path, payload)
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    capabilities = validate_job(loaded.config.jobs[0])
+    assert capabilities.supports_hist_exog is True
+    assert capabilities.supports_futr_exog is False
+    assert capabilities.supports_stat_exog is False
+
+
+@pytest.mark.parametrize("model_name", ["xgboost", "lightgbm"])
+def test_predict_univariate_tree_uses_hist_exog_features(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    model_name: str,
+) -> None:
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = ["hist_a"]
+    payload["jobs"] = [
+        {
+            "model": model_name,
+            "params": {
+                "lags": [1, 2],
+                "n_estimators": 8,
+                "max_depth": 2,
+            },
+        }
+    ]
+    _write_data(tmp_path)
+    config_path = _write_config(tmp_path, payload)
+    loaded = load_app_config(tmp_path, config_path=config_path)
+    job = loaded.config.jobs[0]
+
+    captured: dict[str, pd.DataFrame | list[float] | int | list[int] | None] = {}
+
+    class _FakeForecasterDirect:
+        def __init__(self, *, regressor, steps, lags):
+            del regressor
+            self.steps = list(range(1, steps + 1))
+            captured["lags"] = lags
+
+        def fit(self, y, exog=None, suppress_warnings=True):
+            del suppress_warnings
+            captured["fit_y"] = list(y)
+            captured["fit_exog"] = None if exog is None else exog.copy()
+            return self
+
+        def predict(self, *, steps, exog=None):
+            captured["predict_steps"] = list(steps)
+            captured["predict_exog"] = None if exog is None else exog.copy()
+            return pd.Series([101.0 + step for step in range(len(steps))])
+
+    monkeypatch.setattr(
+        "skforecast.direct.ForecasterDirect",
+        _FakeForecasterDirect,
+    )
+    monkeypatch.setattr(
+        "neuralforecast.models.bs_preforcast_direct._build_tree_curve_frame",
+        lambda *args, **kwargs: pd.DataFrame(
+            columns=["global_step", "train_loss", "val_loss"]
+        ),
+    )
+
+    train_df = pd.DataFrame(
+        {
+            "dt": pd.date_range("2024-01-01", periods=4, freq="W"),
+            "target": [1.0, 2.0, 3.0, 4.0],
+            "hist_a": [10.0, 20.0, 30.0, 40.0],
+        }
+    )
+    future_df = pd.DataFrame(
+        {
+            "dt": pd.date_range("2024-02-04", periods=2, freq="W"),
+            "target": [5.0, 6.0],
+            "hist_a": [50.0, 60.0],
+        }
+    )
+
+    result = predict_univariate_tree(
+        loaded,
+        job,
+        target_column="target",
+        train_df=train_df,
+        future_df=future_df,
+        model_name=model_name,
+    )
+
+    assert result.predictions == [101.0, 102.0]
+    fit_exog = captured["fit_exog"]
+    predict_exog = captured["predict_exog"]
+    assert isinstance(fit_exog, pd.DataFrame)
+    assert isinstance(predict_exog, pd.DataFrame)
+    assert fit_exog.columns.tolist() == ["hist_a_lag_1", "hist_a_lag_2"]
+    assert predict_exog.columns.tolist() == ["hist_a_lag_1", "hist_a_lag_2"]
+    assert fit_exog.iloc[2:].reset_index(drop=True).to_dict(orient="records") == [
+        {"hist_a_lag_1": 20.0, "hist_a_lag_2": 10.0},
+        {"hist_a_lag_1": 30.0, "hist_a_lag_2": 20.0},
+    ]
+    assert predict_exog.to_dict(orient="records") == [
+        {"hist_a_lag_1": 40.0, "hist_a_lag_2": 30.0},
+        {"hist_a_lag_1": 50.0, "hist_a_lag_2": 40.0},
+    ]
 
 
 def test_validate_only_rejects_residual_enabled_top_level_direct_models(tmp_path: Path) -> None:

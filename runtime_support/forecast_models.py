@@ -188,7 +188,14 @@ def capabilities_for(model_name: str) -> ModelCapabilities:
     if model_name in BASELINE_MODEL_NAMES:
         return ModelCapabilities(model_name, False, False, False, False, False)
     if model_name in DIRECT_STAGE_MODEL_NAMES:
-        return ModelCapabilities(model_name, False, False, False, False, False)
+        return ModelCapabilities(
+            model_name,
+            False,
+            model_name in {"xgboost", "lightgbm"},
+            False,
+            False,
+            False,
+        )
     model_cls = MODEL_CLASSES[model_name]
     return ModelCapabilities(
         name=model_name,
@@ -242,6 +249,41 @@ def resolved_strategy(config: AppConfig, devices: int | None) -> Any:
 
 def _resolved_dataloader_kwargs(config: AppConfig) -> dict[str, Any]:
     return dict(config.training.dataloader_kwargs)
+
+
+def _resolve_scheduler_config(
+    config: AppConfig,
+) -> tuple[type[torch.optim.lr_scheduler.LRScheduler], dict[str, Any]]:
+    scheduler_name = config.training.lr_scheduler.name
+    if scheduler_name == "OneCycleLR":
+        return (
+            torch.optim.lr_scheduler.OneCycleLR,
+            {
+                "max_lr": config.training.lr_scheduler.max_lr,
+                "total_steps": config.training.max_steps,
+                "pct_start": config.training.lr_scheduler.pct_start,
+                "div_factor": config.training.lr_scheduler.div_factor,
+                "final_div_factor": config.training.lr_scheduler.final_div_factor,
+                "anneal_strategy": config.training.lr_scheduler.anneal_strategy,
+                "three_phase": config.training.lr_scheduler.three_phase,
+                "cycle_momentum": config.training.lr_scheduler.cycle_momentum,
+            },
+        )
+    if scheduler_name == "ReduceLROnPlateau":
+        return (
+            torch.optim.lr_scheduler.ReduceLROnPlateau,
+            {
+                "mode": config.training.lr_scheduler.mode,
+                "factor": config.training.lr_scheduler.factor,
+                "patience": config.training.lr_scheduler.patience,
+                "threshold": config.training.lr_scheduler.threshold,
+                "threshold_mode": config.training.lr_scheduler.threshold_mode,
+                "cooldown": config.training.lr_scheduler.cooldown,
+                "min_lr": config.training.lr_scheduler.min_lr,
+                "eps": config.training.lr_scheduler.eps,
+            },
+        )
+    raise ValueError(f"Unsupported training scheduler: {scheduler_name}")
 
 
 def build_model(
@@ -325,24 +367,15 @@ def build_model(
     if caps.requires_n_series:
         shared_kwargs["n_series"] = 1 if n_series is None else n_series
     signature = inspect.signature(model_cls.__init__)
-    scheduler_kwargs = {
-        "max_lr": config.training.lr_scheduler.max_lr,
-        "total_steps": config.training.max_steps,
-        "pct_start": config.training.lr_scheduler.pct_start,
-        "div_factor": config.training.lr_scheduler.div_factor,
-        "final_div_factor": config.training.lr_scheduler.final_div_factor,
-        "anneal_strategy": config.training.lr_scheduler.anneal_strategy,
-        "three_phase": config.training.lr_scheduler.three_phase,
-        "cycle_momentum": config.training.lr_scheduler.cycle_momentum,
-    }
+    scheduler_cls, scheduler_kwargs = _resolve_scheduler_config(config)
     if "max_lr" in signature.parameters:
         shared_kwargs["max_lr"] = config.training.lr_scheduler.max_lr
     else:
         shared_kwargs["_max_lr"] = config.training.lr_scheduler.max_lr
     if "lr_scheduler" in signature.parameters:
-        shared_kwargs["lr_scheduler"] = torch.optim.lr_scheduler.OneCycleLR
+        shared_kwargs["lr_scheduler"] = scheduler_cls
     else:
-        shared_kwargs["_lr_scheduler_cls"] = torch.optim.lr_scheduler.OneCycleLR
+        shared_kwargs["_lr_scheduler_cls"] = scheduler_cls
     if "lr_scheduler_kwargs" in signature.parameters:
         shared_kwargs["lr_scheduler_kwargs"] = scheduler_kwargs
     else:

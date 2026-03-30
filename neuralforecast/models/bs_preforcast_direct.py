@@ -83,6 +83,64 @@ def _max_lag(lags: int | list[int]) -> int:
     return lags if isinstance(lags, int) else max(lags)
 
 
+def _lag_list(lags: int | list[int]) -> list[int]:
+    return [lags] if isinstance(lags, int) else list(lags)
+
+
+def _build_hist_exog_feature_frame(
+    source_df: pd.DataFrame,
+    *,
+    hist_exog_cols: tuple[str, ...],
+    lags: int | list[int],
+) -> pd.DataFrame | None:
+    if not hist_exog_cols:
+        return None
+    missing = [column for column in hist_exog_cols if column not in source_df.columns]
+    if missing:
+        raise ValueError(
+            "direct tree models require configured dataset.hist_exog_cols to exist in the fold frame: "
+            + ", ".join(sorted(missing))
+        )
+    feature_columns: dict[str, pd.Series] = {}
+    for column in hist_exog_cols:
+        series = source_df[column].astype(float).reset_index(drop=True)
+        for lag in _lag_list(lags):
+            feature_columns[f"{column}_lag_{lag}"] = series.shift(lag)
+    return pd.DataFrame(feature_columns)
+
+
+def _build_hist_exog_feature_frames(
+    *,
+    train_df: pd.DataFrame,
+    future_df: pd.DataFrame,
+    hist_exog_cols: tuple[str, ...],
+    lags: int | list[int],
+) -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
+    if not hist_exog_cols:
+        return None, None
+    train_exog = _build_hist_exog_feature_frame(
+        train_df,
+        hist_exog_cols=hist_exog_cols,
+        lags=lags,
+    )
+    combined = pd.concat(
+        [
+            train_df.loc[:, list(hist_exog_cols)],
+            future_df.loc[:, list(hist_exog_cols)],
+        ],
+        ignore_index=True,
+    )
+    combined_exog = _build_hist_exog_feature_frame(
+        combined,
+        hist_exog_cols=hist_exog_cols,
+        lags=lags,
+    )
+    assert train_exog is not None
+    assert combined_exog is not None
+    future_exog = combined_exog.iloc[len(train_df) : len(train_df) + len(future_df)].copy()
+    return train_exog, future_exog
+
+
 def _build_tree_regressor(model_name: str, params: dict[str, Any]) -> Any:
     resolved_params = dict(params)
     if model_name == "xgboost":
@@ -156,10 +214,11 @@ def _build_tree_curve_frame(
     *,
     model_name: str,
     training_loss: str,
+    train_exog: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     from sklearn.base import clone
 
-    X_train, y_train = forecaster.create_train_X_y(y=series)
+    X_train, y_train = forecaster.create_train_X_y(y=series, exog=train_exog)
     step_frames: list[pd.DataFrame] = []
     metric_name, _ = _resolve_tree_history_metric(model_name, training_loss)
     for step in forecaster.steps:
@@ -347,17 +406,28 @@ def predict_univariate_tree(
         steps=len(future_df),
         lags=lags,
     )
+    train_exog, future_exog = _build_hist_exog_feature_frames(
+        train_df=train_df,
+        future_df=future_df,
+        hist_exog_cols=stage_loaded.config.dataset.hist_exog_cols,
+        lags=lags,
+    )
     series = train_df[target_column].astype(float).reset_index(drop=True)
     forecaster.fit(
         y=series,
+        exog=train_exog,
         suppress_warnings=True,
     )
-    predictions = forecaster.predict(steps=list(range(1, len(future_df) + 1)))
+    predictions = forecaster.predict(
+        steps=list(range(1, len(future_df) + 1)),
+        exog=future_exog,
+    )
     curve_frame = _build_tree_curve_frame(
         forecaster,
         series,
         model_name=model_name,
         training_loss=stage_loaded.config.training.loss,
+        train_exog=train_exog,
     )
     return DirectPredictionResult(
         predictions=[float(value) for value in predictions.to_list()],
