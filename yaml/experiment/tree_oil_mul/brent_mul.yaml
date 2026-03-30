@@ -1,3 +1,6 @@
+task:
+  name: brent_mul
+
 dataset:
   path: data/df.csv
   target_col: Com_BrentCrudeOil

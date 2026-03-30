@@ -215,22 +215,34 @@ def _extract_tree_history_frame(
     training_loss: str,
 ) -> pd.DataFrame:
     metric_name, postprocess = _resolve_tree_history_metric(model_name, training_loss)
-    raw_history: list[float]
+    train_history: list[float]
+    validation_history: list[float]
     if model_name == "xgboost":
         evals_result = estimator.evals_result()
-        dataset_history = next(iter(evals_result.values()), {})
-        raw_history = list(dataset_history.get(metric_name, []))
+        train_history = list(evals_result.get("validation_0", {}).get(metric_name, []))
+        validation_history = list(
+            evals_result.get("validation_1", {}).get(metric_name, [])
+        )
     else:
         evals_result = getattr(estimator, "evals_result_", {})
-        dataset_history = next(iter(evals_result.values()), {})
-        raw_history = list(dataset_history.get(metric_name, []))
-    if not raw_history:
+        train_history = list(evals_result.get("training", {}).get(metric_name, []))
+        validation_history = list(
+            evals_result.get("validation", {}).get(metric_name, [])
+        )
+    if not train_history:
         return pd.DataFrame(columns=["global_step", "train_loss", "val_loss"])
+    validation_values = (
+        [postprocess(value) for value in validation_history]
+        if validation_history
+        else [np.nan] * len(train_history)
+    )
+    if len(validation_values) < len(train_history):
+        validation_values.extend([np.nan] * (len(train_history) - len(validation_values)))
     return pd.DataFrame(
         {
-            "global_step": np.arange(1, len(raw_history) + 1, dtype=int),
-            "train_loss": [postprocess(value) for value in raw_history],
-            "val_loss": [np.nan] * len(raw_history),
+            "global_step": np.arange(1, len(train_history) + 1, dtype=int),
+            "train_loss": [postprocess(value) for value in train_history],
+            "val_loss": validation_values[: len(train_history)],
         }
     )
 
@@ -241,6 +253,7 @@ def _build_tree_curve_frame(
     *,
     model_name: str,
     training_loss: str,
+    val_size: int,
     train_exog: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     from sklearn.base import clone
@@ -256,14 +269,30 @@ def _build_tree_curve_frame(
             remove_suffix=True,
         )
         estimator = clone(forecaster.estimator)
-        fit_kwargs: dict[str, Any] = {"eval_set": [(X_step, y_step)]}
+        effective_val_size = max(0, int(val_size))
+        has_validation = effective_val_size > 0 and len(X_step) > effective_val_size
+        if has_validation:
+            split_idx = len(X_step) - effective_val_size
+            X_step_train = X_step.iloc[:split_idx].copy()
+            y_step_train = y_step.iloc[:split_idx].copy()
+            X_step_val = X_step.iloc[split_idx:].copy()
+            y_step_val = y_step.iloc[split_idx:].copy()
+            fit_kwargs: dict[str, Any] = {
+                "eval_set": [(X_step_train, y_step_train), (X_step_val, y_step_val)]
+            }
+        else:
+            X_step_train = X_step
+            y_step_train = y_step
+            fit_kwargs = {"eval_set": [(X_step_train, y_step_train)]}
         if model_name == "xgboost":
             estimator.set_params(eval_metric=metric_name)
             fit_kwargs["verbose"] = False
         else:
             fit_kwargs["eval_metric"] = metric_name
-            fit_kwargs["eval_names"] = ["training"]
-        estimator.fit(X_step, y_step, **fit_kwargs)
+            fit_kwargs["eval_names"] = (
+                ["training", "validation"] if has_validation else ["training"]
+            )
+        estimator.fit(X_step_train, y_step_train, **fit_kwargs)
         step_frame = _extract_tree_history_frame(
             estimator,
             model_name=model_name,
@@ -278,11 +307,13 @@ def _build_tree_curve_frame(
     combined = pd.concat(step_frames, ignore_index=True)
     aggregated = (
         combined.groupby("global_step", as_index=False)
-        .agg(train_loss=("train_loss", "mean"))
+        .agg(
+            train_loss=("train_loss", "mean"),
+            val_loss=("val_loss", "mean"),
+        )
         .sort_values("global_step", kind="stable")
         .reset_index(drop=True)
     )
-    aggregated["val_loss"] = np.nan
     return aggregated[["global_step", "train_loss", "val_loss"]]
 
 
@@ -458,6 +489,7 @@ def predict_univariate_tree(
         series,
         model_name=model_name,
         training_loss=stage_loaded.config.training.loss,
+        val_size=stage_loaded.config.training.val_size,
         train_exog=train_exog,
     )
     return DirectPredictionResult(

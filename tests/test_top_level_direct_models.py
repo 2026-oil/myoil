@@ -10,6 +10,7 @@ import yaml
 
 from app_config import load_app_config
 from neuralforecast.models.bs_preforcast_direct import (
+    _extract_tree_history_frame,
     _resolve_tree_history_metric,
     _sanitize_structural_warmup_exog_rows,
     predict_univariate_tree,
@@ -144,19 +145,16 @@ def test_validate_only_repro_config_accepts_top_level_direct_models(tmp_path: Pa
     runtime._validate_jobs(loaded, loaded.config.jobs, capability_path)
 
     capability = yaml.safe_load(capability_path.read_text(encoding="utf-8"))
-    assert [job.model for job in loaded.config.jobs][:8] == [
+    assert [job.model for job in loaded.config.jobs] == [
         "ARIMA",
         "DLinear",
         "ES",
         "lightgbm",
-        "LSTM",
-        "NHITS",
-        "PatchTST",
         "xgboost",
     ]
     for model_name in ("ARIMA", "ES", "xgboost", "lightgbm"):
-        assert capability[model_name]["requested_mode"] == "learned_fixed"
-        assert capability[model_name]["validated_mode"] == "learned_fixed"
+        assert capability[model_name]["requested_mode"] == "learned_auto_requested"
+        assert capability[model_name]["validated_mode"] == "learned_auto"
         assert capability[model_name]["validation_error"] is None
         assert capability[model_name]["supports_auto"] is True
     assert capability["ARIMA"]["supports_hist_exog"] is False
@@ -400,3 +398,42 @@ def test_tree_history_metric_rejects_unsupported_losses() -> None:
         match=r"support only training\.loss in \{mse, mae\}",
     ):
         _resolve_tree_history_metric("xgboost", "exloss")
+
+
+def test_extract_tree_history_frame_reads_xgboost_validation_history() -> None:
+    class _Estimator:
+        def evals_result(self):
+            return {
+                "validation_0": {"rmse": [2.0, 1.0]},
+                "validation_1": {"rmse": [3.0, 2.0]},
+            }
+
+    frame = _extract_tree_history_frame(
+        _Estimator(),
+        model_name="xgboost",
+        training_loss="mse",
+    )
+
+    assert frame.to_dict(orient="records") == [
+        {"global_step": 1, "train_loss": 4.0, "val_loss": 9.0},
+        {"global_step": 2, "train_loss": 1.0, "val_loss": 4.0},
+    ]
+
+
+def test_extract_tree_history_frame_reads_lightgbm_validation_history() -> None:
+    class _Estimator:
+        evals_result_ = {
+            "training": {"l1": [2.5, 1.5]},
+            "validation": {"l1": [3.5, 2.5]},
+        }
+
+    frame = _extract_tree_history_frame(
+        _Estimator(),
+        model_name="lightgbm",
+        training_loss="mae",
+    )
+
+    assert frame.to_dict(orient="records") == [
+        {"global_step": 1, "train_loss": 2.5, "val_loss": 3.5},
+        {"global_step": 2, "train_loss": 1.5, "val_loss": 2.5},
+    ]
