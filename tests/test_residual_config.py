@@ -146,6 +146,21 @@ def _onecycle_scheduler(max_lr: float = 0.001) -> dict[str, Any]:
     }
 
 
+def _plateau_scheduler(max_lr: float = 0.001) -> dict[str, Any]:
+    return {
+        "name": "ReduceLROnPlateau",
+        "max_lr": max_lr,
+        "mode": "min",
+        "factor": 0.5,
+        "patience": 1,
+        "threshold": 1e-4,
+        "threshold_mode": "rel",
+        "cooldown": 0,
+        "min_lr": 0.0,
+        "eps": 1e-8,
+    }
+
+
 
 def _write_search_space(
     root: Path,
@@ -1429,6 +1444,43 @@ def test_model_builder_propagates_centralized_training_controls(tmp_path: Path):
         assert model.hparams.val_check_steps == 7
         assert model.hparams.min_steps_before_early_stop == 13
         assert model.hparams.early_stop_patience_steps == 11
+
+
+def test_model_builder_supports_reduce_lr_on_plateau_scheduler(tmp_path: Path):
+    payload = _payload()
+    payload["training"]["lr_scheduler"] = _plateau_scheduler(0.007)
+    payload["jobs"] = [
+        {
+            "model": "LSTM",
+            "params": {"encoder_hidden_size": 32, "decoder_hidden_size": 32},
+        }
+    ]
+    (tmp_path / "data.csv").write_text(
+        "dt,target,hist_a\n2020-01-01,1,2\n", encoding="utf-8"
+    )
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    model = build_model(loaded.config, loaded.config.jobs[0])
+    optimizers = model.configure_optimizers()
+
+    assert loaded.normalized_payload["training"]["lr_scheduler"] == _plateau_scheduler(0.007)
+    assert model.hparams.max_lr == pytest.approx(0.007)
+    assert model._lr_scheduler_cls is torch.optim.lr_scheduler.ReduceLROnPlateau
+    assert model._lr_scheduler_kwargs["mode"] == "min"
+    assert model._lr_scheduler_kwargs["factor"] == pytest.approx(0.5)
+    assert model._lr_scheduler_kwargs["patience"] == 1
+    assert model._lr_scheduler_kwargs["threshold"] == pytest.approx(1e-4)
+    assert model._lr_scheduler_kwargs["threshold_mode"] == "rel"
+    assert model._lr_scheduler_kwargs["cooldown"] == 0
+    assert model._lr_scheduler_kwargs["min_lr"] == pytest.approx(0.0)
+    assert model._lr_scheduler_kwargs["eps"] == pytest.approx(1e-8)
+    assert optimizers["lr_scheduler"]["monitor"] == "ptl/val_loss"
+    assert isinstance(
+        optimizers["lr_scheduler"]["scheduler"],
+        torch.optim.lr_scheduler.ReduceLROnPlateau,
+    )
 
 
 def test_load_app_config_drops_training_season_length_and_maps_model_step_size(
@@ -7327,7 +7379,7 @@ EXPECTED_CASE_TRAINING = {
     "windows_batch_size": 1024,
     "inference_windows_batch_size": 1024,
     "optimizer": {"name": "adamw", "kwargs": {}},
-    "lr_scheduler": _onecycle_scheduler(0.001),
+    "lr_scheduler": _plateau_scheduler(0.001),
     "model_step_size": 1,
     "max_steps": 2000,
     "val_size": 16,
@@ -8772,6 +8824,7 @@ def test_hpt_n100_bs_effective_training_and_scheduler_come_from_global_setting()
     )
 
     assert payload["training"]["input_size"] == 64
+    assert payload["training"]["lr_scheduler"]["name"] == "ReduceLROnPlateau"
     assert payload["training"]["lr_scheduler"]["max_lr"] == pytest.approx(0.001)
     assert payload["training"]["val_check_steps"] == 20
     assert payload["training"]["min_steps_before_early_stop"] == 500

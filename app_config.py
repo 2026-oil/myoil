@@ -164,16 +164,62 @@ class TrainingLossParams:
 
 @dataclass(frozen=True)
 class TrainingLRSchedulerConfig:
-    name: Literal["OneCycleLR"] = "OneCycleLR"
+    name: Literal["OneCycleLR", "ReduceLROnPlateau"] = cast(
+        Literal["OneCycleLR", "ReduceLROnPlateau"],
+        DEFAULT_TRAINING_LR_SCHEDULER["name"],
+    )
     max_lr: float = DEFAULT_TRAINING_LR_SCHEDULER["max_lr"]
-    pct_start: float = DEFAULT_TRAINING_LR_SCHEDULER["pct_start"]
-    div_factor: float = DEFAULT_TRAINING_LR_SCHEDULER["div_factor"]
-    final_div_factor: float = DEFAULT_TRAINING_LR_SCHEDULER["final_div_factor"]
-    anneal_strategy: Literal["cos", "linear"] = DEFAULT_TRAINING_LR_SCHEDULER[
-        "anneal_strategy"
-    ]
-    three_phase: bool = DEFAULT_TRAINING_LR_SCHEDULER["three_phase"]
-    cycle_momentum: bool = DEFAULT_TRAINING_LR_SCHEDULER["cycle_momentum"]
+    pct_start: float | None = None
+    div_factor: float | None = None
+    final_div_factor: float | None = None
+    anneal_strategy: Literal["cos", "linear"] | None = None
+    three_phase: bool | None = None
+    cycle_momentum: bool | None = None
+    mode: Literal["min", "max"] | None = cast(
+        Literal["min", "max"] | None,
+        DEFAULT_TRAINING_LR_SCHEDULER.get("mode"),
+    )
+    factor: float | None = DEFAULT_TRAINING_LR_SCHEDULER.get("factor")
+    patience: int | None = DEFAULT_TRAINING_LR_SCHEDULER.get("patience")
+    threshold: float | None = DEFAULT_TRAINING_LR_SCHEDULER.get("threshold")
+    threshold_mode: Literal["rel", "abs"] | None = cast(
+        Literal["rel", "abs"] | None,
+        DEFAULT_TRAINING_LR_SCHEDULER.get("threshold_mode"),
+    )
+    cooldown: int | None = DEFAULT_TRAINING_LR_SCHEDULER.get("cooldown")
+    min_lr: float | None = DEFAULT_TRAINING_LR_SCHEDULER.get("min_lr")
+    eps: float | None = DEFAULT_TRAINING_LR_SCHEDULER.get("eps")
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "name": self.name,
+            "max_lr": self.max_lr,
+        }
+        if self.name == "OneCycleLR":
+            payload.update(
+                {
+                    "pct_start": self.pct_start,
+                    "div_factor": self.div_factor,
+                    "final_div_factor": self.final_div_factor,
+                    "anneal_strategy": self.anneal_strategy,
+                    "three_phase": self.three_phase,
+                    "cycle_momentum": self.cycle_momentum,
+                }
+            )
+        elif self.name == "ReduceLROnPlateau":
+            payload.update(
+                {
+                    "mode": self.mode,
+                    "factor": self.factor,
+                    "patience": self.patience,
+                    "threshold": self.threshold,
+                    "threshold_mode": self.threshold_mode,
+                    "cooldown": self.cooldown,
+                    "min_lr": self.min_lr,
+                    "eps": self.eps,
+                }
+            )
+        return payload
 
 
 @dataclass(frozen=True)
@@ -320,6 +366,7 @@ class AppConfig:
         if self.task.name is None:
             payload.pop("task", None)
         payload["dataset"]["path"] = str(self.dataset.path)
+        payload["training"]["lr_scheduler"] = self.training.lr_scheduler.to_dict()
         for key in ("transformations_target", "transformations_exog"):
             if payload["runtime"].get(key) is None:
                 payload["runtime"].pop(key, None)
@@ -651,53 +698,105 @@ def _normalize_training_lr_scheduler(value: Any) -> TrainingLRSchedulerConfig:
             "anneal_strategy",
             "three_phase",
             "cycle_momentum",
+            "mode",
+            "factor",
+            "patience",
+            "threshold",
+            "threshold_mode",
+            "cooldown",
+            "min_lr",
+            "eps",
         },
         section="training.lr_scheduler",
     )
     name = str(payload.get("name", "")).strip()
-    if name != "OneCycleLR":
-        raise ValueError("training.lr_scheduler.name must be 'OneCycleLR'")
+    if name not in {"OneCycleLR", "ReduceLROnPlateau"}:
+        raise ValueError(
+            "training.lr_scheduler.name must be one of: OneCycleLR, ReduceLROnPlateau"
+        )
     max_lr = _coerce_float(payload["max_lr"], field_name="training.lr_scheduler.max_lr")
     if max_lr <= 0:
         raise ValueError("training.lr_scheduler.max_lr must be > 0")
-    pct_start = _coerce_float(
-        payload["pct_start"], field_name="training.lr_scheduler.pct_start"
-    )
-    if not 0 < pct_start < 1:
-        raise ValueError("training.lr_scheduler.pct_start must satisfy 0 < value < 1")
-    div_factor = _coerce_float(
-        payload["div_factor"], field_name="training.lr_scheduler.div_factor"
-    )
-    if div_factor <= 1:
-        raise ValueError("training.lr_scheduler.div_factor must be > 1")
-    final_div_factor = _coerce_float(
-        payload["final_div_factor"],
-        field_name="training.lr_scheduler.final_div_factor",
-    )
-    if final_div_factor <= 1:
-        raise ValueError("training.lr_scheduler.final_div_factor must be > 1")
-    anneal_strategy = str(payload["anneal_strategy"]).strip().lower()
-    if anneal_strategy not in {"cos", "linear"}:
-        raise ValueError(
-            "training.lr_scheduler.anneal_strategy must be one of: cos, linear"
+    if name == "OneCycleLR":
+        pct_start = _coerce_float(
+            payload["pct_start"], field_name="training.lr_scheduler.pct_start"
         )
+        if not 0 < pct_start < 1:
+            raise ValueError("training.lr_scheduler.pct_start must satisfy 0 < value < 1")
+        div_factor = _coerce_float(
+            payload["div_factor"], field_name="training.lr_scheduler.div_factor"
+        )
+        if div_factor <= 1:
+            raise ValueError("training.lr_scheduler.div_factor must be > 1")
+        final_div_factor = _coerce_float(
+            payload["final_div_factor"],
+            field_name="training.lr_scheduler.final_div_factor",
+        )
+        if final_div_factor <= 1:
+            raise ValueError("training.lr_scheduler.final_div_factor must be > 1")
+        anneal_strategy = str(payload["anneal_strategy"]).strip().lower()
+        if anneal_strategy not in {"cos", "linear"}:
+            raise ValueError(
+                "training.lr_scheduler.anneal_strategy must be one of: cos, linear"
+            )
+        return TrainingLRSchedulerConfig(
+            name="OneCycleLR",
+            max_lr=max_lr,
+            pct_start=pct_start,
+            div_factor=div_factor,
+            final_div_factor=final_div_factor,
+            anneal_strategy=cast(Literal["cos", "linear"], anneal_strategy),
+            three_phase=_coerce_bool(
+                payload["three_phase"],
+                field_name="training.lr_scheduler.three_phase",
+                default=False,
+            ),
+            cycle_momentum=_coerce_bool(
+                payload["cycle_momentum"],
+                field_name="training.lr_scheduler.cycle_momentum",
+                default=False,
+            ),
+        )
+
+    mode = str(payload["mode"]).strip().lower()
+    if mode not in {"min", "max"}:
+        raise ValueError("training.lr_scheduler.mode must be one of: min, max")
+    factor = _coerce_float(payload["factor"], field_name="training.lr_scheduler.factor")
+    if not 0 < factor < 1:
+        raise ValueError("training.lr_scheduler.factor must satisfy 0 < value < 1")
+    patience = _coerce_nonnegative_int(
+        payload["patience"], field_name="training.lr_scheduler.patience"
+    )
+    threshold = _coerce_float(
+        payload["threshold"], field_name="training.lr_scheduler.threshold"
+    )
+    if threshold < 0:
+        raise ValueError("training.lr_scheduler.threshold must be >= 0")
+    threshold_mode = str(payload["threshold_mode"]).strip().lower()
+    if threshold_mode not in {"rel", "abs"}:
+        raise ValueError(
+            "training.lr_scheduler.threshold_mode must be one of: rel, abs"
+        )
+    cooldown = _coerce_nonnegative_int(
+        payload["cooldown"], field_name="training.lr_scheduler.cooldown"
+    )
+    min_lr = _coerce_float(payload["min_lr"], field_name="training.lr_scheduler.min_lr")
+    if min_lr < 0:
+        raise ValueError("training.lr_scheduler.min_lr must be >= 0")
+    eps = _coerce_float(payload["eps"], field_name="training.lr_scheduler.eps")
+    if eps <= 0:
+        raise ValueError("training.lr_scheduler.eps must be > 0")
     return TrainingLRSchedulerConfig(
-        name="OneCycleLR",
+        name="ReduceLROnPlateau",
         max_lr=max_lr,
-        pct_start=pct_start,
-        div_factor=div_factor,
-        final_div_factor=final_div_factor,
-        anneal_strategy=cast(Literal["cos", "linear"], anneal_strategy),
-        three_phase=_coerce_bool(
-            payload["three_phase"],
-            field_name="training.lr_scheduler.three_phase",
-            default=False,
-        ),
-        cycle_momentum=_coerce_bool(
-            payload["cycle_momentum"],
-            field_name="training.lr_scheduler.cycle_momentum",
-            default=False,
-        ),
+        mode=cast(Literal["min", "max"], mode),
+        factor=factor,
+        patience=patience,
+        threshold=threshold,
+        threshold_mode=cast(Literal["rel", "abs"], threshold_mode),
+        cooldown=cooldown,
+        min_lr=min_lr,
+        eps=eps,
     )
 
 

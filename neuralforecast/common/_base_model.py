@@ -654,24 +654,42 @@ class BaseModel(pl.LightningModule):
 
         scheduler_cls = self._lr_scheduler_cls or torch.optim.lr_scheduler.OneCycleLR
         lr_scheduler_signature = inspect.signature(scheduler_cls)
-        lr_scheduler_kwargs = {
-            "max_lr": self.max_lr,
-            "total_steps": self.max_steps,
-            "pct_start": 0.3,
-            "div_factor": 25.0,
-            "final_div_factor": 10000.0,
-            "anneal_strategy": "cos",
-            "three_phase": False,
-            "cycle_momentum": False,
-            **deepcopy(self._lr_scheduler_kwargs),
-        }
+        if scheduler_cls is torch.optim.lr_scheduler.ReduceLROnPlateau:
+            lr_scheduler_kwargs = {
+                "mode": "min",
+                "factor": 0.5,
+                "patience": 1,
+                "threshold": 1e-4,
+                "threshold_mode": "rel",
+                "cooldown": 0,
+                "min_lr": 0.0,
+                "eps": 1e-8,
+                **deepcopy(self._lr_scheduler_kwargs),
+            }
+        else:
+            lr_scheduler_kwargs = {
+                "max_lr": self.max_lr,
+                "total_steps": self.max_steps,
+                "pct_start": 0.3,
+                "div_factor": 25.0,
+                "final_div_factor": 10000.0,
+                "anneal_strategy": "cos",
+                "three_phase": False,
+                "cycle_momentum": False,
+                **deepcopy(self._lr_scheduler_kwargs),
+            }
         if "optimizer" in lr_scheduler_signature.parameters:
             if "optimizer" in lr_scheduler_kwargs:
                 warnings.warn(
                     "ignoring optimizer passed in lr_scheduler_kwargs, using the model's optimizer"
                 )
                 del lr_scheduler_kwargs["optimizer"]
-        lr_scheduler = {"frequency": 1, "interval": "step"}
+        lr_scheduler = {}
+        if scheduler_cls is torch.optim.lr_scheduler.ReduceLROnPlateau:
+            lr_scheduler["monitor"] = "ptl/val_loss"
+        else:
+            lr_scheduler["frequency"] = 1
+            lr_scheduler["interval"] = "step"
         lr_scheduler["scheduler"] = scheduler_cls(
             optimizer=optimizer, **lr_scheduler_kwargs
         )

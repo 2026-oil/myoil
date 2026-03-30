@@ -113,14 +113,16 @@ DEFAULT_TRAINING_PARAMS = {
     "early_stop_patience_steps": -1,
 }
 DEFAULT_TRAINING_LR_SCHEDULER = {
-    "name": "OneCycleLR",
+    "name": "ReduceLROnPlateau",
     "max_lr": 0.001,
-    "pct_start": 0.3,
-    "div_factor": 25.0,
-    "final_div_factor": 10000.0,
-    "anneal_strategy": "cos",
-    "three_phase": False,
-    "cycle_momentum": False,
+    "mode": "min",
+    "factor": 0.5,
+    "patience": 1,
+    "threshold": 1e-4,
+    "threshold_mode": "rel",
+    "cooldown": 0,
+    "min_lr": 0.0,
+    "eps": 1e-8,
 }
 LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD = {"step_size": "model_step_size"}
 FIXED_TRAINING_VALUES = {
