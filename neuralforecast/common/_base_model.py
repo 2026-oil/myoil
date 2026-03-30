@@ -609,6 +609,22 @@ class BaseModel(pl.LightningModule):
                 "setting val_check_steps to max_steps."
             )
         val_check_interval = min(self.val_check_steps, self.max_steps)
+        if self._lr_scheduler_cls is torch.optim.lr_scheduler.ReduceLROnPlateau:
+            if val_size <= 0:
+                raise ValueError(
+                    "ReduceLROnPlateau requires val_size > 0 because it monitors "
+                    "the validation metric ptl/val_loss."
+                )
+            train_batches_per_epoch = max(1, len(datamodule.train_dataloader()))
+            if val_check_interval > train_batches_per_epoch:
+                raise ValueError(
+                    "ReduceLROnPlateau requires validation before the first "
+                    "scheduler step. "
+                    f"Got val_check_steps={self.val_check_steps}, "
+                    f"effective_val_check_interval={val_check_interval}, "
+                    f"train_batches_per_epoch={train_batches_per_epoch}, "
+                    f"val_size={val_size}."
+                )
         self.trainer_kwargs["val_check_interval"] = int(val_check_interval)
         self.trainer_kwargs["check_val_every_n_epoch"] = None
         self._maybe_add_best_checkpoint_callback()

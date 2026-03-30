@@ -19,7 +19,7 @@ import yaml
 import neuralforecast.auto as nf_auto
 import neuralforecast.models as nf_models
 import plugins.bs_preforcast.runtime as bs_runtime
-from neuralforecast.core import MODEL_FILENAME_DICT
+from neuralforecast.core import MODEL_FILENAME_DICT, NeuralForecast
 from runtime_support.adapters import build_multivariate_inputs, build_univariate_inputs
 from plugins.bs_preforcast.runtime import prepare_bs_preforcast_fold_inputs
 from app_config import (
@@ -160,6 +160,16 @@ def _plateau_scheduler(max_lr: float = 0.001) -> dict[str, Any]:
         "min_lr": 0.0,
         "eps": 1e-8,
     }
+
+
+def _simple_univariate_source_frame(rows: int = 96) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "dt": pd.date_range("2020-01-01", periods=rows, freq="D"),
+            "target": np.linspace(1.0, float(rows), rows),
+            "hist_a": np.linspace(10.0, 10.0 + rows - 1, rows),
+        }
+    )
 
 
 
@@ -1482,6 +1492,84 @@ def test_model_builder_supports_reduce_lr_on_plateau_scheduler(tmp_path: Path):
         optimizers["lr_scheduler"]["scheduler"],
         torch.optim.lr_scheduler.ReduceLROnPlateau,
     )
+
+
+def test_reduce_lr_on_plateau_requires_validation_set(tmp_path: Path):
+    payload = _payload()
+    payload["training"].update(
+        {
+            "lr_scheduler": _plateau_scheduler(0.007),
+            "val_size": 0,
+            "val_check_steps": 1,
+            "max_steps": 5,
+            "early_stop_patience_steps": -1,
+        }
+    )
+    payload["residual"]["enabled"] = False
+    payload["jobs"] = [{"model": "DummyUnivariate", "params": {"h_train": 1}}]
+    _write_search_space(tmp_path)
+    _simple_univariate_source_frame().to_csv(tmp_path / "data.csv", index=False)
+
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+    model = build_model(loaded.config, loaded.config.jobs[0])
+    adapter_inputs = build_univariate_inputs(
+        _simple_univariate_source_frame(),
+        loaded.config.jobs[0],
+        dataset=loaded.config.dataset,
+        dt_col=loaded.config.dataset.dt_col,
+    )
+    nf = NeuralForecast(models=[model], freq="D")
+
+    with pytest.raises(ValueError, match="ReduceLROnPlateau requires val_size > 0"):
+        nf.fit(
+            adapter_inputs.fit_df,
+            static_df=adapter_inputs.static_df,
+            val_size=loaded.config.training.val_size,
+        )
+
+
+def test_reduce_lr_on_plateau_requires_validation_before_scheduler_step(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["training"].update(
+        {
+            "lr_scheduler": _plateau_scheduler(0.007),
+            "val_size": 12,
+            "val_check_steps": 20,
+            "max_steps": 50,
+            "early_stop_patience_steps": -1,
+        }
+    )
+    payload["residual"]["enabled"] = False
+    payload["jobs"] = [{"model": "DummyUnivariate", "params": {"h_train": 1}}]
+    _write_search_space(tmp_path)
+    source_df = _simple_univariate_source_frame()
+    source_df.to_csv(tmp_path / "data.csv", index=False)
+
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+    model = build_model(loaded.config, loaded.config.jobs[0])
+    adapter_inputs = build_univariate_inputs(
+        source_df,
+        loaded.config.jobs[0],
+        dataset=loaded.config.dataset,
+        dt_col=loaded.config.dataset.dt_col,
+    )
+    nf = NeuralForecast(models=[model], freq="D")
+
+    with pytest.raises(
+        ValueError,
+        match="ReduceLROnPlateau requires validation before the first scheduler step",
+    ):
+        nf.fit(
+            adapter_inputs.fit_df,
+            static_df=adapter_inputs.static_df,
+            val_size=loaded.config.training.val_size,
+        )
 
 
 def test_load_app_config_drops_training_season_length_and_maps_model_step_size(
