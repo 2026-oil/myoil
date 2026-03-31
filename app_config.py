@@ -82,6 +82,7 @@ SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
     "training.windows_batch_size",
     "training.inference_windows_batch_size",
     "training.lr_scheduler",
+    "training.scaler_type",
     "training.max_steps",
     "training.val_size",
     "training.val_check_steps",

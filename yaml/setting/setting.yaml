@@ -8,6 +8,7 @@ training:
   inference_windows_batch_size: 1024
   max_steps: 2000
   val_size: 16
+  scaler_type: robust
   val_check_steps: 1
   min_steps_before_early_stop: 500
   model_step_size: 1

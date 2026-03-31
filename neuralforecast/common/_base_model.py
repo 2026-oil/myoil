@@ -759,8 +759,6 @@ class BaseModel(pl.LightningModule):
     def _update_best_val_state(self, avg_loss: float) -> None:
         if not math.isfinite(avg_loss):
             return
-        if self.global_step < self.min_steps_before_early_stop:
-            return
         if self._best_val_metric is None or avg_loss < self._best_val_metric:
             self._best_val_metric = float(avg_loss)
             self._best_val_global_step = int(self.global_step)
