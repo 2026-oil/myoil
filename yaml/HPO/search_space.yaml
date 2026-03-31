@@ -75,12 +75,6 @@ models:
       choices:
       - 1
       - 2
-    context_size:
-      type: categorical
-      choices:
-      - 16
-      - 32
-      - 64
   iTransformer:
     hidden_size:
       type: categorical
@@ -696,12 +690,6 @@ bs_preforcast_models:
       choices:
       - 2
       - 4
-    context_size:
-      type: categorical
-      choices:
-      - 16
-      - 32
-      - 64
   TSMixerx:
     n_block:
       type: categorical

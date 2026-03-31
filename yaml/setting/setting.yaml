@@ -6,24 +6,24 @@ training:
   valid_batch_size: 64
   windows_batch_size: 1024
   inference_windows_batch_size: 1024
-  max_steps: 2000
+  max_steps: 1000
   val_size: 16
   scaler_type: robust
   val_check_steps: 1
-  min_steps_before_early_stop: 500
+  min_steps_before_early_stop: 100
   model_step_size: 1
-  early_stop_patience_steps: 3
+  early_stop_patience_steps: 6
   loss: mae
   optimizer:
     name: adamw
     kwargs: {}
   lr_scheduler:
     name: ReduceLROnPlateau
-    max_lr: 0.001
+    max_lr: 0.0003
     mode: min
     factor: 0.5
-    patience: 1
-    threshold: 0.0001
+    patience: 2
+    threshold: 0.001
     threshold_mode: rel
     cooldown: 0
     min_lr: 0.0

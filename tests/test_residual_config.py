@@ -6622,7 +6622,6 @@ def test_narrowed_model_param_ranges_are_explicit_for_selected_auto_models():
                 "encoder_dropout": (0.0, 0.1, 0.2, 0.3),
                 "decoder_hidden_size": (96, 128, 160),
                 "decoder_layers": (1, 2),
-                "context_size": (16, 32, 64),
             },
         },
     }
@@ -7489,13 +7488,17 @@ EXPECTED_CASE_TRAINING = {
     "inference_windows_batch_size": 1024,
     "scaler_type": "robust",
     "optimizer": {"name": "adamw", "kwargs": {}},
-    "lr_scheduler": _plateau_scheduler(0.001),
+    "lr_scheduler": {
+        **_plateau_scheduler(0.0003),
+        "patience": 2,
+        "threshold": 0.001,
+    },
     "model_step_size": 1,
-    "max_steps": 2000,
+    "max_steps": 1000,
     "val_size": 16,
     "val_check_steps": 1,
-    "min_steps_before_early_stop": 500,
-    "early_stop_patience_steps": 3,
+    "min_steps_before_early_stop": 100,
+    "early_stop_patience_steps": 6,
     "loss": "mae",
 }
 
@@ -7504,7 +7507,6 @@ EXPECTED_CASE_MODEL_PARAMS = {
         "encoder_hidden_size": 64,
         "decoder_hidden_size": 64,
         "encoder_n_layers": 4,
-        "context_size": 8,
     },
     "TimeXer": {
         "patch_len": 8,
@@ -7537,7 +7539,6 @@ EXPECTED_SHARED_DEFAULT_MODEL_PARAMS = {
         "encoder_hidden_size": 64,
         "decoder_hidden_size": 64,
         "encoder_n_layers": 4,
-        "context_size": 10,
     },
     "TimeXer": {
         "patch_len": 16,
@@ -7683,7 +7684,6 @@ EXPECTED_REPO_AUTO_SELECTORS = {
         "encoder_dropout",
         "decoder_hidden_size",
         "decoder_layers",
-        "context_size",
     ],
     "NonstationaryTransformer": [
         "hidden_size",
@@ -8064,7 +8064,6 @@ def test_bs_preforcast_uni_jobs_yaml_fanout_catalog_matches_requested_fixed_para
             "encoder_hidden_size": 64,
             "decoder_hidden_size": 64,
             "encoder_n_layers": 4,
-            "context_size": 8,
         },
         "PatchTST": {
             "hidden_size": 16,
@@ -8123,7 +8122,6 @@ def test_bs_preforcast_multi_jobs_yaml_matches_requested_fixed_params() -> None:
             "encoder_hidden_size": 64,
             "decoder_hidden_size": 64,
             "encoder_n_layers": 4,
-            "context_size": 8,
         },
         "TSMixerx": {
             "n_block": 3,
@@ -9260,7 +9258,7 @@ def test_repo_search_space_updates_requested_auto_selectors_only():
     assert set(FIXED_TRAINING_KEYS).isdisjoint(SEARCH_SPACE_TRAINING)
     assert "step_size" not in SEARCH_SPACE_TRAINING
     assert "early_stop_patience_steps" not in SEARCH_SPACE_TRAINING
-    assert "context_size" in SEARCH_SPACE_MODELS["LSTM"]
+    assert "context_size" not in SEARCH_SPACE_MODELS["LSTM"]
     assert "GRU" not in SEARCH_SPACE_MODELS
     assert "TFT" not in SEARCH_SPACE_MODELS
 
