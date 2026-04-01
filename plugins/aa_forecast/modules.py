@@ -91,5 +91,5 @@ class CriticalSparseAttention(nn.Module):
         fallback = hidden_states[:, -1, :]
         context = torch.where(has_any, context, fallback)
         expanded_context = context.unsqueeze(1).expand(-1, hidden_states.size(1), -1)
-        attended = hidden_states + expanded_context
+        attended = torch.where(mask.unsqueeze(-1), expanded_context, hidden_states)
         return attended, weights
