@@ -6,14 +6,10 @@ dataset:
   dt_col: dt
   hist_exog_cols:
     - Idx_OVX
-    - Com_CrudeOil
-    - Com_Gasoline
-    - Idx_SnPVIX
     - Com_Oil_Spread
     - BS_Core_Index_A
     - BS_Core_Index_B
     - BS_Core_Index_C
-    - BS_Core_Index_Integrated
     - Com_LMEX
     - Com_BloombergCommodity_BCOM
     - GPRD_THREAT
