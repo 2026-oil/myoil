@@ -76,6 +76,7 @@ LEGACY_SHARED_JOB_TRAINING_KEYS = {
 }
 SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
     "runtime.random_seed",
+    "runtime.opt_n_trial",
     "training.input_size",
     "training.batch_size",
     "training.valid_batch_size",

@@ -8305,7 +8305,7 @@ def test_load_app_config_auto_loads_repo_shared_settings_for_repo_yaml(tmp_path:
     (tmp_path / "yaml" / "setting" / "setting.yaml").write_text(
         yaml.safe_dump(
             {
-                "runtime": {"random_seed": 11},
+                "runtime": {"random_seed": 11, "opt_n_trial": 13},
                 "training": {
                     "input_size": 8,
                     "batch_size": 32,
@@ -8359,6 +8359,7 @@ def test_load_app_config_auto_loads_repo_shared_settings_for_repo_yaml(tmp_path:
     loaded = load_app_config(tmp_path, config_path=config_path)
 
     assert loaded.config.runtime.random_seed == 11
+    assert loaded.config.runtime.opt_n_trial == 13
     assert loaded.config.training.input_size == 8
     assert loaded.config.training.batch_size == 32
     assert loaded.config.training.loss == "mse"
