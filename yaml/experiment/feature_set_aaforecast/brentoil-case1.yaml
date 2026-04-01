@@ -22,10 +22,10 @@ residual:
 jobs:
   - model: AAForecast
     params:
-      encoder_hidden_size: 128
+      encoder_hidden_size: 256
       encoder_n_layers: 2
       encoder_dropout: 0.1
-      decoder_hidden_size: 128
+      decoder_hidden_size: 256
       decoder_layers: 2
       season_length: 4
       trend_kernel_size: 3
