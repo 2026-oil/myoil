@@ -142,6 +142,15 @@ class AAForecast(BaseModel):
             return hidden
         return hidden[:, -self.h :]
 
+    def _event_mask(self, event_signal: torch.Tensor) -> torch.Tensor:
+        event_center = event_signal.median(dim=1, keepdim=True).values
+        event_mad = (
+            (event_signal - event_center).abs().median(dim=1, keepdim=True).values
+        ).clamp_min(1e-4)
+        upward_shift = (event_signal - event_center).clamp_min(0.0)
+        event_score = 0.6745 * upward_shift / event_mad
+        return event_score > self.anomaly_threshold
+
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]
         hist_exog = windows_batch["hist_exog"]
@@ -153,8 +162,10 @@ class AAForecast(BaseModel):
         if self.hist_exog_size > 0:
             encoder_parts.append(hist_exog)
             event_signal = hist_exog[:, :, :1]
+            event_mask = self._event_mask(event_signal)
         else:
             event_signal = torch.zeros_like(insample_y)
+            event_mask = torch.zeros_like(insample_y, dtype=torch.bool)
         encoder_parts.extend(
             [
                 star["trend"],
@@ -166,7 +177,7 @@ class AAForecast(BaseModel):
         encoder_input = torch.cat(encoder_parts, dim=2)
 
         hidden_states, _ = self.encoder(encoder_input)
-        critical_mask = star["critical_mask"] | (event_signal.abs() > 0)
+        critical_mask = star["critical_mask"] | event_mask
         attended_states, _ = self.attention(hidden_states, critical_mask)
 
         hidden_aligned = self._align_horizon(hidden_states)
