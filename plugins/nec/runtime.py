@@ -1,24 +1,31 @@
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 import json
-import math
 from pathlib import Path
 from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
 from sklearn.mixture import GaussianMixture
-import torch
-from torch import nn
-from torch.utils.data import DataLoader, TensorDataset
+from neuralforecast import NeuralForecast
 
 from app_config import JobConfig, LoadedConfig
-from .config import NecClassifierConfig, NecConfig, NecForecastConfig
+from runtime_support.adapters import build_univariate_inputs
+from runtime_support.forecast_models import build_model
+from .config import NecConfig, nec_active_hist_columns, nec_branch_configs
+
+_PROBABILITY_COLUMN = "__nec_probability_feature"
 
 
-def _device() -> torch.device:
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+@dataclass(frozen=True)
+class _BranchRunResult:
+    name: str
+    model_name: str
+    variables: tuple[str, ...]
+    predictions: np.ndarray
+    raw_predictions: np.ndarray
+    actual: np.ndarray
 
 
 def _stage_root(run_root: Path) -> Path:
@@ -26,6 +33,12 @@ def _stage_root(run_root: Path) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     (root / "config").mkdir(parents=True, exist_ok=True)
     (root / "manifest").mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _summary_root(run_root: Path) -> Path:
+    root = run_root / "summary" / "nec"
+    root.mkdir(parents=True, exist_ok=True)
     return root
 
 
@@ -38,63 +51,26 @@ def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-class _Encoder(nn.Module):
-    def __init__(self, input_dim: int, hidden_dim: int, layer_dim: int, dropout: float) -> None:
-        super().__init__()
-        effective_dropout = dropout if layer_dim > 1 else 0.0
-        self.lstm = nn.LSTM(input_dim, hidden_dim, layer_dim, dropout=effective_dropout, batch_first=True)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out, _ = self.lstm(x)
-        return out
-
-
-class _RegressionHead(nn.Module):
-    def __init__(self, hidden_dim: int, output_dim: int) -> None:
-        super().__init__()
-        self.bn1 = nn.BatchNorm1d(hidden_dim)
-        self.fc1 = nn.Linear(hidden_dim, 512)
-        self.bn2 = nn.BatchNorm1d(512)
-        self.fc2 = nn.Linear(512, 256)
-        self.bn3 = nn.BatchNorm1d(256)
-        self.fc3 = nn.Linear(256, output_dim)
-
-    def forward(self, encoded: torch.Tensor) -> torch.Tensor:
-        x = self.fc1(self.bn1(encoded[:, -1, :]))
-        x = self.fc2(self.bn2(x))
-        x = self.fc3(self.bn3(x))
-        return x
+def _infer_freq(train_df: pd.DataFrame, dt_col: str) -> str:
+    series = pd.to_datetime(train_df[dt_col])
+    inferred = pd.infer_freq(series)
+    if inferred is not None:
+        return inferred
+    if len(series) < 2:
+        raise ValueError("NEC could not infer dataset frequency from fewer than 2 timestamps")
+    return pd.tseries.frequencies.to_offset(series.iloc[1] - series.iloc[0]).freqstr
 
 
-class _ClassifierHead(nn.Module):
-    def __init__(self, hidden_dim: int, output_dim: int) -> None:
-        super().__init__()
-        self.bn1 = nn.BatchNorm1d(hidden_dim)
-        self.fc1 = nn.Linear(hidden_dim, output_dim)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, encoded: torch.Tensor) -> torch.Tensor:
-        return self.sigmoid(self.fc1(self.bn1(encoded[:, -1, :])))
+def _branch_target_column(branch_name: str) -> str:
+    return f"__nec_{branch_name}_target"
 
 
-class _Regressor(nn.Module):
-    def __init__(self, input_dim: int, hidden_dim: int, layer_dim: int, output_dim: int, dropout: float) -> None:
-        super().__init__()
-        self.encoder = _Encoder(input_dim, hidden_dim, layer_dim, dropout)
-        self.head = _RegressionHead(hidden_dim, output_dim)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.head(self.encoder(x))
-
-
-class _Classifier(nn.Module):
-    def __init__(self, input_dim: int, hidden_dim: int, layer_dim: int, output_dim: int, dropout: float) -> None:
-        super().__init__()
-        self.encoder = _Encoder(input_dim, hidden_dim, layer_dim, dropout)
-        self.head = _ClassifierHead(hidden_dim, output_dim)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.head(self.encoder(x))
+def _next_fold_index(run_root: Path) -> int:
+    classifier_dir = _summary_root(run_root) / "classifier"
+    if not classifier_dir.exists():
+        return 0
+    existing = sorted(classifier_dir.glob("fold_*.csv"))
+    return len(existing)
 
 
 class _NecPredictor:
@@ -105,35 +81,39 @@ class _NecPredictor:
         self.config: NecConfig = loaded.config.stage_plugin_config
         self.target_col = loaded.config.dataset.target_col
         self.dt_col = loaded.config.dataset.dt_col
-        self.history_steps = self.config.history_steps or loaded.config.training.input_size
+        self.history_steps = loaded.config.training.input_size
         self.horizon = len(self.future_df)
-        self.device = _device()
-        self.rng = np.random.default_rng(self.loaded.config.runtime.random_seed)
+        self.freq = _infer_freq(self.train_df, self.dt_col)
+        self.active_hist_columns = nec_active_hist_columns(self.config)
         self._validate_frames()
-        (
-            self.feature_matrix,
-            self.diff_norm_target,
-            self.target_mean,
-            self.target_std,
-            self.extreme_flags,
-        ) = self._build_training_features()
+        self.diff_norm_target, self.target_mean, self.target_std = self._diff_normalize(
+            self.train_df[self.target_col].astype(float).to_numpy()
+        )
+        self.normalized_columns = self._build_normalized_columns()
+        self.probability_feature = self._build_probability_feature()
+        self.extreme_flags = (np.abs(self.diff_norm_target) > self.config.preprocessing.epsilon).astype(np.float32)
+        self.normal_feature_matrix = self._feature_matrix_for_branch("normal")
+        self.extreme_feature_matrix = self._feature_matrix_for_branch("extreme")
+        self.classifier_feature_matrix = self._feature_matrix_for_branch("classifier")
         total_windows = len(self.diff_norm_target) - self.history_steps - self.horizon + 1
         if total_windows <= 0:
-            raise ValueError("NEC requires at least history_steps + horizon training rows in each fold")
-        self.train_positions, self.val_positions = self._split_positions(total_windows)
-        if not self.train_positions:
-            raise ValueError("NEC requires at least one training window in each fold")
-        if not self.val_positions:
-            raise ValueError("NEC requires at least one validation window in each fold")
+            raise ValueError("NEC requires at least training.input_size + horizon training rows in each fold")
+        self.actual_target = self.future_df[self.target_col].astype(float).to_numpy(dtype=np.float32)
+        self.actual_classifier = self._future_extreme_flags()
 
     def _validate_frames(self) -> None:
-        required_columns = [self.target_col, *self.config.hist_columns]
-        missing = [c for c in required_columns if c not in self.train_df.columns]
+        required_columns = [self.target_col, *self.active_hist_columns]
+        missing = [column for column in required_columns if column not in self.train_df.columns]
         if missing:
-            raise ValueError("NEC configured hist_columns are missing from the training frame: " + ", ".join(missing))
+            raise ValueError(
+                "NEC configured branch variables are missing from the training frame: " + ", ".join(missing)
+            )
         for column in required_columns:
             if self.train_df[column].isna().any():
                 raise ValueError(f"NEC does not support NaN values in training column {column!r}")
+        for column in self.active_hist_columns:
+            if self.future_df[column].isna().any():
+                raise ValueError(f"NEC does not support NaN values in future column {column!r}")
 
     def _diff_normalize(self, values: np.ndarray) -> tuple[np.ndarray, float, float]:
         if self.config.preprocessing.mode != "diff_std":
@@ -145,184 +125,120 @@ class _NecPredictor:
             raise ValueError("NEC diff preprocessing requires non-zero standard deviation")
         return ((diffs - mean) / std).astype(np.float32), mean, std
 
-    def _build_training_features(self) -> tuple[np.ndarray, np.ndarray, float, float, np.ndarray]:
-        target = self.train_df[self.target_col].astype(float).to_numpy()
-        diff_norm_target, mean, std = self._diff_normalize(target)
-        features = [diff_norm_target.reshape(-1, 1)]
-        for column in self.config.hist_columns:
-            column_values = self.train_df[column].astype(float).to_numpy()
-            diff_norm, _col_mean, _col_std = self._diff_normalize(column_values)
-            features.append(diff_norm.reshape(-1, 1))
-        if self.config.preprocessing.probability_feature:
-            gm = GaussianMixture(
-                n_components=self.config.preprocessing.gmm_components,
-                random_state=self.loaded.config.runtime.random_seed,
-            )
-            target_prob = diff_norm_target.reshape(-1, 1)
-            gm.fit(target_prob)
-            proba = gm.predict_proba(target_prob)
-            weights = gm.weights_
-            prob_in_distribution = (proba * weights).sum(axis=1)
-            prob_like_outlier = 1.0 - prob_in_distribution
-            features.append(prob_like_outlier.reshape(-1, 1))
-        matrix = np.concatenate(features, axis=1).astype(np.float32)
-        extreme_flags = (np.abs(diff_norm_target) > self.config.preprocessing.epsilon).astype(np.float32)
-        return matrix, diff_norm_target.astype(np.float32), mean, std, extreme_flags
+    def _build_normalized_columns(self) -> dict[str, np.ndarray]:
+        normalized: dict[str, np.ndarray] = {self.target_col: self.diff_norm_target}
+        for column in self.active_hist_columns:
+            values = self.train_df[column].astype(float).to_numpy()
+            diff_norm, _mean, _std = self._diff_normalize(values)
+            normalized[column] = diff_norm.astype(np.float32)
+        return normalized
 
-    def _split_positions(self, total_windows: int) -> tuple[list[int], list[int]]:
-        positions = list(range(self.history_steps, len(self.diff_norm_target) - self.horizon + 1))
-        val_windows = min(max(1, self.config.validation.windows), len(positions) - 1)
-        if val_windows <= 0 or val_windows >= len(positions):
-            raise ValueError("NEC validation split leaves no training windows")
-        return positions[:-val_windows], positions[-val_windows:]
-
-    def _window_inputs(self, start: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        x = self.feature_matrix[start - self.history_steps : start]
-        y_reg = self.diff_norm_target[start : start + self.horizon]
-        y_cls = self.extreme_flags[start : start + self.horizon]
-        return x, y_reg, y_cls
-
-    def _sample_positions(self, positions: list[int], model_cfg: NecForecastConfig | NecClassifierConfig) -> list[int]:
-        if not positions:
-            raise ValueError("NEC cannot sample from an empty position set")
-        if not model_cfg.oversampling:
-            size = model_cfg.train_volume
-            chosen = self.rng.choice(positions, size=size, replace=size > len(positions))
-            return [int(item) for item in chosen.tolist()]
-        extreme_positions = [pos for pos in positions if self.extreme_flags[pos : pos + self.horizon].sum() >= 1]
-        normal_positions = [pos for pos in positions if self.extreme_flags[pos : pos + self.horizon].sum() == 0]
-        if not extreme_positions:
-            raise ValueError("NEC oversampling requested but no extreme windows exist in training fold")
-        normal_target = int(round(model_cfg.train_volume * model_cfg.normal_ratio))
-        extreme_target = model_cfg.train_volume - normal_target
-        sampled: list[int] = []
-        sampled.extend(
-            int(item)
-            for item in self.rng.choice(extreme_positions, size=extreme_target, replace=extreme_target > len(extreme_positions)).tolist()
+    def _build_probability_feature(self) -> np.ndarray:
+        gm = GaussianMixture(
+            n_components=self.config.preprocessing.gmm_components,
+            random_state=self.loaded.config.runtime.random_seed,
         )
-        if normal_target:
-            if not normal_positions:
-                raise ValueError("NEC oversampling requested normal windows but none exist in training fold")
-            sampled.extend(
-                int(item)
-                for item in self.rng.choice(normal_positions, size=normal_target, replace=normal_target > len(normal_positions)).tolist()
+        target_prob = self.diff_norm_target.reshape(-1, 1)
+        gm.fit(target_prob)
+        proba = gm.predict_proba(target_prob)
+        weights = gm.weights_
+        prob_in_distribution = (proba * weights).sum(axis=1)
+        prob_like_outlier = 1.0 - prob_in_distribution
+        return prob_like_outlier.reshape(-1, 1).astype(np.float32)
+
+    def _feature_columns_for_branch(self, branch_name: str) -> tuple[str, ...]:
+        branch = nec_branch_configs(self.config)[branch_name]
+        columns = [self.target_col, *branch.variables]
+        if branch_name in {"classifier", "extreme"}:
+            columns.append(_PROBABILITY_COLUMN)
+        return tuple(columns)
+
+    def _feature_matrix_for_branch(self, branch_name: str) -> np.ndarray:
+        arrays = []
+        for column in self._feature_columns_for_branch(branch_name):
+            if column == _PROBABILITY_COLUMN:
+                arrays.append(self.probability_feature)
+            else:
+                arrays.append(self.normalized_columns[column].reshape(-1, 1))
+        return np.concatenate(arrays, axis=1).astype(np.float32)
+
+    def _branch_training_frame(self, branch_name: str) -> pd.DataFrame:
+        branch = nec_branch_configs(self.config)[branch_name]
+        payload: dict[str, Any] = {
+            self.dt_col: pd.to_datetime(self.train_df[self.dt_col]).reset_index(drop=True),
+            _branch_target_column(branch_name): (
+                self.extreme_flags if branch_name == "classifier" else self.diff_norm_target
+            ),
+        }
+        for column in branch.variables:
+            payload[column] = self.normalized_columns[column]
+        if branch_name in {"classifier", "extreme"}:
+            payload[_PROBABILITY_COLUMN] = self.probability_feature.reshape(-1)
+        return pd.DataFrame(payload)
+
+    def _branch_config(self, branch_name: str) -> tuple[LoadedConfig, JobConfig]:
+        branch = nec_branch_configs(self.config)[branch_name]
+        hist_cols = list(branch.variables)
+        if branch_name in {"classifier", "extreme"}:
+            hist_cols.append(_PROBABILITY_COLUMN)
+        dataset = replace(
+            self.loaded.config.dataset,
+            target_col=_branch_target_column(branch_name),
+            hist_exog_cols=tuple(hist_cols),
+            futr_exog_cols=(),
+            static_exog_cols=(),
+        )
+        training = replace(self.loaded.config.training, scaler_type="identity")
+        config = replace(self.loaded.config, dataset=dataset, training=training)
+        job = JobConfig(model=branch.model, params=dict(branch.model_params))
+        return replace(self.loaded, config=config), job
+
+    def _predict_branch(self, branch_name: str) -> _BranchRunResult:
+        branch_loaded, branch_job = self._branch_config(branch_name)
+        train_frame = self._branch_training_frame(branch_name)
+        adapter_inputs = build_univariate_inputs(
+            train_frame,
+            branch_job,
+            dataset=branch_loaded.config.dataset,
+            dt_col=self.dt_col,
+            future_df=None,
+        )
+        model = build_model(branch_loaded.config, branch_job, params_override=branch_job.params)
+        nf = NeuralForecast(models=[model], freq=self.freq)
+        nf.fit(
+            adapter_inputs.fit_df,
+            static_df=adapter_inputs.static_df,
+            val_size=max(branch_loaded.config.training.val_size, self.horizon),
+        )
+        predictions = nf.predict(df=adapter_inputs.fit_df, static_df=adapter_inputs.static_df)
+        prediction_values = (
+            predictions.loc[predictions["unique_id"] == branch_loaded.config.dataset.target_col, branch_job.model]
+            .reset_index(drop=True)
+            .astype(float)
+            .to_numpy(dtype=np.float32)
+        )
+        if len(prediction_values) != self.horizon:
+            raise ValueError(
+                f"NEC {branch_name} branch returned {len(prediction_values)} predictions; expected horizon={self.horizon}"
             )
-        self.rng.shuffle(sampled)
-        return sampled
-
-    def _build_loader(self, starts: list[int], *, classifier_mode: bool, batch_size: int) -> DataLoader:
-        x_batches = []
-        y_batches = []
-        for start in starts:
-            x, y_reg, y_cls = self._window_inputs(start)
-            x_batches.append(x)
-            y_batches.append(y_cls if classifier_mode else y_reg)
-        x_tensor = torch.tensor(np.asarray(x_batches), dtype=torch.float32)
-        y_tensor = torch.tensor(np.asarray(y_batches), dtype=torch.float32)
-        dataset = TensorDataset(x_tensor, y_tensor)
-        effective_batch = min(batch_size, len(dataset))
-        if effective_batch < 2:
-            raise ValueError("NEC effective batch size must be at least 2")
-        return DataLoader(dataset, batch_size=effective_batch, shuffle=True, num_workers=0, drop_last=True)
-
-    def _train_regressor(self, model_cfg: NecForecastConfig, *, normal_role: bool) -> tuple[_Encoder, _RegressionHead, float]:
-        starts = self._sample_positions(self.train_positions, model_cfg)
-        loader = self._build_loader(starts, classifier_mode=False, batch_size=model_cfg.batch_size)
-        encoder = _Encoder(self.feature_matrix.shape[1], model_cfg.hidden_dim, model_cfg.layer_dim, model_cfg.dropout).to(self.device)
-        head = _RegressionHead(model_cfg.hidden_dim, self.horizon).to(self.device)
-        encoder_optimizer = torch.optim.SGD(encoder.parameters(), lr=model_cfg.encoder_lr)
-        head_optimizer = torch.optim.Adam(head.parameters(), lr=model_cfg.head_lr)
-        best_loss = float("inf")
-        best_encoder = encoder.state_dict()
-        best_head = head.state_dict()
-        early_stop = 0
-        previous_loss = float("inf")
-        for _epoch in range(model_cfg.epochs):
-            encoder.train(); head.train()
-            for x_batch, y_batch in loader:
-                x_batch = x_batch.to(self.device)
-                y_batch = y_batch.to(self.device)
-                encoder_optimizer.zero_grad(); head_optimizer.zero_grad()
-                predictions = head(encoder(x_batch))
-                if normal_role:
-                    mask = (torch.abs(y_batch) <= self.config.preprocessing.epsilon).float()
-                else:
-                    mask = (torch.abs(y_batch) > self.config.preprocessing.epsilon).float()
-                losses = (predictions - y_batch) ** 2 * mask
-                loss = losses.sum() / torch.clamp(mask.sum(), min=1.0)
-                loss.backward(); encoder_optimizer.step(); head_optimizer.step()
-            encoder.eval(); head.eval()
-            val_loss = self._evaluate_regressor(encoder, head, normal_role=normal_role)
-            if val_loss < best_loss:
-                best_loss = val_loss
-                best_encoder = {k: v.detach().cpu().clone() for k, v in encoder.state_dict().items()}
-                best_head = {k: v.detach().cpu().clone() for k, v in head.state_dict().items()}
-            if val_loss > previous_loss:
-                early_stop += 1
-            else:
-                early_stop = 0
-            if early_stop >= model_cfg.early_stop_patience:
-                break
-            previous_loss = val_loss
-        encoder.load_state_dict(best_encoder)
-        head.load_state_dict(best_head)
-        encoder.eval(); head.eval()
-        return encoder, head, best_loss
-
-    def _train_classifier(self, model_cfg: NecClassifierConfig) -> tuple[_Encoder, _ClassifierHead, float]:
-        starts = self._sample_positions(self.train_positions, model_cfg)
-        x_batches = []
-        y_batches = []
-        for start in starts:
-            x, _y_reg, y_cls = self._window_inputs(start)
-            x_batches.append(x[:, :1])
-            y_batches.append(y_cls)
-        x_tensor = torch.tensor(np.asarray(x_batches), dtype=torch.float32)
-        y_tensor = torch.tensor(np.asarray(y_batches), dtype=torch.float32)
-        dataset = TensorDataset(x_tensor, y_tensor)
-        effective_batch = min(model_cfg.batch_size, len(dataset))
-        if effective_batch < 2:
-            raise ValueError("NEC effective batch size must be at least 2")
-        loader = DataLoader(dataset, batch_size=effective_batch, shuffle=True, num_workers=0, drop_last=True)
-        encoder = _Encoder(1, model_cfg.hidden_dim, model_cfg.layer_dim, model_cfg.dropout).to(self.device)
-        head = _ClassifierHead(model_cfg.hidden_dim, self.horizon).to(self.device)
-        encoder_optimizer = torch.optim.SGD(encoder.parameters(), lr=model_cfg.encoder_lr)
-        head_optimizer = torch.optim.Adam(head.parameters(), lr=model_cfg.head_lr)
-        bce = nn.BCELoss(reduction="sum")
-        mse = nn.MSELoss(reduction="sum")
-        best_f1 = -1.0
-        best_encoder = encoder.state_dict(); best_head = head.state_dict(); early_stop = 0; previous = -1.0
-        for _epoch in range(model_cfg.epochs):
-            encoder.train(); head.train()
-            for x_batch, y_batch in loader:
-                x_batch = x_batch.to(self.device); y_batch = y_batch.to(self.device)
-                encoder_optimizer.zero_grad(); head_optimizer.zero_grad()
-                predictions = head(encoder(x_batch))
-                loss = model_cfg.bce_weight * bce(predictions ** 2, y_batch) + model_cfg.mse_weight * mse(predictions, y_batch)
-                loss.backward(); encoder_optimizer.step(); head_optimizer.step()
-            encoder.eval(); head.eval()
-            score = self._evaluate_classifier(encoder, head)
-            if score > best_f1:
-                best_f1 = score
-                best_encoder = {k: v.detach().cpu().clone() for k, v in encoder.state_dict().items()}
-                best_head = {k: v.detach().cpu().clone() for k, v in head.state_dict().items()}
-            if score < previous:
-                early_stop += 1
-            else:
-                early_stop = 0
-            if score >= 1.0 or early_stop >= model_cfg.early_stop_patience:
-                break
-            previous = score
-        encoder.load_state_dict(best_encoder)
-        head.load_state_dict(best_head)
-        encoder.eval(); head.eval()
-        return encoder, head, best_f1
-
-    def _predict_sequence(self, encoder: _Encoder, head: nn.Module, x: np.ndarray) -> np.ndarray:
-        with torch.no_grad():
-            x_tensor = torch.tensor(x[np.newaxis, ...], dtype=torch.float32, device=self.device)
-            preds = head(encoder(x_tensor)).detach().cpu().numpy()[0]
-        return preds.astype(np.float32)
+        if branch_name == "classifier":
+            return _BranchRunResult(
+                name=branch_name,
+                model_name=branch_job.model,
+                variables=nec_branch_configs(self.config)[branch_name].variables,
+                predictions=np.clip(prediction_values, 0.0, 1.0).astype(np.float32),
+                raw_predictions=prediction_values,
+                actual=self.actual_classifier,
+            )
+        level_predictions = self._diff_denormalize(prediction_values)
+        return _BranchRunResult(
+            name=branch_name,
+            model_name=branch_job.model,
+            variables=nec_branch_configs(self.config)[branch_name].variables,
+            predictions=level_predictions,
+            raw_predictions=prediction_values,
+            actual=self.actual_target,
+        )
 
     def _diff_denormalize(self, pred_diff_norm: np.ndarray) -> np.ndarray:
         denorm = pred_diff_norm.astype(float) * self.target_std + self.target_mean
@@ -333,51 +249,28 @@ class _NecPredictor:
             output[idx] = previous
         return output.astype(np.float32)
 
-    def _evaluate_regressor(self, encoder: _Encoder, head: _RegressionHead, *, normal_role: bool) -> float:
-        rmses = []
-        for start in self.val_positions:
-            x, y_reg, _y_cls = self._window_inputs(start)
-            pred_norm = self._predict_sequence(encoder, head, x)
-            pred_level = self._diff_denormalize(pred_norm)
-            actual = self.train_df[self.target_col].astype(float).to_numpy()[start : start + self.horizon]
-            rmses.append(math.sqrt(float(np.square(actual - pred_level).mean())))
-        return float(np.mean(rmses))
+    def _future_extreme_flags(self) -> np.ndarray:
+        raw_target = self.train_df[self.target_col].astype(float).tolist() + self.future_df[self.target_col].astype(float).tolist()
+        diffs = np.diff(np.asarray(raw_target, dtype=float))
+        normalized = ((diffs[-self.horizon :] - self.target_mean) / self.target_std).astype(np.float32)
+        return (np.abs(normalized) > self.config.preprocessing.epsilon).astype(np.float32)
 
-    def _evaluate_classifier(self, encoder: _Encoder, head: _ClassifierHead) -> float:
-        all_true: list[int] = []
-        all_pred: list[int] = []
-        for start in self.val_positions:
-            x, _y_reg, y_cls = self._window_inputs(start)
-            logits = self._predict_sequence(encoder, head, x[:, :1])
-            preds = (logits >= 0.5).astype(int)
-            all_true.extend(int(v) for v in y_cls)
-            all_pred.extend(int(v) for v in preds)
-        tp = sum(1 for p, a in zip(all_pred, all_true) if p == a == 1)
-        fp = sum(1 for p, a in zip(all_pred, all_true) if p == 1 and a == 0)
-        fn = sum(1 for p, a in zip(all_pred, all_true) if p == 0 and a == 1)
-        if tp == 0:
-            return 0.0
-        precision = tp / (tp + fp)
-        recall = tp / (tp + fn)
-        if precision + recall == 0:
-            return 0.0
-        return 2 * precision * recall / (precision + recall)
-
-    def run(self) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, Any | None]:
-        if not any(self.extreme_flags[pos : pos + self.horizon].sum() >= 1 for pos in self.train_positions):
-            raise ValueError("NEC oversampling requested but no extreme window exists in training fold")
-        normal_encoder, normal_head, normal_val = self._train_regressor(self.config.normal, normal_role=True)
-        extreme_encoder, extreme_head, extreme_val = self._train_regressor(self.config.extreme, normal_role=False)
-        classifier_encoder, classifier_head, classifier_f1 = self._train_classifier(self.config.classifier)
-
-        history = self.feature_matrix[-self.history_steps :]
-        classifier_probs = self._predict_sequence(classifier_encoder, classifier_head, history[:, :1])
-        normal_norm = self._predict_sequence(normal_encoder, normal_head, history)
-        extreme_norm = self._predict_sequence(extreme_encoder, extreme_head, history)
-        normal_level = self._diff_denormalize(normal_norm)
-        extreme_level = self._diff_denormalize(extreme_norm)
-        gates = (classifier_probs >= 0.5).astype(np.float32)
-        merged = np.where(gates == 1, extreme_level, normal_level).astype(np.float32)
+    def run(self) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, Any | None, dict[str, _BranchRunResult]]:
+        branch_results = {
+            branch_name: self._predict_branch(branch_name)
+            for branch_name in ("normal", "extreme", "classifier")
+        }
+        classifier_probs = branch_results["classifier"].predictions
+        normal_level = branch_results["normal"].predictions
+        extreme_level = branch_results["extreme"].predictions
+        if self.config.inference.mode == "soft_weighted":
+            merged = (
+                classifier_probs.astype(np.float32) * extreme_level
+                + (1.0 - classifier_probs.astype(np.float32)) * normal_level
+            ).astype(np.float32)
+        else:
+            gates = (classifier_probs >= self.config.inference.threshold).astype(np.float32)
+            merged = np.where(gates == 1, extreme_level, normal_level).astype(np.float32)
         predictions = pd.DataFrame(
             {
                 "unique_id": [self.target_col] * self.horizon,
@@ -385,19 +278,74 @@ class _NecPredictor:
                 "NEC": merged,
             }
         )
-        curve_frame = pd.DataFrame(
-            {
-                "normal_val_rmse": [normal_val] * self.horizon,
-                "extreme_val_rmse": [extreme_val] * self.horizon,
-                "classifier_val_f1": [classifier_f1] * self.horizon,
-            }
-        )
         return (
             predictions,
             self.future_df[self.target_col].reset_index(drop=True),
             pd.to_datetime(self.train_df[self.dt_col].iloc[-1]),
             self.train_df,
-            curve_frame,
+            None,
+            branch_results,
+        )
+
+
+def _plot_branch_result(path: Path, *, ds: pd.Series, actual: np.ndarray, predicted: np.ndarray, title: str, actual_label: str, predicted_label: str) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    figure, axis = plt.subplots(figsize=(10, 4.5))
+    axis.plot(pd.to_datetime(ds), actual, label=actual_label, linewidth=2.2, color="black")
+    axis.plot(pd.to_datetime(ds), predicted, label=predicted_label, linewidth=1.8)
+    axis.set_title(title)
+    axis.set_xlabel("ds")
+    axis.legend(loc="best")
+    figure.autofmt_xdate()
+    figure.tight_layout()
+    figure.savefig(path, dpi=150)
+    plt.close(figure)
+
+
+def _write_branch_summary_artifacts(
+    run_root: Path,
+    *,
+    fold_idx: int,
+    ds: pd.Series,
+    branch_results: dict[str, _BranchRunResult],
+) -> None:
+    summary_root = _summary_root(run_root)
+    for branch_name, branch_result in branch_results.items():
+        branch_dir = summary_root / branch_name
+        branch_dir.mkdir(parents=True, exist_ok=True)
+        csv_path = branch_dir / f"fold_{fold_idx:03d}.csv"
+        png_path = branch_dir / f"fold_{fold_idx:03d}.png"
+        payload = pd.DataFrame(
+            {
+                "branch": [branch_name] * len(ds),
+                "model": [branch_result.model_name] * len(ds),
+                "ds": pd.to_datetime(ds),
+                "actual": branch_result.actual,
+                "predicted": branch_result.predictions,
+            }
+        )
+        if branch_name == "classifier":
+            payload["predicted_probability"] = branch_result.predictions
+            payload["predicted_raw"] = branch_result.raw_predictions
+            actual_label = "actual_extreme_flag"
+            predicted_label = "predicted_probability"
+        else:
+            actual_label = "actual_target"
+            predicted_label = branch_name
+        payload.to_csv(csv_path, index=False)
+        _plot_branch_result(
+            png_path,
+            ds=pd.to_datetime(ds),
+            actual=branch_result.actual,
+            predicted=branch_result.predictions,
+            title=f"NEC {branch_name} fold {fold_idx:03d}",
+            actual_label=actual_label,
+            predicted_label=predicted_label,
         )
 
 
@@ -426,15 +374,34 @@ def predict_nec_fold(
         raise ValueError("NEC currently supports only jobs[NEC].params.variant=paper")
     predictor = _NecPredictor(loaded=loaded, train_df=train_df, future_df=future_df)
     result = predictor.run()
+    predictions, actuals, train_end_ds, prepared_train_df, curve_frame, branch_results = result
     if run_root is not None:
         stage_root = _stage_root(run_root)
+        fold_idx = _next_fold_index(run_root)
         summary = {
-            "history_steps": predictor.history_steps,
-            "use_probability_feature": predictor.config.preprocessing.probability_feature,
-            "hist_columns_used": list(predictor.config.hist_columns),
+            "history_steps_source": "training.input_size",
+            "history_steps_value": predictor.history_steps,
+            "probability_feature_forced": True,
+            "active_hist_columns": list(predictor.active_hist_columns),
+            "merge_mode": predictor.config.inference.mode,
+            "inference_threshold": predictor.config.inference.threshold,
+            "branches": {
+                branch_name: {
+                    "model": branch_result.model_name,
+                    "variables": list(branch_result.variables),
+                    "predicted_row_count": len(branch_result.predictions),
+                }
+                for branch_name, branch_result in branch_results.items()
+            },
         }
         _write_json(stage_root / "nec_fold_summary.json", summary)
-    return result
+        _write_branch_summary_artifacts(
+            run_root,
+            fold_idx=fold_idx,
+            ds=predictions["ds"],
+            branch_results=branch_results,
+        )
+    return predictions, actuals, train_end_ds, prepared_train_df, curve_frame
 
 
 def materialize_nec_stage(
@@ -462,12 +429,26 @@ def materialize_nec_stage(
         "selected_config_path": str(stage_loaded.source_path),
         "paper_faithful_preprocessing": stage_loaded.config.preprocessing.mode,
         "paper_overrides_shared_scaler": True,
+        "inference_mode": stage_loaded.config.inference.mode,
+        "inference_threshold": stage_loaded.config.inference.threshold,
         "shared_scaler_type_seen": loaded.config.training.scaler_type,
-        "feature_columns": [loaded.config.dataset.target_col, *stage_loaded.config.hist_columns],
-        "use_probability_feature": stage_loaded.config.preprocessing.probability_feature,
+        "active_hist_columns": list(nec_active_hist_columns(loaded.config.stage_plugin_config)),
+        "history_steps_source": "training.input_size",
+        "history_steps_value": loaded.config.training.input_size,
+        "probability_feature_forced": True,
         "gmm_components": stage_loaded.config.preprocessing.gmm_components,
+        "epsilon": stage_loaded.config.preprocessing.epsilon,
         "validate_only": validate_only,
         "stage1_resolved_config_path": str(resolved_path),
+        "summary_nec_root": str(run_root / "summary" / "nec"),
+        "branches": {
+            name: {
+                "model": branch.model,
+                "variables": list(branch.variables),
+                "model_params": dict(branch.model_params),
+            }
+            for name, branch in nec_branch_configs(loaded.config.stage_plugin_config).items()
+        },
     }
     manifest_payload = {
         "entrypoint_version": "nec-stage-plugin",

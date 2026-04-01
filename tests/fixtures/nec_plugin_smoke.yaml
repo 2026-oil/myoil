@@ -1,46 +1,37 @@
 nec:
-  history_steps: 4
-  hist_columns:
-    - hist_a
-    - hist_b
   preprocessing:
     mode: diff_std
-    probability_feature: true
     gmm_components: 2
     epsilon: 1.2
+  inference:
+    mode: soft_weighted
+    threshold: 0.5
   classifier:
-    hidden_dim: 16
-    layer_dim: 2
-    dropout: 0.1
-    batch_size: 2
-    train_volume: 8
-    epochs: 2
-    early_stop_patience: 1
-    encoder_lr: 0.001
-    head_lr: 0.001
+    model: MLP
+    variables: []
+    model_params:
+      hidden_size: 16
+      num_layers: 1
+      max_steps: 1
+      batch_size: 2
   normal:
-    hidden_dim: 16
-    layer_dim: 2
-    dropout: 0.1
-    batch_size: 2
-    train_volume: 8
-    epochs: 2
-    early_stop_patience: 1
-    encoder_lr: 0.001
-    head_lr: 0.001
-    oversampling: false
-    normal_ratio: 0.0
+    model: MLP
+    variables:
+      - hist_a
+    model_params:
+      hidden_size: 16
+      num_layers: 1
+      max_steps: 1
+      batch_size: 2
   extreme:
-    hidden_dim: 16
-    layer_dim: 2
-    dropout: 0.1
-    batch_size: 2
-    train_volume: 8
-    epochs: 2
-    early_stop_patience: 1
-    encoder_lr: 0.001
-    head_lr: 0.001
-    oversampling: true
-    normal_ratio: 0.0
+    model: MLP
+    variables:
+      - hist_a
+      - hist_b
+    model_params:
+      hidden_size: 16
+      num_layers: 1
+      max_steps: 1
+      batch_size: 2
   validation:
     windows: 2

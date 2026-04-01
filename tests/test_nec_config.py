@@ -11,71 +11,46 @@ from app_config import load_app_config
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_nec_config_loads_thin_main_yaml_and_preserves_shared_scaler_metadata() -> None:
+def test_nec_config_loads_branch_contract_and_replaces_legacy_metadata() -> None:
     loaded = load_app_config(
         REPO_ROOT,
         config_path=REPO_ROOT / "tests/fixtures/nec_runtime_smoke.yaml",
     )
 
+    stage1 = loaded.normalized_payload["nec"]["stage1"]
     assert loaded.config.stage_plugin_config.enabled is True
-    assert loaded.config.stage_plugin_config.history_steps == 4
     assert loaded.config.training.scaler_type == "robust"
-    assert loaded.normalized_payload["nec"]["stage1"]["shared_scaler_override_active"] is True
-    assert loaded.normalized_payload["nec"]["stage1"]["preprocessing_mode"] == "diff_std"
-    assert loaded.normalized_payload["nec"]["stage1"]["hist_columns"] == ["hist_a", "hist_b"]
+    assert stage1["shared_scaler_override_active"] is True
+    assert stage1["history_steps_source"] == "training.input_size"
+    assert stage1["history_steps_value"] == 4
+    assert stage1["probability_feature_forced"] is True
+    assert stage1["active_hist_columns"] == ["hist_a", "hist_b"]
+    assert stage1["branches"]["classifier"]["model"] == "MLP"
+    assert stage1["branches"]["classifier"]["variables"] == []
+    assert stage1["branches"]["normal"]["variables"] == ["hist_a"]
+    assert stage1["branches"]["extreme"]["variables"] == ["hist_a", "hist_b"]
+    assert "history_steps" not in stage1
+    assert "hist_columns" not in stage1
+    assert "probability_feature" not in stage1
 
 
-def test_nec_plugin_yaml_rejects_unknown_keys(tmp_path: Path) -> None:
+def test_nec_plugin_yaml_rejects_removed_keys(tmp_path: Path) -> None:
     bad_plugin = tmp_path / "nec_bad.yaml"
     bad_plugin.write_text(
         yaml.safe_dump(
             {
                 "nec": {
                     "history_steps": 4,
-                    "dataset": {"path": "forbidden.csv"},
+                    "hist_columns": ["hist_a"],
                     "preprocessing": {
                         "mode": "diff_std",
                         "probability_feature": True,
                         "gmm_components": 2,
                         "epsilon": 1.2,
                     },
-                    "classifier": {
-                        "hidden_dim": 8,
-                        "layer_dim": 1,
-                        "dropout": 0.1,
-                        "batch_size": 2,
-                        "train_volume": 4,
-                        "epochs": 1,
-                        "early_stop_patience": 1,
-                        "encoder_lr": 0.001,
-                        "head_lr": 0.001,
-                    },
-                    "normal": {
-                        "hidden_dim": 8,
-                        "layer_dim": 1,
-                        "dropout": 0.1,
-                        "batch_size": 2,
-                        "train_volume": 4,
-                        "epochs": 1,
-                        "early_stop_patience": 1,
-                        "encoder_lr": 0.001,
-                        "head_lr": 0.001,
-                        "oversampling": False,
-                        "normal_ratio": 0.0,
-                    },
-                    "extreme": {
-                        "hidden_dim": 8,
-                        "layer_dim": 1,
-                        "dropout": 0.1,
-                        "batch_size": 2,
-                        "train_volume": 4,
-                        "epochs": 1,
-                        "early_stop_patience": 1,
-                        "encoder_lr": 0.001,
-                        "head_lr": 0.001,
-                        "oversampling": True,
-                        "normal_ratio": 0.0,
-                    },
+                    "classifier": {"model": "MLP", "variables": [], "model_params": {}},
+                    "normal": {"model": "MLP", "variables": [], "model_params": {}},
+                    "extreme": {"model": "MLP", "variables": [], "model_params": {}},
                     "validation": {"windows": 1},
                 }
             },
@@ -123,5 +98,59 @@ def test_nec_plugin_yaml_rejects_unknown_keys(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match=r"unsupported key\(s\): dataset"):
+    with pytest.raises(ValueError, match=r"no longer supports top-level key\(s\): (hist_columns, history_steps|history_steps, hist_columns)|probability_feature has been removed"):
         load_app_config(tmp_path, config_path=main_cfg)
+
+
+def test_nec_plugin_yaml_rejects_unknown_branch_model_params(tmp_path: Path) -> None:
+    bad_plugin = tmp_path / "nec_bad_params.yaml"
+    bad_plugin.write_text(
+        yaml.safe_dump(
+            {
+                "nec": {
+                    "preprocessing": {"mode": "diff_std", "gmm_components": 2, "epsilon": 1.2},
+                    "classifier": {"model": "MLP", "variables": [], "model_params": {"bad_param": 1}},
+                    "normal": {"model": "MLP", "variables": [], "model_params": {}},
+                    "extreme": {"model": "MLP", "variables": [], "model_params": {}},
+                    "validation": {"windows": 1},
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    main_cfg = REPO_ROOT / "tests/fixtures/nec_runtime_smoke.yaml"
+    copied = tmp_path / "config.yaml"
+    payload = yaml.safe_load(main_cfg.read_text(encoding="utf-8"))
+    payload["nec"]["config_path"] = str(bad_plugin)
+    copied.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"unsupported parameter\(s\).+bad_param"):
+        load_app_config(tmp_path, config_path=copied)
+
+
+def test_nec_plugin_yaml_rejects_incompatible_branch_model(tmp_path: Path) -> None:
+    bad_plugin = tmp_path / "nec_bad_model.yaml"
+    bad_plugin.write_text(
+        yaml.safe_dump(
+            {
+                "nec": {
+                    "preprocessing": {"mode": "diff_std", "gmm_components": 2, "epsilon": 1.2},
+                    "classifier": {"model": "TimeXer", "variables": [], "model_params": {}},
+                    "normal": {"model": "MLP", "variables": [], "model_params": {}},
+                    "extreme": {"model": "MLP", "variables": [], "model_params": {}},
+                    "validation": {"windows": 1},
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    main_cfg = REPO_ROOT / "tests/fixtures/nec_runtime_smoke.yaml"
+    copied = tmp_path / "config.yaml"
+    payload = yaml.safe_load(main_cfg.read_text(encoding="utf-8"))
+    payload["nec"]["config_path"] = str(bad_plugin)
+    copied.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"multivariate and not supported"):
+        load_app_config(tmp_path, config_path=copied)

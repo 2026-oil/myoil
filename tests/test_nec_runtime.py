@@ -4,11 +4,11 @@ import json
 from pathlib import Path
 
 import pandas as pd
-import pytest
 import yaml
 
 from app_config import load_app_config
 import runtime_support.runner as runtime
+from plugins.nec.runtime import _NecPredictor
 
 
 def _write_dataset(path: Path, *, include_extremes: bool = True) -> Path:
@@ -40,50 +40,22 @@ def _write_plugin_yaml(path: Path, *, epsilon: float = 1.2) -> Path:
         yaml.safe_dump(
             {
                 "nec": {
-                    "history_steps": 4,
-                    "hist_columns": ["hist_a", "hist_b"],
-                    "preprocessing": {
-                        "mode": "diff_std",
-                        "probability_feature": True,
-                        "gmm_components": 2,
-                        "epsilon": epsilon,
-                    },
+                    "preprocessing": {"mode": "diff_std", "gmm_components": 2, "epsilon": epsilon},
+                    "inference": {"mode": "soft_weighted", "threshold": 0.5},
                     "classifier": {
-                        "hidden_dim": 16,
-                        "layer_dim": 2,
-                        "dropout": 0.1,
-                        "batch_size": 2,
-                        "train_volume": 8,
-                        "epochs": 2,
-                        "early_stop_patience": 1,
-                        "encoder_lr": 0.001,
-                        "head_lr": 0.001,
+                        "model": "MLP",
+                        "variables": [],
+                        "model_params": {"hidden_size": 16, "num_layers": 1, "max_steps": 1, "batch_size": 2},
                     },
                     "normal": {
-                        "hidden_dim": 16,
-                        "layer_dim": 2,
-                        "dropout": 0.1,
-                        "batch_size": 2,
-                        "train_volume": 8,
-                        "epochs": 2,
-                        "early_stop_patience": 1,
-                        "encoder_lr": 0.001,
-                        "head_lr": 0.001,
-                        "oversampling": False,
-                        "normal_ratio": 0.0,
+                        "model": "MLP",
+                        "variables": ["hist_a"],
+                        "model_params": {"hidden_size": 16, "num_layers": 1, "max_steps": 1, "batch_size": 2},
                     },
                     "extreme": {
-                        "hidden_dim": 16,
-                        "layer_dim": 2,
-                        "dropout": 0.1,
-                        "batch_size": 2,
-                        "train_volume": 8,
-                        "epochs": 2,
-                        "early_stop_patience": 1,
-                        "encoder_lr": 0.001,
-                        "head_lr": 0.001,
-                        "oversampling": True,
-                        "normal_ratio": 0.0,
+                        "model": "MLP",
+                        "variables": ["hist_a", "hist_b"],
+                        "model_params": {"hidden_size": 16, "num_layers": 1, "max_steps": 1, "batch_size": 2},
                     },
                     "validation": {"windows": 2},
                 }
@@ -160,12 +132,38 @@ def test_nec_runtime_produces_predictions_and_fold_artifacts(tmp_path: Path) -> 
     assert actuals.tolist() == source_df.loc[[12, 13], "target"].tolist()
     assert train_df["target"].tolist() == source_df.loc[list(range(12)), "target"].tolist()
     assert str(train_end_ds) == "2020-03-18 00:00:00"
-    assert nf is not None
+    assert nf is None
 
     artifact = json.loads((run_root / "nec" / "nec_fold_summary.json").read_text())
-    assert artifact["history_steps"] == 4
-    assert artifact["use_probability_feature"] is True
-    assert artifact["hist_columns_used"] == ["hist_a", "hist_b"]
+    assert artifact["history_steps_source"] == "training.input_size"
+    assert artifact["history_steps_value"] == 4
+    assert artifact["probability_feature_forced"] is True
+    assert artifact["active_hist_columns"] == ["hist_a", "hist_b"]
+    assert artifact["merge_mode"] == "soft_weighted"
+    assert artifact["branches"]["classifier"]["model"] == "MLP"
+    assert "history_steps" not in artifact
+    assert "hist_columns_used" not in artifact
+    assert (run_root / "summary" / "nec" / "normal" / "fold_000.csv").exists()
+    assert (run_root / "summary" / "nec" / "normal" / "fold_000.png").exists()
+    assert (run_root / "summary" / "nec" / "extreme" / "fold_000.csv").exists()
+    assert (run_root / "summary" / "nec" / "classifier" / "fold_000.csv").exists()
+
+
+def test_nec_predictor_routes_inputs_by_model_role(tmp_path: Path) -> None:
+    data_path = _write_dataset(tmp_path / "data.csv", include_extremes=True)
+    plugin_path = _write_plugin_yaml(tmp_path / "nec_plugin.yaml")
+    config_path = _write_main_config(tmp_path / "config.yaml", data_path, plugin_path)
+    loaded = load_app_config(tmp_path, config_path=config_path)
+    source_df = pd.read_csv(data_path)
+    predictor = _NecPredictor(
+        loaded=loaded,
+        train_df=source_df.iloc[:12].reset_index(drop=True),
+        future_df=source_df.iloc[12:14].reset_index(drop=True),
+    )
+
+    assert predictor.classifier_feature_matrix.shape[1] == 2  # target + probability
+    assert predictor.extreme_feature_matrix.shape[1] == 4  # target + hist_a + hist_b + probability
+    assert predictor.normal_feature_matrix.shape[1] == 2  # target + hist_a
 
 
 def test_nec_runtime_fails_fast_when_no_extreme_windows_exist(tmp_path: Path) -> None:
@@ -175,12 +173,36 @@ def test_nec_runtime_fails_fast_when_no_extreme_windows_exist(tmp_path: Path) ->
     loaded = load_app_config(tmp_path, config_path=config_path)
     source_df = pd.read_csv(data_path)
 
-    with pytest.raises(ValueError, match="extreme window"):
-        runtime._fit_and_predict_fold(
-            loaded,
-            loaded.config.jobs[0],
-            source_df=source_df,
-            freq="W",
-            train_idx=list(range(12)),
-            test_idx=[12, 13],
-        )
+    predictions, actuals, *_rest = runtime._fit_and_predict_fold(
+        loaded,
+        loaded.config.jobs[0],
+        source_df=source_df,
+        freq="W",
+        train_idx=list(range(12)),
+        test_idx=[12, 13],
+    )
+    assert len(predictions) == 2
+    assert len(actuals) == 2
+
+
+def test_feature_set_nec_validate_only_exposes_branch_metadata() -> None:
+    code = runtime.main([
+        "--config",
+        "yaml/experiment/feature_set_nec/brentoil-case1.yaml",
+        "--validate-only",
+    ])
+    assert code == 0
+    root = Path("runs/feature_set_nec_brentoil_case1_nec")
+    resolved = json.loads((root / "config" / "config.resolved.json").read_text())
+    nec_payload = resolved["nec"]
+    assert nec_payload["history_steps_source"] == "training.input_size"
+    assert nec_payload["probability_feature_forced"] is True
+    assert "hist_columns" not in nec_payload
+    assert "history_steps" not in nec_payload
+    assert nec_payload["branches"]["classifier"]["model"] == "LSTM"
+    assert nec_payload["branches"]["normal"]["variables"] == ["Com_Gasoline", "Com_Steel"]
+    assert nec_payload["active_hist_columns"] == [
+        "Com_Gasoline",
+        "Com_Steel",
+        "Bonds_US_Spread_10Y_1Y",
+    ]

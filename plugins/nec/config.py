@@ -14,67 +14,36 @@ NEC_LINKED_KEYS = {
     "history_steps",
     "hist_columns",
     "preprocessing",
+    "inference",
     "classifier",
     "normal",
     "extreme",
     "validation",
 }
 NEC_PREPROCESSING_KEYS = {"mode", "probability_feature", "gmm_components", "epsilon"}
+NEC_INFERENCE_KEYS = {"mode", "threshold"}
 NEC_VALIDATION_KEYS = {"windows"}
-NEC_FORECAST_KEYS = {
-    "hidden_dim",
-    "layer_dim",
-    "dropout",
-    "batch_size",
-    "train_volume",
-    "epochs",
-    "early_stop_patience",
-    "encoder_lr",
-    "head_lr",
-    "oversampling",
-    "normal_ratio",
-}
-NEC_CLASSIFIER_KEYS = NEC_FORECAST_KEYS | {"bce_weight", "mse_weight"}
+NEC_BRANCH_KEYS = {"model", "model_params", "variables"}
 
 
 @dataclass(frozen=True)
 class NecPreprocessingConfig:
     mode: str = "diff_std"
-    probability_feature: bool = True
     gmm_components: int = 3
     epsilon: float = 1.5
 
 
 @dataclass(frozen=True)
-class NecForecastConfig:
-    hidden_dim: int
-    layer_dim: int
-    dropout: float
-    batch_size: int
-    train_volume: int
-    epochs: int
-    early_stop_patience: int
-    encoder_lr: float
-    head_lr: float
-    oversampling: bool
-    normal_ratio: float
+class NecBranchConfig:
+    model: str
+    model_params: dict[str, Any] = field(default_factory=dict)
+    variables: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
-class NecClassifierConfig:
-    hidden_dim: int
-    layer_dim: int
-    dropout: float
-    batch_size: int
-    train_volume: int
-    epochs: int
-    early_stop_patience: int
-    encoder_lr: float
-    head_lr: float
-    oversampling: bool
-    normal_ratio: float
-    bce_weight: float
-    mse_weight: float
+class NecInferenceConfig:
+    mode: str = "soft_weighted"
+    threshold: float = 0.5
 
 
 @dataclass(frozen=True)
@@ -86,56 +55,11 @@ class NecValidationConfig:
 class NecConfig:
     enabled: bool = False
     config_path: str | None = None
-    history_steps: int | None = None
-    hist_columns: tuple[str, ...] = field(default_factory=tuple)
     preprocessing: NecPreprocessingConfig = field(default_factory=NecPreprocessingConfig)
-    classifier: NecClassifierConfig = field(
-        default_factory=lambda: NecClassifierConfig(
-            hidden_dim=1024,
-            layer_dim=4,
-            dropout=0.4,
-            batch_size=64,
-            train_volume=1000,
-            epochs=100,
-            early_stop_patience=4,
-            encoder_lr=0.001,
-            head_lr=0.0005,
-            oversampling=True,
-            normal_ratio=0.0,
-            bce_weight=0.5,
-            mse_weight=0.5,
-        )
-    )
-    normal: NecForecastConfig = field(
-        default_factory=lambda: NecForecastConfig(
-            hidden_dim=1024,
-            layer_dim=4,
-            dropout=0.4,
-            batch_size=64,
-            train_volume=180000,
-            epochs=80,
-            early_stop_patience=3,
-            encoder_lr=0.001,
-            head_lr=0.0005,
-            oversampling=False,
-            normal_ratio=0.0,
-        )
-    )
-    extreme: NecForecastConfig = field(
-        default_factory=lambda: NecForecastConfig(
-            hidden_dim=512,
-            layer_dim=4,
-            dropout=0.4,
-            batch_size=32,
-            train_volume=50000,
-            epochs=100,
-            early_stop_patience=4,
-            encoder_lr=0.001,
-            head_lr=0.0005,
-            oversampling=True,
-            normal_ratio=0.0,
-        )
-    )
+    inference: NecInferenceConfig = field(default_factory=NecInferenceConfig)
+    classifier: NecBranchConfig = field(default_factory=lambda: NecBranchConfig(model="LSTM"))
+    normal: NecBranchConfig = field(default_factory=lambda: NecBranchConfig(model="LSTM"))
+    extreme: NecBranchConfig = field(default_factory=lambda: NecBranchConfig(model="LSTM"))
     validation: NecValidationConfig = field(default_factory=NecValidationConfig)
 
 
@@ -191,49 +115,42 @@ def _coerce_probability(value: Any, *, field_name: str) -> float:
     return parsed
 
 
-def _normalize_forecast_block(payload: Any, *, section: str, default: NecForecastConfig, unknown_keys: Any) -> NecForecastConfig:
-    if payload is None:
-        return default
+def _normalize_model_name(value: Any, *, field_name: str) -> str:
+    if value is None:
+        raise ValueError(f"{field_name} is required")
+    model_name = str(value).strip()
+    if not model_name:
+        raise ValueError(f"{field_name} is required")
+    return model_name
+
+
+def _normalize_model_params(value: Any, *, field_name: str) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError(f"{field_name} must be a mapping")
+    return dict(value)
+
+
+def _normalize_branch_block(
+    payload: Any,
+    *,
+    section: str,
+    coerce_name_tuple: Any,
+    unknown_keys: Any,
+) -> NecBranchConfig:
     if not isinstance(payload, dict):
         raise ValueError(f"{section} must be a mapping")
     values = dict(payload)
-    unknown_keys(values, allowed=NEC_FORECAST_KEYS, section=section)
-    return NecForecastConfig(
-        hidden_dim=_coerce_positive_int(values.get("hidden_dim", default.hidden_dim), field_name=f"{section}.hidden_dim"),
-        layer_dim=_coerce_positive_int(values.get("layer_dim", default.layer_dim), field_name=f"{section}.layer_dim"),
-        dropout=_coerce_probability(values.get("dropout", default.dropout), field_name=f"{section}.dropout"),
-        batch_size=_coerce_positive_int(values.get("batch_size", default.batch_size), field_name=f"{section}.batch_size"),
-        train_volume=_coerce_positive_int(values.get("train_volume", default.train_volume), field_name=f"{section}.train_volume"),
-        epochs=_coerce_positive_int(values.get("epochs", default.epochs), field_name=f"{section}.epochs"),
-        early_stop_patience=_coerce_positive_int(values.get("early_stop_patience", default.early_stop_patience), field_name=f"{section}.early_stop_patience"),
-        encoder_lr=_coerce_non_negative_float(values.get("encoder_lr", default.encoder_lr), field_name=f"{section}.encoder_lr"),
-        head_lr=_coerce_non_negative_float(values.get("head_lr", default.head_lr), field_name=f"{section}.head_lr"),
-        oversampling=bool(values.get("oversampling", default.oversampling)),
-        normal_ratio=_coerce_probability(values.get("normal_ratio", default.normal_ratio), field_name=f"{section}.normal_ratio"),
-    )
-
-
-def _normalize_classifier_block(payload: Any, *, section: str, default: NecClassifierConfig, unknown_keys: Any) -> NecClassifierConfig:
-    if payload is None:
-        return default
-    if not isinstance(payload, dict):
-        raise ValueError(f"{section} must be a mapping")
-    values = dict(payload)
-    unknown_keys(values, allowed=NEC_CLASSIFIER_KEYS, section=section)
-    return NecClassifierConfig(
-        hidden_dim=_coerce_positive_int(values.get("hidden_dim", default.hidden_dim), field_name=f"{section}.hidden_dim"),
-        layer_dim=_coerce_positive_int(values.get("layer_dim", default.layer_dim), field_name=f"{section}.layer_dim"),
-        dropout=_coerce_probability(values.get("dropout", default.dropout), field_name=f"{section}.dropout"),
-        batch_size=_coerce_positive_int(values.get("batch_size", default.batch_size), field_name=f"{section}.batch_size"),
-        train_volume=_coerce_positive_int(values.get("train_volume", default.train_volume), field_name=f"{section}.train_volume"),
-        epochs=_coerce_positive_int(values.get("epochs", default.epochs), field_name=f"{section}.epochs"),
-        early_stop_patience=_coerce_positive_int(values.get("early_stop_patience", default.early_stop_patience), field_name=f"{section}.early_stop_patience"),
-        encoder_lr=_coerce_non_negative_float(values.get("encoder_lr", default.encoder_lr), field_name=f"{section}.encoder_lr"),
-        head_lr=_coerce_non_negative_float(values.get("head_lr", default.head_lr), field_name=f"{section}.head_lr"),
-        oversampling=bool(values.get("oversampling", default.oversampling)),
-        normal_ratio=_coerce_probability(values.get("normal_ratio", default.normal_ratio), field_name=f"{section}.normal_ratio"),
-        bce_weight=_coerce_probability(values.get("bce_weight", default.bce_weight), field_name=f"{section}.bce_weight"),
-        mse_weight=_coerce_probability(values.get("mse_weight", default.mse_weight), field_name=f"{section}.mse_weight"),
+    unknown_keys(values, allowed=NEC_BRANCH_KEYS, section=section)
+    if "model" not in values:
+        raise ValueError(f"{section}.model is required")
+    if "variables" not in values:
+        raise ValueError(f"{section}.variables is required")
+    return NecBranchConfig(
+        model=_normalize_model_name(values.get("model"), field_name=f"{section}.model"),
+        model_params=_normalize_model_params(values.get("model_params"), field_name=f"{section}.model_params"),
+        variables=coerce_name_tuple(values.get("variables"), field_name=f"{section}.variables"),
     )
 
 
@@ -267,26 +184,74 @@ def normalize_linked_nec_config(value: Any, *, unknown_keys: Any, coerce_bool: A
         raise ValueError("nec.preprocessing.mode must be 'diff_std' to preserve paper preprocessing")
     preprocessing = NecPreprocessingConfig(
         mode=mode,
-        probability_feature=coerce_bool(preprocessing_payload.get("probability_feature"), field_name="nec.preprocessing.probability_feature", default=default.preprocessing.probability_feature),
-        gmm_components=_coerce_positive_int(preprocessing_payload.get("gmm_components", default.preprocessing.gmm_components), field_name="nec.preprocessing.gmm_components"),
-        epsilon=_coerce_non_negative_float(preprocessing_payload.get("epsilon", default.preprocessing.epsilon), field_name="nec.preprocessing.epsilon"),
+        gmm_components=_coerce_positive_int(
+            preprocessing_payload.get("gmm_components", default.preprocessing.gmm_components),
+            field_name="nec.preprocessing.gmm_components",
+        ),
+        epsilon=_coerce_non_negative_float(
+            preprocessing_payload.get("epsilon", default.preprocessing.epsilon),
+            field_name="nec.preprocessing.epsilon",
+        ),
+    )
+
+    inference_payload = dict(payload.get("inference") or {})
+    unknown_keys(inference_payload, allowed=NEC_INFERENCE_KEYS, section="nec.inference")
+    inference_mode = str(inference_payload.get("mode", default.inference.mode)).strip()
+    if inference_mode not in {"soft_weighted", "hard_threshold"}:
+        raise ValueError("nec.inference.mode must be 'soft_weighted' or 'hard_threshold'")
+    inference = NecInferenceConfig(
+        mode=inference_mode,
+        threshold=_coerce_probability(
+            inference_payload.get("threshold", default.inference.threshold),
+            field_name="nec.inference.threshold",
+        ),
     )
 
     validation_payload = dict(payload.get("validation") or {})
     unknown_keys(validation_payload, allowed=NEC_VALIDATION_KEYS, section="nec.validation")
     validation = NecValidationConfig(
-        windows=_coerce_positive_int(validation_payload.get("windows", default.validation.windows), field_name="nec.validation.windows")
+        windows=_coerce_positive_int(
+            validation_payload.get("windows", default.validation.windows),
+            field_name="nec.validation.windows",
+        )
     )
-    hist_columns = coerce_name_tuple(payload.get("hist_columns"), field_name="nec.hist_columns")
+
+    removed_top_level = [key for key in ("history_steps", "hist_columns") if key in payload]
+    if removed_top_level:
+        raise ValueError(
+            "nec plugin YAML no longer supports top-level key(s): " + ", ".join(sorted(removed_top_level))
+        )
+    if "probability_feature" in preprocessing_payload:
+        raise ValueError(
+            "nec.preprocessing.probability_feature has been removed; probability feature is always enabled"
+        )
+
+    classifier = _normalize_branch_block(
+        payload.get("classifier"),
+        section="nec.classifier",
+        coerce_name_tuple=coerce_name_tuple,
+        unknown_keys=unknown_keys,
+    )
+    normal = _normalize_branch_block(
+        payload.get("normal"),
+        section="nec.normal",
+        coerce_name_tuple=coerce_name_tuple,
+        unknown_keys=unknown_keys,
+    )
+    extreme = _normalize_branch_block(
+        payload.get("extreme"),
+        section="nec.extreme",
+        coerce_name_tuple=coerce_name_tuple,
+        unknown_keys=unknown_keys,
+    )
 
     return NecConfig(
         enabled=True,
-        history_steps=_coerce_positive_int(payload.get("history_steps", default.history_steps), field_name="nec.history_steps", allow_none=True),
-        hist_columns=hist_columns,
         preprocessing=preprocessing,
-        classifier=_normalize_classifier_block(payload.get("classifier"), section="nec.classifier", default=default.classifier, unknown_keys=unknown_keys),
-        normal=_normalize_forecast_block(payload.get("normal"), section="nec.normal", default=default.normal, unknown_keys=unknown_keys),
-        extreme=_normalize_forecast_block(payload.get("extreme"), section="nec.extreme", default=default.extreme, unknown_keys=unknown_keys),
+        inference=inference,
+        classifier=classifier,
+        normal=normal,
+        extreme=extreme,
         validation=validation,
     )
 
@@ -301,9 +266,37 @@ def resolve_nec_route_path(repo_root: Path, nec: NecConfig) -> Path:
     return (repo_root / route_path).resolve()
 
 
+def _branch_to_dict(branch: NecBranchConfig) -> dict[str, Any]:
+    return {
+        "model": branch.model,
+        "model_params": dict(branch.model_params),
+        "variables": list(branch.variables),
+    }
+
+
+def nec_branch_configs(config: NecConfig) -> dict[str, NecBranchConfig]:
+    return {
+        "classifier": config.classifier,
+        "normal": config.normal,
+        "extreme": config.extreme,
+    }
+
+
+def nec_active_hist_columns(config: NecConfig) -> tuple[str, ...]:
+    ordered: list[str] = []
+    for branch in nec_branch_configs(config).values():
+        for column in branch.variables:
+            if column not in ordered:
+                ordered.append(column)
+    return tuple(ordered)
+
+
 def nec_to_dict(config: NecConfig) -> dict[str, Any]:
     payload = asdict(config)
-    payload["hist_columns"] = list(config.hist_columns)
+    payload["classifier"] = _branch_to_dict(config.classifier)
+    payload["normal"] = _branch_to_dict(config.normal)
+    payload["extreme"] = _branch_to_dict(config.extreme)
+    payload["active_hist_columns"] = list(nec_active_hist_columns(config))
     if not payload.get("enabled", False):
         return {"enabled": False, "config_path": payload.get("config_path")}
     return payload

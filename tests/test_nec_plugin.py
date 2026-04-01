@@ -30,6 +30,11 @@ def test_nec_plugin_is_registered_and_validate_jobs_accepts_nec(tmp_path: Path) 
     assert capability["nec"]["enabled"] is True
     assert capability["nec"]["handled_jobs"][0]["plugin_owned"] is True
     assert capability["nec"]["shared_training_scaler"] == "robust"
+    assert capability["nec"]["inference_mode"] == "soft_weighted"
+    assert capability["nec"]["history_steps_source"] == "training.input_size"
+    assert capability["nec"]["probability_feature_forced"] is True
+    assert capability["nec"]["active_hist_columns"] == ["hist_a", "hist_b"]
+    assert capability["nec"]["branches"]["classifier"]["model"] == "MLP"
 
 
 def test_fit_and_predict_fold_dispatches_to_nec_plugin(monkeypatch: pytest.MonkeyPatch) -> None:

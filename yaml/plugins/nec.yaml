@@ -1,48 +1,45 @@
 nec:
-  history_steps: 96
-  hist_columns: []
   preprocessing:
     mode: diff_std
-    probability_feature: true
     gmm_components: 3
     epsilon: 1.5
+  inference:
+    mode: soft_weighted
+    threshold: 0.5
   classifier:
-    hidden_dim: 1024
-    layer_dim: 4
-    dropout: 0.4
-    batch_size: 64
-    train_volume: 1000
-    epochs: 100
-    early_stop_patience: 4
-    encoder_lr: 0.001
-    head_lr: 0.0005
-    oversampling: true
-    normal_ratio: 0.0
-    bce_weight: 0.5
-    mse_weight: 0.5
+    model: LSTM
+    variables: []
+    model_params:
+      encoder_hidden_size: 128
+      encoder_n_layers: 2
+      decoder_hidden_size: 128
+      decoder_layers: 2
+      max_steps: 100
+      batch_size: 32
   normal:
-    hidden_dim: 1024
-    layer_dim: 4
-    dropout: 0.4
-    batch_size: 64
-    train_volume: 180000
-    epochs: 80
-    early_stop_patience: 3
-    encoder_lr: 0.001
-    head_lr: 0.0005
-    oversampling: false
-    normal_ratio: 0.0
+    model: LSTM
+    variables:
+      - Com_Gasoline
+      - Com_Steel
+    model_params:
+      encoder_hidden_size: 128
+      encoder_n_layers: 2
+      decoder_hidden_size: 128
+      decoder_layers: 2
+      max_steps: 100
+      batch_size: 32
   extreme:
-    hidden_dim: 512
-    layer_dim: 4
-    dropout: 0.4
-    batch_size: 32
-    train_volume: 50000
-    epochs: 100
-    early_stop_patience: 4
-    encoder_lr: 0.001
-    head_lr: 0.0005
-    oversampling: true
-    normal_ratio: 0.0
+    model: LSTM
+    variables:
+      - Com_Gasoline
+      - Com_Steel
+      - Bonds_US_Spread_10Y_1Y
+    model_params:
+      encoder_hidden_size: 128
+      encoder_n_layers: 2
+      decoder_hidden_size: 128
+      decoder_layers: 2
+      max_steps: 100
+      batch_size: 32
   validation:
     windows: 8
