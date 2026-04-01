@@ -10,12 +10,15 @@ import pandas as pd
 
 from . import config as _cfg
 from .runtime import materialize_nec_stage, predict_nec_fold
+from runtime_support.shared_training_contract import (
+    duplicated_centralized_training_model_param_keys,
+)
 
 if TYPE_CHECKING:
     from app_config import AppConfig, LoadedConfig
     from tuning.search_space import SearchSpaceContract
 
-_PROTECTED_BRANCH_MODEL_PARAMS = {
+_NEC_CONTROLLED_BRANCH_MODEL_PARAMS = {
     "h",
     "input_size",
     "inference_input_size",
@@ -24,11 +27,8 @@ _PROTECTED_BRANCH_MODEL_PARAMS = {
     "stat_exog_list",
     "loss",
     "valid_loss",
-    "scaler_type",
     "random_seed",
     "alias",
-    "optimizer",
-    "optimizer_kwargs",
     "dataloader_kwargs",
     "n_series",
     "enable_checkpointing",
@@ -57,7 +57,15 @@ def _validate_branch_model_params(branch_name: str, branch_cfg: _cfg.NecBranchCo
     model_cls = MODEL_CLASSES[branch_cfg.model]
     signature = inspect.signature(model_cls.__init__)
     explicit_params = {name for name in signature.parameters if name != "self"}
-    protected = sorted(set(branch_cfg.model_params) & _PROTECTED_BRANCH_MODEL_PARAMS)
+    duplicated = sorted(
+        duplicated_centralized_training_model_param_keys(branch_cfg.model_params)
+    )
+    if duplicated:
+        raise ValueError(
+            f"nec.{branch_name}.model_params repeats centralized training key(s): {', '.join(duplicated)}. "
+            "Move these settings under training."
+        )
+    protected = sorted(set(branch_cfg.model_params) & _NEC_CONTROLLED_BRANCH_MODEL_PARAMS)
     if protected:
         raise ValueError(
             f"nec.{branch_name}.model_params cannot override NEC-controlled parameter(s): {', '.join(protected)}"

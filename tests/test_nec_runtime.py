@@ -8,6 +8,7 @@ import yaml
 
 from app_config import load_app_config
 import runtime_support.runner as runtime
+from runtime_support.forecast_models import build_model
 from plugins.nec.runtime import _NecPredictor
 
 
@@ -48,17 +49,22 @@ def _write_plugin_yaml(path: Path, *, epsilon: float = 1.2) -> Path:
                     "classifier": {
                         "model": "MLP",
                         "variables": [],
-                        "model_params": {"hidden_size": 16, "num_layers": 1, "max_steps": 1, "batch_size": 2},
+                        "model_params": {"hidden_size": 16, "num_layers": 1},
+                        "alpha": 2.0,
+                        "beta": 0.5,
+                        "oversample_extreme_windows": True,
                     },
                     "normal": {
                         "model": "MLP",
                         "variables": ["hist_a"],
-                        "model_params": {"hidden_size": 16, "num_layers": 1, "max_steps": 1, "batch_size": 2},
+                        "model_params": {"hidden_size": 16, "num_layers": 1},
+                        "oversample_extreme_windows": False,
                     },
                     "extreme": {
                         "model": "MLP",
                         "variables": ["hist_a", "hist_b"],
-                        "model_params": {"hidden_size": 16, "num_layers": 1, "max_steps": 1, "batch_size": 2},
+                        "model_params": {"hidden_size": 16, "num_layers": 1},
+                        "oversample_extreme_windows": True,
                     },
                     "validation": {"windows": 2},
                 }
@@ -173,6 +179,27 @@ def test_nec_predictor_routes_inputs_by_model_role(tmp_path: Path) -> None:
     assert predictor.classifier_feature_matrix.shape[1] == 2  # target + probability
     assert predictor.extreme_feature_matrix.shape[1] == 4  # target + hist_a + hist_b + probability
     assert predictor.normal_feature_matrix.shape[1] == 2  # target + hist_a
+
+
+def test_nec_branch_models_inherit_shared_training_settings(tmp_path: Path) -> None:
+    data_path = _write_dataset(tmp_path / "data.csv", include_extremes=True)
+    plugin_path = _write_plugin_yaml(tmp_path / "nec_plugin.yaml")
+    config_path = _write_main_config(tmp_path / "config.yaml", data_path, plugin_path)
+    loaded = load_app_config(REPO_ROOT, config_path=config_path)
+    source_df = pd.read_csv(data_path)
+    predictor = _NecPredictor(
+        loaded=loaded,
+        train_df=source_df.iloc[:12].reset_index(drop=True),
+        future_df=source_df.iloc[12:14].reset_index(drop=True),
+    )
+
+    branch_loaded, branch_job = predictor._branch_config("normal")
+    model = build_model(branch_loaded.config, branch_job, params_override=branch_job.params)
+
+    assert "max_steps" not in branch_job.params
+    assert "batch_size" not in branch_job.params
+    assert model.hparams.max_steps == loaded.config.training.max_steps
+    assert model.hparams.batch_size == loaded.config.training.batch_size
 
 
 def test_nec_predictor_uses_selected_losses_and_oversampled_windows(tmp_path: Path) -> None:

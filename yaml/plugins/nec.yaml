@@ -24,8 +24,6 @@ nec:
       encoder_n_layers: 2
       decoder_hidden_size: 128
       decoder_layers: 2
-      max_steps: 100
-      batch_size: 32
     alpha: 2.0
     beta: 0.5
     oversample_extreme_windows: true
@@ -47,8 +45,6 @@ nec:
       encoder_n_layers: 2
       decoder_hidden_size: 128
       decoder_layers: 2
-      max_steps: 100
-      batch_size: 32
     oversample_extreme_windows: false
   extreme:
     model: LSTM
@@ -68,8 +64,6 @@ nec:
       encoder_n_layers: 2
       decoder_hidden_size: 128
       decoder_layers: 2
-      max_steps: 100
-      batch_size: 32
     oversample_extreme_windows: true
   validation:
     windows: 8

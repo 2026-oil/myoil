@@ -134,6 +134,40 @@ def test_nec_plugin_yaml_rejects_unknown_branch_model_params(tmp_path: Path) -> 
         load_app_config(tmp_path, config_path=copied)
 
 
+def test_nec_plugin_yaml_rejects_centralized_training_branch_params(tmp_path: Path) -> None:
+    bad_plugin = tmp_path / "nec_bad_centralized.yaml"
+    bad_plugin.write_text(
+        yaml.safe_dump(
+            {
+                "nec": {
+                    "preprocessing": {"mode": "diff_std", "gmm_components": 2, "epsilon": 1.2},
+                    "classifier": {
+                        "model": "MLP",
+                        "variables": [],
+                        "model_params": {"hidden_size": 16, "max_steps": 1, "batch_size": 2},
+                    },
+                    "normal": {"model": "MLP", "variables": [], "model_params": {}},
+                    "extreme": {"model": "MLP", "variables": [], "model_params": {}},
+                    "validation": {"windows": 1},
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    main_cfg = REPO_ROOT / "tests/fixtures/nec_runtime_smoke.yaml"
+    copied = tmp_path / "config.yaml"
+    payload = yaml.safe_load(main_cfg.read_text(encoding="utf-8"))
+    payload["nec"]["config_path"] = str(bad_plugin)
+    copied.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(
+        ValueError,
+        match=r"repeats centralized training key\(s\): batch_size, max_steps",
+    ):
+        load_app_config(tmp_path, config_path=copied)
+
+
 def test_nec_plugin_yaml_rejects_non_positive_classifier_alpha(tmp_path: Path) -> None:
     bad_plugin = tmp_path / "nec_bad_alpha.yaml"
     bad_plugin.write_text(

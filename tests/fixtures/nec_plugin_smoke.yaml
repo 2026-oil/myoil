@@ -12,8 +12,9 @@ nec:
     model_params:
       hidden_size: 16
       num_layers: 1
-      max_steps: 1
-      batch_size: 2
+    alpha: 2.0
+    beta: 0.5
+    oversample_extreme_windows: true
   normal:
     model: MLP
     variables:
@@ -21,8 +22,7 @@ nec:
     model_params:
       hidden_size: 16
       num_layers: 1
-      max_steps: 1
-      batch_size: 2
+    oversample_extreme_windows: false
   extreme:
     model: MLP
     variables:
@@ -31,7 +31,6 @@ nec:
     model_params:
       hidden_size: 16
       num_layers: 1
-      max_steps: 1
-      batch_size: 2
+    oversample_extreme_windows: true
   validation:
     windows: 2
