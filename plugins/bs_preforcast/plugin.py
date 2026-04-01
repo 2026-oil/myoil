@@ -57,7 +57,7 @@ class BsPreforcastStagePlugin:
         )
 
     def is_enabled(self, config: Any) -> bool:
-        return bool(getattr(config, "enabled", False))
+        return isinstance(config, _cfg.BsPreforcastConfig) and bool(config.enabled)
 
     def config_to_dict(self, config: Any) -> dict[str, Any] | None:
         payload = asdict(config)
@@ -216,6 +216,10 @@ class BsPreforcastStagePlugin:
                 "bs_preforcast stage no longer supports AutoARIMA; use ARIMA instead"
             )
 
+    def owns_top_level_job(self, model_name: str) -> bool:
+        del model_name
+        return False
+
     def model_search_space_fallback_key(self) -> str | None:
         return "models"
 
@@ -264,6 +268,33 @@ class BsPreforcastStagePlugin:
             main_manifest_path=main_manifest_path,
             entrypoint_version=entrypoint_version,
             validate_only=validate_only,
+        )
+
+    # ------------------------------------------------------------------
+    # Optional top-level job ownership
+    # ------------------------------------------------------------------
+
+    def owns_top_level_job(self, model_name: str) -> bool:
+        del model_name
+        return False
+
+    def capabilities_for(self, model_name: str) -> dict[str, Any]:
+        raise ValueError(
+            f"bs_preforcast does not own top-level job execution for model {model_name!r}"
+        )
+
+    def predict_fold(
+        self,
+        loaded: LoadedConfig,
+        job: Any,
+        *,
+        train_df: pd.DataFrame,
+        future_df: pd.DataFrame,
+        run_root: Path | None,
+    ) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, Any | None]:
+        del loaded, train_df, future_df, run_root
+        raise ValueError(
+            f"bs_preforcast does not own top-level fold prediction for model {job.model!r}"
         )
 
     # ------------------------------------------------------------------

@@ -141,6 +141,17 @@ class StagePlugin(Protocol):
         """Raise ``ValueError`` for disallowed models in stage scope."""
         ...
 
+    def owns_top_level_job(self, model_name: str) -> bool:
+        """Return ``True`` when this plugin owns execution of a top-level job model."""
+        ...
+
+    def capabilities_for(self, model_name: str) -> dict[str, Any]:
+        """Return capability flags for a plugin-owned top-level job model.
+
+        Expected keys mirror :class:`runtime_support.forecast_models.ModelCapabilities`.
+        """
+        ...
+
     def model_search_space_fallback_key(self) -> str | None:
         """Optional fallback key when the primary key has no entry (e.g. ``"models"``)."""
         ...
@@ -162,6 +173,18 @@ class StagePlugin(Protocol):
         *,
         run_root: Path | None,
     ) -> tuple[LoadedConfig, pd.DataFrame, pd.DataFrame, Any]:
+        ...
+
+    def predict_fold(
+        self,
+        loaded: LoadedConfig,
+        job: Any,
+        *,
+        train_df: pd.DataFrame,
+        future_df: pd.DataFrame,
+        run_root: Path | None,
+    ) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, Any | None]:
+        """Run a plugin-owned top-level fold prediction path."""
         ...
 
     def materialize_stage(

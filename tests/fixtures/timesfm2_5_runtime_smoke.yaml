@@ -1,0 +1,42 @@
+task:
+  name: timesfm2_5_runtime_smoke
+dataset:
+  path: optuna_smoke_data.csv
+  target_col: target
+  dt_col: dt
+  hist_exog_cols: []
+  futr_exog_cols: []
+  static_exog_cols: []
+runtime:
+  random_seed: 7
+training:
+  input_size: 4
+  batch_size: 1
+  valid_batch_size: 1
+  windows_batch_size: 8
+  inference_windows_batch_size: 8
+  max_steps: 1
+  val_size: 1
+  val_check_steps: 1
+  early_stop_patience_steps: -1
+  loss: mse
+  accelerator: cpu
+cv:
+  horizon: 1
+  step_size: 1
+  n_windows: 1
+  gap: 0
+scheduler:
+  gpu_ids: [0]
+  max_concurrent_jobs: 1
+  worker_devices: 1
+residual:
+  enabled: false
+  model: xgboost
+  params: {}
+jobs:
+  - model: TimesFM2_5
+    params:
+      model_id: google/timesfm-2.5-200m-transformers
+      device: cpu
+      torch_dtype: float32

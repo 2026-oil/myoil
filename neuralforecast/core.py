@@ -68,6 +68,8 @@ from neuralforecast.models import (
     CMamba,
     xLSTMMixer,
     DUET,
+    Chronos2,
+    TimesFM2_5,
 )
 from neuralforecast.tsdataset import (
     LocalFilesTimeSeriesDataset,
@@ -207,6 +209,7 @@ MODEL_FILENAME_DICT = {
     "moderntcn": ModernTCN,
     "nonstationarytransformer": NonstationaryTransformer,
     "autononstationarytransformer": NonstationaryTransformer,
+    "chronos2": Chronos2,
     "automoderntcn": ModernTCN,
     "mamba": Mamba,
     "automamba": Mamba,
@@ -214,6 +217,7 @@ MODEL_FILENAME_DICT = {
     "autosmamba": SMamba,
     "cmamba": CMamba,
     "autocmamba": CMamba,
+    "timesfm2_5": TimesFM2_5,
     "xlstmmixer": xLSTMMixer,
     "autoxlstmmixer": xLSTMMixer,
     "duet": DUET,

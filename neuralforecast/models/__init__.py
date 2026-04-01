@@ -4,7 +4,7 @@ __all__ = ['RNN', 'GRU', 'LSTM', 'TCN', 'DeepAR', 'DilatedRNN',
            'StemGNN', 'HINT', 'TimesNet', 'TimeLLM', 'TSMixer', 'TSMixerx', 'MLPMultivariate',
            'iTransformer', 'BiTCN', 'TiDE', 'DeepNPTS', 'SOFTS', 'TimeMixer', 'KAN', 'RMoK',
            'DeformTime', 'DeformableTST', 'ModernTCN', 'NonstationaryTransformer',
-           'Mamba', 'SMamba', 'CMamba', 'xLSTMMixer', 'DUET',
+           'Mamba', 'SMamba', 'CMamba', 'xLSTMMixer', 'DUET', 'Chronos2', 'TimesFM2_5',
            'TimeXer', 'xLSTM', 'XLinear',
            'BS_PREFORCAST_STAGE_ONLY_PARAM_REGISTRY', 'DIRECT_STAGE_MODEL_NAMES',
            'SUPPORTED_BS_PREFORCAST_MODELS', 'is_direct_stage_model',
@@ -53,6 +53,8 @@ from .smamba import SMamba
 from .cmamba import CMamba
 from .xlstm_mixer import xLSTMMixer
 from .duet import DUET
+from .chronos2 import Chronos2
+from .timesfm2_5 import TimesFM2_5
 from .kan import KAN
 from .rmok import RMoK
 from .timexer import TimeXer
