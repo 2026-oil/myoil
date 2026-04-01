@@ -14,6 +14,7 @@ from app_config import JobConfig, LoadedConfig
 from runtime_support.adapters import build_univariate_inputs
 from runtime_support.forecast_models import build_model
 from .config import NecConfig, nec_active_hist_columns, nec_branch_configs
+from .losses import NecClassifierLoss, NecSelectivePointLoss
 
 _PROBABILITY_COLUMN = "__nec_probability_feature"
 
@@ -26,6 +27,8 @@ class _BranchRunResult:
     predictions: np.ndarray
     raw_predictions: np.ndarray
     actual: np.ndarray
+    sampled_series_count: int
+    oversampled_window_count: int
 
 
 def _stage_root(run_root: Path) -> Path:
@@ -193,24 +196,112 @@ class _NecPredictor:
         job = JobConfig(model=branch.model, params=dict(branch.model_params))
         return replace(self.loaded, config=config), job
 
+    def _effective_val_size(self, branch_loaded: LoadedConfig) -> int:
+        return max(branch_loaded.config.training.val_size, self.horizon)
+
+    def _training_sample_length(self, branch_loaded: LoadedConfig) -> int:
+        return self.history_steps + self._effective_val_size(branch_loaded) + self.horizon
+
+    def _window_extreme_flags(self, start: int) -> np.ndarray:
+        prediction_start = start + self.history_steps
+        prediction_end = prediction_start + self.horizon
+        return self.extreme_flags[prediction_start:prediction_end]
+
+    def _sampled_branch_fit_df(
+        self,
+        branch_name: str,
+        train_frame: pd.DataFrame,
+        branch_loaded: LoadedConfig,
+    ) -> tuple[pd.DataFrame, int]:
+        sequence_length = self._training_sample_length(branch_loaded)
+        candidate_count = len(train_frame) - sequence_length + 1
+        if candidate_count <= 0:
+            raise ValueError(
+                "NEC requires enough rows to build sampled training windows with validation context "
+                f"(need {sequence_length}, got {len(train_frame)})"
+            )
+        windows: list[tuple[int, int]] = [
+            (start, start + sequence_length) for start in range(candidate_count)
+        ]
+        branch_cfg = nec_branch_configs(self.config)[branch_name]
+        oversampled_window_count = 0
+        if branch_cfg.oversample_extreme_windows:
+            extreme_windows = [
+                (start, end)
+                for start, end in windows
+                if bool(self._window_extreme_flags(start).any())
+            ]
+            windows.extend(extreme_windows)
+            oversampled_window_count = len(extreme_windows)
+        sampled_frames: list[pd.DataFrame] = []
+        for sample_idx, (start, end) in enumerate(windows):
+            sample = train_frame.iloc[start:end].copy()
+            sample.rename(
+                columns={
+                    self.dt_col: "ds",
+                    branch_loaded.config.dataset.target_col: "y",
+                },
+                inplace=True,
+            )
+            sample["ds"] = pd.to_datetime(sample["ds"])
+            sample.insert(
+                0,
+                "unique_id",
+                f"{branch_loaded.config.dataset.target_col}__sample_{sample_idx:05d}",
+            )
+            sampled_frames.append(sample)
+        return pd.concat(sampled_frames, ignore_index=True), oversampled_window_count
+
+    def _branch_losses(self, branch_name: str) -> tuple[Any, Any]:
+        branch_cfg = nec_branch_configs(self.config)[branch_name]
+        if branch_name == "classifier":
+            alpha = 2.0 if branch_cfg.alpha is None else branch_cfg.alpha
+            beta = 0.5 if branch_cfg.beta is None else branch_cfg.beta
+            loss = NecClassifierLoss(alpha=alpha, beta=beta)
+            return loss, loss
+        base_loss = (
+            "mae" if self.loaded.config.training.loss.lower() == "mae" else "mse"
+        )
+        loss = NecSelectivePointLoss(
+            epsilon=self.config.preprocessing.epsilon,
+            branch_name="normal" if branch_name == "normal" else "extreme",
+            base_loss=base_loss,
+        )
+        return loss, loss
+
     def _predict_branch(self, branch_name: str) -> _BranchRunResult:
         branch_loaded, branch_job = self._branch_config(branch_name)
         train_frame = self._branch_training_frame(branch_name)
-        adapter_inputs = build_univariate_inputs(
+        inference_inputs = build_univariate_inputs(
             train_frame,
             branch_job,
             dataset=branch_loaded.config.dataset,
             dt_col=self.dt_col,
             future_df=None,
         )
-        model = build_model(branch_loaded.config, branch_job, params_override=branch_job.params)
+        sampled_fit_df, oversampled_window_count = self._sampled_branch_fit_df(
+            branch_name,
+            train_frame,
+            branch_loaded,
+        )
+        training_loss, valid_loss = self._branch_losses(branch_name)
+        model = build_model(
+            branch_loaded.config,
+            branch_job,
+            params_override=branch_job.params,
+            loss_override=training_loss,
+            valid_loss_override=valid_loss,
+        )
         nf = NeuralForecast(models=[model], freq=self.freq)
         nf.fit(
-            adapter_inputs.fit_df,
-            static_df=adapter_inputs.static_df,
-            val_size=max(branch_loaded.config.training.val_size, self.horizon),
+            sampled_fit_df,
+            static_df=None,
+            val_size=self._effective_val_size(branch_loaded),
         )
-        predictions = nf.predict(df=adapter_inputs.fit_df, static_df=adapter_inputs.static_df)
+        predictions = nf.predict(
+            df=inference_inputs.fit_df,
+            static_df=inference_inputs.static_df,
+        )
         prediction_values = (
             predictions.loc[predictions["unique_id"] == branch_loaded.config.dataset.target_col, branch_job.model]
             .reset_index(drop=True)
@@ -222,13 +313,18 @@ class _NecPredictor:
                 f"NEC {branch_name} branch returned {len(prediction_values)} predictions; expected horizon={self.horizon}"
             )
         if branch_name == "classifier":
+            classifier_probs = (
+                1.0 / (1.0 + np.exp(-prediction_values.astype(np.float64)))
+            ).astype(np.float32)
             return _BranchRunResult(
                 name=branch_name,
                 model_name=branch_job.model,
                 variables=nec_branch_configs(self.config)[branch_name].variables,
-                predictions=np.clip(prediction_values, 0.0, 1.0).astype(np.float32),
+                predictions=classifier_probs,
                 raw_predictions=prediction_values,
                 actual=self.actual_classifier,
+                sampled_series_count=int(sampled_fit_df["unique_id"].nunique()),
+                oversampled_window_count=oversampled_window_count,
             )
         level_predictions = self._diff_denormalize(prediction_values)
         return _BranchRunResult(
@@ -238,6 +334,8 @@ class _NecPredictor:
             predictions=level_predictions,
             raw_predictions=prediction_values,
             actual=self.actual_target,
+            sampled_series_count=int(sampled_fit_df["unique_id"].nunique()),
+            oversampled_window_count=oversampled_window_count,
         )
 
     def _diff_denormalize(self, pred_diff_norm: np.ndarray) -> np.ndarray:
@@ -369,9 +467,6 @@ def predict_nec_fold(
     *,
     run_root: Path | None = None,
 ) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, Any | None]:
-    variant = str(job.params.get("variant", "paper")).strip().lower()
-    if variant != "paper":
-        raise ValueError("NEC currently supports only jobs[NEC].params.variant=paper")
     predictor = _NecPredictor(loaded=loaded, train_df=train_df, future_df=future_df)
     result = predictor.run()
     predictions, actuals, train_end_ds, prepared_train_df, curve_frame, branch_results = result
@@ -390,6 +485,8 @@ def predict_nec_fold(
                     "model": branch_result.model_name,
                     "variables": list(branch_result.variables),
                     "predicted_row_count": len(branch_result.predictions),
+                    "sampled_series_count": branch_result.sampled_series_count,
+                    "oversampled_window_count": branch_result.oversampled_window_count,
                 }
                 for branch_name, branch_result in branch_results.items()
             },
@@ -446,6 +543,9 @@ def materialize_nec_stage(
                 "model": branch.model,
                 "variables": list(branch.variables),
                 "model_params": dict(branch.model_params),
+                "alpha": branch.alpha,
+                "beta": branch.beta,
+                "oversample_extreme_windows": branch.oversample_extreme_windows,
             }
             for name, branch in nec_branch_configs(loaded.config.stage_plugin_config).items()
         },

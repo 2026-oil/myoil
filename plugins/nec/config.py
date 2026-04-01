@@ -23,7 +23,14 @@ NEC_LINKED_KEYS = {
 NEC_PREPROCESSING_KEYS = {"mode", "probability_feature", "gmm_components", "epsilon"}
 NEC_INFERENCE_KEYS = {"mode", "threshold"}
 NEC_VALIDATION_KEYS = {"windows"}
-NEC_BRANCH_KEYS = {"model", "model_params", "variables"}
+NEC_BRANCH_KEYS = {
+    "model",
+    "model_params",
+    "variables",
+    "alpha",
+    "beta",
+    "oversample_extreme_windows",
+}
 
 
 @dataclass(frozen=True)
@@ -38,6 +45,9 @@ class NecBranchConfig:
     model: str
     model_params: dict[str, Any] = field(default_factory=dict)
     variables: tuple[str, ...] = field(default_factory=tuple)
+    alpha: float | None = None
+    beta: float | None = None
+    oversample_extreme_windows: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -57,9 +67,26 @@ class NecConfig:
     config_path: str | None = None
     preprocessing: NecPreprocessingConfig = field(default_factory=NecPreprocessingConfig)
     inference: NecInferenceConfig = field(default_factory=NecInferenceConfig)
-    classifier: NecBranchConfig = field(default_factory=lambda: NecBranchConfig(model="LSTM"))
-    normal: NecBranchConfig = field(default_factory=lambda: NecBranchConfig(model="LSTM"))
-    extreme: NecBranchConfig = field(default_factory=lambda: NecBranchConfig(model="LSTM"))
+    classifier: NecBranchConfig = field(
+        default_factory=lambda: NecBranchConfig(
+            model="LSTM",
+            alpha=2.0,
+            beta=0.5,
+            oversample_extreme_windows=True,
+        )
+    )
+    normal: NecBranchConfig = field(
+        default_factory=lambda: NecBranchConfig(
+            model="LSTM",
+            oversample_extreme_windows=False,
+        )
+    )
+    extreme: NecBranchConfig = field(
+        default_factory=lambda: NecBranchConfig(
+            model="LSTM",
+            oversample_extreme_windows=True,
+        )
+    )
     validation: NecValidationConfig = field(default_factory=NecValidationConfig)
 
 
@@ -108,6 +135,13 @@ def _coerce_non_negative_float(value: Any, *, field_name: str) -> float:
     return parsed
 
 
+def _coerce_positive_float(value: Any, *, field_name: str) -> float:
+    parsed = _coerce_non_negative_float(value, field_name=field_name)
+    if parsed <= 0:
+        raise ValueError(f"{field_name} must be > 0")
+    return parsed
+
+
 def _coerce_probability(value: Any, *, field_name: str) -> float:
     parsed = _coerce_non_negative_float(value, field_name=field_name)
     if parsed > 1:
@@ -138,6 +172,8 @@ def _normalize_branch_block(
     section: str,
     coerce_name_tuple: Any,
     unknown_keys: Any,
+    coerce_bool: Any,
+    defaults: NecBranchConfig,
 ) -> NecBranchConfig:
     if not isinstance(payload, dict):
         raise ValueError(f"{section} must be a mapping")
@@ -151,6 +187,23 @@ def _normalize_branch_block(
         model=_normalize_model_name(values.get("model"), field_name=f"{section}.model"),
         model_params=_normalize_model_params(values.get("model_params"), field_name=f"{section}.model_params"),
         variables=coerce_name_tuple(values.get("variables"), field_name=f"{section}.variables"),
+        alpha=_coerce_positive_float(
+            values.get("alpha", defaults.alpha),
+            field_name=f"{section}.alpha",
+        )
+        if values.get("alpha", defaults.alpha) is not None
+        else None,
+        beta=_coerce_probability(
+            values.get("beta", defaults.beta),
+            field_name=f"{section}.beta",
+        )
+        if values.get("beta", defaults.beta) is not None
+        else None,
+        oversample_extreme_windows=coerce_bool(
+            values.get("oversample_extreme_windows"),
+            field_name=f"{section}.oversample_extreme_windows",
+            default=defaults.oversample_extreme_windows,
+        ),
     )
 
 
@@ -231,18 +284,24 @@ def normalize_linked_nec_config(value: Any, *, unknown_keys: Any, coerce_bool: A
         section="nec.classifier",
         coerce_name_tuple=coerce_name_tuple,
         unknown_keys=unknown_keys,
+        coerce_bool=coerce_bool,
+        defaults=default.classifier,
     )
     normal = _normalize_branch_block(
         payload.get("normal"),
         section="nec.normal",
         coerce_name_tuple=coerce_name_tuple,
         unknown_keys=unknown_keys,
+        coerce_bool=coerce_bool,
+        defaults=default.normal,
     )
     extreme = _normalize_branch_block(
         payload.get("extreme"),
         section="nec.extreme",
         coerce_name_tuple=coerce_name_tuple,
         unknown_keys=unknown_keys,
+        coerce_bool=coerce_bool,
+        defaults=default.extreme,
     )
 
     return NecConfig(
@@ -271,6 +330,9 @@ def _branch_to_dict(branch: NecBranchConfig) -> dict[str, Any]:
         "model": branch.model,
         "model_params": dict(branch.model_params),
         "variables": list(branch.variables),
+        "alpha": branch.alpha,
+        "beta": branch.beta,
+        "oversample_extreme_windows": branch.oversample_extreme_windows,
     }
 
 

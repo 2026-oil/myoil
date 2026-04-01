@@ -8,7 +8,17 @@ nec:
     threshold: 0.5
   classifier:
     model: LSTM
-    variables: []
+    variables:
+      - Idx_OVX  
+      - Com_Oil_Spread
+      - BS_Core_Index_A
+      - BS_Core_Index_B
+      - BS_Core_Index_C
+      - Com_LMEX
+      - Com_BloombergCommodity_BCOM
+      - GPRD_THREAT
+      - GPRD
+      - GPRD_ACT
     model_params:
       encoder_hidden_size: 128
       encoder_n_layers: 2
@@ -16,11 +26,22 @@ nec:
       decoder_layers: 2
       max_steps: 100
       batch_size: 32
+    alpha: 2.0
+    beta: 0.5
+    oversample_extreme_windows: true
   normal:
     model: LSTM
     variables:
-      - Com_Gasoline
-      - Com_Steel
+      - Idx_OVX  
+      - Com_Oil_Spread
+      - BS_Core_Index_A
+      - BS_Core_Index_B
+      - BS_Core_Index_C
+      - Com_LMEX
+      - Com_BloombergCommodity_BCOM
+      - GPRD_THREAT
+      - GPRD
+      - GPRD_ACT
     model_params:
       encoder_hidden_size: 128
       encoder_n_layers: 2
@@ -28,12 +49,20 @@ nec:
       decoder_layers: 2
       max_steps: 100
       batch_size: 32
+    oversample_extreme_windows: false
   extreme:
     model: LSTM
     variables:
-      - Com_Gasoline
-      - Com_Steel
-      - Bonds_US_Spread_10Y_1Y
+      - Idx_OVX  
+      - Com_Oil_Spread
+      - BS_Core_Index_A
+      - BS_Core_Index_B
+      - BS_Core_Index_C
+      - Com_LMEX
+      - Com_BloombergCommodity_BCOM
+      - GPRD_THREAT
+      - GPRD
+      - GPRD_ACT
     model_params:
       encoder_hidden_size: 128
       encoder_n_layers: 2
@@ -41,5 +70,6 @@ nec:
       decoder_layers: 2
       max_steps: 100
       batch_size: 32
+    oversample_extreme_windows: true
   validation:
     windows: 8

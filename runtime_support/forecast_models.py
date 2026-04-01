@@ -296,6 +296,8 @@ def build_model(
     *,
     n_series: int | None = None,
     params_override: dict[str, Any] | None = None,
+    loss_override: Any | None = None,
+    valid_loss_override: Any | None = None,
 ) -> Any:
     caps = validate_job(job)
     if job.model in BASELINE_MODEL_NAMES:
@@ -339,11 +341,15 @@ def build_model(
         "enable_checkpointing": False,
         "enable_progress_bar": False,
         "logger": False,
-        "loss": resolve_loss(
+        "loss": loss_override
+        if loss_override is not None
+        else resolve_loss(
             config.training.loss,
             loss_params=config.training.loss_params,
         ),
-        "valid_loss": resolve_loss(
+        "valid_loss": valid_loss_override
+        if valid_loss_override is not None
+        else resolve_loss(
             config.training.loss,
             loss_params=config.training.loss_params,
         ),

@@ -205,6 +205,9 @@ class NecStagePlugin:
                             "model": branch.model,
                             "model_params": dict(branch.model_params),
                             "variables": list(branch.variables),
+                            "alpha": branch.alpha,
+                            "beta": branch.beta,
+                            "oversample_extreme_windows": branch.oversample_extreme_windows,
                             **compatibility[name],
                         }
                         for name, branch in _cfg.nec_branch_configs(nec_cfg).items()

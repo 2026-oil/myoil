@@ -11,6 +11,9 @@ import runtime_support.runner as runtime
 from plugins.nec.runtime import _NecPredictor
 
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
 def _write_dataset(path: Path, *, include_extremes: bool = True) -> Path:
     rows = [
         ("2020-01-01", 10, 1, 5),
@@ -99,7 +102,7 @@ def _write_main_config(path: Path, data_path: Path, plugin_path: Path) -> Path:
                 "cv": {"horizon": 2, "step_size": 2, "n_windows": 1, "gap": 0, "overlap_eval_policy": "by_cutoff_mean"},
                 "scheduler": {"gpu_ids": [0], "max_concurrent_jobs": 1, "worker_devices": 1},
                 "residual": {"enabled": False, "model": "xgboost", "params": {}},
-                "jobs": [{"model": "NEC", "params": {"variant": "paper"}}],
+                "jobs": [{"model": "NEC"}],
                 "nec": {"enabled": True, "config_path": str(plugin_path)},
             },
             sort_keys=False,
@@ -113,7 +116,7 @@ def test_nec_runtime_produces_predictions_and_fold_artifacts(tmp_path: Path) -> 
     data_path = _write_dataset(tmp_path / "data.csv", include_extremes=True)
     plugin_path = _write_plugin_yaml(tmp_path / "nec_plugin.yaml")
     config_path = _write_main_config(tmp_path / "config.yaml", data_path, plugin_path)
-    loaded = load_app_config(tmp_path, config_path=config_path)
+    loaded = load_app_config(REPO_ROOT, config_path=config_path)
     source_df = pd.read_csv(data_path)
     run_root = tmp_path / "run"
 
@@ -141,6 +144,12 @@ def test_nec_runtime_produces_predictions_and_fold_artifacts(tmp_path: Path) -> 
     assert artifact["active_hist_columns"] == ["hist_a", "hist_b"]
     assert artifact["merge_mode"] == "soft_weighted"
     assert artifact["branches"]["classifier"]["model"] == "MLP"
+    assert artifact["branches"]["classifier"]["sampled_series_count"] == 10
+    assert artifact["branches"]["classifier"]["oversampled_window_count"] == 5
+    assert artifact["branches"]["normal"]["sampled_series_count"] == 5
+    assert artifact["branches"]["normal"]["oversampled_window_count"] == 0
+    assert artifact["branches"]["extreme"]["sampled_series_count"] == 10
+    assert artifact["branches"]["extreme"]["oversampled_window_count"] == 5
     assert "history_steps" not in artifact
     assert "hist_columns_used" not in artifact
     assert (run_root / "summary" / "nec" / "normal" / "fold_000.csv").exists()
@@ -153,7 +162,7 @@ def test_nec_predictor_routes_inputs_by_model_role(tmp_path: Path) -> None:
     data_path = _write_dataset(tmp_path / "data.csv", include_extremes=True)
     plugin_path = _write_plugin_yaml(tmp_path / "nec_plugin.yaml")
     config_path = _write_main_config(tmp_path / "config.yaml", data_path, plugin_path)
-    loaded = load_app_config(tmp_path, config_path=config_path)
+    loaded = load_app_config(REPO_ROOT, config_path=config_path)
     source_df = pd.read_csv(data_path)
     predictor = _NecPredictor(
         loaded=loaded,
@@ -166,11 +175,47 @@ def test_nec_predictor_routes_inputs_by_model_role(tmp_path: Path) -> None:
     assert predictor.normal_feature_matrix.shape[1] == 2  # target + hist_a
 
 
+def test_nec_predictor_uses_selected_losses_and_oversampled_windows(tmp_path: Path) -> None:
+    data_path = _write_dataset(tmp_path / "data.csv", include_extremes=True)
+    plugin_path = _write_plugin_yaml(tmp_path / "nec_plugin.yaml")
+    config_path = _write_main_config(tmp_path / "config.yaml", data_path, plugin_path)
+    loaded = load_app_config(REPO_ROOT, config_path=config_path)
+    source_df = pd.read_csv(data_path)
+    predictor = _NecPredictor(
+        loaded=loaded,
+        train_df=source_df.iloc[:12].reset_index(drop=True),
+        future_df=source_df.iloc[12:14].reset_index(drop=True),
+    )
+
+    normal_loss, _ = predictor._branch_losses("normal")
+    extreme_loss, _ = predictor._branch_losses("extreme")
+    classifier_loss, _ = predictor._branch_losses("classifier")
+
+    import torch
+
+    y = torch.tensor([[[0.0], [2.5]]], dtype=torch.float32)
+    y_hat = torch.tensor([[[1.0], [3.5]]], dtype=torch.float32)
+    assert torch.isclose(normal_loss(y, y_hat), torch.tensor(1.0))
+    assert torch.isclose(extreme_loss(y, y_hat), torch.tensor(1.0))
+    assert classifier_loss.alpha == 2.0
+    assert classifier_loss.beta == 0.5
+
+    branch_loaded, _branch_job = predictor._branch_config("extreme")
+    train_frame = predictor._branch_training_frame("extreme")
+    sampled_fit_df, oversampled_window_count = predictor._sampled_branch_fit_df(
+        "extreme",
+        train_frame,
+        branch_loaded,
+    )
+    assert oversampled_window_count == 5
+    assert sampled_fit_df["unique_id"].nunique() == 10
+
+
 def test_nec_runtime_fails_fast_when_no_extreme_windows_exist(tmp_path: Path) -> None:
     data_path = _write_dataset(tmp_path / "data.csv", include_extremes=False)
     plugin_path = _write_plugin_yaml(tmp_path / "nec_plugin.yaml", epsilon=10.0)
     config_path = _write_main_config(tmp_path / "config.yaml", data_path, plugin_path)
-    loaded = load_app_config(tmp_path, config_path=config_path)
+    loaded = load_app_config(REPO_ROOT, config_path=config_path)
     source_df = pd.read_csv(data_path)
 
     predictions, actuals, *_rest = runtime._fit_and_predict_fold(
@@ -188,21 +233,44 @@ def test_nec_runtime_fails_fast_when_no_extreme_windows_exist(tmp_path: Path) ->
 def test_feature_set_nec_validate_only_exposes_branch_metadata() -> None:
     code = runtime.main([
         "--config",
-        "yaml/experiment/feature_set_nec/brentoil-case1.yaml",
+        "yaml/experiment/feature_set_nec/nec.yaml",
         "--validate-only",
     ])
     assert code == 0
     root = Path("runs/feature_set_nec_brentoil_case1_nec")
     resolved = json.loads((root / "config" / "config.resolved.json").read_text())
     nec_payload = resolved["nec"]
+    assert nec_payload["selected_config_path"].endswith("yaml/plugins/nec.yaml")
+    assert nec_payload["stage1"]["source_path"].endswith("yaml/plugins/nec.yaml")
     assert nec_payload["history_steps_source"] == "training.input_size"
     assert nec_payload["probability_feature_forced"] is True
     assert "hist_columns" not in nec_payload
     assert "history_steps" not in nec_payload
     assert nec_payload["branches"]["classifier"]["model"] == "LSTM"
-    assert nec_payload["branches"]["normal"]["variables"] == ["Com_Gasoline", "Com_Steel"]
+    assert nec_payload["branches"]["classifier"]["alpha"] == 2.0
+    assert nec_payload["branches"]["classifier"]["beta"] == 0.5
+    assert nec_payload["branches"]["classifier"]["oversample_extreme_windows"] is True
+    assert nec_payload["branches"]["normal"]["variables"] == [
+        "Idx_OVX",
+        "Com_Oil_Spread",
+        "BS_Core_Index_A",
+        "BS_Core_Index_B",
+        "BS_Core_Index_C",
+        "Com_LMEX",
+        "Com_BloombergCommodity_BCOM",
+        "GPRD_THREAT",
+        "GPRD",
+        "GPRD_ACT",
+    ]
     assert nec_payload["active_hist_columns"] == [
-        "Com_Gasoline",
-        "Com_Steel",
-        "Bonds_US_Spread_10Y_1Y",
+        "Idx_OVX",
+        "Com_Oil_Spread",
+        "BS_Core_Index_A",
+        "BS_Core_Index_B",
+        "BS_Core_Index_C",
+        "Com_LMEX",
+        "Com_BloombergCommodity_BCOM",
+        "GPRD_THREAT",
+        "GPRD",
+        "GPRD_ACT",
     ]

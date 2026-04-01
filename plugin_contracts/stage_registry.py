@@ -20,6 +20,7 @@ def register_stage_plugin(plugin: StagePlugin) -> None:
 
 
 def get_stage_plugin(key: str) -> StagePlugin | None:
+    _ensure_plugins_loaded()
     return _STAGE_PLUGINS.get(key)
 
 
