@@ -228,6 +228,11 @@ def test_feature_set_nec_defaults_plugin_route_when_config_path_is_omitted() -> 
         config_path=REPO_ROOT / "yaml/experiment/feature_set_nec/nec.yaml",
     )
 
+    assert len(loaded.config.jobs) == 1
+    assert loaded.config.jobs[0].model == "NEC"
+    assert loaded.config.jobs[0].params == {}
+    assert loaded.config.jobs[0].requested_mode == "learned_fixed"
+    assert loaded.config.jobs[0].validated_mode == "learned_fixed"
     assert loaded.config.stage_plugin_config.enabled is True
     assert loaded.config.stage_plugin_config.config_path == "yaml/plugins/nec.yaml"
     assert loaded.normalized_payload["nec"]["stage1"]["source_path"].endswith("yaml/plugins/nec.yaml")
