@@ -149,7 +149,7 @@ class AAForecast(BaseModel):
         ).clamp_min(1e-4)
         upward_shift = (event_signal - event_center).clamp_min(0.0)
         event_score = 0.6745 * upward_shift / event_mad
-        return event_score.amax(dim=2, keepdim=True) > self.anomaly_threshold
+        return event_score > self.anomaly_threshold
 
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]
@@ -161,7 +161,7 @@ class AAForecast(BaseModel):
             encoder_parts.append(insample_y)
         if self.hist_exog_size > 0:
             encoder_parts.append(hist_exog)
-            event_signal = hist_exog
+            event_signal = hist_exog[:, :, :1]
             event_mask = self._event_mask(event_signal)
         else:
             event_signal = torch.zeros_like(insample_y)
