@@ -79,8 +79,6 @@ def _validate_branch_model_params(branch_name: str, branch_cfg: _cfg.NecBranchCo
 
 def _validate_branch_contract(branch_name: str, branch_cfg: _cfg.NecBranchConfig) -> dict[str, Any]:
     _exported, caps = _catalog_and_capabilities(branch_cfg.model)
-    if caps.multivariate:
-        raise ValueError(f"nec.{branch_name}.model={branch_cfg.model} is multivariate and not supported by NEC branches")
     needs_hist_exog = bool(branch_cfg.variables) or branch_name in {"classifier", "extreme"}
     if needs_hist_exog and not caps.supports_hist_exog:
         raise ValueError(

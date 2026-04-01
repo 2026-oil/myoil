@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 import yaml
 
 from app_config import load_app_config
@@ -64,6 +65,49 @@ def _write_plugin_yaml(path: Path, *, epsilon: float = 1.2) -> Path:
                         "model": "MLP",
                         "variables": ["hist_a", "hist_b"],
                         "model_params": {"hidden_size": 16, "num_layers": 1},
+                        "oversample_extreme_windows": True,
+                    },
+                    "validation": {"windows": 2},
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _write_uniform_backbone_plugin_yaml(
+    path: Path,
+    *,
+    model_name: str,
+    model_params: dict,
+    epsilon: float = 1.2,
+) -> Path:
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "nec": {
+                    "preprocessing": {"mode": "diff_std", "gmm_components": 2, "epsilon": epsilon},
+                    "inference": {"mode": "soft_weighted", "threshold": 0.5},
+                    "classifier": {
+                        "model": model_name,
+                        "variables": [],
+                        "model_params": dict(model_params),
+                        "alpha": 2.0,
+                        "beta": 0.5,
+                        "oversample_extreme_windows": True,
+                    },
+                    "normal": {
+                        "model": model_name,
+                        "variables": ["hist_a"],
+                        "model_params": dict(model_params),
+                        "oversample_extreme_windows": False,
+                    },
+                    "extreme": {
+                        "model": model_name,
+                        "variables": ["hist_a", "hist_b"],
+                        "model_params": dict(model_params),
                         "oversample_extreme_windows": True,
                     },
                     "validation": {"windows": 2},
@@ -202,6 +246,72 @@ def test_nec_branch_models_inherit_shared_training_settings(tmp_path: Path) -> N
     assert model.hparams.batch_size == loaded.config.training.batch_size
 
 
+@pytest.mark.parametrize(
+    ("model_name", "model_params"),
+    [
+        (
+            "TimeXer",
+            {
+                "patch_len": 1,
+                "hidden_size": 8,
+                "n_heads": 1,
+                "e_layers": 1,
+                "d_ff": 16,
+                "factor": 1,
+                "dropout": 0.1,
+                "use_norm": True,
+            },
+        ),
+        (
+            "TSMixerx",
+            {
+                "n_block": 2,
+                "ff_dim": 16,
+                "dropout": 0.1,
+                "revin": True,
+            },
+        ),
+        (
+            "iTransformer",
+            {
+                "hidden_size": 8,
+                "n_heads": 1,
+                "e_layers": 1,
+                "d_ff": 16,
+                "dropout": 0.0,
+            },
+        ),
+    ],
+)
+def test_nec_runtime_supports_variant_backbones(
+    tmp_path: Path,
+    model_name: str,
+    model_params: dict,
+) -> None:
+    data_path = _write_dataset(tmp_path / "data.csv", include_extremes=True)
+    plugin_path = _write_uniform_backbone_plugin_yaml(
+        tmp_path / f"{model_name.lower()}_plugin.yaml",
+        model_name=model_name,
+        model_params=model_params,
+    )
+    config_path = _write_main_config(tmp_path / "config.yaml", data_path, plugin_path)
+    loaded = load_app_config(REPO_ROOT, config_path=config_path)
+    source_df = pd.read_csv(data_path)
+
+    predictions, actuals, *_rest = runtime._fit_and_predict_fold(
+        loaded,
+        loaded.config.jobs[0],
+        source_df=source_df,
+        freq="W",
+        train_idx=list(range(12)),
+        test_idx=[12, 13],
+    )
+
+    assert len(predictions) == 2
+    assert len(actuals) == 2
+    assert predictions["NEC"].notna().all()
+
+
 def test_nec_predictor_uses_selected_losses_and_oversampled_windows(tmp_path: Path) -> None:
     data_path = _write_dataset(tmp_path / "data.csv", include_extremes=True)
     plugin_path = _write_plugin_yaml(tmp_path / "nec_plugin.yaml")
@@ -257,23 +367,38 @@ def test_nec_runtime_fails_fast_when_no_extreme_windows_exist(tmp_path: Path) ->
     assert len(actuals) == 2
 
 
-def test_feature_set_nec_validate_only_exposes_branch_metadata() -> None:
+@pytest.mark.parametrize(
+    ("config_name", "expected_plugin", "expected_model"),
+    [
+        ("nec_lstm", "yaml/plugins/nec_lstm.yaml", "LSTM"),
+        ("nec_timexer", "yaml/plugins/nec_timexer.yaml", "TimeXer"),
+        ("nec_tsmixerx", "yaml/plugins/nec_tsmixerx.yaml", "TSMixerx"),
+        ("nec_itransformer", "yaml/plugins/nec_itransformer.yaml", "iTransformer"),
+    ],
+)
+def test_feature_set_nec_validate_only_exposes_branch_metadata(
+    config_name: str,
+    expected_plugin: str,
+    expected_model: str,
+) -> None:
     code = runtime.main([
         "--config",
-        "yaml/experiment/feature_set_nec/nec.yaml",
+        f"yaml/experiment/feature_set_nec/{config_name}.yaml",
         "--validate-only",
     ])
     assert code == 0
-    root = Path("runs/feature_set_nec_brentoil_case1_nec")
+    root = Path(f"runs/feature_set_nec_brentoil_case1_{config_name}")
     resolved = json.loads((root / "config" / "config.resolved.json").read_text())
     nec_payload = resolved["nec"]
-    assert nec_payload["selected_config_path"].endswith("yaml/plugins/nec.yaml")
-    assert nec_payload["stage1"]["source_path"].endswith("yaml/plugins/nec.yaml")
+    assert nec_payload["selected_config_path"].endswith(expected_plugin)
+    assert nec_payload["stage1"]["source_path"].endswith(expected_plugin)
     assert nec_payload["history_steps_source"] == "training.input_size"
     assert nec_payload["probability_feature_forced"] is True
     assert "hist_columns" not in nec_payload
     assert "history_steps" not in nec_payload
-    assert nec_payload["branches"]["classifier"]["model"] == "LSTM"
+    assert nec_payload["branches"]["classifier"]["model"] == expected_model
+    assert nec_payload["branches"]["normal"]["model"] == expected_model
+    assert nec_payload["branches"]["extreme"]["model"] == expected_model
     assert nec_payload["branches"]["classifier"]["alpha"] == 2.0
     assert nec_payload["branches"]["classifier"]["beta"] == 0.5
     assert nec_payload["branches"]["classifier"]["oversample_extreme_windows"] is True

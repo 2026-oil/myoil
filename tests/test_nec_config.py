@@ -202,7 +202,7 @@ def test_nec_plugin_yaml_rejects_incompatible_branch_model(tmp_path: Path) -> No
             {
                 "nec": {
                     "preprocessing": {"mode": "diff_std", "gmm_components": 2, "epsilon": 1.2},
-                    "classifier": {"model": "TimeXer", "variables": [], "model_params": {}},
+                    "classifier": {"model": "NBEATS", "variables": [], "model_params": {}},
                     "normal": {"model": "MLP", "variables": [], "model_params": {}},
                     "extreme": {"model": "MLP", "variables": [], "model_params": {}},
                     "validation": {"windows": 1},
@@ -218,14 +218,27 @@ def test_nec_plugin_yaml_rejects_incompatible_branch_model(tmp_path: Path) -> No
     payload["nec"]["config_path"] = str(bad_plugin)
     copied.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
-    with pytest.raises(ValueError, match=r"multivariate and not supported"):
+    with pytest.raises(ValueError, match=r"requires hist exog inputs"):
         load_app_config(tmp_path, config_path=copied)
 
 
-def test_feature_set_nec_defaults_plugin_route_when_config_path_is_omitted() -> None:
+@pytest.mark.parametrize(
+    ("config_name", "expected_plugin", "expected_model"),
+    [
+        ("nec_lstm", "yaml/plugins/nec_lstm.yaml", "LSTM"),
+        ("nec_timexer", "yaml/plugins/nec_timexer.yaml", "TimeXer"),
+        ("nec_tsmixerx", "yaml/plugins/nec_tsmixerx.yaml", "TSMixerx"),
+        ("nec_itransformer", "yaml/plugins/nec_itransformer.yaml", "iTransformer"),
+    ],
+)
+def test_feature_set_nec_variant_configs_load_expected_plugin_route(
+    config_name: str,
+    expected_plugin: str,
+    expected_model: str,
+) -> None:
     loaded = load_app_config(
         REPO_ROOT,
-        config_path=REPO_ROOT / "yaml/experiment/feature_set_nec/nec.yaml",
+        config_path=REPO_ROOT / "yaml/experiment/feature_set_nec" / f"{config_name}.yaml",
     )
 
     assert len(loaded.config.jobs) == 1
@@ -234,5 +247,23 @@ def test_feature_set_nec_defaults_plugin_route_when_config_path_is_omitted() -> 
     assert loaded.config.jobs[0].requested_mode == "learned_fixed"
     assert loaded.config.jobs[0].validated_mode == "learned_fixed"
     assert loaded.config.stage_plugin_config.enabled is True
-    assert loaded.config.stage_plugin_config.config_path == "yaml/plugins/nec.yaml"
-    assert loaded.normalized_payload["nec"]["stage1"]["source_path"].endswith("yaml/plugins/nec.yaml")
+    assert loaded.config.stage_plugin_config.config_path == expected_plugin
+    assert loaded.normalized_payload["nec"]["stage1"]["source_path"].endswith(expected_plugin)
+    assert loaded.normalized_payload["nec"]["stage1"]["branches"]["classifier"]["model"] == expected_model
+    assert loaded.normalized_payload["nec"]["stage1"]["branches"]["normal"]["model"] == expected_model
+    assert loaded.normalized_payload["nec"]["stage1"]["branches"]["extreme"]["model"] == expected_model
+
+
+def test_nec_enabled_without_config_path_defaults_to_nec_lstm() -> None:
+    payload = yaml.safe_load(
+        (REPO_ROOT / "yaml/experiment/feature_set_nec/nec_lstm.yaml").read_text(encoding="utf-8")
+    )
+    payload["nec"] = {"enabled": True}
+    config_path = REPO_ROOT / ".tmp-nec-default-route-test.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    try:
+        loaded = load_app_config(REPO_ROOT, config_path=config_path)
+    finally:
+        config_path.unlink(missing_ok=True)
+
+    assert loaded.config.stage_plugin_config.config_path == "yaml/plugins/nec_lstm.yaml"

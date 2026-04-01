@@ -217,7 +217,7 @@ def normalize_nec_config(value: Any, *, unknown_keys: Any, coerce_bool: Any, coe
     enabled = coerce_bool(payload.get("enabled"), field_name="nec.enabled", default=False)
     config_path = coerce_optional_path_string(payload.get("config_path"), field_name="nec.config_path")
     if enabled and config_path is None:
-        config_path = "yaml/plugins/nec.yaml"
+        config_path = "yaml/plugins/nec_lstm.yaml"
     return NecConfig(enabled=enabled, config_path=config_path)
 
 

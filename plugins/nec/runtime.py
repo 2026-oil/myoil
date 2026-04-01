@@ -12,7 +12,7 @@ from neuralforecast import NeuralForecast
 
 from app_config import JobConfig, LoadedConfig
 from runtime_support.adapters import build_univariate_inputs
-from runtime_support.forecast_models import build_model
+from runtime_support.forecast_models import build_model, capabilities_for
 from .config import NecConfig, nec_active_hist_columns, nec_branch_configs
 from .losses import NecClassifierLoss, NecSelectivePointLoss
 
@@ -103,6 +103,9 @@ class _NecPredictor:
             raise ValueError("NEC requires at least training.input_size + horizon training rows in each fold")
         self.actual_target = self.future_df[self.target_col].astype(float).to_numpy(dtype=np.float32)
         self.actual_classifier = self._future_extreme_flags()
+
+    def _uses_direct_branch_fit(self, branch_model_name: str) -> bool:
+        return bool(capabilities_for(branch_model_name).multivariate)
 
     def _validate_frames(self) -> None:
         required_columns = [self.target_col, *self.active_hist_columns]
@@ -279,11 +282,17 @@ class _NecPredictor:
             dt_col=self.dt_col,
             future_df=None,
         )
-        sampled_fit_df, oversampled_window_count = self._sampled_branch_fit_df(
-            branch_name,
-            train_frame,
-            branch_loaded,
-        )
+        if self._uses_direct_branch_fit(branch_job.model):
+            fit_df = inference_inputs.fit_df
+            oversampled_window_count = 0
+            sampled_series_count = int(fit_df["unique_id"].nunique())
+        else:
+            fit_df, oversampled_window_count = self._sampled_branch_fit_df(
+                branch_name,
+                train_frame,
+                branch_loaded,
+            )
+            sampled_series_count = int(fit_df["unique_id"].nunique())
         training_loss, valid_loss = self._branch_losses(branch_name)
         model = build_model(
             branch_loaded.config,
@@ -294,7 +303,7 @@ class _NecPredictor:
         )
         nf = NeuralForecast(models=[model], freq=self.freq)
         nf.fit(
-            sampled_fit_df,
+            fit_df,
             static_df=None,
             val_size=self._effective_val_size(branch_loaded),
         )
@@ -323,7 +332,7 @@ class _NecPredictor:
                 predictions=classifier_probs,
                 raw_predictions=prediction_values,
                 actual=self.actual_classifier,
-                sampled_series_count=int(sampled_fit_df["unique_id"].nunique()),
+                sampled_series_count=sampled_series_count,
                 oversampled_window_count=oversampled_window_count,
             )
         level_predictions = self._diff_denormalize(prediction_values)
@@ -334,7 +343,7 @@ class _NecPredictor:
             predictions=level_predictions,
             raw_predictions=prediction_values,
             actual=self.actual_target,
-            sampled_series_count=int(sampled_fit_df["unique_id"].nunique()),
+            sampled_series_count=sampled_series_count,
             oversampled_window_count=oversampled_window_count,
         )
 

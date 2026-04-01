@@ -7,9 +7,9 @@ nec:
     mode: soft_weighted
     threshold: 0.5
   classifier:
-    model: LSTM
+    model: TSMixerx
     variables:
-      - Idx_OVX  
+      - Idx_OVX
       - Com_Oil_Spread
       - BS_Core_Index_A
       - BS_Core_Index_B
@@ -20,17 +20,17 @@ nec:
       - GPRD
       - GPRD_ACT
     model_params:
-      encoder_hidden_size: 128
-      encoder_n_layers: 2
-      decoder_hidden_size: 128
-      decoder_layers: 2
+      n_block: 3
+      ff_dim: 96
+      dropout: 0.1
+      revin: true
     alpha: 2.0
     beta: 0.5
     oversample_extreme_windows: true
   normal:
-    model: LSTM
+    model: TSMixerx
     variables:
-      - Idx_OVX  
+      - Idx_OVX
       - Com_Oil_Spread
       - BS_Core_Index_A
       - BS_Core_Index_B
@@ -41,15 +41,15 @@ nec:
       - GPRD
       - GPRD_ACT
     model_params:
-      encoder_hidden_size: 128
-      encoder_n_layers: 2
-      decoder_hidden_size: 128
-      decoder_layers: 2
+      n_block: 3
+      ff_dim: 96
+      dropout: 0.1
+      revin: true
     oversample_extreme_windows: false
   extreme:
-    model: LSTM
+    model: TSMixerx
     variables:
-      - Idx_OVX  
+      - Idx_OVX
       - Com_Oil_Spread
       - BS_Core_Index_A
       - BS_Core_Index_B
@@ -60,10 +60,10 @@ nec:
       - GPRD
       - GPRD_ACT
     model_params:
-      encoder_hidden_size: 128
-      encoder_n_layers: 2
-      decoder_hidden_size: 128
-      decoder_layers: 2
+      n_block: 3
+      ff_dim: 96
+      dropout: 0.1
+      revin: true
     oversample_extreme_windows: true
   validation:
     windows: 8

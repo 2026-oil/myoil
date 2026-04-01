@@ -1,11 +1,11 @@
 task:
-  name: brentoil_case1_nec
+  name: brentoil_case1_nec_itransformer
 dataset:
   path: data/df.csv
   target_col: Com_BrentCrudeOil
   dt_col: dt
   hist_exog_cols:
-  - Idx_OVX  
+  - Idx_OVX
   - Com_Oil_Spread
   - BS_Core_Index_A
   - BS_Core_Index_B
@@ -23,8 +23,4 @@ jobs:
 - model: NEC
 nec:
   enabled: true
-  config_path: yaml/plugins/nec.yaml
-
-
-
-
+  config_path: yaml/plugins/nec_itransformer.yaml
