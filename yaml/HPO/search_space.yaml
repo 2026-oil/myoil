@@ -7,7 +7,9 @@ models:
     n_heads:
       type: categorical
       choices:
-        - 4
+        - 8
+        - 16
+        - 32
     encoder_layers:
       type: categorical
       choices:
@@ -85,8 +87,9 @@ models:
     n_heads:
       type: categorical
       choices:
-      - 4
       - 8
+      - 16
+      - 32
     e_layers:
       type: categorical
       choices:
@@ -158,8 +161,9 @@ models:
     n_heads:
       type: categorical
       choices:
-      - 4
       - 8
+      - 16
+      - 32
     e_layers:
       type: categorical
       choices:
@@ -203,8 +207,9 @@ models:
     n_head:
       type: categorical
       choices:
-      - 4
       - 8
+      - 16
+      - 32
     conv_hidden_size:
       type: categorical
       choices:
@@ -727,6 +732,7 @@ bs_preforcast_models:
     n_heads:
       type: categorical
       choices:
+      - 8
       - 16
       - 32
     e_layers:
@@ -769,8 +775,9 @@ bs_preforcast_models:
     n_head:
       type: categorical
       choices:
-      - 2
-      - 4
+      - 8
+      - 16
+      - 32
 bs_preforcast_training:
   global:
     input_size:
