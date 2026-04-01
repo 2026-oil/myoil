@@ -120,6 +120,7 @@ RESIDUAL_RUNTIME_SMOKE_FIXTURE_FILES = [
     REPO_ROOT / "tests" / "fixtures" / "residual_runtime_smoke_lightgbm.yaml",
 ]
 NEWLY_SUPPORTED_MODEL_ALIASES = {
+    "AAForecast": ("aaforecast", "autoaaforecast"),
     "NonstationaryTransformer": (
         "nonstationarytransformer",
         "autononstationarytransformer",
@@ -3967,6 +3968,62 @@ def test_load_app_config_marks_auto_requested_and_validated_modes(tmp_path: Path
     assert loaded.normalized_payload["search_space_sha256"]
 
 
+def test_load_app_config_marks_aaforecast_auto_requested_and_validated_modes(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = ["event"]
+    payload["jobs"] = [{"model": "AAForecast", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,event\n"
+        "2020-01-01,1,0\n"
+        "2020-01-08,2,1\n"
+        "2020-01-15,3,0\n"
+        "2020-01-22,4,2\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {
+                "AAForecast": [
+                    "encoder_hidden_size",
+                    "encoder_n_layers",
+                    "encoder_dropout",
+                    "decoder_hidden_size",
+                    "decoder_layers",
+                    "season_length",
+                    "trend_kernel_size",
+                    "anomaly_threshold",
+                ]
+            },
+            "training": [],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    job = loaded.config.jobs[0]
+    assert job.requested_mode == "learned_auto_requested"
+    assert job.validated_mode == "learned_auto"
+    assert list(job.selected_search_params) == [
+        "encoder_hidden_size",
+        "encoder_n_layers",
+        "encoder_dropout",
+        "decoder_hidden_size",
+        "decoder_layers",
+        "season_length",
+        "trend_kernel_size",
+        "anomaly_threshold",
+    ]
+    assert loaded.config.training_search.requested_mode == "training_fixed"
+    assert loaded.config.training_search.validated_mode == "training_fixed"
+    assert list(loaded.config.training_search.selected_search_params) == []
+
+
 @pytest.mark.parametrize(
     ("model_name", "selectors"),
     (
@@ -6655,36 +6712,54 @@ def test_priority_models_have_narrowed_training_range_overrides():
     cases = {
         "PatchTST": {
             "categorical": {
-                "input_size": (48, 64, 96),
+                "input_size": (96, 128, 192, 256),
                 "batch_size": (16, 32, 64, 128),
-                "scaler_type": (None,),
+                "scaler_type": ("standard",),
                 "model_step_size": (4, 8),
             },
             "floating": {},
         },
         "TSMixerx": {
             "categorical": {
-                "input_size": (48, 64, 72),
+                "input_size": (96, 128, 192, 256),
                 "batch_size": (16,),
-                "scaler_type": (None,),
+                "scaler_type": ("standard",),
+                "model_step_size": (4, 8),
+            },
+            "floating": {},
+        },
+        "TimeXer": {
+            "categorical": {
+                "input_size": (96, 128, 192, 256),
+                "batch_size": (16, 32, 64, 128),
+                "scaler_type": ("standard",),
                 "model_step_size": (4, 8),
             },
             "floating": {},
         },
         "iTransformer": {
             "categorical": {
-                "input_size": (48, 64, 96),
+                "input_size": (96, 128, 192, 256),
                 "batch_size": (16,),
-                "scaler_type": (None,),
+                "scaler_type": ("standard",),
+                "model_step_size": (4, 8),
+            },
+            "floating": {},
+        },
+        "NonstationaryTransformer": {
+            "categorical": {
+                "input_size": (96, 128, 192, 256),
+                "batch_size": (16, 32, 64),
+                "scaler_type": ("standard",),
                 "model_step_size": (4, 8),
             },
             "floating": {},
         },
         "LSTM": {
             "categorical": {
-                "input_size": (24, 48, 96),
+                "input_size": (96, 128, 192, 256),
                 "batch_size": (32, 64),
-                "scaler_type": (None,),
+                "scaler_type": ("standard",),
                 "model_step_size": (4, 8),
             },
             "floating": {},
@@ -6728,6 +6803,7 @@ def test_supported_residual_model_matrix_matches_defaults_registry_and_yaml():
 
 def test_supported_auto_model_matrix_includes_v3_expansion():
     for model_name in (
+        "AAForecast",
         "RNN",
         "GRU",
         "TCN",
@@ -6774,7 +6850,6 @@ def test_repo_search_space_bs_preforcast_sections_are_unique_and_include_stage_o
         "ES",
         "xgboost",
         "lightgbm",
-        "NHITS",
         "LSTM",
         "TSMixerx",
         "TimeXer",
@@ -6806,7 +6881,6 @@ def test_repo_search_space_bs_preforcast_sections_are_unique_and_include_stage_o
         "min_child_samples",
         "feature_fraction",
     )
-    assert tuple(search_space["bs_preforcast_models"]["NHITS"]) == ("mlp_units",)
     assert search_space["bs_preforcast_models"]["ARIMA"]["order"]["choices"][1] == [
         1,
         1,
@@ -6827,17 +6901,24 @@ def test_repo_search_space_bs_preforcast_sections_are_unique_and_include_stage_o
         12,
         24,
     ]
-    assert search_space["bs_preforcast_models"]["NHITS"]["mlp_units"]["choices"][0] == [
-        [32, 32],
-        [32, 32],
-        [32, 32],
-    ]
+    assert (
+        search_space["bs_preforcast_training"]["global"]["input_size"]["choices"]
+        == [96, 128, 192, 256]
+    )
+    for model_name in ("LSTM", "TSMixerx"):
+        assert (
+            search_space["bs_preforcast_training"]["per_model"][model_name]["input_size"][
+                "choices"
+            ]
+            == [96, 128, 192, 256]
+        )
 
 
 def test_package_exports_and_intentional_omissions_are_explicit():
     for model_name in NEWLY_SUPPORTED_MODEL_ALIASES:
         assert hasattr(nf_models, model_name)
     for auto_name in (
+        "AutoAAForecast",
         "AutoNonstationaryTransformer",
         "AutoMamba",
         "AutoSMamba",
@@ -6853,8 +6934,11 @@ def test_package_exports_and_intentional_omissions_are_explicit():
     assert not hasattr(nf_auto, "AutoDeepEDM")
     assert hasattr(nf_models, "DeformTime")
     assert not hasattr(nf_models, "DeepEDM")
+    assert hasattr(nf_models, "AAForecast")
     assert hasattr(nf_models, "NonstationaryTransformer")
     assert hasattr(nf_models, "DeformableTST")
+    assert "AAForecast" in SUPPORTED_AUTO_MODEL_NAMES
+    assert "AAForecast" in MODEL_CLASSES
     assert "DeformTime" in SUPPORTED_AUTO_MODEL_NAMES
     assert "DeformTime" in MODEL_CLASSES
     assert "DeepEDM" not in SUPPORTED_AUTO_MODEL_NAMES
@@ -6863,6 +6947,8 @@ def test_package_exports_and_intentional_omissions_are_explicit():
     assert "NonstationaryTransformer" in MODEL_CLASSES
     assert "deepedm" not in MODEL_FILENAME_DICT
     assert "autodeepedm" not in MODEL_FILENAME_DICT
+    assert "aaforecast" in MODEL_FILENAME_DICT
+    assert "autoaaforecast" in MODEL_FILENAME_DICT
     assert "nonstationarytransformer" in MODEL_FILENAME_DICT
     assert "autononstationarytransformer" in MODEL_FILENAME_DICT
     assert "DeformableTST" in SUPPORTED_AUTO_MODEL_NAMES
@@ -6870,6 +6956,7 @@ def test_package_exports_and_intentional_omissions_are_explicit():
     search_space = yaml.safe_load((REPO_ROOT / "yaml/HPO/search_space.yaml").read_text())
     assert "DeformTime" not in search_space["models"]
     assert "DeepEDM" not in search_space["models"]
+    assert "AAForecast" in search_space["models"]
     assert "NonstationaryTransformer" in search_space["models"]
     assert "DeformableTST" not in search_space["models"]
 
@@ -6890,6 +6977,7 @@ def test_model_filename_dict_includes_newly_supported_aliases(
 def test_supports_auto_mode_expands_to_newly_added_models():
     for model_name in (
         "RNN",
+        "AAForecast",
         "DeepAR",
         "DeformTime",
         "DeformableTST",
@@ -6953,6 +7041,19 @@ def test_build_model_supports_new_official_model_ports(tmp_path: Path):
                 "decoder_layers": 1,
             },
         },
+        {
+            "model": "AAForecast",
+            "params": {
+                "encoder_hidden_size": 16,
+                "encoder_n_layers": 1,
+                "encoder_dropout": 0.1,
+                "decoder_hidden_size": 16,
+                "decoder_layers": 1,
+                "season_length": 4,
+                "trend_kernel_size": 3,
+                "anomaly_threshold": 3.0,
+            },
+        },
     ]
     loaded = load_app_config(
         tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
@@ -6962,11 +7063,13 @@ def test_build_model_supports_new_official_model_ports(tmp_path: Path):
     deformabletst = build_model(loaded.config, loaded.config.jobs[1], n_series=1)
     modern = build_model(loaded.config, loaded.config.jobs[2], n_series=1)
     nonstationary = build_model(loaded.config, loaded.config.jobs[3], n_series=1)
+    aa_forecast = build_model(loaded.config, loaded.config.jobs[4], n_series=1)
 
     assert deform.__class__.__name__ == "DeformTime"
     assert deformabletst.__class__.__name__ == "DeformableTST"
     assert modern.__class__.__name__ == "ModernTCN"
     assert nonstationary.__class__.__name__ == "NonstationaryTransformer"
+    assert aa_forecast.__class__.__name__ == "AAForecast"
 
 
 def test_should_use_multivariate_for_no_exog_multivariate_model(tmp_path: Path):
@@ -7643,6 +7746,7 @@ EXPECTED_REPO_TRAINING_AUTO_MODELS = [
     "TSMixerx",
     "TimeXer",
     "NonstationaryTransformer",
+    "AAForecast",
 ]
 
 EXPECTED_REPO_AUTO_MODELS = [
@@ -7651,6 +7755,16 @@ EXPECTED_REPO_AUTO_MODELS = [
 ]
 
 EXPECTED_REPO_AUTO_SELECTORS = {
+    "AAForecast": [
+        "encoder_hidden_size",
+        "encoder_n_layers",
+        "encoder_dropout",
+        "decoder_hidden_size",
+        "decoder_layers",
+        "season_length",
+        "trend_kernel_size",
+        "anomaly_threshold",
+    ],
     "iTransformer": [
         "hidden_size",
         "n_heads",

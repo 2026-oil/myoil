@@ -10,8 +10,8 @@
     use_norm: true
 - model: TSMixerx
   params:
-    n_block: 2
-    ff_dim: 64
+    n_block: 3
+    ff_dim: 96
     dropout: 0.1
     revin: true
 - model: Naive

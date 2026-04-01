@@ -226,6 +226,57 @@ models:
       choices:
       - 1
       - 2
+  AAForecast:
+    encoder_hidden_size:
+      type: categorical
+      choices:
+      - 64
+      - 128
+      - 256
+    encoder_n_layers:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 3
+    encoder_dropout:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.1
+      - 0.2
+      - 0.3
+    decoder_hidden_size:
+      type: categorical
+      choices:
+      - 64
+      - 128
+      - 256
+    decoder_layers:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 3
+    season_length:
+      type: categorical
+      choices:
+      - 4
+      - 8
+      - 12
+    trend_kernel_size:
+      type: categorical
+      choices:
+      - 3
+      - 5
+      - 7
+    anomaly_threshold:
+      type: categorical
+      choices:
+      - 2.5
+      - 3.0
+      - 3.5
+      - 4.0
   ARIMA:
     order:
       type: categorical
@@ -445,6 +496,28 @@ training:
         - 4
         - 8
     NonstationaryTransformer:
+      input_size:
+        type: categorical
+        choices:
+        - 48
+        - 64
+        - 96
+      batch_size:
+        type: categorical
+        choices:
+        - 16
+        - 32
+        - 64
+      scaler_type:
+        type: categorical
+        choices:
+        - standard
+      model_step_size:
+        type: categorical
+        choices:
+        - 4
+        - 8
+    AAForecast:
       input_size:
         type: categorical
         choices:

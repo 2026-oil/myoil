@@ -1165,6 +1165,12 @@ def _normalize_job(
     stage_plugin = get_stage_plugin(stage_scope) if stage_scope else None
     if stage_plugin is not None:
         stage_plugin.validate_model(model_name)
+    stage_plugin_owns_job = False
+    if stage_plugin is not None:
+        owns_top_level_job = getattr(stage_plugin, "owns_top_level_job", None)
+        stage_plugin_owns_job = bool(
+            callable(owns_top_level_job) and owns_top_level_job(model_name)
+        )
     params = dict(job.get("params", {}))
     supported_auto_models = (
         stage_plugin.supported_models()
@@ -1172,6 +1178,8 @@ def _normalize_job(
         else SUPPORTED_MODEL_AUTO_MODEL_NAMES
     )
     requested_mode = _requested_job_mode(model_name, params)
+    if stage_plugin_owns_job and not params:
+        requested_mode = "learned_fixed"
     validated_mode: Literal["baseline_fixed", "learned_fixed", "learned_auto"]
     selected: tuple[str, ...] = ()
     if requested_mode == "baseline_fixed":
@@ -1468,7 +1476,7 @@ def _normalize_payload(
         legacy_values = [
             job["params"][selector]
             for job in jobs_payload
-            if selector in job["params"]
+            if isinstance(job.get("params"), dict) and selector in job["params"]
         ]
         if not legacy_values:
             continue
@@ -1485,7 +1493,8 @@ def _normalize_payload(
             )
         training.setdefault(field_name, canonical_value)
         for job in jobs_payload:
-            job["params"].pop(selector, None)
+            if isinstance(job.get("params"), dict):
+                job["params"].pop(selector, None)
 
     jobs: tuple[JobConfig, ...] = tuple(
         _normalize_job(
@@ -1852,6 +1861,12 @@ def load_app_config(
     )
     _ensure_plugins_loaded()
     stage_plugin = get_stage_plugin_for_payload(payload)
+    def _active_stage_owns_top_level_job(model_name: str) -> bool:
+        if stage_plugin is None:
+            return False
+        owns_top_level_job = getattr(stage_plugin, "owns_top_level_job", None)
+        return bool(callable(owns_top_level_job) and owns_top_level_job(model_name))
+
     stage_source_path: Path | None = None
     stage_payload_probe: dict[str, Any] | None = None
     if stage_plugin is not None:
@@ -1911,7 +1926,12 @@ def load_app_config(
             ]
     for jobs_candidate in jobs_payload_candidates:
         for job in jobs_candidate:
-            if str(job.get("model")) not in BASELINE_MODEL_NAMES and not dict(job.get("params", {})):
+            model_name = str(job.get("model"))
+            if (
+                model_name not in BASELINE_MODEL_NAMES
+                and not _active_stage_owns_top_level_job(model_name)
+                and not dict(job.get("params", {}))
+            ):
                 requested_search_space = True
                 break
         if requested_search_space:
@@ -1925,8 +1945,11 @@ def load_app_config(
     if stage_payload_probe is not None:
         stage_jobs = stage_payload_probe.get("jobs", [])
         for sjob in stage_jobs:
-            if str(sjob.get("model")) not in BASELINE_MODEL_NAMES and not dict(
-                sjob.get("params", {})
+            model_name = str(sjob.get("model"))
+            if (
+                model_name not in BASELINE_MODEL_NAMES
+                and not _active_stage_owns_top_level_job(model_name)
+                and not dict(sjob.get("params", {}))
             ):
                 requested_search_space = True
                 break
@@ -1949,6 +1972,7 @@ def load_app_config(
         allow_missing_search_space=(search_space is None),
         model_search_space_key=model_search_space_key,
         training_search_space_key=training_search_space_key,
+        stage_scope=stage_plugin.config_key if stage_plugin is not None else None,
     )
     stage_plugin_loaded = None
     if (

@@ -24,6 +24,7 @@ from utilsforecast.compat import DataFrame, DFType, Series, pl_DataFrame, pl_Ser
 from utilsforecast.validation import validate_freq
 from neuralforecast.common.enums import ExplainerEnum
 from neuralforecast.models import (
+    AAForecast,
     GRU,
     KAN,
     LSTM,
@@ -147,6 +148,8 @@ def _insample_times(
 
 
 MODEL_FILENAME_DICT = {
+    "aaforecast": AAForecast,
+    "autoaaforecast": AAForecast,
     "autoformer": Autoformer,
     "autoautoformer": Autoformer,
     "deepar": DeepAR,

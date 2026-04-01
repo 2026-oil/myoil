@@ -8,6 +8,7 @@ from typing import Any
 import torch
 from neuralforecast.losses.pytorch import ExLoss, MSE, _weighted_mean
 from neuralforecast.models import (
+    AAForecast,
     Autoformer,
     BiTCN,
     DLinear,
@@ -126,6 +127,7 @@ class ForecastL1Loss(torch.nn.L1Loss):
 
 
 MODEL_CLASSES = {
+    "AAForecast": AAForecast,
     "RNN": RNN,
     "GRU": GRU,
     "TCN": TCN,

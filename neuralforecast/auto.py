@@ -1,7 +1,7 @@
 
 
 
-__all__ = ['AutoRNN', 'AutoLSTM', 'AutoGRU', 'AutoTCN', 'AutoDeepAR', 'AutoDilatedRNN', 'AutoBiTCN', 'AutoxLSTM', 'AutoMLP',
+__all__ = ['AutoAAForecast', 'AutoRNN', 'AutoLSTM', 'AutoGRU', 'AutoTCN', 'AutoDeepAR', 'AutoDilatedRNN', 'AutoBiTCN', 'AutoxLSTM', 'AutoMLP',
            'AutoNBEATS', 'AutoNBEATSx', 'AutoNHITS', 'AutoDLinear', 'AutoNLinear', 'AutoTiDE', 'AutoDeepNPTS',
            'AutoKAN', 'AutoTFT', 'AutoVanillaTransformer', 'AutoInformer', 'AutoAutoformer', 'AutoFEDformer',
            'AutoPatchTST', 'AutoiTransformer', 'AutoTimeXer', 'AutoTimesNet', 'AutoStemGNN', 'AutoHINT', 'AutoTSMixer',
@@ -17,6 +17,7 @@ from ray.tune.search.basic_variant import BasicVariantGenerator
 
 from .common._base_auto import BaseAuto, MockTrial
 from .losses.pytorch import MAE, DistributionLoss, MQLoss
+from .models import AAForecast
 from .models.autoformer import Autoformer
 from .models.bitcn import BiTCN
 from .models.cmamba import CMamba
@@ -121,6 +122,75 @@ class AutoRNN(BaseAuto):
             [h * x for x in config["inference_input_size_multiplier"]]
         )
         del config["input_size_multiplier"], config["inference_input_size_multiplier"]
+        if backend == "optuna":
+            config = cls._ray_config_to_optuna(config)
+
+        return config
+
+
+class AutoAAForecast(BaseAuto):
+
+    default_config = {
+        "input_size_multiplier": [1, 2, 3, 4],
+        "h": None,
+        "encoder_hidden_size": tune.choice([64, 128, 256]),
+        "encoder_n_layers": tune.randint(1, 4),
+        "encoder_dropout": tune.choice([0.0, 0.1, 0.2, 0.3]),
+        "decoder_hidden_size": tune.choice([64, 128, 256]),
+        "decoder_layers": tune.choice([1, 2, 3]),
+        "season_length": tune.choice([4, 8, 12]),
+        "trend_kernel_size": tune.choice([3, 5, 7]),
+        "anomaly_threshold": tune.choice([2.5, 3.0, 3.5, 4.0]),
+        "batch_size": tune.choice([16, 32, 64]),
+        "max_steps": tune.choice([500, 1000]),
+        "loss": None,
+        "random_seed": tune.randint(1, 20),
+    }
+
+    def __init__(
+        self,
+        h,
+        loss=MAE(),
+        valid_loss=None,
+        config=None,
+        search_alg=BasicVariantGenerator(random_state=1),
+        num_samples=10,
+        refit_with_val=False,
+        cpus=cpu_count(),
+        gpus=torch.cuda.device_count(),
+        verbose=False,
+        alias=None,
+        backend="ray",
+        callbacks=None,
+    ):
+        if config is None:
+            config = self.get_default_config(h=h, backend=backend)
+
+        super(AutoAAForecast, self).__init__(
+            cls_model=AAForecast,
+            h=h,
+            loss=loss,
+            valid_loss=valid_loss,
+            config=config,
+            search_alg=search_alg,
+            num_samples=num_samples,
+            refit_with_val=refit_with_val,
+            cpus=cpus,
+            gpus=gpus,
+            verbose=verbose,
+            alias=alias,
+            backend=backend,
+            callbacks=callbacks,
+        )
+
+    @classmethod
+    def get_default_config(cls, h, backend, n_series=None):
+        del n_series
+        config = cls.default_config.copy()
+        config["input_size"] = tune.choice(
+            [h * x for x in config["input_size_multiplier"]]
+        )
+        del config["input_size_multiplier"]
         if backend == "optuna":
             config = cls._ray_config_to_optuna(config)
 

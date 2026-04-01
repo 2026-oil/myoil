@@ -1,0 +1,50 @@
+task:
+  name: validate_only_aa_forecast_fixed
+dataset:
+  path: aa_forecast_runtime_smoke.csv
+  target_col: target
+  dt_col: dt
+  hist_exog_cols:
+    - event
+  futr_exog_cols: []
+  static_exog_cols: []
+runtime:
+  random_seed: 7
+training:
+  input_size: 8
+  batch_size: 1
+  valid_batch_size: 1
+  windows_batch_size: 8
+  inference_windows_batch_size: 8
+  max_steps: 1
+  val_size: 2
+  val_check_steps: 1
+  early_stop_patience_steps: -1
+  loss: mse
+  accelerator: cpu
+cv:
+  horizon: 2
+  step_size: 1
+  n_windows: 1
+  gap: 0
+  overlap_eval_policy: by_cutoff_mean
+scheduler:
+  gpu_ids:
+    - 0
+  max_concurrent_jobs: 1
+  worker_devices: 1
+residual:
+  enabled: false
+  model: xgboost
+  params: {}
+jobs:
+  - model: AAForecast
+    params:
+      encoder_hidden_size: 16
+      encoder_n_layers: 1
+      encoder_dropout: 0.1
+      decoder_hidden_size: 16
+      decoder_layers: 1
+      season_length: 4
+      trend_kernel_size: 3
+      anomaly_threshold: 3.0

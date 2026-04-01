@@ -1,5 +1,6 @@
 runtime:
   random_seed: 1
+  opt_n_trial: 100
 training:
   input_size: 96
   batch_size: 32
@@ -10,10 +11,10 @@ training:
   val_size: 16
   scaler_type: robust
   val_check_steps: 1
-  min_steps_before_early_stop: 100
+  min_steps_before_early_stop: 400
   model_step_size: 1
-  early_stop_patience_steps: 6
-  loss: mae
+  early_stop_patience_steps: 20
+  loss: mse
   optimizer:
     name: adamw
     kwargs: {}
@@ -31,8 +32,8 @@ training:
 cv:
   gap: 0
   horizon: 8
-  step_size: 8
-  n_windows: 6
+  step_size: 4
+  n_windows: 2
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean
 scheduler:
