@@ -27,6 +27,6 @@ jobs:
       encoder_dropout: 0.0
       decoder_hidden_size: 128
       decoder_layers: 2
-      season_length: 4
+      season_length: 2
       trend_kernel_size: 3
       anomaly_threshold: 2.0
