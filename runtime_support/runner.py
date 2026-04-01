@@ -42,6 +42,7 @@ from runtime_support.manifest import (
 )
 from runtime_support.forecast_models import (
     BASELINE_MODEL_NAMES,
+    ModelCapabilities,
     build_model,
     is_direct_top_level_model,
     validate_job,
@@ -336,15 +337,17 @@ def _build_resolved_artifacts(
         "manifest_path": manifest_path,
     }
 
-
 def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -> None:
     payload = {}
     caps_by_model: dict[str, Any] = {}
     for job in selected_jobs:
-        caps = validate_job(job)
-        if loaded.config.residual.enabled and is_direct_top_level_model(job.model):
+        caps = _job_capabilities_for(loaded, job)
+        if loaded.config.residual.enabled and (
+            is_direct_top_level_model(job.model)
+            or _plugin_owned_top_level_job(loaded, job.model) is not None
+        ):
             raise ValueError(
-                "Top-level direct models do not yet support residual-enabled runs; "
+                "Top-level direct/plugin-managed models do not yet support residual-enabled runs; "
                 "disable residual or use a learned top-level model / bs_preforcast path."
             )
         caps_by_model[job.model] = caps
@@ -395,6 +398,35 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
             loaded, selected_jobs, caps_by_model
         )
     capability_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _plugin_owned_top_level_job(loaded: LoadedConfig, model_name: str):
+    stage_result = get_active_stage_plugin(loaded.config)
+    if stage_result is None:
+        return None
+    plugin, _ = stage_result
+    owns_top_level_job = getattr(plugin, "owns_top_level_job", None)
+    if callable(owns_top_level_job) and owns_top_level_job(model_name):
+        return plugin
+    return None
+
+
+def _job_capabilities_for(loaded: LoadedConfig, job: JobConfig) -> ModelCapabilities:
+    plugin = _plugin_owned_top_level_job(loaded, job.model)
+    if plugin is not None:
+        plugin_caps = getattr(plugin, "capabilities_for", None)
+        if callable(plugin_caps):
+            payload = plugin_caps(job.model)
+            return ModelCapabilities(**payload)
+        return ModelCapabilities(
+            name=job.model,
+            multivariate=False,
+            supports_hist_exog=False,
+            supports_futr_exog=False,
+            supports_stat_exog=False,
+            requires_n_series=False,
+        )
+    return validate_job(job)
 
 
 def _update_manifest_artifacts(
@@ -487,7 +519,9 @@ def _effective_config(
 
 
 def _should_use_multivariate(loaded: LoadedConfig, job: JobConfig) -> bool:
-    caps = validate_job(job)
+    if _plugin_owned_top_level_job(loaded, job.model) is not None:
+        return False
+    caps = _job_capabilities_for(loaded, job)
     configured_native_exog = (
         (bool(loaded.config.dataset.hist_exog_cols) and caps.supports_hist_exog)
         or (bool(loaded.config.dataset.futr_exog_cols) and caps.supports_futr_exog)
@@ -501,6 +535,8 @@ def _validate_adapters(loaded: LoadedConfig, selected_jobs) -> None:
     dt_col = loaded.config.dataset.dt_col
     future_df = source_df if loaded.config.dataset.futr_exog_cols else None
     for job in selected_jobs:
+        if _plugin_owned_top_level_job(loaded, job.model) is not None:
+            continue
         if _should_use_multivariate(loaded, job):
             build_multivariate_inputs(
                 source_df,
@@ -681,6 +717,15 @@ def _fit_and_predict_fold(
     target_col = loaded.config.dataset.target_col
     train_df = source_df.iloc[train_idx].reset_index(drop=True)
     future_df = source_df.iloc[test_idx].reset_index(drop=True)
+    plugin = _plugin_owned_top_level_job(loaded, job.model)
+    if plugin is not None:
+        return plugin.predict_fold(
+            loaded,
+            job,
+            train_df=train_df,
+            future_df=future_df,
+            run_root=run_root,
+        )
     stage_result = get_active_stage_plugin(loaded.config)
     if stage_result is not None:
         plugin, _ = stage_result

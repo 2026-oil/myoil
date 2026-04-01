@@ -1,0 +1,34 @@
+task:
+  name: brentoil_case1_nec
+dataset:
+  path: data/df.csv
+  target_col: Com_BrentCrudeOil
+  dt_col: dt
+  hist_exog_cols:
+  - Com_Gasoline
+  - Com_Steel
+  - Bonds_US_Spread_10Y_1Y
+  - Bonds_CHN_Spread_30Y_5Y
+  - EX_USD_BRL
+  - Com_Cheese
+  - Bonds_BRZ_Spread_10Y_1Y
+  - Com_Cu_Gold_Ratio
+  - Idx_OVX
+  - Com_Oil_Spread
+  - Com_LME_Zn_Spread
+  - Idx_CSI300
+  - Bonds_CHN_Spread_5Y_1Y
+  - Com_LME_Cu_Spread
+  - Com_LME_Pb_Spread
+  - Com_LME_Al_Spread
+  futr_exog_cols: []
+  static_exog_cols: []
+residual:
+  enabled: false
+jobs:
+- model: NEC
+  params:
+    preset: paper
+nec:
+  enabled: true
+  config_path: yaml/plugins/nec.yaml

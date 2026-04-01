@@ -1,0 +1,48 @@
+nec:
+  history_steps: 96
+  hist_columns: []
+  preprocessing:
+    mode: diff_std
+    probability_feature: true
+    gmm_components: 3
+    epsilon: 1.5
+  classifier:
+    hidden_dim: 1024
+    layer_dim: 4
+    dropout: 0.4
+    batch_size: 64
+    train_volume: 1000
+    epochs: 100
+    early_stop_patience: 4
+    encoder_lr: 0.001
+    head_lr: 0.0005
+    oversampling: true
+    normal_ratio: 0.0
+    bce_weight: 0.5
+    mse_weight: 0.5
+  normal:
+    hidden_dim: 1024
+    layer_dim: 4
+    dropout: 0.4
+    batch_size: 64
+    train_volume: 180000
+    epochs: 80
+    early_stop_patience: 3
+    encoder_lr: 0.001
+    head_lr: 0.0005
+    oversampling: false
+    normal_ratio: 0.0
+  extreme:
+    hidden_dim: 512
+    layer_dim: 4
+    dropout: 0.4
+    batch_size: 32
+    train_volume: 50000
+    epochs: 100
+    early_stop_patience: 4
+    encoder_lr: 0.001
+    head_lr: 0.0005
+    oversampling: true
+    normal_ratio: 0.0
+  validation:
+    windows: 8
