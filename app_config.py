@@ -35,7 +35,22 @@ SHARED_SETTINGS_RELATIVE_PATH = Path("yaml/setting/setting.yaml")
 DEFAULT_MANIFEST_VERSION = "1"
 DEFAULT_ARTIFACT_SCHEMA_VERSION = "1"
 DEFAULT_EVALUATION_PROTOCOL_VERSION = "2"
-SUPPORTED_LOSSES = {"mae", "mse", "exloss"}
+SUPPORTED_LOSSES = {
+    "mae",
+    "mse",
+    "exloss",
+    "latehorizonweightedmape",
+    "huberlatemape",
+    "quantilelatemape",
+}
+LOSSES_WITH_PARAMS = frozenset(
+    {
+        "exloss",
+        "latehorizonweightedmape",
+        "huberlatemape",
+        "quantilelatemape",
+    }
+)
 SUPPORTED_TRAINING_OPTIMIZERS = (
     "adamw",
     "ademamix",
@@ -77,6 +92,8 @@ LEGACY_SHARED_JOB_TRAINING_KEYS = {
 SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
     "runtime.random_seed",
     "runtime.opt_n_trial",
+    "runtime.opt_study_count",
+    "runtime.opt_selected_study",
     "training.input_size",
     "training.batch_size",
     "training.valid_batch_size",
@@ -91,6 +108,7 @@ SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
     "training.model_step_size",
     "training.early_stop_patience_steps",
     "training.loss",
+    "training.loss_params",
     "training.optimizer",
     "cv.gap",
     "cv.horizon",
@@ -131,6 +149,7 @@ FORBIDDEN_RESIDUAL_LAG_SOURCES = {
 ResidualTargetMode = Literal["level", "delta"]
 RuntimeTransformationMode = Literal["diff"]
 
+
 @dataclass(frozen=True)
 class DatasetConfig:
     path: Path
@@ -146,6 +165,8 @@ class DatasetConfig:
 class RuntimeConfig:
     random_seed: int = 1
     opt_n_trial: int | None = None
+    opt_study_count: int = 1
+    opt_selected_study: int | None = None
     transformations_target: RuntimeTransformationMode | None = None
     transformations_exog: RuntimeTransformationMode | None = None
 
@@ -162,6 +183,16 @@ class TrainingLossParams:
     lamda_underestimate: float = 1.2
     lamda_overestimate: float = 1.0
     lamda: float = 1.0
+    horizon: int = 8
+    ramp_power: float = 1.5
+    base_weight: float = 1.0
+    late_multiplier: float = 3.0
+    late_start: int = 6
+    delta: float = 1.0
+    late_weight: float = 3.0
+    q_under: float = 0.7
+    q_over: float = 0.3
+    late_factor: float = 2.0
 
 
 @dataclass(frozen=True)
@@ -273,6 +304,22 @@ class TrainingSearchConfig:
     selected_search_params: tuple[str, ...] = field(default_factory=tuple)
 
 
+def _normalize_training_search_config(value: Any) -> dict[str, bool]:
+    if value is None:
+        value = {}
+    if not isinstance(value, dict):
+        raise ValueError("training_search must be a mapping")
+    payload = dict(value)
+    _unknown_keys(payload, allowed={"enabled"}, section="training_search")
+    return {
+        "enabled": _coerce_bool(
+            payload.get("enabled", True),
+            field_name="training_search.enabled",
+            default=True,
+        )
+    }
+
+
 @dataclass(frozen=True)
 class CVConfig:
     horizon: int = 12
@@ -336,8 +383,12 @@ class ResidualConfig:
 class JobConfig:
     model: str
     params: dict[str, Any] = field(default_factory=dict)
-    requested_mode: Literal["baseline_fixed", "learned_fixed", "learned_auto_requested"] = "learned_fixed"
-    validated_mode: Literal["baseline_fixed", "learned_fixed", "learned_auto"] = "learned_fixed"
+    requested_mode: Literal[
+        "baseline_fixed", "learned_fixed", "learned_auto_requested"
+    ] = "learned_fixed"
+    validated_mode: Literal["baseline_fixed", "learned_fixed", "learned_auto"] = (
+        "learned_fixed"
+    )
     selected_search_params: tuple[str, ...] = field(default_factory=tuple)
 
 
@@ -369,13 +420,15 @@ class AppConfig:
             payload.pop("task", None)
         payload["dataset"]["path"] = str(self.dataset.path)
         payload["training"]["lr_scheduler"] = self.training.lr_scheduler.to_dict()
+        if payload["runtime"].get("opt_selected_study") is None:
+            payload["runtime"].pop("opt_selected_study", None)
         for key in ("transformations_target", "transformations_exog"):
             if payload["runtime"].get(key) is None:
                 payload["runtime"].pop(key, None)
         payload["training_search"]["selected_search_params"] = list(
             payload["training_search"]["selected_search_params"]
         )
-        if payload["training"].get("loss") != "exloss":
+        if payload["training"].get("loss") not in LOSSES_WITH_PARAMS:
             payload["training"].pop("loss_params", None)
         payload["jobs"] = list(payload["jobs"])
         for job in payload["jobs"]:
@@ -548,9 +601,7 @@ def _effective_shared_settings_for_source(
     shared_settings: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], tuple[str, ...]]:
     if shared_settings is None:
-        shared_settings_payload = cast(
-            dict[str, Any], shared_settings_or_repo_root
-        )
+        shared_settings_payload = cast(dict[str, Any], shared_settings_or_repo_root)
     else:
         shared_settings_payload = shared_settings
     del source_path
@@ -585,6 +636,66 @@ def _merge_shared_settings_into_payload(
     return merged
 
 
+def _repo_relative_path(repo_root: Path, path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(repo_root.resolve()))
+    except ValueError:
+        return str(path.resolve())
+
+
+def _aa_forecast_legacy_plugin_path(repo_root: Path, source_path: Path) -> str | None:
+    slug = source_path.stem.replace("-", "_")
+    candidate = (repo_root / "yaml" / "plugins" / f"aa_forecast_{slug}.yaml").resolve()
+    if not candidate.exists():
+        return None
+    return _repo_relative_path(repo_root, candidate)
+
+
+def _apply_aa_forecast_legacy_compatibility(
+    payload: dict[str, Any],
+    *,
+    repo_root: Path,
+    source_path: Path,
+) -> dict[str, Any]:
+    if "aa_forecast" in payload:
+        return payload
+    jobs = payload.get("jobs")
+    if not isinstance(jobs, list) or len(jobs) != 1:
+        return payload
+    job = jobs[0]
+    if not isinstance(job, dict) or str(job.get("model")) != "AAForecast":
+        return payload
+    compat_payload = deepcopy(payload)
+    dataset_payload = dict(compat_payload.get("dataset") or {})
+    hist_exog_cols = _as_tuple(dataset_payload.get("hist_exog_cols"))
+    compat_block: dict[str, Any] = {
+        "enabled": True,
+        "compatibility_mode": "legacy_direct_job_route",
+        "compatibility_source_path": _repo_relative_path(repo_root, source_path),
+    }
+    plugin_path = _aa_forecast_legacy_plugin_path(repo_root, source_path)
+    if plugin_path is not None:
+        compat_block["config_path"] = plugin_path
+    else:
+        compat_block["compatibility_mode"] = "legacy_direct_job_inline"
+        compat_block["mode"] = (
+            "learned_auto" if not dict(job.get("params", {})) else "fixed"
+        )
+        compat_block["tune_training"] = False
+        compat_block["model_params"] = dict(job.get("params", {}))
+        if len(hist_exog_cols) == 1:
+            compat_block["event_column"] = hist_exog_cols[0]
+        compat_block["lowess_frac"] = 0.6
+        compat_block["lowess_delta"] = 0.01
+        compat_block["uncertainty"] = {
+            "enabled": False,
+            "dropout_candidates": [round(step / 10.0, 1) for step in range(1, 10)],
+            "sample_count": 8,
+        }
+    compat_payload["aa_forecast"] = compat_block
+    return compat_payload
+
+
 def _as_tuple(value: Any) -> tuple[str, ...]:
     if value is None:
         return ()
@@ -593,14 +704,10 @@ def _as_tuple(value: Any) -> tuple[str, ...]:
     return tuple(str(item) for item in value)
 
 
-def _unknown_keys(
-    payload: dict[str, Any], *, allowed: set[str], section: str
-) -> None:
+def _unknown_keys(payload: dict[str, Any], *, allowed: set[str], section: str) -> None:
     unknown = sorted(set(payload).difference(allowed))
     if unknown:
-        raise ValueError(
-            f"{section} contains unsupported key(s): {', '.join(unknown)}"
-        )
+        raise ValueError(f"{section} contains unsupported key(s): {', '.join(unknown)}")
 
 
 def _coerce_bool(value: Any, *, field_name: str, default: bool) -> bool:
@@ -634,8 +741,6 @@ def _coerce_optional_path_string(value: Any, *, field_name: str) -> str | None:
     return normalized
 
 
-
-
 def _coerce_float(value: Any, *, field_name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{field_name} must be numeric")
@@ -657,11 +762,25 @@ def _normalize_training_loss_params(value: Any) -> TrainingLossParams:
         "lamda_underestimate",
         "lamda_overestimate",
         "lamda",
+        "horizon",
+        "ramp_power",
+        "base_weight",
+        "late_multiplier",
+        "late_start",
+        "delta",
+        "late_weight",
+        "q_under",
+        "q_over",
+        "late_factor",
     }
     _unknown_keys(payload, allowed=allowed, section="training.loss_params")
     params = TrainingLossParams(
-        up_th=_coerce_float(payload.get("up_th", 0.9), field_name="training.loss_params.up_th"),
-        down_th=_coerce_float(payload.get("down_th", 0.1), field_name="training.loss_params.down_th"),
+        up_th=_coerce_float(
+            payload.get("up_th", 0.9), field_name="training.loss_params.up_th"
+        ),
+        down_th=_coerce_float(
+            payload.get("down_th", 0.1), field_name="training.loss_params.down_th"
+        ),
         lamda_underestimate=_coerce_float(
             payload.get("lamda_underestimate", 1.2),
             field_name="training.loss_params.lamda_underestimate",
@@ -670,10 +789,48 @@ def _normalize_training_loss_params(value: Any) -> TrainingLossParams:
             payload.get("lamda_overestimate", 1.0),
             field_name="training.loss_params.lamda_overestimate",
         ),
-        lamda=_coerce_float(payload.get("lamda", 1.0), field_name="training.loss_params.lamda"),
+        lamda=_coerce_float(
+            payload.get("lamda", 1.0), field_name="training.loss_params.lamda"
+        ),
+        horizon=_coerce_nonnegative_int(
+            payload.get("horizon", 8), field_name="training.loss_params.horizon"
+        ),
+        ramp_power=_coerce_float(
+            payload.get("ramp_power", 1.5), field_name="training.loss_params.ramp_power"
+        ),
+        base_weight=_coerce_float(
+            payload.get("base_weight", 1.0),
+            field_name="training.loss_params.base_weight",
+        ),
+        late_multiplier=_coerce_float(
+            payload.get("late_multiplier", 3.0),
+            field_name="training.loss_params.late_multiplier",
+        ),
+        late_start=_coerce_nonnegative_int(
+            payload.get("late_start", 6), field_name="training.loss_params.late_start"
+        ),
+        delta=_coerce_float(
+            payload.get("delta", 1.0), field_name="training.loss_params.delta"
+        ),
+        late_weight=_coerce_float(
+            payload.get("late_weight", 3.0),
+            field_name="training.loss_params.late_weight",
+        ),
+        q_under=_coerce_float(
+            payload.get("q_under", 0.7), field_name="training.loss_params.q_under"
+        ),
+        q_over=_coerce_float(
+            payload.get("q_over", 0.3), field_name="training.loss_params.q_over"
+        ),
+        late_factor=_coerce_float(
+            payload.get("late_factor", 2.0),
+            field_name="training.loss_params.late_factor",
+        ),
     )
     if not 0 < params.down_th < params.up_th < 1:
-        raise ValueError("training.loss_params thresholds must satisfy 0 < down_th < up_th < 1")
+        raise ValueError(
+            "training.loss_params thresholds must satisfy 0 < down_th < up_th < 1"
+        )
     if params.lamda_underestimate < 0:
         raise ValueError("training.loss_params.lamda_underestimate must be >= 0")
     if params.lamda_overestimate < 0:
@@ -724,7 +881,9 @@ def _normalize_training_lr_scheduler(value: Any) -> TrainingLRSchedulerConfig:
             payload["pct_start"], field_name="training.lr_scheduler.pct_start"
         )
         if not 0 < pct_start < 1:
-            raise ValueError("training.lr_scheduler.pct_start must satisfy 0 < value < 1")
+            raise ValueError(
+                "training.lr_scheduler.pct_start must satisfy 0 < value < 1"
+            )
         div_factor = _coerce_float(
             payload["div_factor"], field_name="training.lr_scheduler.div_factor"
         )
@@ -823,9 +982,7 @@ def _normalize_training_optimizer(value: Any) -> TrainingOptimizerConfig:
     normalized_kwargs: dict[str, Any] = {}
     for key, item in kwargs.items():
         if not isinstance(key, str) or not key.strip():
-            raise ValueError(
-                "training.optimizer.kwargs keys must be non-empty strings"
-            )
+            raise ValueError("training.optimizer.kwargs keys must be non-empty strings")
         normalized_kwargs[key] = deepcopy(item)
     return TrainingOptimizerConfig(
         name=cast(
@@ -1013,7 +1170,9 @@ def _normalize_residual_feature_config(
             "residual.features.lag_features.transforms contains unsupported transform(s): "
             + ", ".join(unsupported_transforms)
         )
-    forbidden_sources = sorted(set(lag_sources).intersection(FORBIDDEN_RESIDUAL_LAG_SOURCES))
+    forbidden_sources = sorted(
+        set(lag_sources).intersection(FORBIDDEN_RESIDUAL_LAG_SOURCES)
+    )
     if forbidden_sources:
         raise ValueError(
             "residual.features.lag_features.sources contains forbidden source(s): "
@@ -1069,6 +1228,7 @@ def _normalize_residual_feature_config(
             static=static_selected,
         ),
     )
+
 
 def resolve_config_path(
     repo_root: Path,
@@ -1172,13 +1332,26 @@ def _normalize_job(
             callable(owns_top_level_job) and owns_top_level_job(model_name)
         )
     params = dict(job.get("params", {}))
+    params_for_mode = params
+    if stage_scope == "aa_forecast" and model_name == "AAForecast":
+        structural_keys = {
+            "event_feature_name",
+            "lowess_frac",
+            "lowess_delta",
+            "uncertainty_enabled",
+            "uncertainty_dropout_candidates",
+            "uncertainty_sample_count",
+        }
+        params_for_mode = {
+            key: value for key, value in params.items() if key not in structural_keys
+        }
     supported_auto_models = (
         stage_plugin.supported_models()
         if stage_plugin is not None
         else SUPPORTED_MODEL_AUTO_MODEL_NAMES
     )
-    requested_mode = _requested_job_mode(model_name, params)
-    if stage_plugin_owns_job and not params:
+    requested_mode = _requested_job_mode(model_name, params_for_mode)
+    if stage_plugin_owns_job and not params_for_mode and model_name != "AAForecast":
         requested_mode = "learned_fixed"
     validated_mode: Literal["baseline_fixed", "learned_fixed", "learned_auto"]
     selected: tuple[str, ...] = ()
@@ -1225,6 +1398,80 @@ def _normalize_job(
     )
 
 
+def _relative_config_reference(repo_root: Path, target_path: Path) -> str:
+    resolved_repo_root = repo_root.resolve()
+    resolved_target = target_path.resolve()
+    if str(resolved_target).startswith(str(resolved_repo_root) + "/"):
+        return str(resolved_target.relative_to(resolved_repo_root))
+    return str(resolved_target)
+
+
+def _infer_aa_forecast_plugin_path(
+    repo_root: Path,
+    *,
+    source_path: Path,
+) -> str | None:
+    stem_slug = source_path.stem.replace("-", "_")
+    candidate = repo_root / "yaml" / "plugins" / f"aa_forecast_{stem_slug}.yaml"
+    if candidate.exists():
+        return _relative_config_reference(repo_root, candidate)
+    return None
+
+
+def _apply_aa_forecast_legacy_compatibility(
+    payload: dict[str, Any],
+    *,
+    repo_root: Path,
+    source_path: Path,
+) -> dict[str, Any]:
+    if "aa_forecast" in payload:
+        return payload
+    jobs_value = payload.get("jobs")
+    if not isinstance(jobs_value, list) or len(jobs_value) != 1:
+        return payload
+    only_job = jobs_value[0]
+    if not isinstance(only_job, dict) or str(only_job.get("model")).strip() != "AAForecast":
+        return payload
+    dataset_payload = payload.get("dataset")
+    if not isinstance(dataset_payload, dict):
+        return payload
+
+    compat_payload = deepcopy(payload)
+    compat_block: dict[str, Any] = {
+        "enabled": True,
+        "compatibility_source_path": _relative_config_reference(repo_root, source_path),
+    }
+    inferred_plugin_path = _infer_aa_forecast_plugin_path(
+        repo_root,
+        source_path=source_path,
+    )
+    if inferred_plugin_path is not None:
+        compat_block["compatibility_mode"] = "legacy_direct_job_route"
+        compat_block["config_path"] = inferred_plugin_path
+    else:
+        compat_block["compatibility_mode"] = "legacy_direct_job_inline"
+        params = dict(only_job.get("params", {}))
+        compat_block["mode"] = "fixed" if params else "learned_auto"
+        compat_block["tune_training"] = False
+        compat_block["model_params"] = params
+        compat_block["lowess_frac"] = 0.6
+        compat_block["lowess_delta"] = 0.01
+        compat_block["uncertainty"] = {
+            "enabled": False,
+            "dropout_candidates": [round(step / 10.0, 1) for step in range(1, 10)],
+            "sample_count": 8,
+        }
+        hist_exog_cols = [
+            str(column).strip()
+            for column in dataset_payload.get("hist_exog_cols", ())
+            if str(column).strip()
+        ]
+        if len(hist_exog_cols) == 1:
+            compat_block["event_column"] = hist_exog_cols[0]
+    compat_payload["aa_forecast"] = compat_block
+    return compat_payload
+
+
 def _normalize_payload(
     payload: dict[str, Any],
     base_dir: Path,
@@ -1237,10 +1484,17 @@ def _normalize_payload(
     repo_root: Path | None = None,
     source_path: Path | None = None,
 ) -> AppConfig:
+    if repo_root is not None and source_path is not None:
+        payload = _apply_aa_forecast_legacy_compatibility(
+            payload,
+            repo_root=repo_root,
+            source_path=source_path,
+        )
     task = dict(payload.get("task", {}))
     dataset = dict(payload.get("dataset", {}))
     runtime = dict(payload.get("runtime", {}))
     training = dict(payload.get("training", {}))
+    training_search = _normalize_training_search_config(payload.get("training_search"))
     training.pop("train_protocol", None)
     training.pop("season_length", None)
     if "learning_rate" in training:
@@ -1296,6 +1550,27 @@ def _normalize_payload(
         runtime["opt_n_trial"] = int(runtime["opt_n_trial"])
         if runtime["opt_n_trial"] <= 0:
             raise ValueError("runtime.opt_n_trial must be a positive integer")
+    if "opt_study_count" in runtime:
+        if runtime["opt_study_count"] is None:
+            runtime.pop("opt_study_count", None)
+        else:
+            runtime["opt_study_count"] = int(runtime["opt_study_count"])
+            if runtime["opt_study_count"] <= 0:
+                raise ValueError("runtime.opt_study_count must be a positive integer")
+    if runtime.get("opt_selected_study") is not None:
+        runtime["opt_selected_study"] = int(runtime["opt_selected_study"])
+        if runtime["opt_selected_study"] <= 0:
+            raise ValueError(
+                "runtime.opt_selected_study must be a positive integer"
+            )
+    if (
+        runtime.get("opt_selected_study") is not None
+        and runtime["opt_selected_study"]
+        > runtime.get("opt_study_count", RuntimeConfig.opt_study_count)
+    ):
+        raise ValueError(
+            "runtime.opt_selected_study cannot exceed runtime.opt_study_count"
+        )
     if "transformations" in runtime:
         raise ValueError(
             "runtime.transformations is no longer supported; "
@@ -1321,13 +1596,13 @@ def _normalize_payload(
     if loss not in SUPPORTED_LOSSES:
         raise ValueError(f"Unsupported common loss: {loss}")
     training["loss"] = loss
-    if loss == "exloss":
+    if loss in LOSSES_WITH_PARAMS:
         training["loss_params"] = _normalize_training_loss_params(
             training.get("loss_params")
         )
     elif "loss_params" in training:
         raise ValueError(
-            "training.loss_params is only supported when training.loss == exloss"
+            f"training.loss_params is only supported when training.loss in {LOSSES_WITH_PARAMS}"
         )
     if "accelerator" in training:
         value = training.get("accelerator")
@@ -1338,9 +1613,7 @@ def _normalize_payload(
         else:
             normalized_accelerator = value.strip().lower()
             if normalized_accelerator not in SUPPORTED_TRAINER_ACCELERATORS:
-                raise ValueError(
-                    "training.accelerator must be one of: auto, cpu, gpu"
-                )
+                raise ValueError("training.accelerator must be one of: auto, cpu, gpu")
             training["accelerator"] = normalized_accelerator
     if "devices" in training:
         value = training.get("devices")
@@ -1377,9 +1650,7 @@ def _normalize_payload(
 
     scheduler.setdefault("worker_devices", 1)
     scheduler.setdefault("parallelize_single_job_tuning", True)
-    scheduler["gpu_ids"] = tuple(
-        int(item) for item in scheduler.get("gpu_ids", (0, 1))
-    )
+    scheduler["gpu_ids"] = tuple(int(item) for item in scheduler.get("gpu_ids", (0, 1)))
     scheduler["worker_devices"] = _coerce_positive_int(
         int(scheduler["worker_devices"]),
         field_name="scheduler.worker_devices",
@@ -1419,9 +1690,7 @@ def _normalize_payload(
         raise ValueError(f"Unsupported residual model: {residual_model}")
     residual_target = str(residual["target"]).lower()
     if residual_target not in {"level", "delta"}:
-        raise ValueError(
-            "residual.target must be one of: level, delta"
-        )
+        raise ValueError("residual.target must be one of: level, delta")
     residual["model"] = residual_model
     residual["target"] = residual_target
     residual["params"] = dict(residual.get("params", {}))
@@ -1530,9 +1799,8 @@ def _normalize_payload(
                 "Move these settings under training."
             )
     training_selected = ()
-    if any(
-        job.validated_mode == "learned_auto"
-        and job.model in SUPPORTED_AUTO_MODEL_NAMES
+    if training_search["enabled"] and any(
+        job.validated_mode == "learned_auto" and job.model in SUPPORTED_AUTO_MODEL_NAMES
         for job in jobs
     ):
         training_search_payload = None
@@ -1540,10 +1808,7 @@ def _normalize_payload(
             training_search_payload = search_space.get(training_search_space_key)
             if training_search_payload is None and stage_plugin is not None:
                 fallback = stage_plugin.training_search_space_fallback_key()
-                if (
-                    fallback is not None
-                    and training_search_space_key != fallback
-                ):
+                if fallback is not None and training_search_space_key != fallback:
                     training_search_payload = search_space.get(fallback)
         training_selected = (
             tuple(training_search_payload["global"])
@@ -1552,11 +1817,11 @@ def _normalize_payload(
         )
     training_requested_mode = cast(
         Literal["training_fixed", "training_auto_requested"],
-        "training_auto_requested" if training_selected else "training_fixed"
+        "training_auto_requested" if training_selected else "training_fixed",
     )
     training_validated_mode = cast(
         Literal["training_fixed", "training_auto"],
-        "training_auto" if training_selected else "training_fixed"
+        "training_auto" if training_selected else "training_fixed",
     )
 
     return AppConfig(
@@ -1615,8 +1880,7 @@ def _load_jobs_from_path(jobs_path: Path) -> list[Any]:
         jobs_source_type = "yaml"
     else:
         raise ValueError(
-            "jobs route must reference a yaml, yml, or toml file: "
-            f"{jobs_path}"
+            f"jobs route must reference a yaml, yml, or toml file: {jobs_path}"
         )
     jobs_payload = _load_document(jobs_path, jobs_source_type)
     resolved_jobs: Any
@@ -1836,8 +2100,7 @@ def load_app_config(
         ) = _load_shared_settings_from_path(explicit_shared_settings_path)
         if resolved_shared_settings_path is None:
             raise FileNotFoundError(
-                "Shared settings file does not exist: "
-                f"{explicit_shared_settings_path}"
+                f"Shared settings file does not exist: {explicit_shared_settings_path}"
             )
     elif source_type == "yaml" and _uses_repo_shared_settings(repo_root, source_path):
         (
@@ -1854,6 +2117,11 @@ def load_app_config(
             effective_shared_settings,
             owned_paths=effective_owned_paths,
         )
+    payload = _apply_aa_forecast_legacy_compatibility(
+        dict(payload),
+        repo_root=repo_root,
+        source_path=source_path,
+    )
     jobs_fanout_specs = _resolve_jobs_fanout_specs(
         repo_root,
         source_path=source_path,
@@ -1861,6 +2129,7 @@ def load_app_config(
     )
     _ensure_plugins_loaded()
     stage_plugin = get_stage_plugin_for_payload(payload)
+
     def _active_stage_owns_top_level_job(model_name: str) -> bool:
         if stage_plugin is None:
             return False
@@ -1915,7 +2184,9 @@ def load_app_config(
                     jobs_payload=tuple(dict(job) for job in payload["jobs"]),
                     stage_jobs_reference=(
                         str(spec.resolved_path.relative_to(repo_root.resolve()))
-                        if str(spec.resolved_path).startswith(str(repo_root.resolve()) + "/")
+                        if str(spec.resolved_path).startswith(
+                            str(repo_root.resolve()) + "/"
+                        )
                         else str(spec.resolved_path)
                     ),
                 )
@@ -1924,12 +2195,25 @@ def load_app_config(
             jobs_payload_candidates = [
                 [dict(job) for job in spec.jobs_payload] for spec in jobs_fanout_specs
             ]
+        elif isinstance(stage_payload_probe, dict) and "jobs" in stage_payload_probe:
+            payload["jobs"] = [dict(job) for job in stage_payload_probe["jobs"]]
+            jobs_payload_candidates = [payload["jobs"]]
+    if isinstance(stage_payload_probe, dict):
+        if stage_payload_probe.get("requires_search_space"):
+            requested_search_space = True
+        if "training_search" in stage_payload_probe:
+            payload["training_search"] = dict(stage_payload_probe["training_search"])
+        if stage_payload_probe.get("residual"):
+            payload["residual"] = dict(stage_payload_probe["residual"])
     for jobs_candidate in jobs_payload_candidates:
         for job in jobs_candidate:
             model_name = str(job.get("model"))
             if (
                 model_name not in BASELINE_MODEL_NAMES
-                and not _active_stage_owns_top_level_job(model_name)
+                and not (
+                    _active_stage_owns_top_level_job(model_name)
+                    and model_name != "AAForecast"
+                )
                 and not dict(job.get("params", {}))
             ):
                 requested_search_space = True
@@ -1937,9 +2221,8 @@ def load_app_config(
         if requested_search_space:
             break
     residual_payload = dict(payload.get("residual", {}))
-    if (
-        residual_payload.get("enabled", True)
-        and not dict(residual_payload.get("params", {}))
+    if residual_payload.get("enabled", True) and not dict(
+        residual_payload.get("params", {})
     ):
         requested_search_space = True
     if stage_payload_probe is not None:
@@ -1973,6 +2256,8 @@ def load_app_config(
         model_search_space_key=model_search_space_key,
         training_search_space_key=training_search_space_key,
         stage_scope=stage_plugin.config_key if stage_plugin is not None else None,
+        repo_root=repo_root,
+        source_path=source_path,
     )
     stage_plugin_loaded = None
     if (
@@ -2033,8 +2318,12 @@ def load_app_config(
         input_hash=_hash_text(raw_text),
         resolved_hash=_hash_text(resolved_text),
         search_space_path=search_space_contract.path if search_space_contract else None,
-        search_space_hash=search_space_contract.sha256 if search_space_contract else None,
-        search_space_payload=search_space_contract.payload if search_space_contract else None,
+        search_space_hash=search_space_contract.sha256
+        if search_space_contract
+        else None,
+        search_space_payload=search_space_contract.payload
+        if search_space_contract
+        else None,
         shared_settings_path=resolved_shared_settings_path,
         shared_settings_hash=shared_settings_hash,
         stage_plugin_loaded=stage_plugin_loaded,
@@ -2051,8 +2340,14 @@ def loaded_config_for_jobs_fanout(
     training_search_space_key: str = "training",
 ) -> LoadedConfig:
     base_keys = {
-        "task", "dataset", "runtime", "training", "cv",
-        "scheduler", "residual", "jobs",
+        "task",
+        "dataset",
+        "runtime",
+        "training",
+        "cv",
+        "scheduler",
+        "residual",
+        "jobs",
     }
     _ensure_plugins_loaded()
     stage_plugin = get_stage_plugin_for_payload(loaded.normalized_payload)
@@ -2131,15 +2426,18 @@ def loaded_config_for_jobs_fanout(
             loaded.source_path,
             config.stage_plugin_config.config_path,
         )
-        if stage_source_path.exists():
-            stage_plugin_loaded = stage_plugin.load_stage(
-                repo_root,
-                source_path=loaded.source_path,
-                source_type=loaded.source_type,
-                config=config.stage_plugin_config,
-                search_space_contract=stage_search_space_contract,
+        if not stage_source_path.exists():
+            raise FileNotFoundError(
+                f"stage plugin config_path does not exist: {stage_source_path}"
             )
-            config = stage_plugin.apply_stage_to_config(config, stage_plugin_loaded)
+        stage_plugin_loaded = stage_plugin.load_stage(
+            repo_root,
+            source_path=loaded.source_path,
+            source_type=loaded.source_type,
+            config=config.stage_plugin_config,
+            search_space_contract=stage_search_space_contract,
+        )
+        config = stage_plugin.apply_stage_to_config(config, stage_plugin_loaded)
     normalized_payload = config.to_dict()
     if stage_plugin is not None:
         if stage_plugin_loaded is not None:
