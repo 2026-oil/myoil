@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import app_config as app_config_module
 import io
 import inspect
 import os
@@ -3971,7 +3972,25 @@ def test_load_app_config_marks_auto_requested_and_validated_modes(tmp_path: Path
         encoding="utf-8",
     )
     config_path = _write_config(tmp_path, payload, ".yaml")
-    _write_search_space(tmp_path)
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {
+                "AAForecast": [
+                    "encoder_hidden_size",
+                    "encoder_n_layers",
+                    "encoder_dropout",
+                    "decoder_hidden_size",
+                    "decoder_layers",
+                    "season_length",
+                    "trend_kernel_size",
+                    "anomaly_threshold",
+                ]
+            },
+            "training": ["input_size", "model_step_size"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
 
     loaded = load_app_config(tmp_path, config_path=config_path)
 
@@ -4111,11 +4130,13 @@ def test_load_app_config_routes_aa_forecast_plugin_model_only_auto(
         "aa_forecast:\n"
         "  mode: learned_auto\n"
         "  tune_training: false\n"
+        "  star_hist_exog_cols:\n"
+        "    - event\n"
         "  model_params: {}\n",
         encoding="utf-8",
     )
     payload = _payload()
-    payload["dataset"]["hist_exog_cols"] = ["event"]
+    payload["dataset"]["hist_exog_cols"] = ["event", "macro"]
     payload["jobs"] = []
     payload["aa_forecast"] = {
         "enabled": True,
@@ -4123,11 +4144,11 @@ def test_load_app_config_routes_aa_forecast_plugin_model_only_auto(
     }
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     (tmp_path / "data.csv").write_text(
-        "dt,target,event\n"
-        "2020-01-01,1,0\n"
-        "2020-01-08,2,1\n"
-        "2020-01-15,3,0\n"
-        "2020-01-22,4,2\n",
+        "dt,target,event,macro\n"
+        "2020-01-01,1,0,10\n"
+        "2020-01-08,2,1,11\n"
+        "2020-01-15,3,0,12\n"
+        "2020-01-22,4,2,13\n",
         encoding="utf-8",
     )
     config_path = _write_config(tmp_path, payload, ".yaml")
@@ -4175,8 +4196,73 @@ def test_load_app_config_routes_aa_forecast_plugin_model_only_auto(
     assert loaded.config.training_search.validated_mode == "training_fixed"
     assert list(loaded.config.training_search.selected_search_params) == []
     assert loaded.stage_plugin_loaded is not None
+    assert loaded.stage_plugin_loaded.config.star_hist_exog_cols == ("event",)
+    assert loaded.config.stage_plugin_config.star_hist_exog_cols_resolved == ("event",)
+    assert loaded.config.stage_plugin_config.non_star_hist_exog_cols_resolved == (
+        "macro",
+    )
     assert str(loaded.stage_plugin_loaded.source_path) == str(
         plugin_path.resolve()
+    )
+
+
+def test_load_app_config_resolves_inline_aa_forecast_star_groups(
+    tmp_path: Path,
+) -> None:
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = ["event", "macro"]
+    payload["jobs"] = []
+    payload["aa_forecast"] = {
+        "enabled": True,
+        "mode": "learned_auto",
+        "tune_training": False,
+        "model_params": {},
+        "star_hist_exog_cols": ["event"],
+        "lowess_frac": 0.6,
+        "lowess_delta": 0.01,
+        "uncertainty": {
+            "enabled": False,
+            "dropout_candidates": [0.1, 0.2, 0.3],
+            "sample_count": 3,
+        },
+    }
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,event,macro\n"
+        "2020-01-01,1,0,10\n"
+        "2020-01-08,2,1,11\n"
+        "2020-01-15,3,0,12\n"
+        "2020-01-22,4,2,13\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {
+                "AAForecast": [
+                    "encoder_hidden_size",
+                    "encoder_n_layers",
+                    "encoder_dropout",
+                    "decoder_hidden_size",
+                    "decoder_layers",
+                    "season_length",
+                    "trend_kernel_size",
+                    "anomaly_threshold",
+                ]
+            },
+            "training": ["input_size", "model_step_size"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    assert loaded.stage_plugin_loaded is None
+    assert loaded.config.stage_plugin_config.star_hist_exog_cols == ("event",)
+    assert loaded.config.stage_plugin_config.star_hist_exog_cols_resolved == ("event",)
+    assert loaded.config.stage_plugin_config.non_star_hist_exog_cols_resolved == (
+        "macro",
     )
 
 
@@ -4188,6 +4274,8 @@ def test_load_app_config_routes_aa_forecast_plugin_best_fixed(
         "aa_forecast:\n"
         "  mode: fixed\n"
         "  tune_training: false\n"
+        "  star_hist_exog_cols:\n"
+        "    - event\n"
         "  model_params:\n"
         "    encoder_hidden_size: 256\n"
         "    encoder_n_layers: 3\n"
@@ -4200,7 +4288,7 @@ def test_load_app_config_routes_aa_forecast_plugin_best_fixed(
         encoding="utf-8",
     )
     payload = _payload()
-    payload["dataset"]["hist_exog_cols"] = ["event"]
+    payload["dataset"]["hist_exog_cols"] = ["event", "macro"]
     payload["jobs"] = []
     payload["aa_forecast"] = {
         "enabled": True,
@@ -4208,11 +4296,11 @@ def test_load_app_config_routes_aa_forecast_plugin_best_fixed(
     }
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     (tmp_path / "data.csv").write_text(
-        "dt,target,event\n"
-        "2020-01-01,1,0\n"
-        "2020-01-08,2,1\n"
-        "2020-01-15,3,0\n"
-        "2020-01-22,4,2\n",
+        "dt,target,event,macro\n"
+        "2020-01-01,1,0,10\n"
+        "2020-01-08,2,1,11\n"
+        "2020-01-15,3,0,12\n"
+        "2020-01-22,4,2,13\n",
         encoding="utf-8",
     )
     config_path = _write_config(tmp_path, payload, ".yaml")
@@ -4260,7 +4348,91 @@ def test_load_app_config_routes_aa_forecast_plugin_best_fixed(
     assert loaded.config.training_search.validated_mode == "training_fixed"
     assert list(loaded.config.training_search.selected_search_params) == []
     assert loaded.stage_plugin_loaded is not None
+    assert loaded.stage_plugin_loaded.config.star_hist_exog_cols == ("event",)
+    assert loaded.config.stage_plugin_config.star_hist_exog_cols_resolved == ("event",)
+    assert loaded.config.stage_plugin_config.non_star_hist_exog_cols_resolved == (
+        "macro",
+    )
     assert str(loaded.stage_plugin_loaded.source_path) == str(plugin_path.resolve())
+
+
+def test_load_app_config_rejects_aa_forecast_plugin_event_column(
+    tmp_path: Path,
+) -> None:
+    plugin_path = tmp_path / "aa_forecast_plugin_legacy.yaml"
+    plugin_path.write_text(
+        "aa_forecast:\n"
+        "  mode: learned_auto\n"
+        "  tune_training: false\n"
+        "  event_column: event\n"
+        "  model_params: {}\n",
+        encoding="utf-8",
+    )
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = ["event"]
+    payload["jobs"] = []
+    payload["aa_forecast"] = {
+        "enabled": True,
+        "config_path": str(plugin_path),
+    }
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,event\n"
+        "2020-01-01,1,0\n"
+        "2020-01-08,2,1\n"
+        "2020-01-15,3,0\n"
+        "2020-01-22,4,2\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+
+    with pytest.raises(ValueError, match="unsupported key\\(s\\): event_column"):
+        load_app_config(tmp_path, config_path=config_path)
+
+
+def test_load_app_config_aa_forecast_legacy_inline_requires_canonical_star_grouping(
+    tmp_path: Path,
+) -> None:
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = ["event"]
+    payload["jobs"] = [{"model": "AAForecast", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,event\n"
+        "2020-01-01,1,0\n"
+        "2020-01-08,2,1\n"
+        "2020-01-15,3,0\n"
+        "2020-01-22,4,2\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {
+                "AAForecast": [
+                    "encoder_hidden_size",
+                    "encoder_n_layers",
+                    "encoder_dropout",
+                    "decoder_hidden_size",
+                    "decoder_layers",
+                    "season_length",
+                    "trend_kernel_size",
+                    "anomaly_threshold",
+                ]
+            },
+            "training": ["input_size", "model_step_size"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    with pytest.raises(ValueError, match=r"star_hist_exog_cols|event_column"):
+        load_app_config(tmp_path, config_path=config_path)
+
+
+def test_normalize_payload_no_longer_mentions_event_feature_name_for_aa_forecast() -> None:
+    source = inspect.getsource(app_config_module._normalize_payload)
+    assert "event_feature_name" not in source
 
 
 @pytest.mark.parametrize(

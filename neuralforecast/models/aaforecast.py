@@ -43,7 +43,8 @@ class AAForecast(BaseModel):
         lowess_frac: float = 0.6,
         lowess_delta: float = 0.01,
         anomaly_threshold: float = 3.5,
-        event_feature_name: Optional[str] = None,
+        star_hist_exog_list=None,
+        non_star_hist_exog_list=None,
         uncertainty_enabled: bool = False,
         uncertainty_dropout_candidates=None,
         uncertainty_sample_count: int = 5,
@@ -121,23 +122,17 @@ class AAForecast(BaseModel):
         self._stochastic_inference_enabled = False
         self._stochastic_dropout_p = float(encoder_dropout)
 
-        if event_feature_name is None and self.hist_exog_size == 1:
-            event_feature_name = self.hist_exog_list[0]
-        self.event_feature_name = event_feature_name
-        if self.hist_exog_size == 0:
-            self.event_feature_index = None
-        else:
-            if not self.event_feature_name:
-                raise ValueError(
-                    "AAForecast requires event_feature_name when hist_exog_list has multiple columns"
-                )
-            if self.event_feature_name not in self.hist_exog_list:
-                raise ValueError(
-                    f"AAForecast event_feature_name {self.event_feature_name!r} is not in hist_exog_list"
-                )
-            self.event_feature_index = self.hist_exog_list.index(self.event_feature_name)
+        self.star_hist_exog_list = tuple(star_hist_exog_list or ())
+        self.non_star_hist_exog_list = tuple(non_star_hist_exog_list or ())
+        self.star_hist_exog_indices, self.non_star_hist_exog_indices = (
+            self._resolve_hist_exog_groups()
+        )
 
-        feature_size = (0 if exclude_insample_y else 1) + self.hist_exog_size + 4
+        feature_size = (
+            (0 if exclude_insample_y else 1)
+            + self.hist_exog_size
+            + 4 * (1 + len(self.star_hist_exog_list))
+        )
         self.star = STARFeatureExtractor(
             season_length=season_length,
             lowess_frac=lowess_frac,
@@ -194,39 +189,121 @@ class AAForecast(BaseModel):
             return hidden
         return hidden[:, -self.h :]
 
-    def _event_mask(self, hist_exog: torch.Tensor) -> torch.Tensor:
-        if self.event_feature_index is None:
-            return torch.zeros_like(hist_exog[:, :, :1], dtype=torch.bool)
-        event_signal = hist_exog[
-            :, :, self.event_feature_index : self.event_feature_index + 1
-        ]
-        return event_signal.ne(0)
+    def _resolve_hist_exog_groups(self) -> tuple[tuple[int, ...], tuple[int, ...]]:
+        if self.hist_exog_size == 0:
+            if self.star_hist_exog_list or self.non_star_hist_exog_list:
+                raise ValueError(
+                    "AAForecast received STAR/non-STAR hist exog groups without hist_exog_list"
+                )
+            return (), ()
+
+        if not self.star_hist_exog_list:
+            raise ValueError(
+                "AAForecast requires star_hist_exog_list when hist_exog_list is non-empty"
+            )
+
+        hist_lookup = {name: idx for idx, name in enumerate(self.hist_exog_list)}
+        all_names = self.star_hist_exog_list + self.non_star_hist_exog_list
+        if len(set(self.star_hist_exog_list)) != len(self.star_hist_exog_list):
+            raise ValueError("AAForecast star_hist_exog_list must not contain duplicates")
+        if len(set(self.non_star_hist_exog_list)) != len(self.non_star_hist_exog_list):
+            raise ValueError(
+                "AAForecast non_star_hist_exog_list must not contain duplicates"
+            )
+        overlap = sorted(set(self.star_hist_exog_list).intersection(self.non_star_hist_exog_list))
+        if overlap:
+            raise ValueError(
+                "AAForecast hist exog groups must be disjoint: " + ", ".join(overlap)
+            )
+        unknown = sorted(set(all_names).difference(hist_lookup))
+        if unknown:
+            raise ValueError(
+                "AAForecast hist exog groups contain unknown column(s): "
+                + ", ".join(unknown)
+            )
+
+        resolved_star = tuple(
+            name for name in self.hist_exog_list if name in self.star_hist_exog_list
+        )
+        resolved_non_star = tuple(
+            name for name in self.hist_exog_list if name in self.non_star_hist_exog_list
+        )
+        if resolved_star != self.star_hist_exog_list:
+            raise ValueError(
+                "AAForecast star_hist_exog_list must follow hist_exog_list order exactly"
+            )
+        if resolved_non_star != self.non_star_hist_exog_list:
+            raise ValueError(
+                "AAForecast non_star_hist_exog_list must follow hist_exog_list order exactly"
+            )
+        if resolved_star + resolved_non_star != tuple(self.hist_exog_list):
+            raise ValueError(
+                "AAForecast hist exog groups must cover hist_exog_list exactly"
+            )
+
+        return (
+            tuple(hist_lookup[name] for name in self.star_hist_exog_list),
+            tuple(hist_lookup[name] for name in self.non_star_hist_exog_list),
+        )
+
+    @staticmethod
+    def _select_hist_exog(hist_exog: torch.Tensor, indices: tuple[int, ...]) -> torch.Tensor | None:
+        if not indices:
+            return None
+        index_tensor = torch.as_tensor(indices, device=hist_exog.device, dtype=torch.long)
+        return torch.index_select(hist_exog, dim=2, index=index_tensor)
+
+    @staticmethod
+    def _reduce_critical_mask(mask: torch.Tensor | None, *, template: torch.Tensor) -> torch.Tensor:
+        if mask is None:
+            return torch.zeros_like(template, dtype=torch.bool)
+        if mask.ndim != 3:
+            raise ValueError("AAForecast critical mask must be rank-3")
+        if mask.size(-1) == 1:
+            return mask.bool()
+        return mask.any(dim=2, keepdim=True)
 
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]
         hist_exog = windows_batch["hist_exog"]
 
-        star = self.star(insample_y)
+        target_star = self.star(insample_y)
+        star_hist_exog = self._select_hist_exog(hist_exog, self.star_hist_exog_indices)
+        star_hist_outputs = self.star(star_hist_exog) if star_hist_exog is not None else None
         encoder_parts = []
         if not self.exclude_insample_y:
             encoder_parts.append(insample_y)
         if self.hist_exog_size > 0:
             encoder_parts.append(hist_exog)
-            event_mask = self._event_mask(hist_exog)
-        else:
-            event_mask = torch.zeros_like(insample_y, dtype=torch.bool)
         encoder_parts.extend(
             [
-                star["trend"],
-                star["seasonal"],
-                star["anomalies"],
-                star["residual"],
+                target_star["trend"],
+                target_star["seasonal"],
+                target_star["anomalies"],
+                target_star["residual"],
             ]
         )
+        if star_hist_outputs is not None:
+            encoder_parts.extend(
+                [
+                    star_hist_outputs["trend"],
+                    star_hist_outputs["seasonal"],
+                    star_hist_outputs["anomalies"],
+                    star_hist_outputs["residual"],
+                ]
+            )
         encoder_input = torch.cat(encoder_parts, dim=2)
 
         hidden_states, _ = self.encoder(encoder_input)
-        critical_mask = star["critical_mask"] | event_mask
+        target_mask = self._reduce_critical_mask(
+            target_star["critical_mask"],
+            template=insample_y,
+        )
+        star_hist_mask = self._reduce_critical_mask(
+            None if star_hist_outputs is None else star_hist_outputs["critical_mask"],
+            template=insample_y,
+        )
+        critical_mask = target_mask | star_hist_mask
         attended_states, _ = self.attention(hidden_states, critical_mask)
 
         hidden_aligned = self._align_horizon(hidden_states)

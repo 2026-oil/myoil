@@ -1,11 +1,15 @@
 aa_forecast:
   mode: learned_auto
   tune_training: false
-  event_column: event
   lowess_frac: 0.6
   lowess_delta: 0.01
   uncertainty:
     enabled: false
-    dropout_candidates: [0.1, 0.2, 0.3]
+    dropout_candidates:
+    - 0.1
+    - 0.2
+    - 0.3
     sample_count: 3
   model_params: {}
+  star_hist_exog_cols:
+  - event

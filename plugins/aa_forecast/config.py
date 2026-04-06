@@ -16,7 +16,7 @@ AA_FORECAST_MAIN_KEYS = {
     "mode",
     "tune_training",
     "model_params",
-    "event_column",
+    "star_hist_exog_cols",
     "lowess_frac",
     "lowess_delta",
     "uncertainty",
@@ -27,7 +27,7 @@ AA_FORECAST_LINKED_KEYS = {
     "mode",
     "tune_training",
     "model_params",
-    "event_column",
+    "star_hist_exog_cols",
     "lowess_frac",
     "lowess_delta",
     "uncertainty",
@@ -59,7 +59,9 @@ class AAForecastPluginConfig:
     mode: Literal["fixed", "learned_auto"] = "learned_auto"
     tune_training: bool = False
     model_params: dict[str, Any] = field(default_factory=dict)
-    event_column: str | None = None
+    star_hist_exog_cols: tuple[str, ...] = field(default_factory=tuple)
+    star_hist_exog_cols_resolved: tuple[str, ...] = field(default_factory=tuple)
+    non_star_hist_exog_cols_resolved: tuple[str, ...] = field(default_factory=tuple)
     lowess_frac: float = 0.6
     lowess_delta: float = 0.01
     uncertainty: AAForecastUncertaintyConfig = field(
@@ -98,7 +100,9 @@ def aa_forecast_uncertainty_public_dict(
 
 def aa_forecast_plugin_tuning_public_dict(cfg: AAForecastPluginConfig) -> dict[str, Any]:
     return {
-        "event_column": cfg.event_column,
+        "star_hist_exog_cols": list(cfg.star_hist_exog_cols),
+        "star_hist_exog_cols_resolved": list(cfg.star_hist_exog_cols_resolved),
+        "non_star_hist_exog_cols_resolved": list(cfg.non_star_hist_exog_cols_resolved),
         "lowess_frac": cfg.lowess_frac,
         "lowess_delta": cfg.lowess_delta,
         "uncertainty": aa_forecast_uncertainty_public_dict(cfg.uncertainty),
@@ -158,6 +162,24 @@ def _coerce_optional_name_string(value: Any, *, field_name: str) -> str | None:
         raise ValueError(f"{field_name} must be a string")
     normalized = value.strip()
     return normalized or None
+
+
+def _coerce_name_tuple(value: Any, *, field_name: str) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        raise ValueError(f"{field_name} must be a list of strings")
+    if not isinstance(value, (list, tuple)):
+        raise ValueError(f"{field_name} must be a list of strings")
+    normalized: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError(f"{field_name} must contain only strings")
+        candidate = item.strip()
+        if not candidate:
+            raise ValueError(f"{field_name} must not contain empty strings")
+        normalized.append(candidate)
+    return tuple(normalized)
 
 
 def _coerce_probability(value: Any, *, field_name: str) -> float:
@@ -266,9 +288,9 @@ def _normalize_canonical_fields(
         field_name=f"{section}.tune_training",
         default=False,
     )
-    event_column = _coerce_optional_name_string(
-        payload.get("event_column"),
-        field_name=f"{section}.event_column",
+    star_hist_exog_cols = _coerce_name_tuple(
+        payload.get("star_hist_exog_cols"),
+        field_name=f"{section}.star_hist_exog_cols",
     )
     lowess_frac = _coerce_probability(
         payload.get("lowess_frac", 0.6),
@@ -289,7 +311,7 @@ def _normalize_canonical_fields(
         mode=mode,  # type: ignore[arg-type]
         tune_training=tune_training,
         model_params=model_params,
-        event_column=event_column,
+        star_hist_exog_cols=star_hist_exog_cols,
         lowess_frac=lowess_frac,
         lowess_delta=lowess_delta,
         uncertainty=uncertainty,
@@ -344,7 +366,7 @@ def normalize_aa_forecast_config(
             "mode",
             "tune_training",
             "model_params",
-            "event_column",
+            "star_hist_exog_cols",
             "lowess_frac",
             "lowess_delta",
             "uncertainty",
@@ -393,6 +415,43 @@ def aa_forecast_to_dict(config: AAForecastPluginConfig) -> dict[str, Any]:
         config.uncertainty.dropout_candidates
     )
     return payload
+
+
+def resolve_aa_forecast_hist_exog(
+    config: AAForecastPluginConfig,
+    *,
+    hist_exog_cols: tuple[str, ...],
+) -> AAForecastPluginConfig:
+    if not config.enabled:
+        return config
+    normalized_hist = tuple(column.strip() for column in hist_exog_cols if column.strip())
+    if not normalized_hist:
+        raise ValueError(
+            "AAForecast requires dataset.hist_exog_cols to be non-empty"
+        )
+    if len(set(normalized_hist)) != len(normalized_hist):
+        raise ValueError("dataset.hist_exog_cols must not contain duplicates")
+    if not config.star_hist_exog_cols:
+        raise ValueError("aa_forecast.star_hist_exog_cols is required and must be non-empty")
+    if len(set(config.star_hist_exog_cols)) != len(config.star_hist_exog_cols):
+        raise ValueError("aa_forecast.star_hist_exog_cols must not contain duplicates")
+    unknown = sorted(set(config.star_hist_exog_cols).difference(normalized_hist))
+    if unknown:
+        raise ValueError(
+            "aa_forecast.star_hist_exog_cols contains unknown column(s): "
+            + ", ".join(unknown)
+        )
+    resolved_star = tuple(column for column in normalized_hist if column in config.star_hist_exog_cols)
+    resolved_non_star = tuple(
+        column for column in normalized_hist if column not in config.star_hist_exog_cols
+    )
+    if not resolved_star:
+        raise ValueError("aa_forecast.star_hist_exog_cols must select at least one dataset.hist_exog_cols entry")
+    return replace(
+        config,
+        star_hist_exog_cols_resolved=resolved_star,
+        non_star_hist_exog_cols_resolved=resolved_non_star,
+    )
 
 
 def aa_forecast_jobs_payload(config: AAForecastPluginConfig) -> list[dict[str, Any]]:

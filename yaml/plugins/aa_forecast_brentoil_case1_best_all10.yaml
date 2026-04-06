@@ -6,10 +6,16 @@ aa_forecast:
   uncertainty:
     enabled: true
     dropout_candidates:
-    - 0.1
-    - 0.2
-    - 0.3
-    sample_count: 3
+      - 0.1
+      - 0.2
+      - 0.3
+      - 0.4
+      - 0.5
+      - 0.6
+      - 0.7
+      - 0.8
+      - 0.9
+    sample_count: 5
   model_params:
     encoder_hidden_size: 256
     encoder_n_layers: 3
@@ -19,4 +25,6 @@ aa_forecast:
     season_length: 4
     anomaly_threshold: 4.0
   star_hist_exog_cols:
-  - event
+    - GPRD_THREAT
+    - GPRD
+    - GPRD_ACT

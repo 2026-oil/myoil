@@ -66,7 +66,8 @@ def materialize_aa_forecast_stage(
 def _aa_params_override(loaded: Any) -> dict[str, Any]:
     stage_cfg = loaded.config.stage_plugin_config
     return {
-        "event_feature_name": stage_cfg.event_column,
+        "star_hist_exog_list": list(stage_cfg.star_hist_exog_cols_resolved),
+        "non_star_hist_exog_list": list(stage_cfg.non_star_hist_exog_cols_resolved),
         "lowess_frac": stage_cfg.lowess_frac,
         "lowess_delta": stage_cfg.lowess_delta,
         "uncertainty_enabled": stage_cfg.uncertainty.enabled,
@@ -170,7 +171,10 @@ def _write_uncertainty_artifacts(
         summary_path,
         {
             "train_end_ds": str(pd.Timestamp(train_end_ds)),
-            "event_column": stage_cfg.event_column,
+            "star_hist_exog_cols_resolved": list(stage_cfg.star_hist_exog_cols_resolved),
+            "non_star_hist_exog_cols_resolved": list(
+                stage_cfg.non_star_hist_exog_cols_resolved
+            ),
             "dropout_candidates": list(stage_cfg.uncertainty.dropout_candidates),
             "sample_count": stage_cfg.uncertainty.sample_count,
             "selected_dropout_by_horizon": summary["selected_dropout"].tolist(),

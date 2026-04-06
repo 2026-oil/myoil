@@ -448,6 +448,30 @@ class AppConfig:
         return payload
 
 
+def _resolve_aa_forecast_stage_plugin_config(config: AppConfig) -> AppConfig:
+    result = get_active_stage_plugin(config)
+    if result is None:
+        return config
+    plugin, stage_config = result
+    if plugin.config_key != "aa_forecast":
+        return config
+
+    from plugins.aa_forecast.config import (
+        AAForecastPluginConfig,
+        resolve_aa_forecast_hist_exog,
+    )
+
+    if not isinstance(stage_config, AAForecastPluginConfig):
+        return config
+    resolved = resolve_aa_forecast_hist_exog(
+        stage_config,
+        hist_exog_cols=config.dataset.hist_exog_cols,
+    )
+    if resolved == stage_config:
+        return config
+    return replace(config, stage_plugin_config=resolved)
+
+
 @dataclass(frozen=True)
 class LoadedConfig:
     config: AppConfig
@@ -666,8 +690,6 @@ def _apply_aa_forecast_legacy_compatibility(
     if not isinstance(job, dict) or str(job.get("model")) != "AAForecast":
         return payload
     compat_payload = deepcopy(payload)
-    dataset_payload = dict(compat_payload.get("dataset") or {})
-    hist_exog_cols = _as_tuple(dataset_payload.get("hist_exog_cols"))
     compat_block: dict[str, Any] = {
         "enabled": True,
         "compatibility_mode": "legacy_direct_job_route",
@@ -683,8 +705,6 @@ def _apply_aa_forecast_legacy_compatibility(
         )
         compat_block["tune_training"] = False
         compat_block["model_params"] = dict(job.get("params", {}))
-        if len(hist_exog_cols) == 1:
-            compat_block["event_column"] = hist_exog_cols[0]
         compat_block["lowess_frac"] = 0.6
         compat_block["lowess_delta"] = 0.01
         compat_block["uncertainty"] = {
@@ -1335,7 +1355,6 @@ def _normalize_job(
     params_for_mode = params
     if stage_scope == "aa_forecast" and model_name == "AAForecast":
         structural_keys = {
-            "event_feature_name",
             "lowess_frac",
             "lowess_delta",
             "uncertainty_enabled",
@@ -1461,13 +1480,6 @@ def _apply_aa_forecast_legacy_compatibility(
             "dropout_candidates": [round(step / 10.0, 1) for step in range(1, 10)],
             "sample_count": 8,
         }
-        hist_exog_cols = [
-            str(column).strip()
-            for column in dataset_payload.get("hist_exog_cols", ())
-            if str(column).strip()
-        ]
-        if len(hist_exog_cols) == 1:
-            compat_block["event_column"] = hist_exog_cols[0]
     compat_payload["aa_forecast"] = compat_block
     return compat_payload
 
@@ -2291,6 +2303,7 @@ def load_app_config(
             raise FileNotFoundError(
                 f"Stage plugin selected route does not exist: {stage_source_path}"
             )
+    config = _resolve_aa_forecast_stage_plugin_config(config)
     normalized_payload = config.to_dict()
     if stage_plugin is not None and stage_plugin_loaded is not None:
         for key, value in stage_plugin.stage_normalized_payload(
@@ -2438,6 +2451,7 @@ def loaded_config_for_jobs_fanout(
             search_space_contract=stage_search_space_contract,
         )
         config = stage_plugin.apply_stage_to_config(config, stage_plugin_loaded)
+    config = _resolve_aa_forecast_stage_plugin_config(config)
     normalized_payload = config.to_dict()
     if stage_plugin is not None:
         if stage_plugin_loaded is not None:
