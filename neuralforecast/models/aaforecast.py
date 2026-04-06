@@ -4,6 +4,7 @@ from typing import Optional
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from plugins.aa_forecast import CriticalSparseAttention, STARFeatureExtractor
 
@@ -15,9 +16,9 @@ from ..losses.pytorch import MAE
 class AAForecast(BaseModel):
     """AAForecast
 
-    PyTorch/neuralforecast-style adaptation of the AA-Forecast paper:
-    STAR-style decomposition + anomaly/event-aware sparse attention over a GRU
-    encoder + dense multi-horizon forecast head.
+    PyTorch/neuralforecast adaptation of the AA-Forecast architecture:
+    STAR decomposition + anomaly/event-aware sparse attention over a GRU encoder
+    + stochastic-dropout uncertainty inference at prediction time.
     """
 
     EXOGENOUS_FUTR = False
@@ -38,8 +39,14 @@ class AAForecast(BaseModel):
         decoder_layers: int = 2,
         attention_hidden_size: Optional[int] = None,
         season_length: int = 12,
-        trend_kernel_size: int = 5,
+        trend_kernel_size: int | None = None,
+        lowess_frac: float = 0.6,
+        lowess_delta: float = 0.01,
         anomaly_threshold: float = 3.5,
+        event_feature_name: Optional[str] = None,
+        uncertainty_enabled: bool = False,
+        uncertainty_dropout_candidates=None,
+        uncertainty_sample_count: int = 5,
         hist_exog_list=None,
         futr_exog_list=None,
         stat_exog_list=None,
@@ -102,13 +109,39 @@ class AAForecast(BaseModel):
         self.decoder_layers = decoder_layers
         self.season_length = season_length
         self.trend_kernel_size = trend_kernel_size
+        self.lowess_frac = lowess_frac
+        self.lowess_delta = lowess_delta
         self.anomaly_threshold = anomaly_threshold
         self.exclude_insample_y = exclude_insample_y
+        self.uncertainty_enabled = bool(uncertainty_enabled)
+        self.uncertainty_dropout_candidates = tuple(
+            uncertainty_dropout_candidates or ()
+        )
+        self.uncertainty_sample_count = int(uncertainty_sample_count)
+        self._stochastic_inference_enabled = False
+        self._stochastic_dropout_p = float(encoder_dropout)
+
+        if event_feature_name is None and self.hist_exog_size == 1:
+            event_feature_name = self.hist_exog_list[0]
+        self.event_feature_name = event_feature_name
+        if self.hist_exog_size == 0:
+            self.event_feature_index = None
+        else:
+            if not self.event_feature_name:
+                raise ValueError(
+                    "AAForecast requires event_feature_name when hist_exog_list has multiple columns"
+                )
+            if self.event_feature_name not in self.hist_exog_list:
+                raise ValueError(
+                    f"AAForecast event_feature_name {self.event_feature_name!r} is not in hist_exog_list"
+                )
+            self.event_feature_index = self.hist_exog_list.index(self.event_feature_name)
 
         feature_size = (0 if exclude_insample_y else 1) + self.hist_exog_size + 4
         self.star = STARFeatureExtractor(
             season_length=season_length,
-            trend_kernel_size=trend_kernel_size,
+            lowess_frac=lowess_frac,
+            lowess_delta=lowess_delta,
             anomaly_threshold=anomaly_threshold,
         )
         self.encoder = nn.GRU(
@@ -134,6 +167,25 @@ class AAForecast(BaseModel):
             dropout=encoder_dropout,
         )
 
+    def configure_stochastic_inference(
+        self,
+        *,
+        enabled: bool,
+        dropout_p: float | None = None,
+    ) -> None:
+        self._stochastic_inference_enabled = bool(enabled)
+        if dropout_p is not None:
+            self._stochastic_dropout_p = float(dropout_p)
+
+    def _apply_stochastic_dropout(self, tensor: torch.Tensor) -> torch.Tensor:
+        training = self.training or self._stochastic_inference_enabled
+        if not training:
+            return tensor
+        p = self.encoder_dropout if self.training else self._stochastic_dropout_p
+        if p <= 0:
+            return tensor
+        return F.dropout(tensor, p=p, training=True)
+
     def _align_horizon(self, hidden: torch.Tensor) -> torch.Tensor:
         if self.h > self.input_size:
             hidden = hidden.permute(0, 2, 1)
@@ -142,14 +194,13 @@ class AAForecast(BaseModel):
             return hidden
         return hidden[:, -self.h :]
 
-    def _event_mask(self, event_signal: torch.Tensor) -> torch.Tensor:
-        event_center = event_signal.median(dim=1, keepdim=True).values
-        event_mad = (
-            (event_signal - event_center).abs().median(dim=1, keepdim=True).values
-        ).clamp_min(1e-4)
-        upward_shift = (event_signal - event_center).clamp_min(0.0)
-        event_score = 0.6745 * upward_shift / event_mad
-        return event_score > self.anomaly_threshold
+    def _event_mask(self, hist_exog: torch.Tensor) -> torch.Tensor:
+        if self.event_feature_index is None:
+            return torch.zeros_like(hist_exog[:, :, :1], dtype=torch.bool)
+        event_signal = hist_exog[
+            :, :, self.event_feature_index : self.event_feature_index + 1
+        ]
+        return event_signal.ne(0)
 
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]
@@ -161,10 +212,8 @@ class AAForecast(BaseModel):
             encoder_parts.append(insample_y)
         if self.hist_exog_size > 0:
             encoder_parts.append(hist_exog)
-            event_signal = hist_exog[:, :, :1]
-            event_mask = self._event_mask(event_signal)
+            event_mask = self._event_mask(hist_exog)
         else:
-            event_signal = torch.zeros_like(insample_y)
             event_mask = torch.zeros_like(insample_y, dtype=torch.bool)
         encoder_parts.extend(
             [
@@ -182,6 +231,8 @@ class AAForecast(BaseModel):
 
         hidden_aligned = self._align_horizon(hidden_states)
         attended_aligned = self._align_horizon(attended_states)
+        hidden_aligned = self._apply_stochastic_dropout(hidden_aligned)
+        attended_aligned = self._apply_stochastic_dropout(attended_aligned)
         decoder_input = torch.cat([hidden_aligned, attended_aligned], dim=-1)
-        output = self.decoder(decoder_input)
-        return output[:, -self.h :]
+        decoder_input = self._apply_stochastic_dropout(decoder_input)
+        return self.decoder(decoder_input)[:, -self.h :]

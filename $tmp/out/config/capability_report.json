@@ -1,0 +1,92 @@
+{
+  "AAForecast": {
+    "name": "AAForecast",
+    "multivariate": false,
+    "supports_hist_exog": true,
+    "supports_futr_exog": false,
+    "supports_stat_exog": false,
+    "requires_n_series": false,
+    "single_device_only": true,
+    "requested_mode": "learned_auto_requested",
+    "validated_mode": "learned_fixed",
+    "supports_auto": true,
+    "search_space_entry_found": false,
+    "selected_search_params": [],
+    "unknown_search_params": [],
+    "validation_error": null
+  },
+  "residual": {
+    "model": "xgboost",
+    "target": "level",
+    "requested_mode": "residual_disabled",
+    "validated_mode": "residual_disabled",
+    "supports_auto": true,
+    "search_space_entry_found": false,
+    "selected_search_params": [],
+    "unknown_search_params": [],
+    "validation_error": null,
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": false,
+        "sources": [],
+        "steps": [],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "event"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base",
+      "event_lag_1"
+    ]
+  },
+  "training_search": {
+    "requested_mode": "training_fixed",
+    "validated_mode": "training_fixed",
+    "supports_auto": false,
+    "search_space_entry_found": false,
+    "selected_search_params": [],
+    "unknown_search_params": [],
+    "validation_error": null
+  },
+  "aa_forecast": {
+    "enabled": true,
+    "config_path": "tests/fixtures/aa_forecast_runtime_plugin_auto_model_only.yaml",
+    "selected_config_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/tests/fixtures/aa_forecast_runtime_plugin_auto_model_only.yaml",
+    "mode": "learned_auto",
+    "tune_training": false,
+    "event_column": "event",
+    "lowess_frac": 0.6,
+    "lowess_delta": 0.01,
+    "uncertainty": {
+      "enabled": false,
+      "dropout_candidates": [
+        0.1,
+        0.3
+      ],
+      "sample_count": 3
+    },
+    "model_params": {},
+    "compatibility_mode": null,
+    "compatibility_source_path": null,
+    "handled_jobs": [
+      {
+        "model": "AAForecast",
+        "requested_mode": "learned_auto_requested",
+        "validated_mode": "learned_fixed",
+        "supports_hist_exog": true
+      }
+    ]
+  }
+}

@@ -179,7 +179,7 @@ class NecStagePlugin:
         )
         for branch_name, branch_cfg in _cfg.nec_branch_configs(normalized).items():
             _validate_branch_contract(branch_name, branch_cfg)
-        return {"jobs": [], "residual": {}}
+        return {"residual": {}}
 
     def load_stage(self, repo_root: Path, *, source_path: Path, source_type: str, config: Any, search_space_contract: SearchSpaceContract | None) -> _cfg.NecStageLoadedConfig:
         return _cfg.load_nec_stage1(

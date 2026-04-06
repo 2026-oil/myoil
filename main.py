@@ -13,6 +13,13 @@ _BOOTSTRAP_ENV = 'NEURALFORECAST_RESIDUAL_BOOTSTRAPPED'
 _ALLOW_INTERNAL_OUTPUT_ROOT_ENV = 'NEURALFORECAST_ALLOW_INTERNAL_OUTPUT_ROOT'
 
 
+def _positive_int_arg(raw: str) -> int:
+    value = int(raw)
+    if value <= 0:
+        raise argparse.ArgumentTypeError('must be a positive integer')
+    return value
+
+
 def _build_env() -> dict[str, str]:
     env = os.environ.copy()
     env.setdefault('PYTHONPATH', str(WORKSPACE_ROOT))
@@ -53,6 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('--setting', default=None)
     parser.add_argument('--validate-only', action='store_true')
     parser.add_argument('--jobs', nargs='+', default=None)
+    parser.add_argument('--optuna-study', type=_positive_int_arg, default=None)
     parser.add_argument('--output-root', default=None, help=argparse.SUPPRESS)
     parser.add_argument('--internal-jobs-route', default=None, help=argparse.SUPPRESS)
     parser.add_argument(

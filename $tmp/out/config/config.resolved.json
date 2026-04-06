@@ -1,0 +1,167 @@
+{
+  "task": {
+    "name": "validate_only_aa_forecast_plugin_auto_model_only"
+  },
+  "dataset": {
+    "path": "/home/sonet/.openclaw/workspace/research/neuralforecast/tests/fixtures/aa_forecast_runtime_smoke.csv",
+    "target_col": "target",
+    "dt_col": "dt",
+    "freq": null,
+    "hist_exog_cols": [
+      "event"
+    ],
+    "futr_exog_cols": [],
+    "static_exog_cols": []
+  },
+  "runtime": {
+    "random_seed": 7,
+    "opt_n_trial": null,
+    "opt_study_count": 1,
+    "opt_selected_study": null
+  },
+  "training": {
+    "train_protocol": "expanding_window_tscv",
+    "input_size": 8,
+    "batch_size": 1,
+    "valid_batch_size": 1,
+    "windows_batch_size": 8,
+    "inference_windows_batch_size": 8,
+    "lr_scheduler": {
+      "name": "ReduceLROnPlateau",
+      "max_lr": 0.001,
+      "mode": "min",
+      "factor": 0.5,
+      "patience": 1,
+      "threshold": 0.0001,
+      "threshold_mode": "rel",
+      "cooldown": 0,
+      "min_lr": 0.0,
+      "eps": 1e-08
+    },
+    "scaler_type": null,
+    "model_step_size": 1,
+    "max_steps": 1,
+    "val_size": 2,
+    "val_check_steps": 1,
+    "min_steps_before_early_stop": 0,
+    "early_stop_patience_steps": -1,
+    "loss": "mse",
+    "optimizer": {
+      "name": "adamw",
+      "kwargs": {}
+    },
+    "accelerator": "cpu",
+    "devices": null,
+    "strategy": null,
+    "precision": null,
+    "dataloader_kwargs": {}
+  },
+  "training_search": {
+    "requested_mode": "training_fixed",
+    "validated_mode": "training_fixed",
+    "selected_search_params": []
+  },
+  "cv": {
+    "horizon": 2,
+    "step_size": 1,
+    "n_windows": 1,
+    "gap": 0,
+    "max_train_size": null,
+    "overlap_eval_policy": "by_cutoff_mean"
+  },
+  "scheduler": {
+    "gpu_ids": [
+      0
+    ],
+    "max_concurrent_jobs": 1,
+    "worker_devices": 1,
+    "parallelize_single_job_tuning": true
+  },
+  "residual": {
+    "enabled": false,
+    "model": "xgboost",
+    "target": "level",
+    "cpu_threads": null,
+    "params": {},
+    "features": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": false,
+        "sources": [],
+        "steps": [],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "event"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "requested_mode": "residual_disabled",
+    "validated_mode": "residual_disabled",
+    "selected_search_params": []
+  },
+  "jobs": [
+    {
+      "model": "AAForecast",
+      "params": {},
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": []
+    }
+  ],
+  "aa_forecast": {
+    "enabled": true,
+    "config_path": "tests/fixtures/aa_forecast_runtime_plugin_auto_model_only.yaml",
+    "mode": "learned_auto",
+    "tune_training": false,
+    "model_params": {},
+    "event_column": "event",
+    "lowess_frac": 0.6,
+    "lowess_delta": 0.01,
+    "uncertainty": {
+      "enabled": false,
+      "dropout_candidates": [
+        0.1,
+        0.3
+      ],
+      "sample_count": 3
+    },
+    "compatibility_mode": null,
+    "compatibility_source_path": null,
+    "stage1": {
+      "source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/tests/fixtures/aa_forecast_runtime_plugin_auto_model_only.yaml",
+      "source_type": "yaml",
+      "config_input_sha256": "5dc87369645df875fa4d4a38c67aba9d0d185293b4febd308e9475d9118f986d",
+      "config_resolved_sha256": "639dd06dfd22ec481839b31f762c0440181e36498c16b88bb842a1efd44dbbb0",
+      "search_space_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/yaml/HPO/search_space.yaml",
+      "search_space_sha256": "717a287d7aea1c04496e07a58f3439ab51b447e0d24da3ff7d7381e88e6161d1",
+      "mode": "learned_auto",
+      "tune_training": false,
+      "event_column": "event",
+      "lowess_frac": 0.6,
+      "lowess_delta": 0.01,
+      "uncertainty": {
+        "enabled": false,
+        "dropout_candidates": [
+          0.1,
+          0.3
+        ],
+        "sample_count": 3
+      },
+      "model_params": {},
+      "compatibility_mode": null,
+      "compatibility_source_path": null
+    }
+  },
+  "search_space_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/yaml/HPO/search_space.yaml",
+  "search_space_sha256": "717a287d7aea1c04496e07a58f3439ab51b447e0d24da3ff7d7381e88e6161d1",
+  "shared_settings_path": null,
+  "shared_settings_sha256": null
+}

@@ -1,0 +1,32 @@
+{
+  "artifacts": [
+    {
+      "kind": "json",
+      "path": "/home/sonet/.openclaw/workspace/research/neuralforecast/$tmp/out/models/AAForecast/visualizations/cross_study_summary.json"
+    },
+    {
+      "kind": "csv",
+      "path": "/home/sonet/.openclaw/workspace/research/neuralforecast/$tmp/out/models/AAForecast/visualizations/cross_study_leaderboard.csv"
+    },
+    {
+      "kind": "html",
+      "path": "/home/sonet/.openclaw/workspace/research/neuralforecast/$tmp/out/models/AAForecast/visualizations/best_value_by_study.html"
+    },
+    {
+      "kind": "png",
+      "path": "/home/sonet/.openclaw/workspace/research/neuralforecast/$tmp/out/models/AAForecast/visualizations/best_value_by_study.png"
+    },
+    {
+      "kind": "html",
+      "path": "/home/sonet/.openclaw/workspace/research/neuralforecast/$tmp/out/models/AAForecast/visualizations/finished_trials_by_study.html"
+    },
+    {
+      "kind": "png",
+      "path": "/home/sonet/.openclaw/workspace/research/neuralforecast/$tmp/out/models/AAForecast/visualizations/finished_trials_by_study.png"
+    },
+    {
+      "kind": "html",
+      "path": "/home/sonet/.openclaw/workspace/research/neuralforecast/$tmp/out/models/AAForecast/visualizations/cross_study_dashboard.html"
+    }
+  ]
+}

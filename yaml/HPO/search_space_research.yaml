@@ -1,0 +1,885 @@
+models:
+  PatchTST:
+    hidden_size:
+      type: categorical
+      choices:
+        - 32
+        - 64
+        - 128
+        - 256
+    n_heads:
+      type: categorical
+      choices:
+        - 4
+        - 8
+        - 16
+        - 32
+    encoder_layers:
+      type: categorical
+      choices:
+        - 2
+        - 3
+        - 4
+        - 6
+    patch_len:
+      type: categorical
+      choices:
+        - 4
+        - 8
+        - 12
+        - 16
+        - 24
+    dropout:
+      type: categorical
+      choices:
+        - 0.0
+        - 0.05
+        - 0.1
+        - 0.15
+        - 0.2
+  NHITS:
+    mlp_units:
+      type: categorical
+      choices:
+        - - - 32
+            - 32
+            - 32
+          - - 32
+            - 32
+            - 32
+          - - 32
+            - 32
+            - 32
+        - - - 64
+            - 64
+            - 64
+          - - 64
+            - 64
+            - 64
+          - - 64
+            - 64
+            - 64
+        - - - 128
+            - 128
+            - 128
+          - - 128
+            - 128
+            - 128
+          - - 128
+            - 128
+            - 128
+    dropout:
+      type: categorical
+      choices:
+        - 0.0
+        - 0.1
+        - 0.2
+  DLinear:
+    moving_avg:
+      type: categorical
+      choices:
+        - 13
+        - 25
+        - 33
+        - 51
+  NLinear:
+    normalize:
+      type: categorical
+      choices:
+        - true
+        - false
+  LSTM:
+    encoder_hidden_size:
+      type: categorical
+      choices:
+        - 64
+        - 96
+        - 128
+        - 160
+        - 256
+    encoder_n_layers:
+      type: categorical
+      choices:
+        - 2
+        - 3
+        - 4
+        - 5
+    inference_input_size:
+      type: categorical
+      choices:
+        - 32
+        - 48
+        - 64
+        - 96
+        - 128
+    encoder_dropout:
+      type: categorical
+      choices:
+        - 0.0
+        - 0.1
+        - 0.2
+        - 0.3
+        - 0.4
+    decoder_hidden_size:
+      type: categorical
+      choices:
+        - 64
+        - 96
+        - 128
+        - 160
+        - 256
+    decoder_layers:
+      type: categorical
+      choices:
+        - 1
+        - 2
+        - 3
+  LSTM_new:
+    encoder_hidden_size:
+      type: categorical
+      choices:
+        - 64
+        - 96
+        - 128
+        - 160
+        - 256
+    encoder_n_layers:
+      type: categorical
+      choices:
+        - 2
+        - 3
+        - 4
+        - 5
+    inference_input_size:
+      type: categorical
+      choices:
+        - 32
+        - 48
+        - 64
+        - 96
+        - 128
+    encoder_dropout:
+      type: categorical
+      choices:
+        - 0.0
+        - 0.1
+        - 0.2
+        - 0.3
+        - 0.4
+    decoder_hidden_size:
+      type: categorical
+      choices:
+        - 64
+        - 96
+        - 128
+        - 160
+        - 256
+    decoder_layers:
+      type: categorical
+      choices:
+        - 1
+        - 2
+        - 3
+  iTransformer:
+    hidden_size:
+      type: categorical
+      choices:
+        - 64
+        - 96
+        - 128
+        - 160
+        - 256
+    n_heads:
+      type: categorical
+      choices:
+        - 4
+        - 8
+        - 16
+        - 32
+    e_layers:
+      type: categorical
+      choices:
+        - 2
+        - 3
+        - 4
+        - 6
+    d_ff:
+      type: categorical
+      choices:
+        - 128
+        - 256
+        - 512
+        - 1024
+    d_layers:
+      type: categorical
+      choices:
+        - 1
+        - 2
+    factor:
+      type: categorical
+      choices:
+        - 1
+        - 3
+        - 4
+        - 5
+    dropout:
+      type: categorical
+      choices:
+        - 0.0
+        - 0.05
+        - 0.1
+        - 0.15
+        - 0.2
+        - 0.3
+    use_norm:
+      type: categorical
+      choices:
+        - true
+        - false
+  TSMixerx:
+    n_block:
+      type: categorical
+      choices:
+        - 2
+        - 3
+        - 4
+        - 6
+        - 8
+    ff_dim:
+      type: categorical
+      choices:
+        - 64
+        - 96
+        - 128
+        - 192
+        - 256
+    dropout:
+      type: categorical
+      choices:
+        - 0.0
+        - 0.05
+        - 0.1
+        - 0.15
+        - 0.2
+        - 0.3
+    revin:
+      type: categorical
+      choices:
+        - true
+        - false
+  TimeXer:
+    patch_len:
+      type: categorical
+      choices:
+        - 4
+        - 8
+        - 12
+        - 16
+        - 24
+    hidden_size:
+      type: categorical
+      choices:
+        - 64
+        - 96
+        - 128
+        - 160
+        - 256
+    n_heads:
+      type: categorical
+      choices:
+        - 4
+        - 8
+        - 16
+        - 32
+    e_layers:
+      type: categorical
+      choices:
+        - 2
+        - 3
+        - 4
+        - 6
+    d_ff:
+      type: categorical
+      choices:
+        - 128
+        - 256
+        - 512
+        - 1024
+    factor:
+      type: categorical
+      choices:
+        - 1
+        - 3
+        - 4
+        - 5
+    dropout:
+      type: categorical
+      choices:
+        - 0.0
+        - 0.05
+        - 0.1
+        - 0.15
+        - 0.2
+        - 0.3
+    use_norm:
+      type: categorical
+      choices:
+        - true
+        - false
+  NonstationaryTransformer:
+    hidden_size:
+      type: categorical
+      choices:
+        - 64
+        - 96
+        - 128
+        - 160
+        - 256
+    dropout:
+      type: categorical
+      choices:
+        - 0.0
+        - 0.1
+        - 0.2
+        - 0.3
+    n_head:
+      type: categorical
+      choices:
+        - 4
+        - 8
+        - 16
+        - 32
+    conv_hidden_size:
+      type: categorical
+      choices:
+        - 64
+        - 96
+        - 128
+        - 160
+        - 256
+    encoder_layers:
+      type: categorical
+      choices:
+        - 1
+        - 2
+        - 3
+        - 4
+    decoder_layers:
+      type: categorical
+      choices:
+        - 1
+        - 2
+        - 3
+  AAForecast:
+    encoder_hidden_size:
+      type: categorical
+      choices:
+        - 64
+        - 128
+        - 256
+        - 512
+    encoder_n_layers:
+      type: categorical
+      choices:
+        - 1
+        - 2
+        - 3
+        - 4
+    encoder_dropout:
+      type: categorical
+      choices:
+        - 0.0
+        - 0.1
+        - 0.2
+        - 0.3
+        - 0.4
+    decoder_hidden_size:
+      type: categorical
+      choices:
+        - 64
+        - 128
+        - 256
+        - 512
+    decoder_layers:
+      type: categorical
+      choices:
+        - 1
+        - 2
+        - 3
+        - 4
+    season_length:
+      type: categorical
+      choices:
+        - 4
+        - 8
+        - 12
+        - 16
+    trend_kernel_size:
+      type: categorical
+      choices:
+        - 3
+        - 5
+        - 7
+        - 9
+    anomaly_threshold:
+      type: categorical
+      choices:
+        - 2.0
+        - 2.5
+        - 3.0
+        - 3.5
+        - 4.0
+  GRU:
+    encoder_hidden_size:
+      type: categorical
+      choices:
+        - 64
+        - 96
+        - 128
+        - 160
+        - 256
+    encoder_n_layers:
+      type: categorical
+      choices:
+        - 2
+        - 3
+        - 4
+    encoder_dropout:
+      type: categorical
+      choices:
+        - 0.0
+        - 0.1
+        - 0.2
+        - 0.3
+    decoder_hidden_size:
+      type: categorical
+      choices:
+        - 64
+        - 96
+        - 128
+        - 160
+    decoder_layers:
+      type: categorical
+      choices:
+        - 1
+        - 2
+  TFT:
+    hidden_size:
+      type: categorical
+      choices:
+        - 32
+        - 64
+        - 128
+        - 256
+    dropout:
+      type: categorical
+      choices:
+        - 0.0
+        - 0.05
+        - 0.1
+        - 0.2
+    n_head:
+      type: categorical
+      choices:
+        - 4
+        - 8
+        - 16
+        - 32
+    attention_hidden_size:
+      type: categorical
+      choices:
+        - 32
+        - 64
+        - 128
+  xgboost:
+    lags:
+      type: categorical
+      choices:
+        - - 1
+          - 2
+          - 3
+        - - 1
+          - 2
+          - 3
+          - 6
+          - 12
+        - - 1
+          - 2
+          - 3
+          - 6
+          - 12
+          - 24
+    n_estimators:
+      type: categorical
+      choices:
+        - 32
+        - 64
+        - 128
+        - 256
+    max_depth:
+      type: int
+      low: 2
+      high: 10
+      step: 1
+    learning_rate:
+      type: float
+      low: 0.01
+      high: 0.3
+      step: 0.01
+  lightgbm:
+    lags:
+      type: categorical
+      choices:
+        - - 1
+          - 2
+          - 3
+        - - 1
+          - 2
+          - 3
+          - 6
+          - 12
+        - - 1
+          - 2
+          - 3
+          - 6
+          - 12
+          - 24
+    n_estimators:
+      type: categorical
+      choices:
+        - 32
+        - 64
+        - 128
+        - 256
+    max_depth:
+      type: categorical
+      choices:
+        - 4
+        - 6
+        - 8
+        - -1
+    num_leaves:
+      type: categorical
+      choices:
+        - 15
+        - 31
+        - 63
+        - 127
+    min_child_samples:
+      type: categorical
+      choices:
+        - 5
+        - 10
+        - 20
+        - 40
+    feature_fraction:
+      type: float
+      low: 0.5
+      high: 1.0
+      step: 0.05
+    learning_rate:
+      type: float
+      low: 0.01
+      high: 0.3
+      step: 0.01
+training:
+  global:
+    input_size:
+      type: categorical
+      choices:
+        - 48
+        - 64
+        - 96
+        - 128
+        - 192
+    batch_size:
+      type: categorical
+      choices:
+        - 16
+        - 32
+        - 64
+        - 128
+    scaler_type:
+      type: categorical
+      choices:
+        - standard
+        - robust
+        - minmax
+    model_step_size:
+      type: categorical
+      choices:
+        - 1
+        - 4
+        - 8
+  per_model:
+    LSTM:
+      input_size:
+        type: categorical
+        choices:
+          - 24
+          - 48
+          - 64
+          - 96
+          - 128
+      batch_size:
+        type: categorical
+        choices:
+          - 16
+          - 32
+          - 64
+      scaler_type:
+        type: categorical
+        choices:
+          - standard
+          - robust
+      model_step_size:
+        type: categorical
+        choices:
+          - 1
+          - 4
+          - 8
+    LSTM_new:
+      input_size:
+        type: categorical
+        choices:
+          - 24
+          - 48
+          - 64
+          - 96
+          - 128
+      batch_size:
+        type: categorical
+        choices:
+          - 16
+          - 32
+          - 64
+      scaler_type:
+        type: categorical
+        choices:
+          - standard
+          - robust
+      model_step_size:
+        type: categorical
+        choices:
+          - 1
+          - 4
+          - 8
+    TSMixerx:
+      input_size:
+        type: categorical
+        choices:
+          - 48
+          - 64
+          - 72
+          - 96
+      batch_size:
+        type: categorical
+        choices:
+          - 16
+          - 32
+      scaler_type:
+        type: categorical
+        choices:
+          - standard
+          - robust
+      model_step_size:
+        type: categorical
+        choices:
+          - 1
+          - 4
+          - 8
+    TimeXer:
+      input_size:
+        type: categorical
+        choices:
+          - 48
+          - 64
+          - 96
+          - 128
+      batch_size:
+        type: categorical
+        choices:
+          - 16
+          - 32
+          - 64
+          - 128
+      scaler_type:
+        type: categorical
+        choices:
+          - standard
+          - robust
+      model_step_size:
+        type: categorical
+        choices:
+          - 1
+          - 4
+          - 8
+    iTransformer:
+      input_size:
+        type: categorical
+        choices:
+          - 48
+          - 64
+          - 96
+          - 128
+      batch_size:
+        type: categorical
+        choices:
+          - 16
+          - 32
+          - 64
+      scaler_type:
+        type: categorical
+        choices:
+          - standard
+          - robust
+      model_step_size:
+        type: categorical
+        choices:
+          - 1
+          - 4
+          - 8
+    NonstationaryTransformer:
+      input_size:
+        type: categorical
+        choices:
+          - 48
+          - 64
+          - 96
+          - 128
+      batch_size:
+        type: categorical
+        choices:
+          - 16
+          - 32
+          - 64
+      scaler_type:
+        type: categorical
+        choices:
+          - standard
+          - robust
+      model_step_size:
+        type: categorical
+        choices:
+          - 1
+          - 4
+          - 8
+    AAForecast:
+      input_size:
+        type: categorical
+        choices:
+          - 48
+          - 64
+          - 96
+          - 128
+      batch_size:
+        type: categorical
+        choices:
+          - 16
+          - 32
+          - 64
+      scaler_type:
+        type: categorical
+        choices:
+          - standard
+          - robust
+      model_step_size:
+        type: categorical
+        choices:
+          - 1
+          - 4
+          - 8
+residual:
+  xgboost:
+    n_estimators:
+      type: categorical
+      choices:
+        - 16
+        - 32
+        - 64
+        - 128
+        - 256
+    max_depth:
+      type: int
+      low: 2
+      high: 10
+      step: 1
+    subsample:
+      type: float
+      low: 0.5
+      high: 1.0
+      step: 0.05
+    colsample_bytree:
+      type: float
+      low: 0.5
+      high: 1.0
+      step: 0.05
+    learning_rate:
+      type: float
+      low: 0.01
+      high: 0.3
+      step: 0.01
+  randomforest:
+    n_estimators:
+      type: categorical
+      choices:
+        - 64
+        - 128
+        - 200
+        - 300
+        - 500
+    max_depth:
+      type: categorical
+      choices:
+        - 4
+        - 6
+        - 8
+        - 12
+        - -1
+    min_samples_leaf:
+      type: categorical
+      choices:
+        - 1
+        - 2
+        - 4
+        - 8
+    max_features:
+      type: categorical
+      choices:
+        - sqrt
+        - log2
+        - 1.0
+  lightgbm:
+    n_estimators:
+      type: categorical
+      choices:
+        - 32
+        - 64
+        - 128
+        - 256
+    max_depth:
+      type: categorical
+      choices:
+        - 4
+        - 6
+        - 8
+        - -1
+    num_leaves:
+      type: categorical
+      choices:
+        - 15
+        - 31
+        - 63
+        - 127
+    min_child_samples:
+      type: categorical
+      choices:
+        - 5
+        - 10
+        - 20
+        - 40
+    feature_fraction:
+      type: float
+      low: 0.5
+      high: 1.0
+      step: 0.05

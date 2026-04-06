@@ -1,0 +1,45 @@
+task:
+  name: research_nec_hpo
+setting: yaml/setting/setting_nec_hpo.yaml
+dataset:
+  path: data/df.csv
+  target_col: Com_CrudeOil
+  dt_col: dt
+  hist_exog_cols:
+  - Com_LME_Ni_Cash
+  - Com_LME_Cu_Cash
+  - Com_LME_Al_Cash
+  - Com_LME_Zn_Cash
+  - Com_LME_Ni_Inv
+  - Com_LME_Cu_Inv
+  - Com_Gasoline
+  - Com_NaturalGas
+  - Com_Coal
+  - Com_Oil_Spread
+  - Com_BloombergCommodity_BCOM
+  - Com_LMEX
+  - Idx_DxyUSD
+  - Idx_SnP500
+  - Idx_SnPVIX
+  - Idx_OVX
+  - Idx_GVZ
+  - GPRD
+  - GPRD_ACT
+  - GPRD_THREAT
+  - Bonds_US_10Y
+  - Bonds_US_2Y
+  - Bonds_CHN_10Y
+  - EX_USD_CNY
+  - EX_USD_KRW
+  - BS_Core_Index_A
+  - BS_Core_Index_B
+  - BS_Core_Index_Integrated
+  futr_exog_cols: []
+  static_exog_cols: []
+residual:
+  enabled: false
+jobs:
+- model: NEC
+nec:
+  enabled: true
+  config_path: yaml/plugins/nec_research_v6.yaml

@@ -1,0 +1,35 @@
+{
+  "approvals": {},
+  "config": {
+    "direction": "lower",
+    "execution_policy": "danger_full_access",
+    "goal": "Reduce Brent fold1 h6 MAPE below 3% and h7/h8 MAPE below 5% using AAForecast-based methodology.",
+    "guard": "UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_validate_only_aa_forecast.py tests/test_residual_config.py::test_load_app_config_marks_aaforecast_auto_requested_and_validated_modes tests/test_residual_config.py::test_package_exports_and_intentional_omissions_are_explicit tests/test_residual_config.py::test_model_filename_dict_includes_newly_supported_aliases tests/test_residual_config.py::test_supports_auto_mode_expands_to_newly_added_models tests/test_residual_config.py::test_build_model_supports_new_official_model_ports",
+    "iterations": null,
+    "metric": "brent_fold1_h6_3_h7h8_5_threshold_gap_pct",
+    "parallel_mode": "serial",
+    "repos": [
+      {
+        "path": "/home/sonet/.openclaw/workspace/research/neuralforecast",
+        "role": "primary",
+        "scope": "**"
+      }
+    ],
+    "rollback_policy": null,
+    "run_tag": "brent-aaf-h6h8-thresholds",
+    "scope": "**",
+    "session_mode": "background",
+    "stop_condition": "metric <= 0",
+    "verify": "UV_CACHE_DIR=/tmp/uv-cache uv run python .omx/research/research-20260401-brent-aaf-h6h8/verify_brent_h6_h8_thresholds.py",
+    "web_search": "disabled"
+  },
+  "created_at": "2026-04-01T14:43:35Z",
+  "defaults": {},
+  "mode": "loop",
+  "notes": [],
+  "original_goal": "Reduce Brent fold1 h6 MAPE below 3% and h7/h8 MAPE below 5% using AAForecast-based methodology.",
+  "prompt_text": "Goal: Reduce the Brent AAForecast spike-window error so that fold1 h6 MAPE is below 3% and h7/h8 MAPE are below 5%.\n\nCurrent measured baseline from verify_brent_h6_h8_thresholds.py:\n- metric_name = brent_fold1_h6_3_h7h8_5_threshold_gap_pct\n- metric = max(h6_mape-3, h7_mape-5, h8_mape-5)\n- success condition: metric <= 0\n- baseline metric ~= 12.8176\n\nRequired behavior:\n- Work autonomously in loop mode.\n- Do not ask follow-up questions.\n- Prefer small, causal experiments on AAForecast first.\n- Keep or discard based on the mechanical metric only.\n- Never revert or stage unrelated pre-existing user changes.\n- Existing dirty files may be present; avoid touching them unless truly necessary for this goal.\n\nPrimary success metric:\n- Verify command prints the single metric `brent_fold1_h6_3_h7h8_5_threshold_gap_pct`.\n- Lower is better.\n- Success condition: metric <= 0.\n\nSecondary evidence to inspect:\n- `.omx/research/research-20260401-brent-aaf-h6h8/autoresearch_eval/summary_thresholds.json`\n- h6/h7/h8 per-horizon MAPE and threshold excess.\n\nPromising next directions:\n1. Attention selectivity tuning after the recent narrower-attention win.\n2. Horizon-aware loss weighting biased toward h7/h8.\n3. Event-mask and anomaly-threshold tuning.\n4. If AAForecast plateaus, consider NEC/plugin or residual-style hybridization.",
+  "resume_seed": {},
+  "updated_at": "2026-04-01T14:43:35Z",
+  "version": 1
+}

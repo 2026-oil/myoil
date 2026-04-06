@@ -362,6 +362,30 @@ class _NecPredictor:
         normalized = ((diffs[-self.horizon :] - self.target_mean) / self.target_std).astype(np.float32)
         return (np.abs(normalized) > self.config.preprocessing.epsilon).astype(np.float32)
 
+    def _merge_predictions(
+        self,
+        *,
+        classifier_probs: np.ndarray,
+        normal_level: np.ndarray,
+        extreme_level: np.ndarray,
+    ) -> np.ndarray:
+        mode = self.config.inference.mode
+        classifier_probs = classifier_probs.astype(np.float32)
+        if mode == "soft_weighted":
+            return (
+                classifier_probs * extreme_level
+                + (1.0 - classifier_probs) * normal_level
+            ).astype(np.float32)
+        if mode == "soft_weighted_inverse":
+            return (
+                (1.0 - classifier_probs) * extreme_level
+                + classifier_probs * normal_level
+            ).astype(np.float32)
+        gates = (classifier_probs >= self.config.inference.threshold).astype(np.float32)
+        if mode == "hard_threshold_inverse":
+            gates = (classifier_probs < self.config.inference.threshold).astype(np.float32)
+        return np.where(gates == 1, extreme_level, normal_level).astype(np.float32)
+
     def run(self) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, Any | None, dict[str, _BranchRunResult]]:
         branch_results = {
             branch_name: self._predict_branch(branch_name)
@@ -370,14 +394,11 @@ class _NecPredictor:
         classifier_probs = branch_results["classifier"].predictions
         normal_level = branch_results["normal"].predictions
         extreme_level = branch_results["extreme"].predictions
-        if self.config.inference.mode == "soft_weighted":
-            merged = (
-                classifier_probs.astype(np.float32) * extreme_level
-                + (1.0 - classifier_probs.astype(np.float32)) * normal_level
-            ).astype(np.float32)
-        else:
-            gates = (classifier_probs >= self.config.inference.threshold).astype(np.float32)
-            merged = np.where(gates == 1, extreme_level, normal_level).astype(np.float32)
+        merged = self._merge_predictions(
+            classifier_probs=classifier_probs,
+            normal_level=normal_level,
+            extreme_level=extreme_level,
+        )
         predictions = pd.DataFrame(
             {
                 "unique_id": [self.target_col] * self.horizon,

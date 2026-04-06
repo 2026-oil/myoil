@@ -9,6 +9,53 @@ from app_config import load_app_config
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+FEATURE_SET_NEC_HYBRID_VARIANTS = {
+    "all10": {
+        "config_name": "neciso_brent_hybrid_tsmixerx_lstm_inverse_all10",
+        "plugin_path": "yaml/plugins/nec_brent_hybrid_tsmixerx_lstm_inverse_all10.yaml",
+        "task_name": "neciso_brent_case1_nec_hybrid_tsmixerx_lstm_inverse_all10",
+        "variables": [
+            "Idx_OVX",
+            "Com_Oil_Spread",
+            "BS_Core_Index_A",
+            "BS_Core_Index_B",
+            "BS_Core_Index_C",
+            "Com_LMEX",
+            "Com_BloombergCommodity_BCOM",
+            "GPRD_THREAT",
+            "GPRD",
+            "GPRD_ACT",
+        ],
+    },
+    "no_bs_core": {
+        "config_name": "neciso_brent_hybrid_tsmixerx_lstm_inverse_no_bs_core",
+        "plugin_path": "yaml/plugins/nec_brent_hybrid_tsmixerx_lstm_inverse_no_bs_core.yaml",
+        "task_name": "neciso_brent_case1_nec_hybrid_tsmixerx_lstm_inverse_no_bs_core",
+        "variables": [
+            "Idx_OVX",
+            "Com_Oil_Spread",
+            "Com_LMEX",
+            "Com_BloombergCommodity_BCOM",
+            "GPRD_THREAT",
+            "GPRD",
+            "GPRD_ACT",
+        ],
+    },
+    "no_gprd": {
+        "config_name": "neciso_brent_hybrid_tsmixerx_lstm_inverse_no_gprd",
+        "plugin_path": "yaml/plugins/nec_brent_hybrid_tsmixerx_lstm_inverse_no_gprd.yaml",
+        "task_name": "neciso_brent_case1_nec_hybrid_tsmixerx_lstm_inverse_no_gprd",
+        "variables": [
+            "Idx_OVX",
+            "Com_Oil_Spread",
+            "BS_Core_Index_A",
+            "BS_Core_Index_B",
+            "BS_Core_Index_C",
+            "Com_LMEX",
+            "Com_BloombergCommodity_BCOM",
+        ],
+    },
+}
 
 
 def test_nec_config_loads_branch_contract_and_replaces_legacy_metadata() -> None:
@@ -267,3 +314,63 @@ def test_nec_enabled_without_config_path_defaults_to_nec_lstm() -> None:
         config_path.unlink(missing_ok=True)
 
     assert loaded.config.stage_plugin_config.config_path == "yaml/plugins/nec_lstm.yaml"
+
+
+def test_feature_set_nec_hybrid_route_preserves_top_level_nec_job() -> None:
+    loaded = load_app_config(
+        REPO_ROOT,
+        config_path=(
+            REPO_ROOT
+            / "yaml/experiment/feature_set_nec/neciso_brent_hybrid_tsmixerx_lstm_inverse.yaml"
+        ),
+    )
+
+    assert len(loaded.config.jobs) == 1
+    assert loaded.config.jobs[0].model == "NEC"
+    assert loaded.config.jobs[0].params == {}
+    assert loaded.config.stage_plugin_config.config_path == (
+        "yaml/plugins/nec_brent_hybrid_tsmixerx_lstm_inverse.yaml"
+    )
+    assert (
+        loaded.normalized_payload["nec"]["stage1"]["source_path"].endswith(
+            "yaml/plugins/nec_brent_hybrid_tsmixerx_lstm_inverse.yaml"
+        )
+    )
+    assert (
+        loaded.normalized_payload["nec"]["stage1"]["branches"]["classifier"]["model"]
+        == "TSMixerx"
+    )
+    assert (
+        loaded.normalized_payload["nec"]["stage1"]["branches"]["normal"]["model"]
+        == "LSTM"
+    )
+    assert (
+        loaded.normalized_payload["nec"]["stage1"]["branches"]["extreme"]["model"]
+        == "TSMixerx"
+    )
+
+
+@pytest.mark.parametrize(
+    "expected",
+    list(FEATURE_SET_NEC_HYBRID_VARIANTS.values()),
+)
+def test_feature_set_nec_hybrid_feature_variants_preserve_uniform_branch_variables(
+    expected: dict[str, object],
+) -> None:
+    loaded = load_app_config(
+        REPO_ROOT,
+        config_path=(
+            REPO_ROOT
+            / "yaml/experiment/feature_set_nec"
+            / f"{expected['config_name']}.yaml"
+        ),
+    )
+
+    assert loaded.normalized_payload["task"]["name"] == expected["task_name"]
+    assert loaded.config.stage_plugin_config.config_path == expected["plugin_path"]
+    stage1 = loaded.normalized_payload["nec"]["stage1"]
+    assert stage1["source_path"].endswith(expected["plugin_path"])
+    assert stage1["active_hist_columns"] == expected["variables"]
+    assert stage1["branches"]["classifier"]["variables"] == expected["variables"]
+    assert stage1["branches"]["normal"]["variables"] == expected["variables"]
+    assert stage1["branches"]["extreme"]["variables"] == expected["variables"]

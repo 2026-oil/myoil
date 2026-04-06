@@ -1,0 +1,1120 @@
+OpenAI Codex v0.118.0 (research preview)
+--------
+workdir: /home/sonet/.openclaw/workspace/research/neuralforecast
+model: gpt-5.4
+provider: cliproxy_codex
+approval: never
+sandbox: danger-full-access
+reasoning effort: high
+reasoning summaries: none
+session id: 019d497f-57a1-78f3-b362-755244916c80
+--------
+user
+$codex-autoresearch
+This repo is managed by the autoresearch runtime controller.
+The human already completed the confirmation phase for this run.
+Use /home/sonet/.openclaw/workspace/research/neuralforecast/autoresearch-launch.json as the authoritative launch manifest.
+Runtime launch decision: fresh (launch_manifest_ready).
+
+Original ask: $codex-autoresearch Brent only. h7 and h8 MAPE up to 5% is acceptable. Use AAForecast methodology, all df.csv variables allowed, Optuna and detailed settings allowed, fixed 8-week forecast stays fixed.
+Session mode: background
+Mode: loop
+Goal: Reduce Brent fold1 h7-h8 max MAPE to 5% or lower using AAForecast-based methodology on the fixed 8-week forecast setup.
+Scope: **
+Metric: brent_fold1_max_mape_h7_h8_pct
+Direction: lower
+Verify: UV_CACHE_DIR=/tmp/uv-cache uv run python .omx/research/research-20260401-brent-aaf-h6h8/verify_brent_h7_h8_max_mape.py
+Execution policy: danger_full_access
+Guard: UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_validate_only_aa_forecast.py tests/test_residual_config.py::test_load_app_config_marks_aaforecast_auto_requested_and_validated_modes tests/test_residual_config.py::test_package_exports_and_intentional_omissions_are_explicit tests/test_residual_config.py::test_model_filename_dict_includes_newly_supported_aliases tests/test_residual_config.py::test_supports_auto_mode_expands_to_newly_added_models tests/test_residual_config.py::test_build_model_supports_new_official_model_ports
+Stop condition: metric <= 5
+Parallel mode: serial
+Web search: disabled
+
+Results path: /home/sonet/.openclaw/workspace/research/neuralforecast/research-results.tsv
+State path: /home/sonet/.openclaw/workspace/research/neuralforecast/autoresearch-state.json
+
+Runtime checklist:
+- Baseline first, then initialize fresh artifacts if they do not exist yet.
+- Record every completed experiment before starting the next one.
+- Use helper scripts for authoritative TSV/state updates.
+- Let helper logic own keep/stop gating and retained-state semantics.
+
+Instructions:
+- Do not run the interactive wizard again.
+- Do not ask the user for launch confirmation again.
+- If results/state artifacts exist, resume from them.
+- If they do not exist yet, initialize a fresh run from the launch manifest.
+- When initializing fresh artifacts for this managed run, call autoresearch_init_run.py with --session-mode background.
+- Continue autonomously until a terminal condition or blocker is reached.
+- Keep all run-control decisions aligned with the launch manifest and current state.
+
+hook: SessionStart
+hook: SessionStart Completed
+codex
+런치 매니페스트와 현재 run-control 아티팩트를 먼저 확인하고, autoresearch skill의 필수 런타임 문서를 읽은 뒤 fresh/resume 경로를 확정하겠습니다. Baseline 여부, state/results 존재 여부, 그리고 helper-script 경로를 먼저 잡아서 이후 반복이 관리 규약에서 벗어나지 않게 진행할게요.
+exec
+/bin/bash -lc pwd in /home/sonet/.openclaw/workspace/research/neuralforecast
+ succeeded in 0ms:
+/home/sonet/.openclaw/workspace/research/neuralforecast
+
+exec
+/bin/bash -lc 'rg -n "autoresearch|Brent|AAForecast|h7|h8|fold1|max MAPE" /home/sonet/.codex/memories/MEMORY.md' in /home/sonet/.openclaw/workspace/research/neuralforecast
+ succeeded in 0ms:
+70:scope: Use for 2026-03-29~2026-03-30 NeuralForecast work that combined direct top-level model/runtime contracts, tree_oil run-root naming defaults, direct-tree validation-loss capture, and Brent/WTI tree notion rewrite constraints.
+94:## Task 3: Analyze tree uni-vs-mul degradations and rewrite notion.md for Brent+WTI with MAPE-only deltas
+121:- for tree notion rewrites, the user gave sequential directives (“둘 다 한 문서로”, “델타량 비교하는건 mape만”, “04-03 제거”, “04-04 제거”, “공통 jobs 설정/Training CV 설정 Appendix로”, “02-01 제거”) -> keep Brent+WTI in one report, MAPE-only deltas, and prune/move sections exactly as requested. [Task 3]
+131:- in tree_oil uni-vs-mul comparisons, only `hist_exog_cols` changes (`BS_Core_Index_Integrated` added in mul); this doubles per-step features (8 target lags -> 16 with exog lags) and was associated with Brent/WTI MAPE degradation in cited runs. [Task 3]
+162:- 마지막 폴드 기준으로 설명해줘, _build_tscv_splits, fold_idx=5, train_end 2026-01-12, forecast 2026-01-19..2026-03-09, futr_df, fit_df, Com_BrentCrudeOil, BS_Core_Index_Integrated
+945:- decision trigger from the latest audit: Case 3 was best by combined BrentCrude/WTI feature_set_bs average, while Case 2 was best by delta-vs-baseline; recommendation must state which objective is being optimized. [Task 3]
+1084:## Task 3: Gather Case3 Brent/WTI residual-HPO requirements (new YAML family, no in-place overwrite)
+1092:- case3, Brent/WTI, TSMixerx LSTM iTransformer PatchTST Naive, residual target level/delta, training.loss exloss, new yaml family
+1119:- case3 residual requirement bundle currently captured but not fully implemented: both targets (Brent/WTI), five base models, residual target variants (level/delta), shared exloss defaults, and non-destructive addition of new YAMLs. [Task 3]
+1356:- bomb inventory contract from this run: 12 diff-based exloss YAMLs (Brent/WTI × input_size {48,128} × {base,res-level,res-delta}), residual params fixed (`learning_rate=0.003`, `subsample=0.5`, `colsample_bytree=0.90`), and LSTM jobs replacing xLSTM. [Task 2]
+1559:## Task 4: Narrow HPT lane to case1/2-only (Brent+WTI) and sync runner/tests
+1573:- rollout_summaries/2026-03-21T13-47-41-3IKT-hyperparam_pruning_fold10_metric_selector_update.md (cwd=/home/sonet/.openclaw/workspace/research/neuralforecast, rollout_path=/home/sonet/.codex/sessions/2026/03/21/rollout-2026-03-21T22-47-41-019d10a6-d1f3-76a3-9844-241d6e2528c3.jsonl, updated_at=2026-03-21T14:28:58+00:00, thread_id=019d10a6-d1f3-76a3-9844-241d6e2528c3)
+1684:scope: Use for team lanes that must rank next experiments from existing `runs/*` artifacts, validate shortlist configs, and report evidence-first updates for Brent/WTI regime-shift tasks.
+1786:scope: Use for `/home/sonet/.openclaw/workspace/research/neuralforecast` when baseline Brent/WTI YAML contracts, fairness presets, residual runtime metrics, CSV-only leaderboard policy, batch execution, run-level summary artifacts, and loss-curve diagnostics must stay aligned.
+1789:## Task 1: Expand baseline Brent/WTI learned-auto roster with empty params + search-space parity
+1881:## Task 12: Merge Brent/WTI HPT summaries and append every model hyperparameter block
+1916:- when structure options were offered for merged Brent/WTI reporting, the user accepted the staged outline and per-case sections -> keep explicit case subsections even when deduplicating narrative. [Task 12]
+1965:## Task 2: Execute full WTI/Brent correlation run and produce report + plots + artifacts
+1973:- top/bottom 제한 없이 전부 보여줘, runs/df-csv-corr-analysis-20260320T014008Z, report.md, summary.json, raw/diff Pearson, Com_CrudeOil, Com_BrentCrudeOil, np.atleast_1d(axes).flatten(), to_markdown ImportError tabulate
+1975:## Task 3: Attempt Notion upload for WTI/Brent correlation section and detect sharing blocker
+2038:- `data/df.csv` baseline in this workflow: 584 data rows, 90 columns, numeric analysis excludes `dt`; targets are `Com_CrudeOil` and `Com_BrentCrudeOil`. [Task 1][Task 6]
+2344:- derived oil spread pattern: for `data/df.csv`, append `Com_Oil_Spread` as `float(Com_CrudeOil) - float(Com_BrentCrudeOil)` using Python CSV tooling with `utf-8-sig`, then verify a few head/tail rows against the source columns. [Task 2]
+2547:- Notion access for this workflow was validated on page `32add0b4-6a75-802e-ac97-e1c2e8e7c1e9` (workspace `immanuelk1m`, integration bot `kse0119@naver.com`), and initial block reads showed Case 1~4 / BrentCrude / WTI sections with `has_more=true`; always read full block tree before rewriting narrative blocks. [Task 1]
+2778:scope: Use for quick factual checks and narrow CSV extracts from `/home/sonet/.openclaw/workspace/research/df.csv` when the user asks about Brent/WTI anomalies or requests lightweight downstream-ready slices.
+2780:## Task 1: Verify Brent/WTI series stay non-negative in `df.csv`
+2787:- research/df.csv, Com_CrudeOil, Com_BrentCrudeOil, negative count 0, minimum 15.76, minimum 21.608, 2013-04-01 to 2026-01-12, utf-8-sig
+2791:- Verified scan over 668 weekly rows in `research/df.csv` found zero negative values for `Com_CrudeOil` (WTI proxy) and `Com_BrentCrudeOil` (Brent).
+2792:- Useful factual anchors from the validated run: minimum WTI was 15.76 on 2020-04-27 and minimum Brent was 21.608 on 2020-04-20.
+2796:## Task 2: Export Brent/WTI-only CSV for downstream analysis
+2803:- df_brent_wti_only.csv, csv.DictReader, csv.DictWriter, dt, Com_CrudeOil, Com_BrentCrudeOil, 669 rows including header
+2807:- Reusable extraction pattern: use `csv.DictReader/DictWriter` to emit `dt`, `Com_CrudeOil`, and `Com_BrentCrudeOil` into `df_brent_wti_only.csv` under the research workspace.
+3000:- claim_conflict owner=worker-2, Com_BrentCrudeOil missing literal, two-gpu marker assertion, phase1-spec-compliance-review.md, nvidia-smi
+3046:- phase1/runs/20260318T021129Z, base.md, main.tex, main.pdf, xelatex, Noto Serif CJK KR, summary.json model_names, detected_gpu_devices=1 available_cuda_devices=2, FEDformer null Brent holdout, debug_holdout
+3051:- The completed artifact set for run `phase1/runs/20260318T021129Z` is a 10-model result without `FEDformer`; `summary.json` is the source of truth for final completed models, while `debug_holdout/Com_BrentCrudeOil_FEDformer_{forecasts,merged}.csv` preserve the failed Brent holdout symptom (all 12 predictions null).
+3318:- rollout_summaries/2026-03-09T11-44-33-h8bi-worker_3_discord_mention_review.md (cwd=/home/sonet/.openclaw, rollout_path=/home/sonet/.codex/sessions/2026/03/09/rollout-2026-03-09T20-44-33-019cd269-c68c-7c01-b8c4-749d139e9eb4.jsonl, updated_at=2026-03-09T11:46:19+00:00, thread_id=019cd269-c68c-7c01-b8c4-749d139e9eb4)
+4464:## Task 3: Query oil-related rows and export 3-month Excel workbooks (general oil + Brent/WTI/Dubai)
+4478:- Useful target-specific refinement: for option-style narrowing to Brent/WTI/Dubai, filter `target IN ('브랜트유','WTI유','두바이유')` and include per-table per-target count rows in summary.
+
+exec
+/bin/bash -lc "printf '%s
+' /home/sonet/.codex/skills/codex-autoresearch/references/core-principles.md /home/sonet/.codex/skills/codex-autoresearch/references/structured-output-spec.md /home/sonet/.codex/skills/codex-autoresearch/references/runtime-hard-invariants.md /home/sonet/.codex/skills/codex-autoresearch/references/session-resume-protocol.md /home/sonet/.codex/skills/codex-autoresearch/references/environment-awareness.md /home/sonet/.codex/skills/codex-autoresearch/references/loop-workflow.md /home/sonet/.codex/skills/codex-autoresearch/references/autonomous-loop-protocol.md | xargs -I{} sh -lc 'echo \"===== {} =====\"; sed -n \"1,220p\" \"{}\"'" in /home/sonet/.openclaw/workspace/research/neuralforecast
+ succeeded in 0ms:
+===== /home/sonet/.codex/skills/codex-autoresearch/references/core-principles.md =====
+# Core Principles
+
+These principles define the skill.
+
+## 1. Constraint Enables Autonomy
+
+Autonomous loops work when scope is small enough to fully understand.
+
+- Prefer a bounded file set.
+- Prefer a single metric.
+- Prefer a fixed iteration cost.
+
+## 2. Humans Set Direction, Agents Execute
+
+The user defines the goal. Codex decides how to test ideas inside the declared boundaries.
+
+## 3. Metrics Must Be Mechanical
+
+If a command cannot decide whether the result improved, the loop is not ready.
+
+Good metrics:
+
+- test failure count
+- coverage percentage
+- bundle size
+- response latency
+- benchmark throughput
+- validation metric such as `val_bpb`
+
+Bad metrics:
+
+- "looks better"
+- "feels cleaner"
+- "probably faster"
+
+## 4. Fast Verification Wins
+
+Use the fastest trustworthy check. Slow verification destroys iteration speed.
+
+Prefer:
+
+- targeted tests over full suites
+- incremental builds over full rebuilds
+- narrow benchmarks over end-to-end manual testing
+
+## 5. One Change Per Iteration
+
+Atomic experiments create causality. If the result changes, the agent knows why.
+
+## 6. Git Is Memory
+
+Kept experiments stay in history. Failed experiments are rolled back using the pre-approved experiment rollback strategy. The results log (`research-results.tsv`) records every experiment -- kept or discarded -- as the true audit trail.
+
+## 7. Simplicity Is A Tiebreaker
+
+Equal metric plus less complexity is a win. Tiny metric gains (< 1%) with significant code ugliness are not. Marginal improvement plus added complexity = discard. Metric unchanged plus simpler code = keep.
+
+## 8. Honest Limits
+
+If permissions, tooling, flakiness, or missing context make the loop unsafe, stop and say so. Planning cleanly is better than guessing.
+===== /home/sonet/.codex/skills/codex-autoresearch/references/structured-output-spec.md =====
+# Structured Output Specification
+
+Every `codex-autoresearch` mode must produce predictable output and, where defined, predictable artifact files. Interactive and user-facing modes use human-readable sections; `exec` uses JSON-only machine-readable output.
+
+## Status Values
+
+All modes share these status values (see `references/results-logging.md` for full schema):
+
+| Status | Meaning |
+|--------|---------|
+| `baseline` | Initial measurement before any changes |
+| `keep` | Change improved the metric and passed guard |
+| `discard` | Change did not improve or failed guard |
+| `crash` | Verification crashed or produced an error |
+| `no-op` | No actual diff was produced |
+| `blocked` | Hard blocker encountered, loop stopped |
+| `refine` | Strategy adjustment within current approach |
+| `pivot` | Strategy abandoned, fundamentally new approach |
+| `search` | Web search performed for external knowledge |
+| `drift` | Metric drifted from expected value during session resume |
+
+## Common Response Sections
+
+These sections apply to interactive and other user-facing modes. `exec` mode is the exception and follows the JSON contract below.
+
+Before work starts:
+
+1. `Setup`
+2. `Config`
+3. `Baseline`
+
+During work:
+
+1. `Iteration`
+2. `Metric`
+3. `Decision`
+
+At completion:
+
+1. `Summary`
+2. `Artifacts`
+3. `Next Actions`
+
+## Common Iteration Line
+
+Use this shape during loops:
+
+```text
+[iteration N] hypothesis -> metric result -> keep/discard/crash
+```
+
+Extended statuses for stuck recovery and search:
+
+```text
+[iteration N] [REFINE] adjusted strategy -> metric result -> refine
+[iteration N] [PIVOT] abandoned strategy X, trying Y -> metric result -> pivot
+[iteration N] [SEARCH] "query" -> found approach -> metric result -> search
+```
+
+Parallel batch notation:
+
+```text
+[iteration Na] [PARALLEL worker-a] hypothesis -> metric result -> keep (SELECTED)
+[iteration Nb] [PARALLEL worker-b] hypothesis -> metric result -> discard
+```
+
+## Mode Output Templates
+
+### loop
+
+Required completion summary:
+
+- goal
+- baseline metric
+- best metric
+- keep/discard/crash/refine/pivot counts
+- lessons extracted (count)
+- environment summary (one line)
+- artifact path
+
+Artifact:
+
+- `research-results.tsv`
+- `autoresearch-lessons.md` (if lessons were extracted)
+- `autoresearch-state.json` (session state snapshot, not committed to git; see `references/session-resume-protocol.md`)
+
+### plan
+
+Required reply sections:
+
+- Goal
+- Scope
+- Metric
+- Direction
+- Verify
+- Guard
+- Launch Options
+
+No output directory required unless the user asks to save artifacts.
+
+### debug
+
+Output directory:
+
+```text
+debug/{YYMMDD}-{HHMM}-{slug}/
+  findings.md
+  eliminated.md
+  debug-results.tsv
+  summary.md
+```
+
+`summary.md` must include:
+
+- issue statement
+- scope
+- findings by severity
+- disproven hypotheses count
+- recommended next action
+
+### fix
+
+Output directory:
+
+```text
+fix/{YYMMDD}-{HHMM}-{slug}/
+  fix-results.tsv
+  blocked.md
+  summary.md
+```
+
+`summary.md` must include:
+
+- baseline error count
+- final error count
+- categories fixed
+- blocked items
+- guard status
+
+### security
+
+Output directory:
+
+```text
+security/{YYMMDD}-{HHMM}-{slug}/
+  overview.md
+  threat-model.md
+  attack-surface-map.md
+  findings.md
+  coverage.md
+  dependency-audit.md
+  recommendations.md
+  security-audit-results.tsv
+```
+
+### ship
+
+Ship mode also persists the generic iterating-run artifacts:
+
+- `research-results.tsv`
+- `autoresearch-lessons.md` (if lessons were extracted)
+- `autoresearch-state.json`
+
+Output directory:
+
+```text
+ship/{YYMMDD}-{HHMM}-{slug}/
+  checklist.md
+  ship-log.tsv
+  summary.md
+```
+
+### exec
+
+JSON output mode for CI/CD. No human-readable text.
+
+Per-iteration line (stdout):
+
+```json
+{"iteration": 1, "commit": "abc1234", "metric": 41, "delta": -6, "guard": "pass", "status": "keep", "description": "narrowed auth types"}
+```
+
+Completion summary (stdout, last line):
+
+```json
+{"status": "completed", "baseline": 47, "best": 38, "best_iteration": 5, "total_iterations": 10, "keeps": 4, "discards": 5, "crashes": 1, "improved": true, "exit_code": 0}
+```
+
+Error output (stderr):
+
+```json
+{"error": "missing required field: Verify", "exit_code": 2}
+```
+
+Exit codes: 0 = improved, 1 = no improvement, 2 = hard blocker.
+
+## Logging Rules
+
+- TSV headers must be written exactly once.
+- When helper-managed artifacts include timestamps (for example lessons entries or runtime/state metadata), they should use UTC.
+- File paths should be repo-relative inside artifacts.
+- Final summaries should reference every artifact created.
+- Parallel workers use `[PARALLEL worker-{id}]` prefix.
+===== /home/sonet/.codex/skills/codex-autoresearch/references/runtime-hard-invariants.md =====
+# Runtime Hard Invariants
+
+Use this file as the primary execution checklist during active runs. Keep it short in memory. Treat the other protocol files as detailed reference material unless a specific situation requires them.
+
+## Shared Runtime Checklist
+
+1. Measure the baseline before initializing run artifacts.
+2. Initialize artifacts immediately after the baseline is known.
+3. Treat every completed experiment as unfinished until it is logged.
+4. Record each completed experiment before starting the next one.
+5. Use the bundled helper scripts for authoritative TSV/JSON updates.
+6. Let helper logic own keep/stop gating and row/state semantics.
+7. Foreground's core persistent artifacts are `research-results.tsv` and `autoresearch-state.json`. Background adds launch/runtime control artifacts.
+8. Lessons are secondary helper-derived output, not a primary runtime invariant.
+9. Stop only on goal reached, manual stop, configured iteration cap, a true blocker, or the documented soft-blocker handoff after strategy exhaustion.
+10. After any context compaction event, re-read `core-principles.md`, this file, and the selected mode workflow before the next iteration.
+11. Every 10 iterations, run the Protocol Fingerprint Check. If any item fails, re-read the loaded runtime docs before continuing.
+
+## Protocol Fingerprint Check
+
+Verify you can still recall:
+
+- baseline before init,
+- log every completed experiment before the next one starts,
+- helper scripts own authoritative TSV/JSON updates and keep/stop gating,
+- the current stop conditions and rollback strategy,
+- the selected mode workflow plus any active pivot/refine escalation.
+
+## Closeout Order
+
+For normal loop execution, the closeout order is:
+
+1. finish the experiment,
+2. run verify and guard,
+3. record the result through the helper,
+4. only then choose the next idea.
+
+Do not treat logging as optional bookkeeping.
+===== /home/sonet/.codex/skills/codex-autoresearch/references/session-resume-protocol.md =====
+# Session Resume Protocol
+
+Detect and recover from interrupted runs. Resume from the last consistent retained state instead of guessing from stale artifacts.
+
+## JSON State File
+
+The primary recovery source is `autoresearch-state.json`, an atomic-write snapshot updated after each main iteration. Schema:
+
+```json
+{
+  "version": 1,
+  "run_tag": "<run-tag>",
+  "mode": "loop",
+  "config": {
+    "session_mode": "foreground",
+    "goal": "<goal text>",
+    "scope": "<glob pattern>",
+    "repos": [
+      {"path": "/path/to/primary-repo", "scope": "src/**", "role": "primary"},
+      {"path": "/path/to/companion-repo", "scope": "pkg/**", "role": "companion"}
+    ],
+    "metric": "<metric name>",
+    "direction": "lower | higher",
+    "verify": "<verify command>",
+    "guard": "<guard command or null>"
+  },
+  "state": {
+    "iteration": 15,
+    "baseline_metric": 47,
+    "best_metric": 28,
+    "best_iteration": 12,
+    "current_metric": 28,
+    "current_labels": ["production-path"],
+    "last_commit": "a1b2c3d",
+    "last_repo_commits": {
+      "/path/to/primary-repo": "a1b2c3d",
+      "/path/to/companion-repo": "b2c3d4e"
+    },
+    "last_trial_commit": "d4e5f6a",
+    "last_trial_repo_commits": {
+      "/path/to/primary-repo": "d4e5f6a",
+      "/path/to/companion-repo": "c3d4e5f"
+    },
+    "last_trial_metric": 31,
+    "last_trial_labels": ["production-path", "root-cause"],
+    "keeps": 8,
+    "discards": 5,
+    "crashes": 1,
+    "no_ops": 0,
+    "blocked": 0,
+    "consecutive_discards": 2,
+    "pivot_count": 0,
+    "last_status": "discard"
+  },
+  "supervisor": {
+    "recommended_action": "relaunch | stop | needs_human",
+    "should_continue": true,
+    "terminal_reason": "none | blocked | iteration_cap_reached | ...",
+    "last_exit_kind": "turn_complete | terminal | ...",
+    "last_turn_finished_at": "2026-03-19T08:20:10Z",
+    "restart_count": 3,
+    "stagnation_count": 0
+  },
+  "updated_at": "2026-03-19T08:15:32Z"
+}
+```
+
+Write protocol: write to a uniquely named temporary file in the same directory, fsync, then rename to `autoresearch-state.json` (atomic). Never commit this file to git.
+
+`config.session_mode` is the authoritative interactive-mode marker. It distinguishes foreground runs from background managed runs. Foreground runs resume from `research-results.tsv` plus `autoresearch-state.json` alone. Background runs still require a confirmed `autoresearch-launch.json` in addition to results/state.
+
+If an existing interactive run switches from foreground to background or back again, synchronize `autoresearch-state.json` to the chosen mode before continuing. The human-facing skill flow should do this internally when it resumes in the other mode; scripted background `autoresearch_runtime_ctl.py start` performs the same sync automatically before it relaunches nested Codex sessions, and the bundled `autoresearch_set_session_mode.py` helper remains an internal/scripted recovery escape hatch rather than a normal operator step.
+
+`config.repos` is optional for older single-repo states. When present, it is the authoritative managed-repo list: one primary repo plus any companion repos, each with its own scope. `config.scope` remains the primary repo's scope for backward-compatible callers.
+
+`state.last_repo_commits` and `state.last_trial_repo_commits` are optional multi-repo provenance maps keyed by repo path. They complement the TSV's single `commit` column, which continues to record only the primary repo commit. These maps are preserved when valid JSON state exists, but they are not reconstructed from the TSV alone and therefore are not part of the hard TSV/JSON consistency contract.
+
+`state.current_labels` and `state.last_trial_labels` carry the normalized structured labels attached to the retained keep and the latest trial row. They are used for keep/stop label gates and should be preserved during resume and repair flows.
+
+The `supervisor` object is optional. It is written by the runtime control plane (`autoresearch_runtime_ctl.py` and `autoresearch_supervisor_status.py`), is not required for normal session resume, and should be preserved if present.
+
+## Detection Signals
+
+At the start of every invocation, check for prior run artifacts in this order:
+
+| Priority | Signal | File / Command | Weight |
+|----------|--------|---------------|--------|
+| 1 | **JSON state** | `autoresearch-state.json` exists and is valid JSON with `version` field | **primary** |
+| 2 | Results log | `research-results.tsv` exists and has a baseline row | strong |
+| 3 | Lessons file | `autoresearch-lessons.md` exists | moderate |
+| 4 | Git history | Recent commits with `experiment:` prefix | moderate |
+| 5 | Output dirs | `debug/`, `fix/`, `security/`, `ship/` directories with timestamped subdirectories | weak |
+
+If none of these signals are present, proceed with a fresh run (normal wizard flow).
+
+## Helper Script
+
+Prefer the bundled helper script over ad hoc TSV/JSON parsing:
+
+```bash
+python3 <skill-root>/scripts/autoresearch_resume_check.py --repo /path/to/repo
+```
+
+Here `<skill-root>` is the directory containing the loaded `SKILL.md`. In the common repo-local install this is usually `.agents/skills/codex-autoresearch`.
+
+It reconstructs retained state from the TSV, tolerates parallel worker rows, and returns one of four decisions:
+
+- `full_resume`
+- `mini_wizard`
+- `tsv_fallback`
+- `fresh_start`
+
+The helper's decision is the single control-plane source for:
+
+- `autoresearch_launch_gate.py`
+- `autoresearch_health_check.py`
+- `autoresearch_resume_prompt.py`
+- any runtime-managed resume prompt generation inside `autoresearch_runtime_ctl.py`
+
+Do not reimplement a second TSV/JSON reconciliation path in those scripts.
+
+Use `--write-repaired-state` when TSV recovery is valid and you want to rewrite `autoresearch-state.json` before resuming.
+
+## Recovery Priority Matrix
+
+| # | Condition | Decision |
+|---|-----------|----------|
+| 1 | JSON valid + helper reports `full_resume` | **Full resume** (skip wizard) |
+| 2 | JSON valid + helper reports `mini_wizard` | **Mini-wizard** (1 round) |
+| 3 | JSON missing or unusable + helper reports `tsv_fallback` | **TSV fallback** |
+| 4 | Helper reports `fresh_start` | **Fresh start** |
+
+### Priority 1: Full Resume
+
+When the helper reports `full_resume`:
+
+1. Restore loop variables from the JSON `state` and `config`.
+2. Print a resume banner:
+   ```
+   Resuming from iteration {state.iteration}, retained metric: {state.current_metric}, best metric: {state.best_metric}.
+   {state.keeps} kept, {state.discards} discarded, {state.crashes} crashed so far.
+   Source: autoresearch-state.json (validated against TSV main rows)
+   ```
+3. Skip the wizard entirely.
+4. Read the lessons file if present.
+5. Let the runtime preflight confirm that the configured verify command still resolves before continuing.
+6. If the current metric drifted, log a `drift` row and continue from the recalibrated state.
+7. Background managed-runtime resume requires an existing `autoresearch-launch.json`. Foreground resume does not. Runs that predate that manifest are no longer resumable under the detached runtime; switch to a fresh background launch instead of synthesizing compatibility artifacts.
+
+### Priority 2: Mini-Wizard
+
+When JSON exists but the helper reports `mini_wizard`:
+
+1. Show what was detected:
+   - prior run tag, iteration count, retained metric, and last status from JSON,
+   - the helper's mismatch reasons (for example retained-metric mismatch, missing main iteration row, or stale counters).
+2. Ask exactly one question:
+   - resume from JSON state, or
+   - start fresh and archive old artifacts.
+3. If resuming, use JSON `config` as the authoritative config and re-confirm it in a single block.
+4. If starting fresh, archive prior persistent run-control artifacts with `.prev` suffixes and proceed with the full wizard. In the managed-runtime path, this should happen through `autoresearch_runtime_ctl.py launch --fresh-start ...`.
+
+### Priority 3: TSV Fallback
+
+When JSON is missing or unusable but the helper reports `tsv_fallback`:
+
+1. Reconstruct retained state from integer main rows in `research-results.tsv`.
+2. If the user wants to resume, prefer:
+   ```bash
+   python3 <skill-root>/scripts/autoresearch_resume_check.py --repo /path/to/repo --write-repaired-state
+   ```
+3. Present one condensed confirmation block sourced from the reconstructed state.
+4. After confirmation, continue from the next main iteration in the chosen mode. Background runs should create a fresh launch manifest at this point; foreground runs resume directly from results/state.
+5. Do not start the detached runtime directly from bare TSV fallback without a confirmed launch manifest.
+
+### Priority 4: Fresh Start
+
+When the helper reports `fresh_start`:
+
+1. Proceed with the normal wizard flow.
+2. Rename prior persistent run-control artifacts to `.prev` variants if they exist. In the managed-runtime path, this archival is performed by `autoresearch_runtime_ctl.py launch --fresh-start ...`. This includes `research-results.tsv`, `autoresearch-state.json`, `autoresearch-hook-context.json`, `autoresearch-launch.json`, `autoresearch-runtime.json`, and `autoresearch-runtime.log`.
+3. Keep `autoresearch-lessons.md` unless it is clearly corrupt.
+
+## Edge Cases
+
+### Corrupt JSON
+
+If `autoresearch-state.json` exists but is not valid JSON, treat it as unusable. Rename to `.bak` if you need to preserve it, then rely on TSV fallback or fresh start.
+
+### Corrupt Results Log
+
+If `research-results.tsv` is missing a baseline row, has a broken header, or contains unparsable metric cells, treat it as corrupt and start fresh.
+
+### Different Goal
+
+If the recovered config clearly belongs to a different goal than the current request, start fresh and archive the old run-control artifacts to `.prev` through `autoresearch_runtime_ctl.py launch --fresh-start ...`.
+
+
+## Integration Points
+
+- **autonomous-loop-protocol.md:** Run the launch gate before the wizard. Initialize new run artifacts only after baseline is measured.
+- **results-logging.md:** Main integer rows define retained state; worker rows are audit detail only.
+- **interaction-wizard.md:** Mini-wizard uses helper mismatch reasons instead of raw row counts.
+- **health-check-protocol.md:** Deep integrity checks use the resume helper, not row-count heuristics.
+- **exec-workflow.md:** Exec mode skips session resume, archives the configured results log plus repo-root state artifacts, and requires the workflow to clean up its scratch JSON state before exit.
+===== /home/sonet/.codex/skills/codex-autoresearch/references/environment-awareness.md =====
+# Environment Awareness
+
+Phase 0 probe that detects hardware, resources, and toolchain capabilities. Hypothesis generation uses this data to filter infeasible approaches before wasting iterations.
+
+## Probe Sequence
+
+Run these probes once at the start of a run, before the first iteration.
+
+### 1. Compute Resources
+
+| Probe | Command | Fallback |
+|-------|---------|----------|
+| CPU cores | `nproc 2>/dev/null \|\| sysctl -n hw.ncpu 2>/dev/null` | assume 2 |
+| RAM (MB) | `free -m 2>/dev/null \| awk '/Mem:/{print $2}'` or `sysctl -n hw.memsize 2>/dev/null` | assume 4096 |
+| Disk free (MB) | `df -m . 2>/dev/null \| awk 'NR==2{print $4}'` | assume 10240 |
+
+### 2. GPU Detection
+
+| Probe | Command | Interpretation |
+|-------|---------|----------------|
+| NVIDIA count | `nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null` | GPU names, VRAM, **count lines for total devices** |
+| CUDA version | `nvcc --version 2>/dev/null \| grep release` | CUDA toolkit version |
+| Ascend NPU count | `npu-smi info 2>/dev/null` | Huawei Ascend detected, **parse device count** |
+| CANN version | `cat /usr/local/Ascend/ascend-toolkit/latest/version.cfg 2>/dev/null` | CANN toolkit version |
+| ROCm count | `rocm-smi 2>/dev/null` | AMD GPU detected, **parse device count** |
+| Apple Silicon | `sysctl -n machdep.cpu.brand_string 2>/dev/null \| grep -i apple` | MPS available (1 device) |
+| No accelerator | all above fail | CPU-only environment |
+
+**Device count is critical** for parallel experiment planning. Store the total number of accelerator devices in the environment profile so `references/parallel-experiments-protocol.md` can calculate `max_workers = floor(total_devices / devices_per_experiment)`.
+
+### 3. Toolchain Detection
+
+| Probe | Command |
+|-------|---------|
+| Python | `python3 --version 2>/dev/null \|\| python --version 2>/dev/null` |
+| Node.js | `node --version 2>/dev/null` |
+| Go | `go version 2>/dev/null` |
+| Rust | `rustc --version 2>/dev/null` |
+| Java | `java --version 2>/dev/null` |
+| Package managers | check for `pip`, `npm`, `yarn`, `pnpm`, `cargo`, `go`, `mvn`, `gradle` |
+
+### 4. Container Detection
+
+| Probe | Command | Interpretation |
+|-------|---------|----------------|
+| Docker | `cat /proc/1/cgroup 2>/dev/null \| grep -q docker` | inside Docker |
+| Kubernetes | `test -f /var/run/secrets/kubernetes.io/serviceaccount/token` | inside K8s pod |
+| Sandbox | check for read-only filesystems, restricted network | sandboxed environment |
+
+### 5. Network Availability
+
+Respect the confirmed wizard choice first. If the user selected an offline run or `web_search=disabled`, do not send any outbound probe just to "check" connectivity. Record the policy as disabled and stay on the offline path from `references/web-search-protocol.md`.
+
+| Probe | Command | Interpretation |
+|-------|---------|----------------|
+| Web policy | read confirmed `web_search` config / launch manifest | whether external network access is even allowed for this run |
+| Git remote | `git remote -v 2>/dev/null` | remotes configured; does not prove outbound access |
+| Optional outbound HTTP | `curl -s --max-time 3 -o /dev/null -w '%{http_code}' https://httpbin.org/get 2>/dev/null` | run only when `web_search=enabled` and an active external probe is acceptable |
+
+## Environment Profile
+
+Store the probe results as an internal environment profile:
+
+```
+[environment]
+cpu_cores = 8
+ram_mb = 16384
+disk_free_mb = 52000
+gpu = NVIDIA A100 (40GB)
+gpu_count = 8
+cuda = 12.2
+accelerator_type = nvidia
+python = 3.11.5
+node = 20.10.0
+container = docker
+network = available
+```
+
+If the run is intentionally offline, prefer `network = disabled_by_policy`. If outbound access is unknown because active probing was skipped, prefer `network = unknown` instead of forcing a real network call.
+
+## Hypothesis Filtering
+
+### Hard Constraints
+
+Do not attempt hypotheses that require resources the environment lacks:
+
+| Missing Resource | Blocked Hypotheses |
+|------------------|-------------------|
+| No GPU | CUDA kernel optimization, GPU memory management, mixed precision training |
+| No Ascend NPU | CANN operator optimization, Ascend-specific kernels |
+| RAM < 2GB | Large model loading, full dataset processing |
+| Disk < 1GB | Build artifact generation, large file operations |
+| No network | Package installation, web search, remote API calls |
+| Read-only FS | Any file modification (hard blocker for entire run) |
+
+### Soft Constraints
+
+Adjust hypothesis parameters based on available resources:
+
+| Resource Level | Adjustment |
+|---------------|------------|
+| CPU cores <= 2 | Avoid parallelism-dependent optimizations |
+| RAM < 8GB | Prefer streaming over in-memory approaches |
+| Disk < 5GB | Warn about large build artifacts |
+| Slow verify (>60s) | Prefer smaller, more targeted changes |
+
+## Plan Mode Integration
+
+When generating a launch-ready config in plan mode:
+
+1. Run environment probes before suggesting verify/guard commands.
+2. Only suggest commands that are executable in the detected environment.
+3. If the goal requires unavailable resources, warn the user during the wizard phase.
+4. Suggest resource-appropriate verify commands (e.g., smaller test datasets for low-RAM environments).
+
+## Logging
+
+Include environment summary in the first line of the results log comments:
+
+```tsv
+# environment: cpu=8 ram=16384MB gpu=A100(40GB) python=3.11 container=docker
+# metric_direction: lower
+```
+
+## Refresh Policy
+
+- Full probe: once per run start.
+- Disk free: re-check at every managed-runtime cycle boundary as part of health check.
+- GPU state: re-check if a `crash` status mentions GPU/CUDA/memory errors.
+- Do not re-probe CPU, RAM, or toolchains mid-run.
+===== /home/sonet/.codex/skills/codex-autoresearch/references/loop-workflow.md =====
+# Loop Workflow
+
+Use this workflow for the default metric-driven improve/verify loop.
+
+This is the thin execution guide for active runtime work. Keep `runtime-hard-invariants.md` in memory while you iterate. Use `autonomous-loop-protocol.md` only when you need detailed reference for setup, recovery, or escalation behavior.
+
+## Purpose
+
+Iterate toward a measurable outcome by making one focused change, verifying mechanically, deciding keep or discard, logging the result, and repeating.
+
+## Before Launch
+
+- Use `interaction-wizard.md` for every new interactive launch.
+- Use `session-resume-protocol.md` before deciding whether the run is fresh or resumable.
+- Use `environment-awareness.md` before choosing hardware-sensitive work.
+
+## Runtime Cycle
+
+1. Read the current in-scope context, recent results rows, and relevant retained state.
+2. If no baseline exists yet, measure it and initialize `research-results.tsv` plus `autoresearch-state.json`.
+3. Choose one focused hypothesis.
+4. Make one focused change within scope.
+5. Run the verify command and guard.
+6. Record the result through `autoresearch_record_iteration.py` or `autoresearch_select_parallel_batch.py`.
+7. Only after the result is recorded, choose the next experiment.
+
+## Escalation And Recovery
+
+- Use `pivot-protocol.md` when repeated discards show the current line of attack is stale.
+- Use `results-logging.md` only when you need the detailed TSV/state contract or helper behavior.
+- Use `lessons-protocol.md` only when you need to reason about lessons behavior directly.
+- Use `health-check-protocol.md` when runtime integrity looks suspect.
+- Use `parallel-experiments-protocol.md`, `web-search-protocol.md`, or `hypothesis-perspectives.md` only when those behaviors are actively in play.
+
+## Stop Conditions
+
+Keep iterating until one of these happens:
+
+- the goal is reached,
+- the user interrupts,
+- the configured iteration cap is reached,
+- or a true blocker appears.
+===== /home/sonet/.codex/skills/codex-autoresearch/references/autonomous-loop-protocol.md =====
+# Autonomous Loop Protocol
+
+This is the detailed reference for the generic Codex research loop.
+
+During active execution, keep `runtime-hard-invariants.md` plus the selected mode workflow in memory first. Use this file when you need the full setup, recovery, artifact, or escalation details behind the loop.
+
+## Loop Modes
+
+- `unbounded`: default. If the user does not specify `Iterations`, keep iterating until interrupted or another terminal condition is reached (goal/stop condition satisfied, soft-blocker handoff, or hard blocker).
+- `bounded`: when the user explicitly sets `Iterations: N`.
+
+## Required Inputs
+
+Before entering the loop, confirm these are known:
+
+- `Goal`
+- `Scope`
+- `Metric`
+- `Direction`
+- `Verify`
+
+Optional:
+
+- `Guard`
+- `Iterations`
+- `Run tag`
+- `Stop condition`
+- `Required keep labels` (when the run should only retain results from a specific mechanism, path, backend, or root-cause signal)
+- `Required stop labels` (when the goal has a structural or causal success requirement, not just a numeric threshold)
+- `Rollback policy` (required before launch if destructive rollback may be used)
+
+For every new interactive loop, use the wizard contract from `references/interaction-wizard.md` to scan the repo, clarify with the user, and confirm the launch-ready config before the loop begins.
+
+## Phase 0: Preconditions
+
+Fail fast if the loop would be unsafe. Clarify first if the intent is unclear.
+
+### Session Resume Check
+
+Before anything else, check for a prior interrupted run per `references/session-resume-protocol.md`:
+
+Use the launch gate first:
+
+```bash
+python3 <skill-root>/scripts/autoresearch_launch_gate.py --repo /path/to/repo
+```
+
+1. Check for `autoresearch-state.json` first (primary recovery source), then `research-results.tsv`, `autoresearch-lessons.md`, and recent `experiment:` commits.
+2. Apply the Recovery Priority Matrix from `session-resume-protocol.md`:
+   - JSON valid + TSV consistent -> full resume (skip wizard).
+   - JSON valid + TSV inconsistent -> mini-wizard (1 round).
+   - JSON missing + TSV exists -> TSV fallback (reconstruct state, confirm, then create a fresh launch manifest).
+   - JSON corrupt -> rename to `.bak`, fall back to TSV.
+3. If no prior run is detected, proceed with fresh setup.
+
+Launch-gate interpretation:
+- `fresh` -> continue with the confirmation flow for a new launch.
+- `resumable` -> resume from saved state without inventing a second operator entrypoint.
+- `needs_human` / `blocked_start` -> report the issue or service the runtime-control request first.
+
+Exec-mode exception:
+- Do not resume a prior run.
+- Rename prior persistent run-control artifacts to `.prev` and start fresh.
+- Ignore any old exec scratch state except for cleanup at fresh start, and let the exec workflow remove the new scratch state before exit.
+
+### Run Artifact Initialization
+
+Do not create `research-results.tsv` or `autoresearch-state.json` before the baseline metric is known.
+
+After Phase 2 establishes the baseline, initialize both artifacts together:
+
+```bash
+python3 <skill-root>/scripts/autoresearch_init_run.py ...
+```
+
+This writes the baseline TSV row (`iteration = 0`) and the matching JSON snapshot in one step.
+
+Here `<skill-root>` is the directory containing the loaded `SKILL.md`. In the common repo-local install this is usually `.agents/skills/codex-autoresearch`, so the exact command becomes `python3 .agents/skills/codex-autoresearch/scripts/...`.
+
+Exec-mode exception:
+- Do not create or leave repo-root `autoresearch-state.json`.
+- Let the helper scripts use their scratch JSON state under `/tmp/codex-autoresearch-exec/...`.
+- Clean that scratch state before exit with `python3 <skill-root>/scripts/autoresearch_exec_state.py --cleanup`.
+
+### Environment Probe
+
+Run environment detection per `references/environment-awareness.md`:
+
+1. Detect CPU, RAM, disk, GPU/NPU, toolchains, container, and network availability.
+2. Store the environment profile for hypothesis filtering in Phase 3.
+3. Log the environment summary in the results log header.
+
+### Ask-Before-Act
+
+Before starting any interactive loop, ALWAYS:
+
+1. Scan the repo to understand context.
+2. Ask at least one round of clarifying questions based on what you found -- confirm scope, metric, verify command, run style (until interrupted vs bounded), and any rollback approval needed for unattended execution.
+   - If the task spans multiple repos, confirm one primary repo plus any companion repos, each with an explicit per-repo scope.
+3. Present a plain-language summary for the user to approve.
+4. Only start the loop after the user explicitly says "go" / "start" / "launch" or equivalent.
+
+Never silently infer all fields and start iterating. A 30-second confirmation is always cheaper than wasted iterations.
+
+**Two-phase boundary:** All questions happen BEFORE launch. Before the user says "go", require an explicit run-mode choice: **foreground** or **background**. If the user chooses foreground, keep the loop in the same Codex session and use the shared helper scripts directly. If the user chooses background, call `autoresearch_runtime_ctl.py launch` so the confirmed launch manifest and detached runtime are created in one script-level handoff. The launch manifest may describe either a single primary repo or a primary repo plus companion repos with separate scopes. Background runtime cycles launch non-interactive `codex exec` sessions with the generated runtime prompt supplied on stdin. Background launch manifests carry an `execution_policy`; this skill now defaults that policy to `danger_full_access`, so detached sessions normally run with `--dangerously-bypass-approvals-and-sandbox` unless a caller explicitly opts into sandboxed `workspace_write`. If that background `codex exec` session cannot be launched, the runtime must transition to `needs_human` instead of silently falling back to an idle state. If an explicit stop request cannot actually terminate the detached runner, the runtime must also transition to `needs_human` instead of claiming the run is fully stopped. After launch, NEVER pause to ask the user anything during the loop -- not for clarification, not for confirmation, not for permission. If you encounter ambiguity mid-loop, apply best practices, log your reasoning in the commit message, and keep iterating. The user may be asleep.
+
+Exec-mode exception:
+- Do not ask clarifying or launch questions.
+- Treat the prompt/environment config as authoritative.
+- After safety checks pass, launch immediately.
+- If safety checks fail, emit the JSON error/blocker and exit with code 2.
+
+### Safety Checks
+
+1. Confirm the repo is under git if the workflow depends on commits.
+2. Inspect `git status --porcelain`.
+3. If unrelated user changes are present, do not start the commit/revert loop.
+4. Confirm the scope resolves to real files.
+5. Confirm the verify command exists and is plausible for this repo.
+6. If a guard exists, confirm it is a pass/fail command.
+7. If destructive rollback may be needed, get approval during setup before launch and prefer a dedicated experiment branch/worktree for unattended runs.
+
+### Autoresearch-Owned Artifacts
+
+Treat these files as experiment-owned artifacts, not unrelated user changes:
+
+- `research-results.tsv`
+- `autoresearch-state.json`
+- `autoresearch-launch.json`
+- `autoresearch-runtime.json`
+- `autoresearch-runtime.log`
+- `autoresearch-lessons.md`
+- `.tmp`, `.bak`, and `.prev` variants of those files
+
+They may stay uncommitted between iterations and across resumes, but they must never be staged in experiment commits.
+
+### Dirty Worktree Rule
+
+The loop may commit and revert repeatedly. That is only safe when the workspace is isolated.
+
+If `git status --porcelain` is non-empty **during Phase 0 (before launch)**:
+
+- If the only changes are autoresearch-owned artifacts, continue.
+- In interactive modes, otherwise ask the user during the wizard phase: "I see uncommitted changes. Are these part of the current experiment, or should I work on a clean branch?"
+
+- If the user confirms the changes are part of the experiment, continue.
+- If the user says no, suggest `plan` mode or a clean branch/worktree.
+- In `exec` mode, any other pre-existing changes are a hard blocker. Do not ask; emit the blocker and exit with code 2.
+
+If the worktree becomes dirty **after launch** (external modification mid-loop):
+
+- Log a hard blocker: "External changes detected in worktree. Stopping to prevent data loss."
+- Do not ask the user (two-phase boundary). Stop the loop and report.
+
+Never absorb unrelated user edits into experiment commits.
+
+## Phase 1: Read
+
+Before the first edit:
+
+1. Read all in-scope files.
+2. Read configuration or build files that influence verification.
+3. Read the latest results log if one exists.
+4. Read recent git history relevant to the scoped files.
+5. Read `autoresearch-lessons.md` if it exists (see `references/lessons-protocol.md`).
+
+Before every later iteration:
+
+1. Re-read the changed files.
+2. Read the last 10-20 results rows.
+3. Read recent commits or diffs to avoid repeating bad ideas.
+4. Consult lessons for relevant insights on the current strategy direction.
+
+## Phase 2: Baseline
+
+Run the verify command on the current state before making changes.
+
+Record:
+
+- baseline metric value,
+- guard result,
+- current commit hash,
+- a short baseline description.
+
+Immediately after the baseline is known, initialize the run artifacts with `<skill-root>/scripts/autoresearch_init_run.py`.
+
+If the baseline itself fails unpredictably, do not enter the optimization loop. Either repair the setup first or switch to `debug` or `fix` mode.
+
+## Phase 3: Ideate
+
+Choose one concrete hypothesis. When parallel mode is active (see `references/parallel-experiments-protocol.md`), generate N hypotheses instead of one.
+
+### Hypothesis Filtering
+
+Before committing to a hypothesis, filter against environment constraints per `references/environment-awareness.md`. Do not attempt hypotheses that require resources the environment lacks (e.g., GPU optimization without GPU, package installation without network).
+
+### Multi-Perspective Reasoning
+
+Apply the four-lens framework from `references/hypothesis-perspectives.md` when appropriate:
+- **Optimist:** most impactful change?
+- **Skeptic:** why might this fail? (cross-check results log)
+- **Historian:** what do past results and lessons say?
+- **Minimalist:** simpler version possible?
+
+Skip perspectives for obvious, mechanical fixes.
+
+### Lessons Consultation
+
+Consult `autoresearch-lessons.md` (see `references/lessons-protocol.md`):
+- Prefer strategies that succeeded in similar contexts.
+- Avoid strategies that consistently failed.
+- Adapt successful strategies from related goals.
+
+Good hypotheses:
+
+- "Reduce retries from 5 to 2 to lower latency without changing behavior."
+- "Add tests for uncovered auth edge cases to raise coverage."
+- "Inline the hot path to reduce allocations."
+
+Bad hypotheses:
+
+exec
+/bin/bash -lc "printf '%s
+' autoresearch-launch.json autoresearch-state.json research-results.tsv .omx/research/research-20260401-brent-aaf-h6h8/verify_brent_h7_h8_max_mape.py | xargs -I{} sh -lc 'echo \"===== {} =====\"; if [ -e \"{}\" ]; then ls -l \"{}\"; sed -n \"1,220p\" \"{}\"; else echo MISSING; fi'" in /home/sonet/.openclaw/workspace/research/neuralforecast
+ succeeded in 0ms:
+===== autoresearch-launch.json =====
+-rw------- 1 sonet sonet 4552 Apr  1 23:42 autoresearch-launch.json
+{
+  "approvals": {},
+  "config": {
+    "direction": "lower",
+    "execution_policy": "danger_full_access",
+    "goal": "Reduce Brent fold1 h7-h8 max MAPE to 5% or lower using AAForecast-based methodology on the fixed 8-week forecast setup.",
+    "guard": "UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_validate_only_aa_forecast.py tests/test_residual_config.py::test_load_app_config_marks_aaforecast_auto_requested_and_validated_modes tests/test_residual_config.py::test_package_exports_and_intentional_omissions_are_explicit tests/test_residual_config.py::test_model_filename_dict_includes_newly_supported_aliases tests/test_residual_config.py::test_supports_auto_mode_expands_to_newly_added_models tests/test_residual_config.py::test_build_model_supports_new_official_model_ports",
+    "iterations": null,
+    "metric": "brent_fold1_max_mape_h7_h8_pct",
+    "parallel_mode": "serial",
+    "repos": [
+      {
+        "path": "/home/sonet/.openclaw/workspace/research/neuralforecast",
+        "role": "primary",
+        "scope": "**"
+      }
+    ],
+    "rollback_policy": null,
+    "run_tag": "brent-aaf-h7h8-max5",
+    "scope": "**",
+    "session_mode": "background",
+    "stop_condition": "metric <= 5",
+    "verify": "UV_CACHE_DIR=/tmp/uv-cache uv run python .omx/research/research-20260401-brent-aaf-h6h8/verify_brent_h7_h8_max_mape.py",
+    "web_search": "disabled"
+  },
+  "created_at": "2026-04-01T14:42:55Z",
+  "defaults": {},
+  "mode": "loop",
+  "notes": [
+    "Brent only. Fixed 8-week oil forecast remains unchanged. h1~h4 similarity is acceptable.",
+    "Mechanical success rule updated by operator: h7 and h8 MAPE up to 5% are acceptable, implemented as max(h7_mape,h8_mape) <= 5.",
+    "All variables in df.csv may be used; feature selection is unconstrained; Optuna and detailed hyperparameter edits are allowed.",
+    "Use AAForecast methodology as the primary line of attack; if details are unclear, consult ask-gemini with reference/aaforecast.pdf or the existing summary artifact."
+  ],
+  "original_goal": "$codex-autoresearch Brent only. h7 and h8 MAPE up to 5% is acceptable. Use AAForecast methodology, all df.csv variables allowed, Optuna and detailed settings allowed, fixed 8-week forecast stays fixed.",
+  "prompt_text": "Goal: On Brent only, drive the fixed 8-week forecast so that fold_idx=1 horizon steps 7 and 8 each reach acceptable error, operationalized as max(h7_mape,h8_mape) <= 5. The metric is mechanical and must be computed only by `.omx/research/research-20260401-brent-aaf-h6h8/verify_brent_h7_h8_max_mape.py`. Lower is better; stop only when metric <= 5.\\n\\nCurrent baseline under the current retained AAForecast recipe is about 17.8176 on the new metric.\\n\\nHard constraints:\\n- Brent only.\\n- Future oil forecast horizon stays fixed at 8 weeks.\\n- h1~h4 being merely similar is acceptable.\\n- Do not switch away from AAForecast methodology as the base method; refinements should remain AAForecast-style.\\n- When uncertain about the paper method, consult ask-gemini and `reference/aaforecast.pdf` (existing artifact: `.omx/artifacts/gemini-aa-forecast-paper-summary-20260401T130931Z.md`).\\n- All variables in `data/df.csv` may be used. Feature selection is unrestricted. Optuna tuning is allowed. Detailed model/training settings may be modified freely.\\n- Never stage or revert unrelated dirty files already in the repo. Prefer new or isolated artifacts under `.omx/research/research-20260401-brent-aaf-h6h8/**`.\\n\\nRecommended search directions:\\n1. Directly target h7/h8 late-spike behavior, not h6.\\n2. Expand Brent exogenous inputs aggressively from df.csv, including broader shock/risk proxies.\\n3. Add AAForecast-specific controls (season_length, trend_kernel_size, anomaly_threshold, attention width, encoder depth/width, dropout) and tune them with Optuna if useful.\\n4. If needed, extend the AAForecast implementation while preserving the package-authoritative/public-model boundary and non-stage-plugin rule.\\n5. Keep experiments causal and mechanically verified.\\n\\nArtifacts to maintain:\\n- `.omx/research/research-20260401-brent-aaf-h6h8/autoresearch_eval/summary_h7_h8.json`\\n- `.omx/research/research-20260401-brent-aaf-h6h8/autoresearch_eval/brent_h7_h8_points.json`\\n- any additional experiment notes or helper files under the same folder.\\n\\nGuard command must keep passing. If the run finds a materially better retained keep, log it before starting the next experiment.",
+  "resume_seed": {},
+  "updated_at": "2026-04-01T14:42:55Z",
+  "version": 1
+}
+===== autoresearch-state.json =====
+MISSING
+===== research-results.tsv =====
+MISSING
+===== .omx/research/research-20260401-brent-aaf-h6h8/verify_brent_h7_h8_max_mape.py =====
+-rw-rw-r-- 1 sonet sonet 1865 Apr  1 23:42 .omx/research/research-20260401-brent-aaf-h6h8/verify_brent_h7_h8_max_mape.py
+from __future__ import annotations
+
+import csv
+import json
+import os
+import subprocess
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+RUN_DIR = REPO_ROOT / 'runs' / 'feature_set_aaforecast_brentoil_case1_aaforecast'
+FORECASTS = RUN_DIR / 'cv' / 'AAForecast_forecasts.csv'
+OUT_DIR = REPO_ROOT / '.omx' / 'research' / 'research-20260401-brent-aaf-h6h8' / 'autoresearch_eval'
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+cmd = [
+    'uv', 'run', 'python', 'main.py',
+    '--config', 'yaml/experiment/feature_set_aaforecast/brentoil-case1.yaml',
+]
+subprocess.run(cmd, cwd=REPO_ROOT, check=True, env={**os.environ, 'UV_CACHE_DIR': '/tmp/uv-cache'})
+
+rows = list(csv.DictReader(FORECASTS.open()))
+selected = []
+for row in rows:
+    if row['model'] != 'AAForecast':
+        continue
+    if row['fold_idx'] != '1':
+        continue
+    step = int(row['horizon_step'])
+    if step not in (7, 8):
+        continue
+    y = float(row['y'])
+    y_hat = float(row['y_hat'])
+    ape = abs(y - y_hat) / abs(y) * 100.0
+    selected.append({
+        'ds': row['ds'],
+        'fold_idx': 1,
+        'horizon_step': step,
+        'y': y,
+        'y_hat': y_hat,
+        'ape': ape,
+    })
+
+if len(selected) != 2:
+    raise SystemExit(f'Expected exactly 2 Brent fold=1 h7-h8 rows, found {len(selected)}')
+
+metric = max(item['ape'] for item in selected)
+summary = {
+    'metric_name': 'brent_fold1_max_mape_h7_h8_pct',
+    'metric_value': metric,
+    'stop_condition': 'metric <= 5',
+    'window_definition': {'fold_idx': 1, 'horizon_steps': [7, 8]},
+    'points': selected,
+    'mean_mape_h7_h8': sum(item['ape'] for item in selected) / len(selected),
+}
+(OUT_DIR / 'brent_h7_h8_points.json').write_text(json.dumps(selected, indent=2), encoding='utf-8')
+(OUT_DIR / 'summary_h7_h8.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
+print(metric)
+

@@ -250,8 +250,15 @@ def normalize_linked_nec_config(value: Any, *, unknown_keys: Any, coerce_bool: A
     inference_payload = dict(payload.get("inference") or {})
     unknown_keys(inference_payload, allowed=NEC_INFERENCE_KEYS, section="nec.inference")
     inference_mode = str(inference_payload.get("mode", default.inference.mode)).strip()
-    if inference_mode not in {"soft_weighted", "hard_threshold"}:
-        raise ValueError("nec.inference.mode must be 'soft_weighted' or 'hard_threshold'")
+    if inference_mode not in {
+        "soft_weighted",
+        "soft_weighted_inverse",
+        "hard_threshold",
+        "hard_threshold_inverse",
+    }:
+        raise ValueError(
+            "nec.inference.mode must be 'soft_weighted', 'soft_weighted_inverse', 'hard_threshold', or 'hard_threshold_inverse'"
+        )
     inference = NecInferenceConfig(
         mode=inference_mode,
         threshold=_coerce_probability(

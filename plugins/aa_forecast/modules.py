@@ -1,40 +1,79 @@
 from __future__ import annotations
 
+import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from statsmodels.nonparametric.smoothers_lowess import lowess
 
 
-def _safe_divide(numerator: torch.Tensor, denominator: torch.Tensor, eps: float = 1e-4) -> torch.Tensor:
-    stabilized = torch.where(denominator.abs() < eps, torch.full_like(denominator, eps), denominator)
+def _safe_divide(
+    numerator: torch.Tensor,
+    denominator: torch.Tensor,
+    eps: float = 1e-4,
+) -> torch.Tensor:
+    stabilized = torch.where(
+        denominator.abs() < eps,
+        torch.full_like(denominator, eps),
+        denominator,
+    )
     return numerator / stabilized
 
 
 class STARFeatureExtractor(nn.Module):
-    """Approximate STAR decomposition features for AA-Forecast.
+    """Paper-aligned STAR decomposition helper for AA-Forecast.
 
-    The original paper uses LOESS + cyclic averaging + residual anomaly
-    extraction. This implementation keeps the same intent while using
-    lightweight differentiable torch operations suitable for the current repo.
+    The original AA-Forecast pipeline performs multiplicative decomposition
+    using LOWESS trend estimation, periodic seasonal averages, and anomaly
+    extraction from the residual component. The implementation here keeps that
+    structure while remaining compatible with PyTorch/neuralforecast training.
     """
 
-    def __init__(self, season_length: int = 12, trend_kernel_size: int = 5, anomaly_threshold: float = 3.5):
+    def __init__(
+        self,
+        season_length: int = 12,
+        lowess_frac: float = 0.6,
+        lowess_delta: float = 0.01,
+        anomaly_threshold: float = 3.5,
+    ):
         super().__init__()
-        if trend_kernel_size < 1:
-            raise ValueError("trend_kernel_size must be >= 1")
-        if trend_kernel_size % 2 == 0:
-            trend_kernel_size += 1
         self.season_length = max(2, int(season_length))
-        self.trend_kernel_size = int(trend_kernel_size)
+        self.lowess_frac = float(lowess_frac)
+        self.lowess_delta = float(lowess_delta)
         self.anomaly_threshold = float(anomaly_threshold)
+        self._trend_cache: dict[bytes, np.ndarray] = {}
+        self._trend_cache_order: list[bytes] = []
+        self._trend_cache_limit = 4096
 
     def _trend(self, x: torch.Tensor) -> torch.Tensor:
-        return F.avg_pool1d(
-            x.transpose(1, 2),
-            kernel_size=self.trend_kernel_size,
-            stride=1,
-            padding=self.trend_kernel_size // 2,
-        ).transpose(1, 2)
+        series = x.detach().cpu().numpy()
+        batch, seq_len, channels = series.shape
+        positions = np.arange(seq_len, dtype=float)
+        trend = np.empty_like(series, dtype=np.float32)
+        lowess_delta = self.lowess_delta * max(seq_len, 1)
+        for batch_idx in range(batch):
+            for channel_idx in range(channels):
+                observed = series[batch_idx, :, channel_idx].astype(float, copy=False)
+                cache_key = observed.astype(np.float32, copy=False).tobytes()
+                cached = self._trend_cache.get(cache_key)
+                if cached is None:
+                    if np.allclose(observed, observed[0]):
+                        smoothed = observed.copy()
+                    else:
+                        smoothed = lowess(
+                            observed,
+                            positions,
+                            frac=self.lowess_frac,
+                            delta=lowess_delta,
+                            return_sorted=False,
+                        )
+                    cached = smoothed.astype(np.float32)
+                    self._trend_cache[cache_key] = cached
+                    self._trend_cache_order.append(cache_key)
+                    if len(self._trend_cache_order) > self._trend_cache_limit:
+                        stale_key = self._trend_cache_order.pop(0)
+                        self._trend_cache.pop(stale_key, None)
+                trend[batch_idx, :, channel_idx] = cached
+        return torch.as_tensor(trend, device=x.device, dtype=x.dtype)
 
     def _seasonal(self, detrended: torch.Tensor) -> torch.Tensor:
         batch, seq_len, _ = detrended.shape
@@ -45,7 +84,9 @@ class STARFeatureExtractor(nn.Module):
             if phase_values.numel() == 0:
                 continue
             phase_mean = phase_values.mean(dim=1, keepdim=True)
-            seasonal[:, phase:seq_len:period, :] = phase_mean.expand_as(seasonal[:, phase:seq_len:period, :])
+            seasonal[:, phase:seq_len:period, :] = phase_mean.expand_as(
+                seasonal[:, phase:seq_len:period, :]
+            )
         return seasonal
 
     def forward(self, insample_y: torch.Tensor) -> dict[str, torch.Tensor]:
@@ -55,12 +96,21 @@ class STARFeatureExtractor(nn.Module):
         residual = _safe_divide(detrended, seasonal)
 
         residual_center = residual.median(dim=1, keepdim=True).values
-        mad = (residual - residual_center).abs().median(dim=1, keepdim=True).values.clamp_min(1e-4)
+        mad = (
+            (residual - residual_center)
+            .abs()
+            .median(dim=1, keepdim=True)
+            .values.clamp_min(1e-4)
+        )
         robustness = 0.6745 * (residual - residual_center).abs() / mad
         anomaly_mask = robustness > self.anomaly_threshold
 
         anomalies = torch.where(anomaly_mask, residual, torch.ones_like(residual))
-        cleaned_residual = torch.where(anomaly_mask, torch.ones_like(residual), residual)
+        cleaned_residual = torch.where(
+            anomaly_mask,
+            torch.ones_like(residual),
+            residual,
+        )
         return {
             "trend": trend,
             "seasonal": seasonal,
@@ -71,15 +121,21 @@ class STARFeatureExtractor(nn.Module):
 
 
 class CriticalSparseAttention(nn.Module):
-    """Attention over critical anomaly/event timesteps only."""
+    """Attention over anomaly/event timesteps only."""
 
     def __init__(self, hidden_size: int, attention_hidden_size: int | None = None):
         super().__init__()
-        attention_hidden_size = hidden_size if attention_hidden_size is None else int(attention_hidden_size)
+        attention_hidden_size = (
+            hidden_size if attention_hidden_size is None else int(attention_hidden_size)
+        )
         self.proj = nn.Linear(hidden_size, attention_hidden_size)
         self.score = nn.Linear(attention_hidden_size, 1)
 
-    def forward(self, hidden_states: torch.Tensor, critical_mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        critical_mask: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         mask = critical_mask.squeeze(-1).bool()
         logits = self.score(torch.tanh(self.proj(hidden_states))).squeeze(-1)
         masked_logits = logits.masked_fill(~mask, -1e9)

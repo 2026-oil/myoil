@@ -1,0 +1,15 @@
+{
+  "study_count": 1,
+  "selected_study_index": null,
+  "canonical_projection_study_index": 1,
+  "entries": [
+    {
+      "study_index": 1,
+      "study_label": "study-01",
+      "study_root": "/home/sonet/.openclaw/workspace/research/neuralforecast/$tmp/out/models/AAForecast/studies/study-01",
+      "executed": true,
+      "selected": false,
+      "canonical_projection": true
+    }
+  ]
+}

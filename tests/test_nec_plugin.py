@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+import yaml
 
 from app_config import load_app_config
 from plugin_contracts.stage_registry import get_active_stage_plugin, get_stage_plugin
@@ -90,3 +91,43 @@ def test_nec_stage_plugin_is_active_after_config_load() -> None:
     plugin, _config = result
     assert plugin.config_key == "nec"
     assert plugin.owns_top_level_job("NEC") is True
+
+
+def test_nec_job_requires_explicit_nec_enablement(tmp_path: Path) -> None:
+    payload = {
+        "task": {"name": "nec_requires_enablement"},
+        "dataset": {
+            "path": str(REPO_ROOT / "tests/fixtures/nec_runtime_smoke.csv"),
+            "target_col": "target",
+            "dt_col": "dt",
+            "hist_exog_cols": ["hist_a", "hist_b"],
+            "futr_exog_cols": [],
+            "static_exog_cols": [],
+        },
+        "runtime": {"random_seed": 1},
+        "training": {
+            "input_size": 4,
+            "batch_size": 8,
+            "valid_batch_size": 8,
+            "windows_batch_size": 16,
+            "inference_windows_batch_size": 16,
+            "scaler_type": "robust",
+            "model_step_size": 1,
+            "max_steps": 1,
+            "val_size": 1,
+            "val_check_steps": 1,
+            "early_stop_patience_steps": -1,
+            "loss": "mse",
+            "optimizer": {"name": "adamw", "kwargs": {}},
+        },
+        "cv": {"horizon": 2, "step_size": 2, "n_windows": 1, "gap": 0, "overlap_eval_policy": "by_cutoff_mean"},
+        "scheduler": {"gpu_ids": [0], "max_concurrent_jobs": 1, "worker_devices": 1},
+        "residual": {"enabled": False, "model": "xgboost", "params": {}},
+        "jobs": [{"model": "NEC", "params": {"manual_contract": True}}],
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    loaded = load_app_config(REPO_ROOT, config_path=config_path)
+
+    with pytest.raises(ValueError, match="Unsupported model: NEC"):
+        runtime._validate_jobs(loaded, loaded.config.jobs, tmp_path / "capability_report.json")

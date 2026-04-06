@@ -1,233 +1,225 @@
-# 01. 핵심쟁점
+# 01. Brent Case 1 실험 배경 및 기록 목적
 
 ---
 
-본 실험은 **XGB, LGBM** 모델로 Brent / WTI 각각에 대해,
-단변량 예측과 `BS_Core_Index_Integrated`를 추가한 다변량 예측을 비교하여
-블랙스완 지수가 유가 예측에 유의미한 정보를 주는지 검토한다.
+- 본 문서는 **Brent case 1**에 대해 수행한 feature-subset 실험 6건의 결과를 정리한 **실험 기록 문서**이다.
+- 이번 기록의 출발점은, 기존 **NEC 실험에서 뒤쪽 h7~8 급등 구간 대응이 충분하지 않다**는 문제의식이었다.
+- 이에 따라 동일한 Brent case 1 조건에서 변수 조합을 먼저 NEC로 점검하고, 후속으로 **AAForecast 아키텍처 실험**을 추가 수행하였다.
+- 본 문서의 목적은 “어떤 실험이 어떤 결과를 냈는가”를 남기는 것이며, **NEC와 AAForecast를 정면 비교하는 의사결정 문서**로 쓰는 것은 본 범위에 포함하지 않는다.
 
-이번 비교의 핵심은 다음과 같다.
-
-- **Brent와 WTI 모두에서 `BS_Core_Index_Integrated`를 hist exogenous 변수로 추가했지만, 단변량 대비 성능이 악화됐다.**
-- **즉 이번 tree direct 설정에서는 블랙스완 지수가 두 타깃 모두에 대해 유의미한 증분 정보를 만들지 못했다.**
-
-# 02. 데이터 및 모델 세팅
+# 02. 실험 개요 및 공통 세팅
 
 ---
 
-- **예측 타깃:**
-  - `Com_BrentCrudeOil` (BrentCrude)
-  - `Com_CrudeOil` (WTI)
-- **예측 단위:** 주간 예측
-- **평가 구조:** 6개 rolling TSCV (`horizon=8`, `step_size=8`, `gap=0`)
-- **overlap_eval_policy:** `by_cutoff_mean`
-- **training.loss:** `mae`
-- **실험 모델군:** `xgboost`, `lightgbm`
-- **공통 lag 설정:** `[1, 2, 3, 4, 8, 12, 26, 52]`
-- **residual:** 비활성화 (`residual.enabled: false`)
+## 02-01. 공통 실험 조건
 
-# 03. 실험 설계 및 적용
+- **Target**: `Com_BrentCrudeOil`
+- **Dataset**: `data/df.csv`
+- **입력 길이(`input_size`)**: 96
+- **예측 horizon**: 8
+- **CV**: `n_windows=2`, `step_size=4`, `gap=0`
+- **Train protocol**: `expanding_window_tscv`
+- **Loss**: `mse`
+- **Scaler**: `robust`
+- **Batch 실행 기준일**: `2026-04-02`
+- **Batch 결과**: 6개 실험 모두 PASS
 
----
+## 02-02. 변수셋 설계
 
-- 각 타깃(Brent / WTI)에 대해 **uni vs mul 한 쌍씩** 비교했다.
-- 두 run의 차이는 **`hist_exog_cols`에 `BS_Core_Index_Integrated`를 추가했는지 여부**뿐이다.
-- 모델 종류, tree 파라미터, training, CV 구조는 동일하다.
-- 따라서 성능 차이는 본질적으로 **추가 exogenous 변수의 정보 가치**로 해석할 수 있다.
-
-# 04. 실험(모델링) 결과
-
-## 04-01. 전체 leaderboard 비교
-
-| Target | Model | 단변량 MAPE | 다변량 MAPE | Δ MAPE | 단변량 RMSE | 다변량 RMSE | 단변량 MAE | 다변량 MAE |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Brent | xgboost | 6.51% | 10.54% | +4.02%p | 5.699 | 9.558 | 4.716 | 7.684 |
-| Brent | lightgbm | 7.32% | 9.23% | +1.92%p | 6.335 | 8.392 | 5.221 | 6.705 |
-| WTI | xgboost | 7.58% | 12.12% | +4.54%p | 6.334 | 10.021 | 5.234 | 8.277 |
-| WTI | lightgbm | 8.13% | 13.28% | +5.15%p | 6.603 | 10.560 | 5.575 | 8.930 |
-
-### 인사이트
-
-- Brent에서는 exog 추가 후
-  - xgboost: **MAPE +4.02%p** 악화
-  - lightgbm: **MAPE +1.92%p** 악화
-- WTI에서는 exog 추가 후
-  - xgboost: **MAPE +4.54%p** 악화
-  - lightgbm: **MAPE +5.15%p** 악화
-- 즉 **두 타깃 모두에서 mul이 uni보다 명확하게 열위**였다.
-
-## 04-02. fold별 오차 변화
-
-### **BrentCrude**
-
-#### xgboost
-
-| Fold | Cutoff | Δ MAPE (Mul-Uni) |
+| 변수셋 | 설명 | 제외된 변수군 |
 | --- | --- | --- |
-| 0 | 2025-04-07 | +4.93%p |
-| 1 | 2025-06-02 | +0.33%p |
-| 2 | 2025-07-28 | +3.43%p |
-| 3 | 2025-09-22 | +1.03%p |
-| 4 | 2025-11-17 | +3.62%p |
-| 5 | 2026-01-12 | +10.78%p |
+| `BS + GPR` | 블랙스완 지수 계열 + 지정학 리스크 계열을 모두 포함한 10개 변수셋 | 없음 |
+| `BS` | `BS + GPR`에서 지정학 리스크 계열 제거 | `GPRD_THREAT`, `GPRD`, `GPRD_ACT` |
+| `GPR` | `BS + GPR`에서 블랙스완 지수 계열 제거 | `BS_Core_Index_A`, `BS_Core_Index_B`, `BS_Core_Index_C` |
 
-- xgboost는 **6/6 fold 전부**에서 uni가 mul보다 더 좋았다.
+## 02-03. 실행한 6개 실험
 
-#### lightgbm
+| 구분 | 실험명 |
+| --- | --- |
+| NEC | NEC - BS + GPR |
+| NEC | NEC - BS |
+| NEC | NEC - GPR |
+| AAForecast | AAForecast - BS + GPR |
+| AAForecast | AAForecast - BS |
+| AAForecast | AAForecast - GPR |
 
-| Fold | Cutoff | Δ MAPE (Mul-Uni) |
-| --- | --- | --- |
-| 0 | 2025-04-07 | -1.76%p |
-| 1 | 2025-06-02 | +0.27%p |
-| 2 | 2025-07-28 | +1.67%p |
-| 3 | 2025-09-22 | +1.58%p |
-| 4 | 2025-11-17 | +1.96%p |
-| 5 | 2026-01-12 | +7.78%p |
-
-- lightgbm는 **RMSE 기준 6/6 fold**, **MAE 기준 5/6 fold**에서 uni가 mul보다 더 좋았다.
-
-### **WTI**
-
-#### xgboost
-
-| Fold | Cutoff | Δ MAPE (Mul-Uni) |
-| --- | --- | --- |
-| 0 | 2025-04-07 | +8.26%p |
-| 1 | 2025-06-02 | -5.92%p |
-| 2 | 2025-07-28 | +7.42%p |
-| 3 | 2025-09-22 | +4.11%p |
-| 4 | 2025-11-17 | +2.52%p |
-| 5 | 2026-01-12 | +10.85%p |
-
-- xgboost는 **5/6 fold**에서 uni가 mul보다 더 좋았고, 개선된 fold는 `2025-06-02` 하나뿐이었다.
-
-#### lightgbm
-
-| Fold | Cutoff | Δ MAPE (Mul-Uni) |
-| --- | --- | --- |
-| 0 | 2025-04-07 | +12.53%p |
-| 1 | 2025-06-02 | -5.66%p |
-| 2 | 2025-07-28 | +6.10%p |
-| 3 | 2025-09-22 | +4.89%p |
-| 4 | 2025-11-17 | +3.42%p |
-| 5 | 2026-01-12 | +9.65%p |
-
-- lightgbm도 **5/6 fold**에서 uni가 mul보다 더 좋았고, 개선된 fold는 `2025-06-02` 하나뿐이었다.
-
-# 05. 결과 분석 및 얻게 된 인사이트
+# 03. NEC feature-subset 실험 기록
 
 ---
 
-이번 비교를 수치로 요약하면 다음과 같다.
+## 03-01. 실험 의도
 
-1. **Brent와 WTI 모두에서 입력 변수는 8개에서 16개로 늘었지만 MAPE는 개선되지 않았다.**
-   - Brent: MAPE **+1.92%p ~ +4.02%p** 악화
-   - WTI: MAPE **+4.54%p ~ +5.15%p** 악화
+- NEC 실험은 **후행 급등 구간 대응 한계가 어느 변수군 제거에서 더 크게 드러나는지**를 확인하기 위한 기록 단계로 수행하였다.
+- 본 문서에서는 NEC 결과를 “AAForecast와의 승부”로 해석하지 않고, **후속 아키텍처 실험을 열어준 전 단계 기록**으로 정리한다.
 
-2. **추가된 8개 exog lag는 두 타깃 모두에서 target lag보다 훨씬 약한 신호였다.**
-   - Brent: target lag 상관이 exog lag 상관보다 **약 4.6배 ~ 7.9배** 강함
-   - WTI: target lag 상관이 exog lag 상관보다 **약 3.8배 ~ 6.1배** 강함
+## 03-02. NEC 결과 요약
 
-3. **악화는 특정 fold 하나의 우연이 아니라 반복 패턴이다.**
-   - Brent: xgboost **6/6**, lightgbm RMSE **6/6** fold에서 uni 우세
-   - WTI: xgboost/lightgbm 모두 **5/6 fold**에서 uni 우세
+| 변수셋 | MAPE | MAE | RMSE | nRMSE | R² |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `BS + GPR` | **4.84%** | 4.067 | 6.584 | 26.18% | 0.320 |
+| `BS` | 13.53% | 10.231 | 13.343 | 89.05% | -5.755 |
+| `GPR` | 15.79% | 11.782 | 14.781 | 104.02% | -8.530 |
 
-4. **가장 큰 실패 구간은 두 타깃 모두 마지막 fold의 급등 horizon이었다.**
-   - Brent xgboost 마지막 fold 절대오차 합계: `mul 162.376 / uni 88.881`
-   - WTI xgboost 마지막 fold 절대오차 합계: `mul 153.117 / uni 84.838`
+## 03-03. NEC 실험 기록 메모
 
-따라서 이번 실험의 결론은 다음과 같다.
+- NEC 내부에서는 **`BS + GPR`이 가장 낮은 MAPE(4.84%)**를 기록했다.
+- `BS`는 `BS + GPR` 대비 **+8.69%p**, `GPR`은 **+10.95%p** 만큼 MAPE가 악화되었다.
+- `BS`, `GPR`은 모두 R²가 큰 폭의 음수로 내려가, 해당 변수군 제거가 NEC 실험 안정성을 크게 약화시키는 방향으로 나타났다.
+- 따라서 NEC 단계 기록에서는 **GPRD 계열과 블랙스완 지수 계열을 모두 유지한 `BS + GPR` 조합**이 후속 실험의 기준점이 되었다.
 
-- **`BS_Core_Index_Integrated`는 현재 tree direct 설정에서 Brent와 WTI 모두에 대해 유의미한 증분 정보를 주지 못했다.**
-- **두 타깃 모두 target lag만 사용하는 단변량 구성이 더 안정적이고 더 낮은 오차를 기록했다.**
-
-# 06. 향후 Action Plan
+# 04. AAForecast 후속 실험 기록
 
 ---
 
-- Brent / WTI tree 실험의 기본선은 당분간 **uni 구성**으로 유지한다.
-- `BS_Core_Index_Integrated`를 계속 검증하려면, 현재처럼 단순 lag 추가가 아니라 **변환 / 정규화 / interaction / lag 선택 축소** 방식으로 재설계한다.
-- tree 계열에서는 exog를 넣을 때 모든 lag를 그대로 넣기보다, 상관 또는 중요도 기준으로 **소수 lag만 선별**하는 방향이 필요하다.
-- 후속 검증은 `fold_idx=5` 같은 급등 구간을 별도로 나눠, exog가 turning point 검출에 실제 도움을 주는지 다시 확인한다.
+## 04-01. 실험 의도
 
-# Appendix. 근거 파일
+- NEC 단계에서 확인한 문제의식을 바탕으로, 동일한 Brent case 1 / 동일한 feature-subset 축(`BS + GPR`, `BS`, `GPR`)에서 **AAForecast 아키텍처를 후속 실험**으로 수행하였다.
+- 이 단계의 목적은 NEC 결과를 뒤집는 경쟁 비교가 아니라, **후행 급등 구간 대응 문제를 다른 아키텍처에서 어떻게 기록할 수 있는지 확인하는 것**이었다.
+
+## 04-02. AAForecast 결과 요약
+
+| 변수셋 | MAPE | MAE | RMSE | nRMSE | R² |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `BS + GPR` | **4.62%** | 3.395 | 4.935 | 37.96% | -0.351 |
+| `BS` | 6.56% | 4.600 | 4.998 | 39.68% | -0.510 |
+| `GPR` | 8.94% | 6.085 | 6.248 | 51.51% | -1.617 |
+
+## 04-03. AAForecast 실험 기록 메모
+
+- AAForecast 내부에서도 **`BS + GPR`이 가장 낮은 MAPE(4.62%)**를 기록했다.
+- `BS`는 `BS + GPR` 대비 **+1.94%p**, `GPR`은 **+4.32%p** 만큼 MAPE가 상승했다.
+- 즉, AAForecast 후속 실험에서도 **변수 제거보다 `BS + GPR` 유지 조건이 가장 안정적인 기록**으로 남았다.
+- 이번 후속 실험의 기록 결과는, NEC 단계에서 제기된 문제의식 이후 **AAForecast 아키텍처 실험이 실제로 유의미한 결과를 남겼다**는 점을 문서화하는 데 있다.
+
+# 05. 실험 기록 요약 및 인사이트
 
 ---
 
-## A-1. 모델 하이퍼파라미터 설정
+- 이번 배치(`2026-04-02`)에서는 **6개 실험이 모두 정상 종료**되었다.
+- NEC 기록에서는 `BS + GPR`이 가장 좋았고, `GPRD` 계열 또는 **블랙스완 지수 계열**을 제거한 경우 성능 저하 폭이 컸다.
+- 후속 AAForecast 기록에서도 동일하게 `BS + GPR`이 가장 좋았고, 변수군 제거 시 MAPE가 일관되게 악화되었다.
+- 따라서 이번 문서에서 남겨둘 핵심은 다음 두 가지다.
+  1. **Brent case 1 기준 feature-subset 실험에서는 `BS + GPR`이 두 실험군 내부에서 모두 최상위였다.**
+  2. **NEC의 한계를 문제의식으로 삼아 수행한 AAForecast 후속 실험이 실제로 좋은 결과를 기록했다.**
+- 다만 본 문서는 실험 기록 문서이므로, 여기서 곧바로 **“향후엔 무조건 AAForecast를 채택한다”**는 식의 결론까지 확장하지는 않는다.
 
-### **xgboost**
+# 06. Appendix
 
-```yaml
-lags: [1, 2, 3, 4, 8, 12, 26, 52]
-n_estimators: 128
-max_depth: 4
-subsample: 0.8
-colsample_bytree: 0.8
-requested_mode: learned_fixed
-validated_mode: learned_fixed
-```
+---
 
-### **lightgbm**
+## 06-01. 변수셋 상세
 
-```yaml
-lags: [1, 2, 3, 4, 8, 12, 26, 52]
-n_estimators: 128
-max_depth: 4
-num_leaves: 15
-min_child_samples: 20
-feature_fraction: 0.8
-requested_mode: learned_fixed
-validated_mode: learned_fixed
-```
+### `BS + GPR`
+- `Idx_OVX`
+- `Com_Oil_Spread`
+- `BS_Core_Index_A`
+- `BS_Core_Index_B`
+- `BS_Core_Index_C`
+- `Com_LMEX`
+- `Com_BloombergCommodity_BCOM`
+- `GPRD_THREAT`
+- `GPRD`
+- `GPRD_ACT`
 
-## A-2. 공통 Training / CV 설정
+### `BS`
+- `Idx_OVX`
+- `Com_Oil_Spread`
+- `BS_Core_Index_A`
+- `BS_Core_Index_B`
+- `BS_Core_Index_C`
+- `Com_LMEX`
+- `Com_BloombergCommodity_BCOM`
 
-```yaml
-train_protocol: expanding_window_tscv
-input_size: 96
-batch_size: 32
-valid_batch_size: 64
-windows_batch_size: 1024
-inference_windows_batch_size: 1024
-model_step_size: 1
-max_steps: 2000
-val_size: 16
-val_check_steps: 20
-min_steps_before_early_stop: 500
-early_stop_patience_steps: 3
-loss: mae
-```
+### `GPR`
+- `Idx_OVX`
+- `Com_Oil_Spread`
+- `Com_LMEX`
+- `Com_BloombergCommodity_BCOM`
+- `GPRD_THREAT`
+- `GPRD`
+- `GPRD_ACT`
 
-```yaml
-horizon: 8
-step_size: 8
-n_windows: 6
-gap: 0
-max_train_size: null
-overlap_eval_policy: by_cutoff_mean
-```
+## 06-02. 공통 Training / CV / Scheduler 설정
 
-## A-3. 근거 파일
+- **Training**
+  - `input_size=96`
+  - `batch_size=32`
+  - `valid_batch_size=64`
+  - `windows_batch_size=1024`
+  - `inference_windows_batch_size=1024`
+  - `max_steps=1000`
+  - `val_size=16`
+  - `val_check_steps=1`
+  - `min_steps_before_early_stop=400`
+  - `early_stop_patience_steps=20`
+  - `loss=mse`
+  - `optimizer=adamw`
+  - `scaler_type=robust`
+- **CV**
+  - `horizon=8`
+  - `step_size=4`
+  - `n_windows=2`
+  - `gap=0`
+  - `overlap_eval_policy=by_cutoff_mean`
+- **Scheduler**
+  - `gpu_ids=[0, 1]`
+  - `max_concurrent_jobs=2`
+  - `worker_devices=1`
 
-- `runs/tree_oil_mul_brent_mul_tree/summary/leaderboard.csv`
-- `runs/tree_oil_uni_brent_uni_tree/summary/leaderboard.csv`
-- `runs/tree_oil_mul_wti_mul_tree/summary/leaderboard.csv`
-- `runs/tree_oil_uni_wti_uni_tree/summary/leaderboard.csv`
-- `runs/tree_oil_mul_brent_mul_tree/scheduler/workers/xgboost/cv/xgboost_metrics_by_cutoff.csv`
-- `runs/tree_oil_uni_brent_uni_tree/scheduler/workers/xgboost/cv/xgboost_metrics_by_cutoff.csv`
-- `runs/tree_oil_mul_brent_mul_tree/scheduler/workers/lightgbm/cv/lightgbm_metrics_by_cutoff.csv`
-- `runs/tree_oil_uni_brent_uni_tree/scheduler/workers/lightgbm/cv/lightgbm_metrics_by_cutoff.csv`
-- `runs/tree_oil_mul_wti_mul_tree/scheduler/workers/xgboost/cv/xgboost_metrics_by_cutoff.csv`
-- `runs/tree_oil_uni_wti_uni_tree/scheduler/workers/xgboost/cv/xgboost_metrics_by_cutoff.csv`
-- `runs/tree_oil_mul_wti_mul_tree/scheduler/workers/lightgbm/cv/lightgbm_metrics_by_cutoff.csv`
-- `runs/tree_oil_uni_wti_uni_tree/scheduler/workers/lightgbm/cv/lightgbm_metrics_by_cutoff.csv`
-- `runs/tree_oil_mul_brent_mul_tree/scheduler/workers/xgboost/cv/xgboost_forecasts.csv`
-- `runs/tree_oil_uni_brent_uni_tree/scheduler/workers/xgboost/cv/xgboost_forecasts.csv`
-- `runs/tree_oil_mul_wti_mul_tree/scheduler/workers/xgboost/cv/xgboost_forecasts.csv`
-- `runs/tree_oil_uni_wti_uni_tree/scheduler/workers/xgboost/cv/xgboost_forecasts.csv`
-- `yaml/experiment/tree_oil_mul/brent_mul.yaml`
-- `yaml/experiment/tree_oil_uni/brent_uni.yaml`
-- `yaml/experiment/tree_oil_mul/wti_mul.yaml`
-- `yaml/experiment/tree_oil_uni/wti_uni.yaml`
-- `data/df.csv`
+## 06-03. 하이퍼파라미터 (6개 실험 전체)
+
+> 하이퍼파라미터 관련 내용은 Appendix의 가장 하단에만 정리한다. 이번 6개 실험은 실험별 feature subset은 다르지만, 모델/학습 하이퍼파라미터는 실질적으로 동일 그룹으로 묶인다.
+
+### 06-03-01. AAForecast 3개 실험
+
+적용 실험
+- AAForecast - BS + GPR
+- AAForecast - BS
+- AAForecast - GPR
+
+공통 AAForecast model params
+- `encoder_hidden_size=256`
+- `encoder_n_layers=3`
+- `encoder_dropout=0.2`
+- `decoder_hidden_size=256`
+- `decoder_layers=3`
+- `season_length=4`
+- `trend_kernel_size=3`
+- `anomaly_threshold=4.0`
+
+### 06-03-02. NEC 3개 실험
+
+적용 실험
+- NEC - BS + GPR
+- NEC - BS
+- NEC - GPR
+
+공통 NEC preprocessing / inference
+- `preprocessing.mode=diff_std`
+- `gmm_components=3`
+- `epsilon=1.5`
+- `inference.mode=soft_weighted_inverse`
+- `threshold=0.5`
+- `validation.windows=8`
+
+공통 NEC branch params
+- **classifier / extreme (`TSMixerx`)**
+  - `n_block=3`
+  - `ff_dim=96`
+  - `dropout=0.1`
+  - `revin=true`
+- **classifier only**
+  - `alpha=2.0`
+  - `beta=0.5`
+  - `oversample_extreme_windows=true`
+- **normal (`LSTM`)**
+  - `encoder_hidden_size=128`
+  - `decoder_hidden_size=128`
+  - `encoder_n_layers=2`
+  - `decoder_layers=2`
+  - `oversample_extreme_windows=false`
+- **extreme (`TSMixerx`)**
+  - `oversample_extreme_windows=true`
+
+변동 항목
+- NEC 3개 실험 간 차이는 **branch별 변수 목록(feature subset)** 뿐이며, 위 하이퍼파라미터 자체는 동일하다.

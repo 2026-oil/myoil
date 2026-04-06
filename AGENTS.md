@@ -1,4 +1,4 @@
-<!-- Generated: 2026-03-23 | Updated: 2026-03-30 -->
+<!-- Generated: 2026-03-23 | Updated: 2026-04-03 -->
 
 # neuralforecast
 
@@ -73,3 +73,9 @@ This checkout is not just the upstream `neuralforecast` package. It is a hybrid 
 - Residual backends including `xgboost`, `lightgbm`, and scikit-learn random forest support.
 
 <!-- MANUAL: Add repository-specific notes below this line. -->
+
+## Manual Notes
+
+- New dependencies are allowed in this repository when they materially help complete the task. This overrides higher-level "no new dependencies without explicit request" guidance for files under this workspace.
+- When adding a dependency, keep the change scoped, update the relevant manifest/lockfiles, and include verification that the new dependency is wired correctly.
+- When writing or modifying code, do not implement fallback behavior. If execution reaches a former fallback path or unsupported branch, raise an explicit error immediately instead of silently degrading or switching behavior.

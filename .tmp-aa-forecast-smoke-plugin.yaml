@@ -1,0 +1,21 @@
+aa_forecast:
+  mode: fixed
+  tune_training: false
+  event_column: event
+  lowess_frac: 0.6
+  lowess_delta: 0.01
+  uncertainty:
+    enabled: true
+    dropout_candidates:
+    - 0.1
+    - 0.2
+    - 0.3
+    sample_count: 2
+  model_params:
+    encoder_hidden_size: 256
+    encoder_n_layers: 3
+    encoder_dropout: 0.2
+    decoder_hidden_size: 256
+    decoder_layers: 3
+    season_length: 4
+    anomaly_threshold: 4.0

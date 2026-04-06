@@ -38,6 +38,8 @@ dependencies = [
     "pytorch-lightning>=2.0.0",
     "ray[train,tune]>=2.2.0",
     "optuna",
+    "plotly",
+    "kaleido>=0.2.1",
     "pytorch-optimizer>=3.10.0",
     "utilsforecast>=0.2.3",
     "lightgbm",

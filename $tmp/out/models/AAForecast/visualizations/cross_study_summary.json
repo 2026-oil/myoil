@@ -1,0 +1,15 @@
+{
+  "study_count": 1,
+  "canonical_projection_study_index": 1,
+  "selected_study_index": null,
+  "rows": [
+    {
+      "study_index": 1,
+      "study_label": "study-01",
+      "best_value": 0.0,
+      "trial_count": 0,
+      "finished_trial_count": 0,
+      "canonical_projection": true
+    }
+  ]
+}

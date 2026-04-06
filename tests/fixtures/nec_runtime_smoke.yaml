@@ -5,8 +5,8 @@ dataset:
   target_col: target
   dt_col: dt
   hist_exog_cols:
-    - hist_a
-    - hist_b
+  - hist_a
+  - hist_b
   futr_exog_cols: []
   static_exog_cols: []
 runtime:
@@ -34,7 +34,8 @@ cv:
   gap: 0
   overlap_eval_policy: by_cutoff_mean
 scheduler:
-  gpu_ids: [0]
+  gpu_ids:
+  - 0
   max_concurrent_jobs: 1
   worker_devices: 1
   parallelize_single_job_tuning: false
@@ -43,9 +44,7 @@ residual:
   model: xgboost
   params: {}
 jobs:
-  - model: NEC
-    params:
-      variant: paper
+- model: NEC
 nec:
   enabled: true
   config_path: tests/fixtures/nec_plugin_smoke.yaml

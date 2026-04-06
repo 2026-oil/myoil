@@ -3,18 +3,56 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import pytest
+import yaml
 
+from app_config import load_app_config
 import main as bootstrap_main
+
+
+def _minimal_app_config_payload() -> dict[str, object]:
+    return {
+        'dataset': {
+            'path': str(
+                (
+                    bootstrap_main.WORKSPACE_ROOT
+                    / 'tests/fixtures/optuna_smoke_data.csv'
+                ).resolve()
+            ),
+            'target_col': 'target',
+            'dt_col': 'dt',
+        },
+        'residual': {'enabled': False, 'model': 'xgboost', 'params': {}},
+        'jobs': [{'model': 'Naive', 'params': {}}],
+    }
+
+
+def _write_yaml(path: Path, payload: dict[str, object]) -> Path:
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding='utf-8')
+    return path
+
+
+@pytest.fixture(autouse=True)
+def runtime_runner_stub(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
+    stub = ModuleType('runtime_support.runner')
+    stub.load_app_config = lambda *args, **kwargs: SimpleNamespace(
+        jobs_fanout_specs=[]
+    )
+    stub.run_loaded_config = lambda *args, **kwargs: {'ok': True}
+    stub.loaded_config_for_jobs_fanout = lambda repo_root, loaded, spec: loaded
+    stub.main = lambda argv=None: bootstrap_main._run_cli(
+        argv, repo_root=Path(__file__).resolve().parents[1]
+    )
+    monkeypatch.setitem(sys.modules, 'runtime_support.runner', stub)
+    return stub
 
 
 def test_main_loads_config_and_dispatches_without_reexec_and_preserves_pythonpath(
     monkeypatch: pytest.MonkeyPatch,
+    runtime_runner_stub: ModuleType,
 ):
-    import runtime_support.runner as runtime
-
     calls: dict[str, object] = {}
     workspace_root = str(bootstrap_main.WORKSPACE_ROOT)
     monkeypatch.setenv(bootstrap_main._BOOTSTRAP_ENV, '1')
@@ -41,8 +79,8 @@ def test_main_loads_config_and_dispatches_without_reexec_and_preserves_pythonpat
         calls['args'] = args
         return {'ok': True}
 
-    monkeypatch.setattr(runtime, 'load_app_config', fake_load_app_config)
-    monkeypatch.setattr(runtime, 'run_loaded_config', fake_run_loaded_config)
+    runtime_runner_stub.load_app_config = fake_load_app_config
+    runtime_runner_stub.run_loaded_config = fake_run_loaded_config
 
     assert (
         bootstrap_main.main(
@@ -57,6 +95,7 @@ def test_main_loads_config_and_dispatches_without_reexec_and_preserves_pythonpat
     assert getattr(calls['args'], 'jobs') is None
     assert calls['config_path'] == 'yaml/experiment/feature_set/brentoil-case1.yaml'
     assert calls['shared_settings_path'] is None
+    assert getattr(calls['args'], 'optuna_study') is None
 
     parts = os.environ['PYTHONPATH'].split(os.pathsep)
     assert parts[0] == workspace_root
@@ -81,9 +120,8 @@ def test_main_requires_explicit_config(
 
 def test_main_passes_setting_override_to_load_app_config(
     monkeypatch: pytest.MonkeyPatch,
+    runtime_runner_stub: ModuleType,
 ) -> None:
-    import runtime_support.runner as runtime
-
     calls: dict[str, object] = {}
     monkeypatch.setenv(bootstrap_main._BOOTSTRAP_ENV, '1')
 
@@ -102,8 +140,8 @@ def test_main_passes_setting_override_to_load_app_config(
         calls['shared_settings_path'] = shared_settings_path
         return loaded
 
-    monkeypatch.setattr(runtime, 'load_app_config', fake_load_app_config)
-    monkeypatch.setattr(runtime, 'run_loaded_config', lambda *args, **kwargs: {'ok': True})
+    runtime_runner_stub.load_app_config = fake_load_app_config
+    runtime_runner_stub.run_loaded_config = lambda *args, **kwargs: {'ok': True}
 
     assert (
         bootstrap_main.main(
@@ -123,11 +161,44 @@ def test_main_passes_setting_override_to_load_app_config(
     assert calls['shared_settings_path'] == 'yaml/setting/setting.yaml'
 
 
+def test_main_forwards_optuna_study_to_runtime_args(
+    monkeypatch: pytest.MonkeyPatch,
+    runtime_runner_stub: ModuleType,
+) -> None:
+    import runtime_support
+
+    calls: dict[str, object] = {}
+    monkeypatch.setenv(bootstrap_main._BOOTSTRAP_ENV, '1')
+
+    loaded = SimpleNamespace(jobs_fanout_specs=[])
+
+    runtime_runner_stub.load_app_config = lambda *args, **kwargs: loaded
+    monkeypatch.setitem(sys.modules, 'runtime_support.runner', runtime_runner_stub)
+    monkeypatch.setattr(runtime_support, 'runner', runtime_runner_stub, raising=False)
+
+    def fake_run_loaded_config(repo_root: Path, loaded_config, args):
+        calls['repo_root'] = repo_root
+        calls['loaded'] = loaded_config
+        calls['args'] = args
+        return {'ok': True}
+
+    runtime_runner_stub.run_loaded_config = fake_run_loaded_config
+
+    assert (
+        bootstrap_main.main(
+            ['--config', 'demo.yaml', '--optuna-study', '3', '--validate-only']
+        )
+        == 0
+    )
+    assert calls['repo_root'] == bootstrap_main.WORKSPACE_ROOT
+    assert calls['loaded'] is loaded
+    assert getattr(calls['args'], 'optuna_study') == 3
+
+
 def test_runtime_main_delegates_back_to_bootstrap_main(
     monkeypatch: pytest.MonkeyPatch,
+    runtime_runner_stub: ModuleType,
 ) -> None:
-    import runtime_support.runner as runtime
-
     calls: dict[str, object] = {}
 
     def fake_run_cli(args, **kwargs):
@@ -137,9 +208,9 @@ def test_runtime_main_delegates_back_to_bootstrap_main(
 
     monkeypatch.setattr(bootstrap_main, '_run_cli', fake_run_cli)
 
-    assert runtime.main(['--validate-only']) == 23
+    assert runtime_runner_stub.main(['--validate-only']) == 23
     assert calls['args'] == ['--validate-only']
-    assert calls['kwargs']['repo_root'] == Path(runtime.__file__).resolve().parents[1]
+    assert calls['kwargs']['repo_root'] == Path(__file__).resolve().parents[1]
 
 
 def test_bootstrap_owned_contracts_expose_direct_runtime_modules() -> None:
@@ -225,11 +296,25 @@ def test_needs_reexec_falls_back_to_true_when_sys_executable_resolution_fails(
     [
         ['--output-root', 'runs/custom'],
         ['--output-root=runs/custom'],
+        ['--optuna-study', '2', '--output-root', 'runs/custom'],
+        ['--output-root=runs/custom', '--optuna-study', '2'],
     ],
 )
 def test_main_rejects_removed_output_root_flag(argv: list[str]) -> None:
     with pytest.raises(SystemExit, match='--output-root is no longer supported'):
         bootstrap_main.main(argv)
+
+
+def test_build_parser_rejects_non_positive_optuna_study(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    parser = bootstrap_main.build_parser()
+
+    with pytest.raises(SystemExit) as exc_info:
+        parser.parse_args(['--optuna-study', '0'])
+
+    assert exc_info.value.code == 2
+    assert 'argument --optuna-study: must be a positive integer' in capsys.readouterr().err
 
 
 def test_main_allows_internal_output_root_bypass(
@@ -238,3 +323,112 @@ def test_main_allows_internal_output_root_bypass(
     monkeypatch.setenv(bootstrap_main._ALLOW_INTERNAL_OUTPUT_ROOT_ENV, '1')
 
     bootstrap_main._reject_removed_args(['--output-root', 'runs/internal'])
+
+
+def test_load_app_config_shared_settings_round_trip_preserves_optuna_study_selection(
+    tmp_path: Path,
+) -> None:
+    config_path = _write_yaml(tmp_path / 'config.yaml', _minimal_app_config_payload())
+    shared_settings_path = _write_yaml(
+        tmp_path / 'setting.yaml',
+        {
+            'runtime': {
+                'random_seed': 11,
+                'opt_n_trial': 7,
+                'opt_study_count': 3,
+                'opt_selected_study': 2,
+            }
+        },
+    )
+
+    loaded = load_app_config(
+        tmp_path,
+        config_path=config_path,
+        shared_settings_path=shared_settings_path.name,
+    )
+
+    assert loaded.config.runtime.random_seed == 11
+    assert loaded.config.runtime.opt_n_trial == 7
+    assert loaded.config.runtime.opt_study_count == 3
+    assert loaded.config.runtime.opt_selected_study == 2
+    assert loaded.config.to_dict()['runtime'] == {
+        'random_seed': 11,
+        'opt_n_trial': 7,
+        'opt_study_count': 3,
+        'opt_selected_study': 2,
+    }
+    assert loaded.normalized_payload['runtime'] == {
+        'random_seed': 11,
+        'opt_n_trial': 7,
+        'opt_study_count': 3,
+        'opt_selected_study': 2,
+    }
+
+
+def test_load_app_config_defaults_opt_study_count_and_omits_unset_selected_study(
+    tmp_path: Path,
+) -> None:
+    config_path = _write_yaml(tmp_path / 'config.yaml', _minimal_app_config_payload())
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    assert loaded.config.runtime.opt_study_count == 1
+    assert loaded.config.runtime.opt_selected_study is None
+    assert loaded.config.to_dict()['runtime'] == {
+        'random_seed': 1,
+        'opt_n_trial': None,
+        'opt_study_count': 1,
+    }
+    assert loaded.normalized_payload['runtime'] == {
+        'random_seed': 1,
+        'opt_n_trial': None,
+        'opt_study_count': 1,
+    }
+
+
+def test_load_app_config_rejects_opt_selected_study_above_count(tmp_path: Path) -> None:
+    payload = _minimal_app_config_payload()
+    payload['runtime'] = {'opt_study_count': 2, 'opt_selected_study': 3}
+    config_path = _write_yaml(tmp_path / 'config.yaml', payload)
+
+    with pytest.raises(
+        ValueError, match='runtime.opt_selected_study cannot exceed runtime.opt_study_count'
+    ):
+        load_app_config(tmp_path, config_path=config_path)
+
+
+def test_load_app_config_preserves_loss_params_for_supported_parametric_losses(
+    tmp_path: Path,
+) -> None:
+    payload = _minimal_app_config_payload()
+    payload['training'] = {
+        'loss': 'latehorizonweightedmape',
+        'loss_params': {
+        'horizon': 4,
+        'late_start': 3,
+        'late_multiplier': 2.5,
+    }
+    }
+    config_path = _write_yaml(tmp_path / 'config.yaml', payload)
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    assert loaded.config.training.loss == 'latehorizonweightedmape'
+    assert loaded.config.to_dict()['training']['loss_params'] == {
+        'up_th': 0.9,
+        'down_th': 0.1,
+        'lamda_underestimate': 1.2,
+        'lamda_overestimate': 1.0,
+        'lamda': 1.0,
+        'horizon': 4,
+        'ramp_power': 1.5,
+        'base_weight': 1.0,
+        'late_multiplier': 2.5,
+        'late_start': 3,
+        'delta': 1.0,
+        'late_weight': 3.0,
+        'q_under': 0.7,
+        'q_over': 0.3,
+        'late_factor': 2.0,
+    }
+    assert 'loss_params' in loaded.normalized_payload['training']

@@ -24,6 +24,7 @@ class WorkerLaunch:
     devices: int = 1
     phase: str = "full"
     worker_index: int = 0
+    selected_study: int | None = None
 
 
 def build_device_groups(config: AppConfig) -> list[tuple[int, ...]]:
@@ -47,9 +48,18 @@ def build_device_groups(config: AppConfig) -> list[tuple[int, ...]]:
     return groups
 
 
-def build_launch_plan(config: AppConfig, jobs: Iterable[JobConfig]) -> list[WorkerLaunch]:
+def build_launch_plan(
+    config: AppConfig,
+    jobs: Iterable[JobConfig],
+    *,
+    selected_study: int | None = None,
+) -> list[WorkerLaunch]:
     return [
-        WorkerLaunch(job_name=job.model, devices=int(config.scheduler.worker_devices))
+        WorkerLaunch(
+            job_name=job.model,
+            devices=int(config.scheduler.worker_devices),
+            selected_study=selected_study,
+        )
         for job in jobs
     ]
 
@@ -59,6 +69,7 @@ def build_tuning_launch_plan(
     *,
     job_name: str,
     worker_count: int | None = None,
+    selected_study: int | None = None,
 ) -> list[WorkerLaunch]:
     max_workers = len(build_device_groups(config))
     requested = max_workers if worker_count is None else max(1, int(worker_count))
@@ -68,6 +79,7 @@ def build_tuning_launch_plan(
             devices=int(config.scheduler.worker_devices),
             phase="tune-main-only",
             worker_index=index,
+            selected_study=selected_study,
         )
         for index in range(min(max_workers, requested))
     ]
@@ -118,6 +130,8 @@ def _worker_command(
         command.extend(["--internal-jobs-route", loaded.active_jobs_route_slug])
     if launch.phase != "full":
         command.extend(["--internal-stage", launch.phase])
+    if launch.selected_study is not None:
+        command.extend(["--optuna-study", str(launch.selected_study)])
     if loaded.source_type == "toml":
         command.extend(["--config-toml", str(loaded.source_path)])
     else:
@@ -194,6 +208,7 @@ def run_parallel_jobs(
             "job_name": launch.job_name,
             "phase": launch.phase,
             "worker_index": launch.worker_index,
+            "selected_study": launch.selected_study,
             "assigned_gpu_ids": list(assigned_gpu_ids),
             "devices": launch.devices,
             "cuda_visible_devices": ",".join(str(gpu_id) for gpu_id in assigned_gpu_ids),
@@ -235,6 +250,7 @@ def run_parallel_jobs(
                             "job_name": launch.job_name,
                             "phase": launch.phase,
                             "worker_index": launch.worker_index,
+                            "selected_study": launch.selected_study,
                             "assigned_gpu_ids": list(assigned_gpu_ids),
                             "devices": launch.devices,
                             "started_at": _now_iso(),

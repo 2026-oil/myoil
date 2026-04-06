@@ -14,6 +14,53 @@ from plugins.nec.runtime import _NecPredictor
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+FEATURE_SET_NEC_HYBRID_VARIANTS = {
+    "all10": {
+        "config_path": "yaml/experiment/feature_set_nec/neciso_brent_hybrid_tsmixerx_lstm_inverse_all10.yaml",
+        "plugin_path": "yaml/plugins/nec_brent_hybrid_tsmixerx_lstm_inverse_all10.yaml",
+        "task_name": "neciso_brent_case1_nec_hybrid_tsmixerx_lstm_inverse_all10",
+        "variables": [
+            "Idx_OVX",
+            "Com_Oil_Spread",
+            "BS_Core_Index_A",
+            "BS_Core_Index_B",
+            "BS_Core_Index_C",
+            "Com_LMEX",
+            "Com_BloombergCommodity_BCOM",
+            "GPRD_THREAT",
+            "GPRD",
+            "GPRD_ACT",
+        ],
+    },
+    "no_bs_core": {
+        "config_path": "yaml/experiment/feature_set_nec/neciso_brent_hybrid_tsmixerx_lstm_inverse_no_bs_core.yaml",
+        "plugin_path": "yaml/plugins/nec_brent_hybrid_tsmixerx_lstm_inverse_no_bs_core.yaml",
+        "task_name": "neciso_brent_case1_nec_hybrid_tsmixerx_lstm_inverse_no_bs_core",
+        "variables": [
+            "Idx_OVX",
+            "Com_Oil_Spread",
+            "Com_LMEX",
+            "Com_BloombergCommodity_BCOM",
+            "GPRD_THREAT",
+            "GPRD",
+            "GPRD_ACT",
+        ],
+    },
+    "no_gprd": {
+        "config_path": "yaml/experiment/feature_set_nec/neciso_brent_hybrid_tsmixerx_lstm_inverse_no_gprd.yaml",
+        "plugin_path": "yaml/plugins/nec_brent_hybrid_tsmixerx_lstm_inverse_no_gprd.yaml",
+        "task_name": "neciso_brent_case1_nec_hybrid_tsmixerx_lstm_inverse_no_gprd",
+        "variables": [
+            "Idx_OVX",
+            "Com_Oil_Spread",
+            "BS_Core_Index_A",
+            "BS_Core_Index_B",
+            "BS_Core_Index_C",
+            "Com_LMEX",
+            "Com_BloombergCommodity_BCOM",
+        ],
+    },
+}
 
 
 def _write_dataset(path: Path, *, include_extremes: bool = True) -> Path:
@@ -426,3 +473,34 @@ def test_feature_set_nec_validate_only_exposes_branch_metadata(
         "GPRD",
         "GPRD_ACT",
     ]
+
+
+@pytest.mark.parametrize(
+    ("variant", "expected"),
+    list(FEATURE_SET_NEC_HYBRID_VARIANTS.items()),
+)
+def test_feature_set_nec_hybrid_variants_validate_only_expose_uniform_branch_variables(
+    tmp_path: Path,
+    variant: str,
+    expected: dict[str, object],
+) -> None:
+    output_root = tmp_path / f"validate-only-nec-{variant}"
+    code = runtime.main(
+        [
+            "--config",
+            expected["config_path"],
+            "--output-root",
+            str(output_root),
+            "--validate-only",
+        ]
+    )
+
+    assert code == 0
+    resolved = json.loads((output_root / "config" / "config.resolved.json").read_text())
+    assert resolved["task"]["name"] == expected["task_name"]
+    nec_payload = resolved["nec"]
+    assert nec_payload["selected_config_path"].endswith(expected["plugin_path"])
+    assert nec_payload["active_hist_columns"] == expected["variables"]
+    assert nec_payload["branches"]["classifier"]["variables"] == expected["variables"]
+    assert nec_payload["branches"]["normal"]["variables"] == expected["variables"]
+    assert nec_payload["branches"]["extreme"]["variables"] == expected["variables"]

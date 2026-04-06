@@ -1,0 +1,14 @@
+{
+  "compatibility_mode": null,
+  "compatibility_source_path": null,
+  "entrypoint_version": "neuralforecast-residual-v1",
+  "event_column": "event",
+  "main_capability_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/$tmp/out/config/capability_report.json",
+  "main_manifest_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/$tmp/out/manifest/run_manifest.json",
+  "main_resolved_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/$tmp/out/config/config.resolved.json",
+  "selected_jobs": [
+    "AAForecast"
+  ],
+  "uncertainty_enabled": false,
+  "validate_only": true
+}

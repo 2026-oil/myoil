@@ -7,6 +7,11 @@ from typing import Any
 
 import torch
 from neuralforecast.losses.pytorch import ExLoss, MSE, _weighted_mean
+from neuralforecast.losses.research_losses import (
+    HuberLateMAPE,
+    LateHorizonWeightedMAPE,
+    QuantileLateMAPE,
+)
 from neuralforecast.models import (
     AAForecast,
     Autoformer,
@@ -22,6 +27,7 @@ from neuralforecast.models import (
     Informer,
     KAN,
     LSTM,
+    LSTM_new,
     MLP,
     MLPMultivariate,
     NBEATS,
@@ -97,16 +103,18 @@ class ForecastL1Loss(torch.nn.L1Loss):
     def domain_map(self, y_hat: torch.Tensor) -> torch.Tensor:
         return y_hat
 
-    def _compute_weights(self, y: torch.Tensor, mask: torch.Tensor | None) -> torch.Tensor:
+    def _compute_weights(
+        self, y: torch.Tensor, mask: torch.Tensor | None
+    ) -> torch.Tensor:
         if mask is None:
             mask = torch.ones_like(y)
 
         if self.horizon_weight is None:
             weights = torch.ones_like(mask)
         else:
-            assert mask.shape[1] == len(
-                self.horizon_weight
-            ), "horizon_weight must have same length as Y"
+            assert mask.shape[1] == len(self.horizon_weight), (
+                "horizon_weight must have same length as Y"
+            )
             weights = self.horizon_weight.clone()
             weights = weights[None, :, None].to(mask.device)
             weights = torch.ones_like(mask, device=mask.device) * weights
@@ -152,6 +160,7 @@ MODEL_CLASSES = {
     "FEDformer": FEDformer,
     "PatchTST": PatchTST,
     "LSTM": LSTM,
+    "LSTM_new": LSTM_new,
     "NHITS": NHITS,
     "iTransformer": iTransformer,
     "TimeLLM": TimeLLM,
@@ -177,16 +186,48 @@ MODEL_CLASSES = {
 }
 
 
-def resolve_loss(
-    name: str, *, loss_params: TrainingLossParams | None = None
-) -> Any:
+def resolve_loss(name: str, *, loss_params: TrainingLossParams | None = None) -> Any:
     normalized = name.lower()
     if normalized == "mae":
         return ForecastL1Loss()
     if normalized == "mse":
         return MSE()
     if normalized == "exloss":
-        return ExLoss(**asdict(loss_params or TrainingLossParams()))
+        params = asdict(loss_params or TrainingLossParams())
+        exloss_keys = {
+            "up_th",
+            "down_th",
+            "lamda_underestimate",
+            "lamda_overestimate",
+            "lamda",
+        }
+        return ExLoss(**{k: v for k, v in params.items() if k in exloss_keys})
+    if normalized == "latehorizonweightedmape":
+        params = asdict(loss_params or TrainingLossParams())
+        return LateHorizonWeightedMAPE(
+            horizon=params.get("horizon", 8),
+            ramp_power=params.get("ramp_power", 1.5),
+            base_weight=params.get("base_weight", 1.0),
+            late_multiplier=params.get("late_multiplier", 3.0),
+            late_start=params.get("late_start", 6),
+        )
+    if normalized == "huberlatemape":
+        params = asdict(loss_params or TrainingLossParams())
+        return HuberLateMAPE(
+            horizon=params.get("horizon", 8),
+            delta=params.get("delta", 1.0),
+            late_weight=params.get("late_weight", 3.0),
+            late_start=params.get("late_start", 6),
+        )
+    if normalized == "quantilelatemape":
+        params = asdict(loss_params or TrainingLossParams())
+        return QuantileLateMAPE(
+            horizon=params.get("horizon", 8),
+            q_under=params.get("q_under", 0.7),
+            q_over=params.get("q_over", 0.3),
+            late_start=params.get("late_start", 6),
+            late_factor=params.get("late_factor", 2.0),
+        )
     raise ValueError(f"Unsupported common loss: {name}")
 
 
@@ -209,7 +250,8 @@ def capabilities_for(model_name: str) -> ModelCapabilities:
         supports_hist_exog=bool(getattr(model_cls, "EXOGENOUS_HIST", False)),
         supports_futr_exog=bool(getattr(model_cls, "EXOGENOUS_FUTR", False)),
         supports_stat_exog=bool(getattr(model_cls, "EXOGENOUS_STAT", False)),
-        requires_n_series="n_series" in inspect.signature(model_cls.__init__).parameters,
+        requires_n_series="n_series"
+        in inspect.signature(model_cls.__init__).parameters,
     )
 
 
@@ -393,11 +435,14 @@ def build_model(
     else:
         shared_kwargs["_lr_scheduler_kwargs"] = scheduler_kwargs
     accepts_var_kwargs = any(
-        p.kind == inspect.Parameter.VAR_KEYWORD
-        for p in signature.parameters.values()
+        p.kind == inspect.Parameter.VAR_KEYWORD for p in signature.parameters.values()
     )
     accepted = {}
-    for key, value in {**shared_kwargs, **job.params, **(params_override or {})}.items():
+    for key, value in {
+        **shared_kwargs,
+        **job.params,
+        **(params_override or {}),
+    }.items():
         if key in signature.parameters or accepts_var_kwargs:
             accepted[key] = value
     model = model_cls(**accepted)

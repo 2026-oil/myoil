@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 import json
 
 from app_config import (
@@ -82,62 +82,66 @@ def build_manifest(
     compat_mode: str,
     entrypoint_version: str,
     resolved_config_path: Path,
+    optuna_payload: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
-        'manifest_version': DEFAULT_MANIFEST_VERSION,
-        'artifact_schema_version': DEFAULT_ARTIFACT_SCHEMA_VERSION,
-        'evaluation_protocol_version': DEFAULT_EVALUATION_PROTOCOL_VERSION,
-        'config_source_type': loaded.source_type,
-        'config_source_path': str(loaded.source_path),
-        'config_resolved_path': str(resolved_config_path),
-        'config_input_sha256': loaded.input_hash,
-        'config_resolved_sha256': loaded.resolved_hash,
-        'search_space_path': str(loaded.search_space_path)
+    manifest = {
+        "manifest_version": DEFAULT_MANIFEST_VERSION,
+        "artifact_schema_version": DEFAULT_ARTIFACT_SCHEMA_VERSION,
+        "evaluation_protocol_version": DEFAULT_EVALUATION_PROTOCOL_VERSION,
+        "config_source_type": loaded.source_type,
+        "config_source_path": str(loaded.source_path),
+        "config_resolved_path": str(resolved_config_path),
+        "config_input_sha256": loaded.input_hash,
+        "config_resolved_sha256": loaded.resolved_hash,
+        "search_space_path": str(loaded.search_space_path)
         if loaded.search_space_path
         else None,
-        'search_space_sha256': loaded.search_space_hash,
-        'shared_settings_path': (
+        "search_space_sha256": loaded.search_space_hash,
+        "shared_settings_path": (
             str(loaded.shared_settings_path)
             if loaded.shared_settings_path is not None
             else None
         ),
-        'shared_settings_sha256': loaded.shared_settings_hash,
-        'entrypoint_version': entrypoint_version,
-        'compat_mode': compat_mode,
-        'jobs': [
+        "shared_settings_sha256": loaded.shared_settings_hash,
+        "entrypoint_version": entrypoint_version,
+        "compat_mode": compat_mode,
+        "jobs": [
             {
-                'model': job.model,
-                'requested_mode': job.requested_mode,
-                'validated_mode': job.validated_mode,
-                'selected_search_params': list(job.selected_search_params),
+                "model": job.model,
+                "requested_mode": job.requested_mode,
+                "validated_mode": job.validated_mode,
+                "selected_search_params": list(job.selected_search_params),
             }
             for job in loaded.config.jobs
         ],
-        'training_search': {
-            'requested_mode': loaded.config.training_search.requested_mode,
-            'validated_mode': loaded.config.training_search.validated_mode,
-            'selected_search_params': list(
+        "training_search": {
+            "requested_mode": loaded.config.training_search.requested_mode,
+            "validated_mode": loaded.config.training_search.validated_mode,
+            "selected_search_params": list(
                 loaded.config.training_search.selected_search_params
             ),
         },
         **_stage_plugin_manifest_block(loaded),
-        'residual': {
-            'model': loaded.config.residual.model,
-            'target': loaded.config.residual.target,
-            'requested_mode': loaded.config.residual.requested_mode,
-            'validated_mode': loaded.config.residual.validated_mode,
-            'selected_search_params': list(loaded.config.residual.selected_search_params),
-            'feature_policy': residual_feature_policy_payload(
+        "residual": {
+            "model": loaded.config.residual.model,
+            "target": loaded.config.residual.target,
+            "requested_mode": loaded.config.residual.requested_mode,
+            "validated_mode": loaded.config.residual.validated_mode,
+            "selected_search_params": list(loaded.config.residual.selected_search_params),
+            "feature_policy": residual_feature_policy_payload(
                 loaded.config.residual.features
             ),
-            'active_feature_columns': residual_active_feature_columns(
+            "active_feature_columns": residual_active_feature_columns(
                 loaded.config.residual.features
             ),
         },
-        'training': {'loss': loaded.config.training.loss},
+        "training": {"loss": loaded.config.training.loss},
     }
+    if optuna_payload is not None:
+        manifest["optuna"] = _json_ready(dict(optuna_payload))
+    return manifest
 
 
 def write_manifest(path: Path, manifest: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+    path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")

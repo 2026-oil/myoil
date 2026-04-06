@@ -1,0 +1,40 @@
+{
+  "approvals": {},
+  "config": {
+    "direction": "lower",
+    "execution_policy": "danger_full_access",
+    "goal": "Reduce Brent fold1 h7-h8 max MAPE to 5% or lower using AAForecast-based methodology on the fixed 8-week forecast setup.",
+    "guard": "UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_validate_only_aa_forecast.py tests/test_residual_config.py::test_load_app_config_marks_aaforecast_auto_requested_and_validated_modes tests/test_residual_config.py::test_package_exports_and_intentional_omissions_are_explicit tests/test_residual_config.py::test_model_filename_dict_includes_newly_supported_aliases tests/test_residual_config.py::test_supports_auto_mode_expands_to_newly_added_models tests/test_residual_config.py::test_build_model_supports_new_official_model_ports",
+    "iterations": null,
+    "metric": "brent_fold1_max_mape_h7_h8_pct",
+    "parallel_mode": "serial",
+    "repos": [
+      {
+        "path": "/home/sonet/.openclaw/workspace/research/neuralforecast",
+        "role": "primary",
+        "scope": "**"
+      }
+    ],
+    "rollback_policy": null,
+    "run_tag": "brent-aaf-h7h8-max5",
+    "scope": "**",
+    "session_mode": "background",
+    "stop_condition": "metric <= 5",
+    "verify": "UV_CACHE_DIR=/tmp/uv-cache uv run python .omx/research/research-20260401-brent-aaf-h6h8/verify_brent_h7_h8_max_mape.py",
+    "web_search": "disabled"
+  },
+  "created_at": "2026-04-01T14:42:55Z",
+  "defaults": {},
+  "mode": "loop",
+  "notes": [
+    "Brent only. Fixed 8-week oil forecast remains unchanged. h1~h4 similarity is acceptable.",
+    "Mechanical success rule updated by operator: h7 and h8 MAPE up to 5% are acceptable, implemented as max(h7_mape,h8_mape) <= 5.",
+    "All variables in df.csv may be used; feature selection is unconstrained; Optuna and detailed hyperparameter edits are allowed.",
+    "Use AAForecast methodology as the primary line of attack; if details are unclear, consult ask-gemini with reference/aaforecast.pdf or the existing summary artifact."
+  ],
+  "original_goal": "$codex-autoresearch Brent only. h7 and h8 MAPE up to 5% is acceptable. Use AAForecast methodology, all df.csv variables allowed, Optuna and detailed settings allowed, fixed 8-week forecast stays fixed.",
+  "prompt_text": "Goal: On Brent only, drive the fixed 8-week forecast so that fold_idx=1 horizon steps 7 and 8 each reach acceptable error, operationalized as max(h7_mape,h8_mape) <= 5. The metric is mechanical and must be computed only by `.omx/research/research-20260401-brent-aaf-h6h8/verify_brent_h7_h8_max_mape.py`. Lower is better; stop only when metric <= 5.\\n\\nCurrent baseline under the current retained AAForecast recipe is about 17.8176 on the new metric.\\n\\nHard constraints:\\n- Brent only.\\n- Future oil forecast horizon stays fixed at 8 weeks.\\n- h1~h4 being merely similar is acceptable.\\n- Do not switch away from AAForecast methodology as the base method; refinements should remain AAForecast-style.\\n- When uncertain about the paper method, consult ask-gemini and `reference/aaforecast.pdf` (existing artifact: `.omx/artifacts/gemini-aa-forecast-paper-summary-20260401T130931Z.md`).\\n- All variables in `data/df.csv` may be used. Feature selection is unrestricted. Optuna tuning is allowed. Detailed model/training settings may be modified freely.\\n- Never stage or revert unrelated dirty files already in the repo. Prefer new or isolated artifacts under `.omx/research/research-20260401-brent-aaf-h6h8/**`.\\n\\nRecommended search directions:\\n1. Directly target h7/h8 late-spike behavior, not h6.\\n2. Expand Brent exogenous inputs aggressively from df.csv, including broader shock/risk proxies.\\n3. Add AAForecast-specific controls (season_length, trend_kernel_size, anomaly_threshold, attention width, encoder depth/width, dropout) and tune them with Optuna if useful.\\n4. If needed, extend the AAForecast implementation while preserving the package-authoritative/public-model boundary and non-stage-plugin rule.\\n5. Keep experiments causal and mechanically verified.\\n\\nArtifacts to maintain:\\n- `.omx/research/research-20260401-brent-aaf-h6h8/autoresearch_eval/summary_h7_h8.json`\\n- `.omx/research/research-20260401-brent-aaf-h6h8/autoresearch_eval/brent_h7_h8_points.json`\\n- any additional experiment notes or helper files under the same folder.\\n\\nGuard command must keep passing. If the run finds a materially better retained keep, log it before starting the next experiment.",
+  "resume_seed": {},
+  "updated_at": "2026-04-01T14:42:55Z",
+  "version": 1
+}

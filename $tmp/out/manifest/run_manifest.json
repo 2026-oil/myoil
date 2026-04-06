@@ -1,0 +1,99 @@
+{
+  "manifest_version": "1",
+  "artifact_schema_version": "1",
+  "evaluation_protocol_version": "2",
+  "config_source_type": "yaml",
+  "config_source_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/tests/fixtures/aa_forecast_runtime_plugin_auto_model_only_main.yaml",
+  "config_resolved_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/$tmp/out/config/config.resolved.json",
+  "config_input_sha256": "896fd4a66ccb1a6f42ead207bafd89955f6ac7c42c1b211754103aba52f1a12f",
+  "config_resolved_sha256": "39786d8d87918809d7cce8fa772ae86b926556b347b014ad622b2733051b729f",
+  "search_space_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/yaml/HPO/search_space.yaml",
+  "search_space_sha256": "717a287d7aea1c04496e07a58f3439ab51b447e0d24da3ff7d7381e88e6161d1",
+  "shared_settings_path": null,
+  "shared_settings_sha256": null,
+  "entrypoint_version": "neuralforecast-residual-v1",
+  "compat_mode": "dual_read",
+  "jobs": [
+    {
+      "model": "AAForecast",
+      "requested_mode": "learned_auto_requested",
+      "validated_mode": "learned_fixed",
+      "selected_search_params": [],
+      "optuna_study_catalog_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/$tmp/out/models/AAForecast/study_catalog.json",
+      "canonical_projection_study_index": 1
+    }
+  ],
+  "training_search": {
+    "requested_mode": "training_fixed",
+    "validated_mode": "training_fixed",
+    "selected_search_params": []
+  },
+  "aa_forecast": {
+    "enabled": true,
+    "config_path": "tests/fixtures/aa_forecast_runtime_plugin_auto_model_only.yaml",
+    "selected_config_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/tests/fixtures/aa_forecast_runtime_plugin_auto_model_only.yaml",
+    "mode": "learned_auto",
+    "tune_training": false,
+    "event_column": "event",
+    "lowess_frac": 0.6,
+    "lowess_delta": 0.01,
+    "uncertainty": {
+      "enabled": false,
+      "dropout_candidates": [
+        0.1,
+        0.3
+      ],
+      "sample_count": 3
+    },
+    "model_params": {},
+    "compatibility_mode": null,
+    "compatibility_source_path": null
+  },
+  "residual": {
+    "model": "xgboost",
+    "target": "level",
+    "requested_mode": "residual_disabled",
+    "validated_mode": "residual_disabled",
+    "selected_search_params": [],
+    "feature_policy": {
+      "include_base_prediction": true,
+      "include_horizon_step": true,
+      "include_date_features": false,
+      "lag_features": {
+        "enabled": false,
+        "sources": [],
+        "steps": [],
+        "transforms": [
+          "raw"
+        ]
+      },
+      "exog_sources": {
+        "hist": [
+          "event"
+        ],
+        "futr": [],
+        "static": []
+      }
+    },
+    "active_feature_columns": [
+      "horizon_step",
+      "y_hat_base",
+      "event_lag_1"
+    ]
+  },
+  "training": {
+    "loss": "mse"
+  },
+  "optuna": {
+    "study_count": 1,
+    "configured_selected_study_index": null,
+    "cli_selected_study_index": null,
+    "selected_study_index": null,
+    "canonical_projection_study_index": 1,
+    "execute_study_indices": [
+      1
+    ],
+    "study_catalog_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/$tmp/out/models/AAForecast/study_catalog.json",
+    "cross_study_visualizations_root": null
+  }
+}

@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 import shutil
 from tempfile import TemporaryDirectory
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
@@ -73,6 +73,23 @@ from runtime_support.scheduler import (
     build_launch_plan,
     build_tuning_launch_plan,
     run_parallel_jobs,
+)
+from runtime_support.optuna_studies import (
+    StudyContext,
+    StudySelection,
+    build_study_catalog_payload,
+    build_study_context,
+    loaded_with_study_selection_override,
+    resolve_study_selection,
+    selection_manifest_payload,
+    study_catalog_entry,
+    trial_dir_name,
+    write_study_catalog,
+)
+from runtime_support.optuna_visuals import (
+    build_cross_study_visualizations,
+    build_study_visualizations,
+    write_cross_study_visualizations,
 )
 from neuralforecast.models.bs_preforcast_direct import (
     DirectPredictionResult,
@@ -314,6 +331,7 @@ def _build_resolved_artifacts(
     repo_root: Path, loaded: LoadedConfig, output_root: Path
 ) -> dict[str, Path]:
     run_root = output_root.resolve()
+    study_selection = resolve_study_selection(loaded)
     resolved_path = run_root / "config" / "config.resolved.json"
     capability_path = run_root / "config" / "capability_report.json"
     manifest_path = run_root / "manifest" / "run_manifest.json"
@@ -328,6 +346,7 @@ def _build_resolved_artifacts(
         compat_mode="dual_read",
         entrypoint_version=ENTRYPOINT_VERSION,
         resolved_config_path=resolved_path,
+        optuna_payload=selection_manifest_payload(study_selection),
     )
     write_manifest(manifest_path, manifest)
     return {
@@ -433,6 +452,9 @@ def _update_manifest_artifacts(
     manifest_path: Path,
     *,
     job_name: str,
+    study_catalog_path: Path | None = None,
+    selected_study_index: int | None = None,
+    canonical_projection_study_index: int | None = None,
     model_best_params_path: Path | None = None,
     model_study_summary_path: Path | None = None,
     training_best_params_path: Path | None = None,
@@ -446,6 +468,14 @@ def _update_manifest_artifacts(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     for job in manifest.get("jobs", []):
         if job.get("model") == job_name:
+            if study_catalog_path is not None:
+                job["optuna_study_catalog_path"] = str(study_catalog_path)
+            if selected_study_index is not None:
+                job["selected_study_index"] = int(selected_study_index)
+            if canonical_projection_study_index is not None:
+                job["canonical_projection_study_index"] = int(
+                    canonical_projection_study_index
+                )
             if model_best_params_path is not None:
                 job["model_best_params_path"] = str(model_best_params_path)
             if model_study_summary_path is not None:
@@ -468,6 +498,18 @@ def _update_manifest_artifacts(
     if residual_best_params_path is not None:
         manifest.setdefault("residual", {})["best_params_path"] = str(
             residual_best_params_path
+        )
+    if study_catalog_path is not None:
+        manifest.setdefault("optuna", {})["study_catalog_path"] = str(
+            study_catalog_path
+        )
+    if selected_study_index is not None:
+        manifest.setdefault("optuna", {})["selected_study_index"] = int(
+            selected_study_index
+        )
+    if canonical_projection_study_index is not None:
+        manifest.setdefault("optuna", {})["canonical_projection_study_index"] = int(
+            canonical_projection_study_index
         )
     if training_best_params_path is not None:
         manifest.setdefault("training_search", {})["best_params_path"] = str(
@@ -941,54 +983,77 @@ def _score_main_trial_with_residual(
     return _compute_metrics(corrected["y"], corrected["y_hat_corrected"])["MAPE"]
 
 
-def _build_study_name(
-    loaded: LoadedConfig, *, stage: str, job_name: str, suffix: str = ""
-) -> str:
-    task_name = loaded.config.task.name or loaded.source_path.stem or "run"
-    parts = [
-        part
-        for part in (
-            "neuralforecast",
-            task_name,
-            loaded.active_jobs_route_slug or "",
-            job_name,
-            stage,
-            loaded.input_hash[:12],
-        )
-        if part
-    ]
-    if suffix:
-        parts.append(suffix)
-    return "::".join(parts)
+def _selected_optuna_study(args: argparse.Namespace | None) -> int | None:
+    value = getattr(args, "optuna_study", None) if args is not None else None
+    return None if value is None else int(value)
+
+
+def _active_study_selection(
+    loaded: LoadedConfig,
+    args: argparse.Namespace | None = None,
+) -> StudySelection:
+    return resolve_study_selection(
+        loaded,
+        cli_selected_study=_selected_optuna_study(args),
+    )
+
+
+def _study_context(
+    loaded: LoadedConfig,
+    *,
+    run_root: Path,
+    stage: str,
+    job_name: str,
+    worker_index: int = 0,
+) -> StudyContext:
+    selection = _active_study_selection(loaded)
+    selected_index = selection.selected_study_index
+    if selected_index is None:
+        selected_index = selection.canonical_projection_study_index
+    return build_study_context(
+        loaded,
+        selection=selection,
+        run_root=run_root,
+        stage=stage,
+        job_name=job_name,
+        study_index=selected_index,
+        base_seed=optuna_seed(loaded.config.runtime.random_seed),
+        worker_index=worker_index,
+    )
 
 
 def _open_persistent_study(
-    study_root: Path,
+    study_context: StudyContext,
     *,
-    loaded: LoadedConfig,
-    stage: str,
-    job_name: str,
     sampler: optuna.samplers.BaseSampler,
 ) -> tuple[optuna.Study, dict[str, Any]]:
-    storage_dir = study_root / ".optuna"
-    storage_path = storage_dir / f"{stage}.journal"
-    study_name = _build_study_name(loaded, stage=stage, job_name=job_name)
-    storage_dir.mkdir(parents=True, exist_ok=True)
+    study_context.storage_path.parent.mkdir(parents=True, exist_ok=True)
     storage = optuna.storages.JournalStorage(
-        optuna.storages.journal.JournalFileBackend(str(storage_path))
+        optuna.storages.journal.JournalFileBackend(str(study_context.storage_path))
     )
     study = optuna.create_study(
         storage=storage,
-        study_name=study_name,
+        study_name=study_context.study_name,
         load_if_exists=True,
         sampler=sampler,
         direction=DEFAULT_OPTUNA_STUDY_DIRECTION,
     )
     metadata = {
-        "study_name": study_name,
+        "study_index": study_context.study_index,
+        "study_label": study_context.study_label,
+        "study_name": study_context.study_name,
         "storage_backend": "journal",
-        "storage_path": str(storage_path.resolve()),
+        "storage_path": str(study_context.storage_path.resolve()),
+        "sampler_seed": study_context.sampler_seed,
+        "proposal_flow_id": study_context.proposal_flow_id,
+        "canonical_projection_study_index": (
+            study_context.selection.canonical_projection_study_index
+        ),
+        "selected_study_index": study_context.selection.selected_study_index,
     }
+    study.set_user_attr("study_index", study_context.study_index)
+    study.set_user_attr("sampler_seed", study_context.sampler_seed)
+    study.set_user_attr("proposal_flow_id", study_context.proposal_flow_id)
     return study, metadata
 
 
@@ -1106,11 +1171,35 @@ def _require_complete_best_trial(study: optuna.Study, *, label: str) -> optuna.F
     return study.best_trial
 
 
+def _trial_dir_from_context(study_context: StudyContext, trial_number: int) -> Path:
+    return study_context.study_root / "trials" / trial_dir_name(trial_number)
+
+
+def _write_trial_result(
+    trial_dir: Path,
+    *,
+    status: str,
+    study_context: StudyContext,
+    payload: dict[str, Any],
+) -> None:
+    trial_dir.mkdir(parents=True, exist_ok=True)
+    output = {
+        "status": status,
+        "study_index": study_context.study_index,
+        "study_name": study_context.study_name,
+        "proposal_flow_id": study_context.proposal_flow_id,
+        **payload,
+    }
+    (trial_dir / "trial_result.json").write_text(
+        json.dumps(output, indent=2), encoding="utf-8"
+    )
+
+
 def _main_job_objective(
     loaded: LoadedConfig,
     job: JobConfig,
     *,
-    study_root: Path,
+    study_context: StudyContext,
     source_df: pd.DataFrame,
     freq: str,
     splits: list[tuple[list[int], list[int]]],
@@ -1119,6 +1208,11 @@ def _main_job_objective(
     trial_count = optuna_num_trials(loaded.config.runtime.opt_n_trial)
 
     def objective(trial: optuna.Trial) -> float:
+        trial_dir = _trial_dir_from_context(study_context, trial.number)
+        trial.set_user_attr("trial_dir", str(trial_dir))
+        trial.set_user_attr("study_index", study_context.study_index)
+        trial.set_user_attr("sampler_seed", study_context.sampler_seed)
+        trial.set_user_attr("proposal_flow_id", study_context.proposal_flow_id)
         candidate_params = suggest_model_params(
             job.model,
             job.selected_search_params,
@@ -1154,6 +1248,18 @@ def _main_job_objective(
         if candidate_residual_params is not None:
             trial.set_user_attr("best_residual_params", candidate_residual_params)
         fold_mape: list[float] = []
+        _write_trial_result(
+            trial_dir,
+            status="running",
+            study_context=study_context,
+            payload={
+                "trial_number": trial.number,
+                "best_params": candidate_params,
+                "best_training_params": candidate_training_params,
+                "best_residual_params": candidate_residual_params,
+                "fold_mape": fold_mape,
+            },
+        )
         for fold_idx, (train_idx, test_idx) in enumerate(splits):
             phase = f"tune-trial-{trial.number + 1}/{trial_count}"
             if progress is not None:
@@ -1199,11 +1305,25 @@ def _main_job_objective(
                         target_actuals=target_actuals,
                         nf=nf,
                         residual_params=candidate_residual_params,
-                        scratch_root=study_root,
+                        scratch_root=trial_dir,
                     )
                 fold_mape.append(metric)
                 interim_metric = _mean_fold_metric(fold_mape, metric_name="mape")
                 trial.set_user_attr("fold_mape", fold_mape.copy())
+                _write_trial_result(
+                    trial_dir,
+                    status="running",
+                    study_context=study_context,
+                    payload={
+                        "trial_number": trial.number,
+                        "best_params": candidate_params,
+                        "best_training_params": candidate_training_params,
+                        "best_residual_params": candidate_residual_params,
+                        "fold_mape": fold_mape.copy(),
+                        "last_completed_fold": fold_idx,
+                        "interim_metric": interim_metric,
+                    },
+                )
                 trial.report(interim_metric, step=fold_idx)
                 if trial.should_prune():
                     trial.set_user_attr("pruned_after_fold", fold_idx)
@@ -1225,6 +1345,18 @@ def _main_job_objective(
                         detail=f"mape={metric:.4f}",
                     )
             except optuna.TrialPruned:
+                _write_trial_result(
+                    trial_dir,
+                    status="pruned",
+                    study_context=study_context,
+                    payload={
+                        "trial_number": trial.number,
+                        "best_params": candidate_params,
+                        "best_training_params": candidate_training_params,
+                        "best_residual_params": candidate_residual_params,
+                        "fold_mape": fold_mape,
+                    },
+                )
                 raise
             except Exception as exc:
                 if progress is not None:
@@ -1238,11 +1370,37 @@ def _main_job_objective(
                     "failure_reason",
                     f"fold={fold_idx} {type(exc).__name__}: {exc}",
                 )
+                _write_trial_result(
+                    trial_dir,
+                    status="failed",
+                    study_context=study_context,
+                    payload={
+                        "trial_number": trial.number,
+                        "best_params": candidate_params,
+                        "best_training_params": candidate_training_params,
+                        "best_residual_params": candidate_residual_params,
+                        "fold_mape": fold_mape,
+                        "failure_reason": f"{type(exc).__name__}: {exc}",
+                    },
+                )
                 raise _OptunaTrialFailure(
                     f"{job.model} tuning failed on fold {fold_idx}: {type(exc).__name__}: {exc}"
                 ) from exc
         metric = _mean_fold_metric(fold_mape, metric_name="mape")
         trial.set_user_attr("fold_mape", fold_mape)
+        _write_trial_result(
+            trial_dir,
+            status="complete",
+            study_context=study_context,
+            payload={
+                "trial_number": trial.number,
+                "best_params": candidate_params,
+                "best_training_params": candidate_training_params,
+                "best_residual_params": candidate_residual_params,
+                "fold_mape": fold_mape,
+                "objective_value": metric,
+            },
+        )
         return metric
 
     return objective
@@ -1295,16 +1453,17 @@ def _tune_main_job(
     job: JobConfig,
     models_dir: Path,
     *,
+    study_context: StudyContext,
     source_df: pd.DataFrame,
     freq: str,
     splits: list[tuple[list[int], list[int]]],
     progress: _ProgressLogger | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    sampler = build_optuna_sampler(optuna_seed(loaded.config.runtime.random_seed))
+    sampler = build_optuna_sampler(study_context.sampler_seed)
     objective = _main_job_objective(
         loaded,
         job,
-        study_root=models_dir,
+        study_context=study_context,
         source_df=source_df,
         freq=freq,
         splits=splits,
@@ -1312,10 +1471,7 @@ def _tune_main_job(
     )
 
     study, study_metadata = _open_persistent_study(
-        models_dir,
-        loaded=loaded,
-        stage="main-search",
-        job_name=job.model,
+        study_context,
         sampler=sampler,
     )
     optimize_metadata = _optimize_study_with_resume(
@@ -1337,29 +1493,29 @@ def _parallel_tune_main_job_worker(
     job: JobConfig,
     models_dir: Path,
     *,
+    study_context: StudyContext,
     source_df: pd.DataFrame,
     freq: str,
     splits: list[tuple[list[int], list[int]]],
     progress: _ProgressLogger | None = None,
 ) -> dict[str, Any]:
     worker_index = int(os.environ.get("NEURALFORECAST_OPTUNA_WORKER_INDEX", "0"))
-    sampler = build_optuna_sampler(
-        optuna_seed(loaded.config.runtime.random_seed) + worker_index
+    worker_study_context = replace(
+        study_context,
+        sampler_seed=study_context.sampler_seed + worker_index,
     )
+    sampler = build_optuna_sampler(worker_study_context.sampler_seed)
     objective = _main_job_objective(
         loaded,
         job,
-        study_root=models_dir,
+        study_context=worker_study_context,
         source_df=source_df,
         freq=freq,
         splits=splits,
         progress=progress,
     )
     study, study_metadata = _open_persistent_study(
-        models_dir,
-        loaded=loaded,
-        stage="main-search",
-        job_name=job.model,
+        worker_study_context,
         sampler=sampler,
     )
     return _parallel_optimize_study_with_shared_budget(
@@ -1374,13 +1530,12 @@ def _load_main_tuning_result(
     loaded: LoadedConfig,
     job: JobConfig,
     models_dir: Path,
+    *,
+    study_context: StudyContext,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    sampler = build_optuna_sampler(optuna_seed(loaded.config.runtime.random_seed))
+    sampler = build_optuna_sampler(study_context.sampler_seed)
     study, study_metadata = _open_persistent_study(
-        models_dir,
-        loaded=loaded,
-        stage="main-search",
-        job_name=job.model,
+        study_context,
         sampler=sampler,
     )
     optimize_metadata = {
@@ -1402,6 +1557,43 @@ def _load_main_tuning_result(
     )
 
 
+def _copy_projection_file(source: Path, target: Path) -> None:
+    if not source.exists():
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, target)
+
+
+def _write_stage_study_catalog(
+    stage_root: Path,
+    selection: StudySelection,
+    *,
+    summary_by_study: Mapping[int, Mapping[str, Any]] | None = None,
+) -> Path:
+    catalog_path = stage_root / "study_catalog.json"
+    write_study_catalog(
+        catalog_path,
+        build_study_catalog_payload(
+            stage_root,
+            selection,
+            study_summaries=summary_by_study,
+        ),
+    )
+    return catalog_path
+
+
+def _initialize_study_catalogs(
+    run_root: Path,
+    loaded: LoadedConfig,
+    jobs: Sequence[JobConfig],
+) -> None:
+    selection = resolve_study_selection(loaded)
+    for job in jobs:
+        _write_stage_study_catalog(run_root / "models" / job.model, selection)
+        if loaded.config.residual.enabled:
+            _write_stage_study_catalog(run_root / "residual" / job.model, selection)
+
+
 def _score_residual_params(
     loaded: LoadedConfig,
     job: JobConfig,
@@ -1409,11 +1601,16 @@ def _score_residual_params(
     fold_payloads: list[dict[str, Any]],
     *,
     trial: optuna.Trial,
+    study_context: StudyContext,
 ) -> float:
+    trial.set_user_attr("study_index", study_context.study_index)
+    trial.set_user_attr("sampler_seed", study_context.sampler_seed)
+    trial.set_user_attr("proposal_flow_id", study_context.proposal_flow_id)
     mape_scores: list[float] = []
     for step_idx, payload in enumerate(fold_payloads):
         fold_idx = int(payload["fold_idx"])
         try:
+            payload["trial_dir"].mkdir(parents=True, exist_ok=True)
             plugin = build_residual_plugin(_residual_plugin_config(loaded, params))
             plugin.fit(
                 payload["backcast_panel"],
@@ -1886,7 +2083,16 @@ def _apply_residual_plugin(
             residual_study_summary_path=residual_summary_path,
         )
     elif loaded.config.residual.validated_mode == "residual_auto":
-        sampler = build_optuna_sampler(optuna_seed(loaded.config.runtime.random_seed))
+        selection = resolve_study_selection(loaded)
+        residual_study_context = build_study_context(
+            loaded,
+            stage_root=residual_root,
+            stage="residual-search",
+            job_name=job.model,
+            study_index=selection.canonical_projection_study_index,
+            base_seed=optuna_seed(loaded.config.runtime.random_seed),
+        )
+        sampler = build_optuna_sampler(residual_study_context.sampler_seed)
         residual_trial_count = optuna_num_trials(loaded.config.runtime.opt_n_trial)
 
         def objective(trial: optuna.Trial) -> float:
@@ -1903,22 +2109,26 @@ def _apply_residual_plugin(
                 ),
             )
             trial.set_user_attr("best_params", candidate_params)
+            trial_root = _trial_dir_from_context(residual_study_context, trial.number)
+            prepared_payloads: list[dict[str, Any]] = []
             for payload in fold_payloads:
-                payload["trial_dir"].mkdir(parents=True, exist_ok=True)
-            score = _score_residual_params(
+                prepared_payloads.append(
+                    {
+                        **payload,
+                        "trial_dir": trial_root / f"fold-{int(payload['fold_idx']):03d}",
+                    }
+                )
+            return _score_residual_params(
                 loaded,
                 job,
                 candidate_params,
-                fold_payloads,
+                prepared_payloads,
                 trial=trial,
+                study_context=residual_study_context,
             )
-            return score
 
         study, study_metadata = _open_persistent_study(
-            residual_root,
-            loaded=loaded,
-            stage="residual-search",
-            job_name=job.model,
+            residual_study_context,
             sampler=sampler,
         )
         optimize_metadata = _optimize_study_with_resume(
@@ -1933,33 +2143,54 @@ def _apply_residual_plugin(
             **RESIDUAL_DEFAULTS[loaded.config.residual.model],
             **best_trial.user_attrs["best_params"],
         }
-        (residual_root / "best_params.json").write_text(
+        residual_study_context.best_params_path.parent.mkdir(parents=True, exist_ok=True)
+        residual_study_context.best_params_path.write_text(
             json.dumps(residual_params, indent=2), encoding="utf-8"
         )
-        (residual_root / "optuna_study_summary.json").write_text(
-            json.dumps(
-                {
-                    **_trial_metrics_summary(study),
-                    **study_metadata,
-                    **optimize_metadata,
-                    "requested_mode": loaded.config.residual.requested_mode,
-                    "validated_mode": loaded.config.residual.validated_mode,
-                    "selected_search_params": list(
-                        loaded.config.residual.selected_search_params
-                    ),
-                    "best_params": residual_params,
-                    "objective_stage": "tuning_pre_replay_residual_corrected_predictions",
-                },
-                indent=2,
+        residual_summary_payload = {
+            **_trial_metrics_summary(study),
+            **study_metadata,
+            **optimize_metadata,
+            "requested_mode": loaded.config.residual.requested_mode,
+            "validated_mode": loaded.config.residual.validated_mode,
+            "selected_search_params": list(
+                loaded.config.residual.selected_search_params
             ),
+            "best_params": residual_params,
+            "objective_stage": "tuning_pre_replay_residual_corrected_predictions",
+        }
+        residual_study_context.summary_path.write_text(
+            json.dumps(residual_summary_payload, indent=2),
             encoding="utf-8",
+        )
+        build_study_visualizations(residual_study_context, residual_summary_payload)
+        _copy_projection_file(
+            residual_study_context.best_params_path,
+            residual_root / "best_params.json",
+        )
+        _copy_projection_file(
+            residual_study_context.summary_path,
+            residual_root / "optuna_study_summary.json",
+        )
+        _write_stage_study_catalog(
+            residual_root,
+            selection,
+            summary_by_study={
+                residual_study_context.study_index: residual_summary_payload,
+            },
         )
         _update_manifest_artifacts(
             manifest_path,
             job_name=job.model,
+            study_catalog_path=residual_root / "study_catalog.json",
+            selected_study_index=selection.selected_study_index,
+            canonical_projection_study_index=(
+                selection.canonical_projection_study_index
+            ),
             residual_best_params_path=residual_root / "best_params.json",
             residual_study_summary_path=residual_root / "optuna_study_summary.json",
         )
+
 
     for payload in fold_payloads:
         fold_idx = int(payload["fold_idx"])
@@ -2767,14 +2998,19 @@ def _run_single_job(
     effective_training_params: dict[str, Any] = {}
     effective_residual_params: dict[str, Any] | None = None
     residual_study_summary: dict[str, Any] | None = None
+    projection_study_context: StudyContext | None = None
     models_dir = run_root / "models" / job.model
     models_dir.mkdir(parents=True, exist_ok=True)
     total_steps = len(splits)
     if job.validated_mode == "learned_auto":
+        execute_study_count = len(resolve_study_selection(loaded).execute_study_indices)
         if main_stage == "tune-main-only":
             total_steps *= optuna_num_trials(loaded.config.runtime.opt_n_trial)
         else:
-            total_steps *= optuna_num_trials(loaded.config.runtime.opt_n_trial) + 1
+            total_steps *= (
+                optuna_num_trials(loaded.config.runtime.opt_n_trial)
+                * execute_study_count
+            ) + 1
     progress = _ProgressLogger(job.model, total_steps)
     progress.model_started(
         total_folds=len(splits),
@@ -2782,11 +3018,29 @@ def _run_single_job(
     )
 
     if job.validated_mode == "learned_auto":
+        selection = resolve_study_selection(loaded)
+        study_contexts = [
+            build_study_context(
+                loaded,
+                stage_root=models_dir,
+                stage="main-search",
+                job_name=job.model,
+                study_index=study_index,
+            )
+            for study_index in selection.execute_study_indices
+        ]
+        per_study_summary: dict[int, dict[str, Any]] = {}
+        per_study_projection_sources: dict[int, dict[str, Path]] = {}
         if main_stage == "tune-main-only":
+            if len(study_contexts) != 1:
+                raise ValueError(
+                    "parallel tuning workers must execute a single resolved Optuna study"
+                )
             _parallel_tune_main_job_worker(
                 loaded,
                 job,
                 models_dir,
+                study_context=study_contexts[0],
                 source_df=source_df,
                 freq=freq,
                 splits=splits,
@@ -2794,35 +3048,100 @@ def _run_single_job(
             )
             progress.model_finished(detail="main-tuning-complete")
             return
-        if main_stage == "replay-only":
-            best_params, best_training_params, study_summary = _load_main_tuning_result(
-                loaded,
-                job,
-                models_dir,
+        projection_context: StudyContext | None = None
+        best_params: dict[str, Any] | None = None
+        best_training_params: dict[str, Any] | None = None
+        study_summary: dict[str, Any] | None = None
+        for study_context in study_contexts:
+            if main_stage == "replay-only":
+                (
+                    current_best_params,
+                    current_best_training_params,
+                    current_study_summary,
+                ) = _load_main_tuning_result(
+                    loaded,
+                    job,
+                    models_dir,
+                    study_context=study_context,
+                )
+            else:
+                (
+                    current_best_params,
+                    current_best_training_params,
+                    current_study_summary,
+                ) = _tune_main_job(
+                    loaded,
+                    job,
+                    models_dir,
+                    study_context=study_context,
+                    source_df=source_df,
+                    freq=freq,
+                    splits=splits,
+                    progress=progress,
+                )
+            study_context.study_root.mkdir(parents=True, exist_ok=True)
+            study_best_params_path = study_context.study_root / "best_params.json"
+            study_training_best_params_path = (
+                study_context.study_root / "training_best_params.json"
             )
-        else:
-            best_params, best_training_params, study_summary = _tune_main_job(
-                loaded,
-                job,
-                models_dir,
-                source_df=source_df,
-                freq=freq,
-                splits=splits,
-                progress=progress,
+            study_summary_path = study_context.study_root / "optuna_study_summary.json"
+            study_best_params_path.write_text(
+                json.dumps(current_best_params, indent=2), encoding="utf-8"
             )
-        (models_dir / "best_params.json").write_text(
-            json.dumps(best_params, indent=2), encoding="utf-8"
-        )
-        (models_dir / "training_best_params.json").write_text(
-            json.dumps(best_training_params, indent=2), encoding="utf-8"
+            study_training_best_params_path.write_text(
+                json.dumps(current_best_training_params, indent=2),
+                encoding="utf-8",
+            )
+            study_summary_path.write_text(
+                json.dumps(current_study_summary, indent=2), encoding="utf-8"
+            )
+            (study_context.study_root / "metadata.json").write_text(
+                json.dumps(study_catalog_entry(study_context), indent=2),
+                encoding="utf-8",
+            )
+            build_study_visualizations(study_context, current_study_summary)
+            per_study_summary[study_context.study_index] = current_study_summary
+            per_study_projection_sources[study_context.study_index] = {
+                "best_params": study_best_params_path,
+                "training_best_params": study_training_best_params_path,
+                "study_summary": study_summary_path,
+            }
+            if (
+                projection_context is None
+                or study_context.study_index
+                == selection.canonical_projection_study_index
+            ):
+                projection_context = study_context
+                best_params = current_best_params
+                best_training_params = current_best_training_params
+                study_summary = current_study_summary
+        if projection_context is None or best_params is None or best_training_params is None or study_summary is None:
+            raise RuntimeError("failed to resolve canonical Optuna study projection")
+        projection_study_context = projection_context
+        projection_sources = per_study_projection_sources[projection_context.study_index]
+        _copy_projection_file(projection_sources["best_params"], models_dir / "best_params.json")
+        _copy_projection_file(
+            projection_sources["training_best_params"],
+            models_dir / "training_best_params.json",
         )
         study_summary_path = models_dir / "optuna_study_summary.json"
-        study_summary_path.write_text(
-            json.dumps(study_summary, indent=2), encoding="utf-8"
+        _copy_projection_file(projection_sources["study_summary"], study_summary_path)
+        build_cross_study_visualizations(
+            models_dir,
+            study_contexts,
+            per_study_summary,
+        )
+        _write_stage_study_catalog(
+            models_dir,
+            selection,
+            summary_by_study=per_study_summary,
         )
         _update_manifest_artifacts(
             manifest_path,
             job_name=job.model,
+            study_catalog_path=models_dir / "study_catalog.json",
+            selected_study_index=selection.selected_study_index,
+            canonical_projection_study_index=selection.canonical_projection_study_index,
             model_best_params_path=models_dir / "best_params.json",
             model_study_summary_path=study_summary_path,
             training_best_params_path=models_dir / "training_best_params.json",
@@ -2991,7 +3310,16 @@ def _run_single_job(
                         "fold_idx": fold_idx,
                         "backcast_panel": backcast_panel,
                         "eval_panel": eval_panel,
-                        "trial_dir": run_root / "residual" / effective_job.model / "_optuna_trial",
+                        "trial_dir": (
+                            (projection_study_context or build_study_context(
+                                loaded,
+                                stage_root=run_root / "residual" / effective_job.model,
+                                stage="residual-search",
+                                job_name=effective_job.model,
+                                study_index=resolve_study_selection(loaded).canonical_projection_study_index,
+                            )).trials_root
+                            / "replay-selected-study"
+                        ),
                         "base_summary": {
                             "model": effective_job.model,
                             "fold_idx": fold_idx,
@@ -3026,6 +3354,7 @@ def _run_single_job(
     resolved_strategy = loaded.config.training.strategy
     if resolved_strategy is None and resolved_devices > 1:
         resolved_strategy = "ddp-gloo-auto"
+    models_dir.mkdir(parents=True, exist_ok=True)
     (models_dir / "fit_summary.json").write_text(
         json.dumps(
             {
@@ -3089,33 +3418,47 @@ def _run_single_job_with_parallel_tuning(
 ) -> list[dict[str, object]]:
     if _should_prune_model_run_artifacts(job, main_stage="full"):
         _prune_model_run_artifacts(run_root, job.model)
+    selection = resolve_study_selection(loaded)
     scheduler_dir = run_root / "scheduler"
     scheduler_dir.mkdir(parents=True, exist_ok=True)
-    tune_launches = build_tuning_launch_plan(
-        loaded.config,
-        job_name=job.model,
-        worker_count=min(
-            len(build_device_groups(loaded.config)),
-            loaded.config.scheduler.max_concurrent_jobs,
-        ),
-    )
-    (scheduler_dir / "launch_plan.json").write_text(
-        json.dumps([launch.__dict__ for launch in tune_launches], indent=2),
-        encoding="utf-8",
-    )
-    results = run_parallel_jobs(repo_root, loaded, tune_launches, scheduler_dir)
-    if any(int(result["returncode"]) != 0 for result in results):
-        raise SystemExit(
-            json.dumps(
-                {
-                    "ok": False,
-                    "worker_results": results,
-                    "summary_artifacts": {},
-                }
-            )
+    results: list[dict[str, object]] = []
+    for study_index in selection.execute_study_indices:
+        study_loaded = loaded_with_study_selection_override(loaded, study_index)
+        study_scheduler_dir = scheduler_dir / f"study-{study_index:02d}"
+        study_scheduler_dir.mkdir(parents=True, exist_ok=True)
+        tune_launches = build_tuning_launch_plan(
+            study_loaded.config,
+            job_name=job.model,
+            worker_count=min(
+                len(build_device_groups(study_loaded.config)),
+                study_loaded.config.scheduler.max_concurrent_jobs,
+            ),
+            selected_study=study_index,
         )
-    _run_single_job(
+        (study_scheduler_dir / "launch_plan.json").write_text(
+            json.dumps([launch.__dict__ for launch in tune_launches], indent=2),
+            encoding="utf-8",
+        )
+        worker_results = run_parallel_jobs(
+            repo_root, study_loaded, tune_launches, study_scheduler_dir
+        )
+        results.extend(worker_results)
+        if any(int(result["returncode"]) != 0 for result in worker_results):
+            raise SystemExit(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "worker_results": results,
+                        "summary_artifacts": {},
+                    }
+                )
+            )
+    projection_loaded = loaded_with_study_selection_override(
         loaded,
+        selection.canonical_projection_study_index,
+    )
+    _run_single_job(
+        projection_loaded,
         job,
         run_root,
         manifest_path=manifest_path,
@@ -3129,6 +3472,7 @@ def run_loaded_config(
     loaded: LoadedConfig,
     args: argparse.Namespace,
 ) -> dict[str, Any]:
+    loaded = loaded_with_study_selection_override(loaded, getattr(args, "optuna_study", None))
     selected_jobs = _selected_jobs(loaded, args.jobs)
     resolved_roots = _resolve_run_roots(
         repo_root,
@@ -3138,6 +3482,19 @@ def run_loaded_config(
     paths = _build_resolved_artifacts(repo_root, loaded, resolved_roots["run_root"])
     _validate_jobs(loaded, selected_jobs, paths["capability_path"])
     _validate_adapters(loaded, selected_jobs)
+    _initialize_study_catalogs(paths["run_root"], loaded, selected_jobs)
+    selection = resolve_study_selection(loaded)
+    for job in selected_jobs:
+        stage_root = paths["run_root"] / "models" / job.model
+        stage_catalog = build_study_catalog_payload(stage_root, selection)
+        write_cross_study_visualizations(run_root=stage_root, study_catalog=stage_catalog)
+        _update_manifest_artifacts(
+            paths["manifest_path"],
+            job_name=job.model,
+            study_catalog_path=stage_root / "study_catalog.json",
+            selected_study_index=selection.selected_study_index,
+            canonical_projection_study_index=selection.canonical_projection_study_index,
+        )
     stage_result = get_active_stage_plugin(loaded.config)
     if stage_result is not None:
         stage_plugin, _ = stage_result
@@ -3207,7 +3564,8 @@ def run_loaded_config(
             "run_root": str(paths["run_root"]),
             "jobs_route": loaded.active_jobs_route_slug,
         }
-    launches = build_launch_plan(loaded.config, selected_jobs)
+    selection = resolve_study_selection(loaded)
+    launches = build_launch_plan(loaded.config, selected_jobs, selected_study=selection.selected_study_index)
     scheduler_dir = paths["run_root"] / "scheduler"
     scheduler_dir.mkdir(parents=True, exist_ok=True)
     (scheduler_dir / "launch_plan.json").write_text(

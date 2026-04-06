@@ -1,0 +1,21 @@
+{
+  "compatibility_mode": null,
+  "compatibility_source_path": null,
+  "config_path": "tests/fixtures/aa_forecast_runtime_plugin_auto_model_only.yaml",
+  "enabled": true,
+  "event_column": "event",
+  "lowess_delta": 0.01,
+  "lowess_frac": 0.6,
+  "mode": "learned_auto",
+  "model_params": {},
+  "selected_config_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/tests/fixtures/aa_forecast_runtime_plugin_auto_model_only.yaml",
+  "tune_training": false,
+  "uncertainty": {
+    "dropout_candidates": [
+      0.1,
+      0.3
+    ],
+    "enabled": false,
+    "sample_count": 3
+  }
+}

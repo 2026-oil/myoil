@@ -1,0 +1,66 @@
+nec:
+  preprocessing:
+    mode: diff_std
+    gmm_components: 3
+    epsilon: 1.5
+  inference:
+    mode: soft_weighted_inverse
+    threshold: 0.5
+  classifier:
+    model: TSMixerx
+    variables:
+      - Idx_OVX
+      - Com_Oil_Spread
+      - BS_Core_Index_A
+      - BS_Core_Index_B
+      - BS_Core_Index_C
+      - Com_LMEX
+      - Com_BloombergCommodity_BCOM
+      - GPRD_THREAT
+      - GPRD
+      - GPRD_ACT
+    model_params:
+      n_block: 3
+      ff_dim: 96
+      dropout: 0.1
+      revin: true
+    alpha: 2.0
+    beta: 0.5
+    oversample_extreme_windows: true
+  normal:
+    model: LSTM
+    variables:
+      - Idx_OVX
+      - Com_Oil_Spread
+      - BS_Core_Index_A
+      - BS_Core_Index_B
+      - BS_Core_Index_C
+      - Com_LMEX
+      - Com_BloombergCommodity_BCOM
+      - GPRD_THREAT
+      - GPRD
+      - GPRD_ACT
+    model_params:
+      encoder_hidden_size: 128
+      decoder_hidden_size: 128
+      encoder_n_layers: 2
+      decoder_layers: 2
+    oversample_extreme_windows: false
+  extreme:
+    model: TSMixerx
+    variables:
+      - Idx_OVX
+      - Com_Oil_Spread
+      - BS_Core_Index_A
+      - BS_Core_Index_B
+      - BS_Core_Index_C
+      - Com_LMEX
+      - Com_BloombergCommodity_BCOM
+    model_params:
+      n_block: 3
+      ff_dim: 96
+      dropout: 0.1
+      revin: true
+    oversample_extreme_windows: true
+  validation:
+    windows: 8

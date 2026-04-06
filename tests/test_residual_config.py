@@ -23,6 +23,7 @@ from neuralforecast.core import MODEL_FILENAME_DICT, NeuralForecast
 from runtime_support.adapters import build_multivariate_inputs, build_univariate_inputs
 from plugins.bs_preforcast.runtime import prepare_bs_preforcast_fold_inputs
 from app_config import (
+    JobConfig,
     TrainingOptimizerConfig,
     TrainingLossParams,
     _effective_shared_settings_for_source,
@@ -1976,6 +1977,27 @@ def test_scheduler_finalize_recreates_missing_worker_root(
     summary_path = scheduler_root / "workers" / launch.job_name / "summary.json"
     assert summary_path.exists()
     assert json.loads(summary_path.read_text(encoding="utf-8"))["returncode"] == 7
+
+
+def test_worker_command_includes_optuna_study_override(tmp_path: Path) -> None:
+    from runtime_support.scheduler import WorkerLaunch, _worker_command
+
+    payload = _payload()
+    payload["runtime"]["opt_study_count"] = 2
+    payload["runtime"]["opt_selected_study"] = 2
+    loaded = load_app_config(
+        tmp_path, config_path=_write_config(tmp_path, payload, ".yaml")
+    )
+
+    command = _worker_command(
+        tmp_path / "main.py",
+        loaded,
+        WorkerLaunch(job_name="TFT", phase="tune-main-only", selected_study=2),
+        tmp_path / "scheduler" / "workers" / "TFT#0" / "run",
+    )
+
+    assert "--optuna-study" in command
+    assert command[command.index("--optuna-study") + 1] == "2"
 
 
 def test_runtime_executes_single_job_with_dummy_model(tmp_path: Path):
@@ -4022,6 +4044,223 @@ def test_load_app_config_marks_aaforecast_auto_requested_and_validated_modes(
     assert loaded.config.training_search.requested_mode == "training_fixed"
     assert loaded.config.training_search.validated_mode == "training_fixed"
     assert list(loaded.config.training_search.selected_search_params) == []
+
+
+def test_load_app_config_allows_disabling_training_search_for_aaforecast_auto(
+    tmp_path: Path,
+):
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = ["event"]
+    payload["training_search"] = {"enabled": False}
+    payload["jobs"] = [{"model": "AAForecast", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,event\n"
+        "2020-01-01,1,0\n"
+        "2020-01-08,2,1\n"
+        "2020-01-15,3,0\n"
+        "2020-01-22,4,2\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {
+                "AAForecast": [
+                    "encoder_hidden_size",
+                    "encoder_n_layers",
+                    "encoder_dropout",
+                    "decoder_hidden_size",
+                    "decoder_layers",
+                    "season_length",
+                    "trend_kernel_size",
+                    "anomaly_threshold",
+                ]
+            },
+            "training": ["input_size", "model_step_size"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    job = loaded.config.jobs[0]
+    assert job.requested_mode == "learned_auto_requested"
+    assert job.validated_mode == "learned_auto"
+    assert list(job.selected_search_params) == [
+        "encoder_hidden_size",
+        "encoder_n_layers",
+        "encoder_dropout",
+        "decoder_hidden_size",
+        "decoder_layers",
+        "season_length",
+        "trend_kernel_size",
+        "anomaly_threshold",
+    ]
+    assert loaded.config.training_search.requested_mode == "training_fixed"
+    assert loaded.config.training_search.validated_mode == "training_fixed"
+    assert list(loaded.config.training_search.selected_search_params) == []
+
+
+def test_load_app_config_routes_aa_forecast_plugin_model_only_auto(
+    tmp_path: Path,
+):
+    plugin_path = tmp_path / "aa_forecast_plugin.yaml"
+    plugin_path.write_text(
+        "aa_forecast:\n"
+        "  mode: learned_auto\n"
+        "  tune_training: false\n"
+        "  model_params: {}\n",
+        encoding="utf-8",
+    )
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = ["event"]
+    payload["jobs"] = []
+    payload["aa_forecast"] = {
+        "enabled": True,
+        "config_path": str(plugin_path),
+    }
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,event\n"
+        "2020-01-01,1,0\n"
+        "2020-01-08,2,1\n"
+        "2020-01-15,3,0\n"
+        "2020-01-22,4,2\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {
+                "AAForecast": [
+                    "encoder_hidden_size",
+                    "encoder_n_layers",
+                    "encoder_dropout",
+                    "decoder_hidden_size",
+                    "decoder_layers",
+                    "season_length",
+                    "trend_kernel_size",
+                    "anomaly_threshold",
+                ]
+            },
+            "training": ["input_size", "model_step_size"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    assert loaded.config.jobs == (
+        JobConfig(
+            model="AAForecast",
+            params={},
+            requested_mode="learned_auto_requested",
+            validated_mode="learned_auto",
+            selected_search_params=(
+                "encoder_hidden_size",
+                "encoder_n_layers",
+                "encoder_dropout",
+                "decoder_hidden_size",
+                "decoder_layers",
+                "season_length",
+                "trend_kernel_size",
+                "anomaly_threshold",
+            ),
+        ),
+    )
+    assert loaded.config.training_search.requested_mode == "training_fixed"
+    assert loaded.config.training_search.validated_mode == "training_fixed"
+    assert list(loaded.config.training_search.selected_search_params) == []
+    assert loaded.stage_plugin_loaded is not None
+    assert str(loaded.stage_plugin_loaded.source_path) == str(
+        plugin_path.resolve()
+    )
+
+
+def test_load_app_config_routes_aa_forecast_plugin_best_fixed(
+    tmp_path: Path,
+):
+    plugin_path = tmp_path / "aa_forecast_plugin_best.yaml"
+    plugin_path.write_text(
+        "aa_forecast:\n"
+        "  mode: fixed\n"
+        "  tune_training: false\n"
+        "  model_params:\n"
+        "    encoder_hidden_size: 256\n"
+        "    encoder_n_layers: 3\n"
+        "    encoder_dropout: 0.2\n"
+        "    decoder_hidden_size: 256\n"
+        "    decoder_layers: 3\n"
+        "    season_length: 4\n"
+        "    trend_kernel_size: 3\n"
+        "    anomaly_threshold: 4.0\n",
+        encoding="utf-8",
+    )
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = ["event"]
+    payload["jobs"] = []
+    payload["aa_forecast"] = {
+        "enabled": True,
+        "config_path": str(plugin_path),
+    }
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,event\n"
+        "2020-01-01,1,0\n"
+        "2020-01-08,2,1\n"
+        "2020-01-15,3,0\n"
+        "2020-01-22,4,2\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {
+            "models": {
+                "AAForecast": [
+                    "encoder_hidden_size",
+                    "encoder_n_layers",
+                    "encoder_dropout",
+                    "decoder_hidden_size",
+                    "decoder_layers",
+                    "season_length",
+                    "trend_kernel_size",
+                    "anomaly_threshold",
+                ]
+            },
+            "training": ["input_size", "model_step_size"],
+            "residual": {"xgboost": ["n_estimators"]},
+        },
+    )
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    assert loaded.config.jobs == (
+        JobConfig(
+            model="AAForecast",
+            params={
+                "encoder_hidden_size": 256,
+                "encoder_n_layers": 3,
+                "encoder_dropout": 0.2,
+                "decoder_hidden_size": 256,
+                "decoder_layers": 3,
+                "season_length": 4,
+                "trend_kernel_size": 3,
+                "anomaly_threshold": 4.0,
+            },
+            requested_mode="learned_fixed",
+            validated_mode="learned_fixed",
+            selected_search_params=(),
+        ),
+    )
+    assert loaded.config.training_search.requested_mode == "training_fixed"
+    assert loaded.config.training_search.validated_mode == "training_fixed"
+    assert list(loaded.config.training_search.selected_search_params) == []
+    assert loaded.stage_plugin_loaded is not None
+    assert str(loaded.stage_plugin_loaded.source_path) == str(plugin_path.resolve())
 
 
 @pytest.mark.parametrize(
@@ -6364,6 +6603,136 @@ def test_runtime_auto_mode_resumes_persistent_study_budget(
     assert second_summary["remaining_trial_count"] == 0
     assert second_summary["storage_backend"] == "journal"
     assert Path(second_summary["storage_path"]).exists()
+
+
+def test_runtime_auto_mode_multi_study_catalog_and_projection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    payload = _payload()
+    payload["runtime"]["opt_n_trial"] = 1
+    payload["runtime"]["opt_study_count"] = 2
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n2020-01-15,3\n2020-01-22,4\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(tmp_path)
+
+    import runtime_support.runner as runtime
+
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    monkeypatch.setattr(
+        runtime,
+        "load_app_config",
+        lambda _repo_root, **kwargs: load_app_config(tmp_path, **kwargs),
+    )
+
+    def _fake_tune_or_load(
+        loaded,
+        job,
+        models_dir,
+        *,
+        study_context,
+        source_df=None,
+        freq=None,
+        splits=None,
+        progress=None,
+    ):
+        summary = {
+            "direction": "minimize",
+            "trial_count": 1,
+            "finished_trial_count": 1,
+            "state_counts": {"complete": 1},
+            "best_value": float(study_context.study_index),
+            "best_trial_number": 0,
+            "objective_metric": "mean_fold_mape",
+            "study_index": study_context.study_index,
+            "study_name": study_context.study_name,
+            "storage_backend": "journal",
+            "storage_path": str(study_context.storage_path),
+            "sampler_seed": study_context.sampler_seed,
+            "proposal_flow_id": study_context.proposal_flow_id,
+            "requested_trial_count": 1,
+            "existing_trial_count_before_optimize": 0,
+            "existing_finished_trial_count_before_optimize": 0,
+            "remaining_trial_count": 1,
+            "requested_mode": job.requested_mode,
+            "validated_mode": job.validated_mode,
+            "selected_search_params": list(job.selected_search_params),
+            "selected_training_search_params": [],
+            "training_range_source": "training",
+            "best_params": {"study_param": study_context.study_index},
+            "best_training_params": {"max_steps": 1},
+            "fold_mape": [float(study_context.study_index)],
+            "objective_stage": "tuning_pre_replay_direct_predictions",
+        }
+        return {"study_param": study_context.study_index}, {"max_steps": 1}, summary
+
+    monkeypatch.setattr(runtime, "_tune_main_job", _fake_tune_or_load)
+    monkeypatch.setattr(runtime, "_load_main_tuning_result", _fake_tune_or_load)
+    monkeypatch.setattr(runtime, "_write_loss_curve_artifact", lambda *args, **kwargs: None)
+    monkeypatch.setattr(runtime, "_should_build_summary_artifacts", lambda: False)
+
+    def _fake_fit_and_predict_fold(
+        loaded,
+        job,
+        *,
+        source_df,
+        freq,
+        train_idx,
+        test_idx,
+        params_override=None,
+        training_override=None,
+        run_root=None,
+    ):
+        train_df = source_df.iloc[train_idx].reset_index(drop=True)
+        test_df = source_df.iloc[test_idx].reset_index(drop=True)
+        predictions = pd.DataFrame(
+            {
+                "unique_id": [loaded.config.dataset.target_col],
+                "ds": pd.Series([str(test_df[loaded.config.dataset.dt_col].iloc[0])]),
+                job.model: [42.0],
+            }
+        )
+        actuals = test_df[loaded.config.dataset.target_col].reset_index(drop=True)
+        return (
+            predictions,
+            actuals,
+            pd.to_datetime(train_df[loaded.config.dataset.dt_col].iloc[-1]),
+            train_df,
+            SimpleNamespace(models=[]),
+        )
+
+    monkeypatch.setattr(runtime, "_fit_and_predict_fold", _fake_fit_and_predict_fold)
+
+    output_root = tmp_path / "run_multi_study"
+    code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "TFT",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    assert code == 0
+    top_level_summary = json.loads(
+        (output_root / "models" / "TFT" / "optuna_study_summary.json").read_text()
+    )
+    study_catalog = json.loads(
+        (output_root / "models" / "TFT" / "study_catalog.json").read_text()
+    )
+    assert top_level_summary["study_index"] == 1
+    assert study_catalog["study_count"] == 2
+    assert study_catalog["canonical_projection_study_index"] == 1
+    assert len(study_catalog["entries"]) == 2
 
 
 def test_runtime_auto_mode_records_training_selector_provenance_and_artifacts(
@@ -9895,6 +10264,113 @@ def test_runtime_main_joint_auto_mode_records_residual_best_params(
     )
 
 
+def test_runtime_main_recreates_model_dir_before_fit_summary_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    import runtime_support.runner as runtime
+
+    payload = _payload()
+    payload["runtime"]["opt_n_trial"] = 1
+    payload["cv"].update({"horizon": 1, "step_size": 1, "n_windows": 2, "gap": 0})
+    payload["training"].update({"input_size": 1, "max_steps": 1, "val_size": 1})
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["jobs"] = [{"model": "TFT", "params": {}}]
+    payload["residual"] = {"enabled": False}
+    (tmp_path / "data.csv").write_text(
+        "\n".join(
+            [
+                "dt,target",
+                "2020-01-01,1",
+                "2020-01-08,2",
+                "2020-01-15,3",
+                "2020-01-22,4",
+                "2020-01-29,5",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+    _write_search_space(
+        tmp_path,
+        {"models": {"TFT": ["hidden_size"]}, "training": [], "residual": {}},
+    )
+
+    call_count = 0
+    output_root = tmp_path / "run_missing_model_dir"
+
+    def _fake_fit_and_predict_fold(
+        loaded,
+        job,
+        *,
+        source_df,
+        train_idx,
+        test_idx,
+        **_kwargs,
+    ):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 4:
+            runtime._remove_existing_artifact(output_root / "models" / job.model)
+        predictions = pd.DataFrame(
+            {
+                "unique_id": [loaded.config.dataset.target_col],
+                "ds": source_df.iloc[test_idx][loaded.config.dataset.dt_col].reset_index(
+                    drop=True
+                ),
+                job.model: [1.0],
+            }
+        )
+        actuals = pd.Series([1.0])
+        return (
+            predictions,
+            actuals,
+            pd.Timestamp(
+                source_df.iloc[train_idx].iloc[-1][loaded.config.dataset.dt_col]
+            ),
+            source_df.iloc[train_idx].reset_index(drop=True),
+            SimpleNamespace(),
+        )
+
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    monkeypatch.setattr(
+        runtime,
+        "load_app_config",
+        lambda _repo_root, **kwargs: load_app_config(tmp_path, **kwargs),
+    )
+    monkeypatch.setattr(runtime, "_fit_and_predict_fold", _fake_fit_and_predict_fold)
+    monkeypatch.setattr(
+        runtime,
+        "suggest_model_params",
+        lambda *_args, **_kwargs: {"hidden_size": 32},
+    )
+    monkeypatch.setattr(
+        runtime,
+        "suggest_training_params",
+        lambda *_args, **_kwargs: {},
+    )
+    monkeypatch.setattr(runtime, "_should_build_summary_artifacts", lambda: False)
+
+    code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--jobs",
+            "TFT",
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    assert code == 0
+    fit_summary = json.loads(
+        (output_root / "models" / "TFT" / "fit_summary.json").read_text()
+    )
+    assert fit_summary["model"] == "TFT"
+    assert fit_summary["fold_count"] == 2
+    assert call_count == 4
+
+
 def test_apply_residual_plugin_uses_override_params_without_running_residual_study(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -9964,7 +10440,6 @@ def test_apply_residual_plugin_uses_override_params_without_running_residual_stu
     fold_payloads = [
         {
             "fold_idx": 0,
-            "trial_dir": run_root / "residual" / job.model / "_optuna_trial",
             "backcast_panel": panel.copy(),
             "eval_panel": panel.copy(),
             "base_summary": {"fold_idx": 0},
@@ -9994,6 +10469,7 @@ def test_apply_residual_plugin_uses_override_params_without_running_residual_stu
     assert json.loads(
         (run_root / "residual" / job.model / "optuna_study_summary.json").read_text()
     )["objective_stage"] == "tuning_pre_replay_joint_corrected_predictions"
+    assert not (run_root / "residual" / job.model / "_optuna_trial").exists()
 
 
 def test_apply_residual_plugin_prefers_yaml_opt_n_trial_over_env(
@@ -10018,16 +10494,13 @@ def test_apply_residual_plugin_prefers_yaml_opt_n_trial_over_env(
         "build_residual_plugin",
         lambda _config: _ZeroResidualPlugin(),
     )
-    monkeypatch.setattr(
-        runtime,
-        "_score_residual_params",
-        lambda *_args, **_kwargs: 1.0,
-    )
     monkeypatch.setenv("NEURALFORECAST_OPTUNA_NUM_TRIALS", "1")
     monkeypatch.setenv("NEURALFORECAST_OPTUNA_SEED", "7")
 
     payload = _payload()
     payload["runtime"]["opt_n_trial"] = 2
+    payload["runtime"]["opt_study_count"] = 2
+    payload["runtime"]["opt_selected_study"] = 2
     payload["residual"] = {"enabled": True, "model": "xgboost", "params": {}}
     (tmp_path / "data.csv").write_text(
         "dt,target,hist_a\n2020-01-01,1,2\n",
@@ -10049,7 +10522,6 @@ def test_apply_residual_plugin_prefers_yaml_opt_n_trial_over_env(
     fold_payloads = [
         {
             "fold_idx": 0,
-            "trial_dir": run_root / "residual" / job.model / "_optuna_trial",
             "backcast_panel": _residual_target_panel(
                 [
                     {
@@ -10110,6 +10582,29 @@ def test_apply_residual_plugin_prefers_yaml_opt_n_trial_over_env(
     summary = json.loads(
         (run_root / "residual" / job.model / "optuna_study_summary.json").read_text()
     )
+    trial_dir = (
+        run_root
+        / "residual"
+        / job.model
+        / "studies"
+        / "study-02"
+        / "trials"
+        / "trial-0000"
+        / "fold-000"
+    )
+    assert trial_dir.exists()
+    assert (run_root / "residual" / job.model / "study_catalog.json").exists()
+    assert (
+        run_root
+        / "residual"
+        / job.model
+        / "studies"
+        / "study-02"
+        / "visuals"
+        / job.model
+        / "residual-search"
+        / "artifact_inventory.json"
+    ).exists()
     assert first_summary["trial_count"] == 2
     assert first_summary["remaining_trial_count"] == 2
     assert summary["trial_count"] == 2

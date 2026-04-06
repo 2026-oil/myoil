@@ -1,0 +1,39 @@
+task:
+  name: research_iter4_oilcore_tuned
+dataset:
+  path: data/df.csv
+  target_col: Com_CrudeOil
+  dt_col: dt
+  hist_exog_cols:
+  - Com_Gasoline
+  - Com_NaturalGas
+  - Com_Coal
+  - Com_Oil_Spread
+  - Com_BloombergCommodity_BCOM
+  - Com_LMEX
+  - Idx_OVX
+  - Idx_GVZ
+  - Idx_SnPVIX
+  - GPRD_THREAT
+  - GPRD_ACT
+  - BS_Core_Index_Integrated
+  futr_exog_cols: []
+  static_exog_cols: []
+residual:
+  enabled: true
+  model: xgboost
+  params:
+    n_estimators: 128
+    max_depth: 6
+    subsample: 0.8
+    colsample_bytree: 0.8
+jobs:
+- model: AAForecast
+  params:
+    encoder_hidden_size: 256
+    decoder_hidden_size: 256
+    encoder_n_layers: 3
+    encoder_dropout: 0.15
+    season_length: 4
+    trend_kernel_size: 5
+    anomaly_threshold: 2.5

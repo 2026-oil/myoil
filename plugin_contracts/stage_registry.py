@@ -37,6 +37,7 @@ def _ensure_plugins_loaded() -> None:
     """
     if _STAGE_PLUGINS:
         return
+    import plugins.aa_forecast.plugin  # noqa: F401  side-effect: registers plugin
     import plugins.bs_preforcast.plugin  # noqa: F401  side-effect: registers plugin
     import plugins.nec.plugin  # noqa: F401  side-effect: registers plugin
 
