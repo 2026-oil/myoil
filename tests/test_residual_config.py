@@ -4359,7 +4359,7 @@ def test_load_app_config_routes_aa_forecast_plugin_best_fixed(
         "    encoder_dropout: 0.2\n"
         "    decoder_hidden_size: 256\n"
         "    decoder_layers: 3\n"
-        "    season_length: 4\n"
+        "    season_length: 52\n"
         "    trend_kernel_size: 3\n"
         "    p_value: 0.005\n",
     )
@@ -4411,7 +4411,7 @@ def test_load_app_config_routes_aa_forecast_plugin_best_fixed(
                 "encoder_dropout": 0.2,
                 "decoder_hidden_size": 256,
                 "decoder_layers": 3,
-                "season_length": 4,
+                "season_length": 52,
                 "trend_kernel_size": 3,
             },
             requested_mode="learned_fixed",
@@ -7674,7 +7674,7 @@ def test_build_model_supports_new_official_model_ports(tmp_path: Path):
                 "encoder_dropout": 0.1,
                 "decoder_hidden_size": 16,
                 "decoder_layers": 1,
-                "season_length": 4,
+                "season_length": 52,
                 "trend_kernel_size": 3,
                 "p_value": 0.01,
             },

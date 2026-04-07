@@ -12,11 +12,11 @@ aa_forecast:
     encoder_dropout: 0.2
     decoder_hidden_size: 256
     decoder_layers: 3
-    season_length: 4
+    season_length: 52
   star_anomaly_tails:
     upward:
     - GPRD_THREAT
     - GPRD
     - GPRD_ACT
     two_sided: []
-  p_value: 0.005
+  p_value: 0.05

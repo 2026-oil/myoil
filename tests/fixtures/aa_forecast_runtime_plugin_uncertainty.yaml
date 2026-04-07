@@ -12,7 +12,7 @@ aa_forecast:
     encoder_dropout: 0.1
     decoder_hidden_size: 16
     decoder_layers: 1
-    season_length: 4
+    season_length: 52
     trend_kernel_size: 3
     start_padding_enabled: true
   star_anomaly_tails:

@@ -13,7 +13,7 @@ aa_forecast:
     decoder_hidden_size: 128
     decoder_layers: 2
     attention_hidden_size: 32
-    season_length: 4
+    season_length: 52
   star_anomaly_tails:
     upward:
     - GPRD_THREAT
