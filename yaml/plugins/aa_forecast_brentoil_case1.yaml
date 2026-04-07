@@ -20,4 +20,4 @@ aa_forecast:
     - GPRD
     - GPRD_ACT
     two_sided: []
-  p_value: 0.05
+  top_k: 0.05

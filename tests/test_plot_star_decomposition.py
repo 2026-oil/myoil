@@ -41,7 +41,7 @@ def make_weekly_frame(rows: int = 96) -> pd.DataFrame:
 
 
 def run_script(
-    csv_path: Path, output_dir: Path, *targets: str, p_value: float | None = None
+    csv_path: Path, output_dir: Path, *targets: str, top_k: float | None = None
 ) -> subprocess.CompletedProcess[str]:
     env = {
         **os.environ,
@@ -51,8 +51,8 @@ def run_script(
         "NUMEXPR_NUM_THREADS": "1",
     }
     cmd = [sys.executable, str(SCRIPT), "--input", str(csv_path), "--output-dir", str(output_dir)]
-    if p_value is not None:
-        cmd.extend(["--p-value", str(p_value)])
+    if top_k is not None:
+        cmd.extend(["--top-k", str(top_k)])
     if targets:
         cmd.extend(["--targets", *targets])
     return subprocess.run(
@@ -70,7 +70,7 @@ def test_plot_star_decomposition_writes_two_expected_pngs(tmp_path: Path) -> Non
     output_dir = tmp_path / "run"
     make_weekly_frame().to_csv(csv_path, index=False, encoding="utf-8-sig")
 
-    result = run_script(csv_path, output_dir, p_value=0.05)
+    result = run_script(csv_path, output_dir, top_k=0.05)
 
     assert result.returncode == 0, result.stderr
     png_names = sorted(path.name for path in output_dir.glob("*.png"))
@@ -87,7 +87,7 @@ def test_plot_star_decomposition_can_add_gprd_threat_plot(tmp_path: Path) -> Non
     output_dir = tmp_path / "run"
     make_weekly_frame().to_csv(csv_path, index=False, encoding="utf-8-sig")
 
-    result = run_script(csv_path, output_dir, "wti", "brent", "gprd_threat", p_value=0.05)
+    result = run_script(csv_path, output_dir, "wti", "brent", "gprd_threat", top_k=0.05)
 
     assert result.returncode == 0, result.stderr
     png_names = sorted(path.name for path in output_dir.glob("*.png"))
@@ -110,7 +110,7 @@ def test_plot_star_decomposition_fails_fast_when_required_target_is_missing(tmp_
     assert "Required wti target column is missing" in result.stderr
 
 
-def test_compute_selected_count_uses_p_value_ceiling() -> None:
+def test_compute_selected_count_uses_top_k_ceiling() -> None:
     assert compute_selected_count(20, 0.05) == 1
     assert compute_selected_count(21, 0.05) == 2
     assert compute_selected_count(100, 0.02) == 2
@@ -121,7 +121,7 @@ def test_select_tail_anomaly_mask_uses_two_sided_ranking() -> None:
 
     mask, priority, selected_count = select_tail_anomaly_mask(
         raw_residual,
-        p_value=0.4,
+        top_k=0.4,
         tail="two_sided",
     )
 
@@ -135,7 +135,7 @@ def test_select_tail_anomaly_mask_uses_upward_ranking() -> None:
 
     mask, priority, selected_count = select_tail_anomaly_mask(
         raw_residual,
-        p_value=0.4,
+        top_k=0.4,
         tail="upward",
     )
 

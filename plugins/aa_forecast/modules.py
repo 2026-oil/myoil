@@ -34,15 +34,15 @@ class STARFeatureExtractor(nn.Module):
         season_length: int = 12,
         lowess_frac: float = 0.6,
         lowess_delta: float = 0.01,
-        p_value: float = 0.05,
+        top_k: float = 0.05,
     ):
         super().__init__()
         self.season_length = max(2, int(season_length))
         self.lowess_frac = float(lowess_frac)
         self.lowess_delta = float(lowess_delta)
-        self.p_value = float(p_value)
-        if self.p_value <= 0 or self.p_value >= 1:
-            raise ValueError("STARFeatureExtractor p_value must satisfy 0 < value < 1")
+        self.top_k = float(top_k)
+        if self.top_k <= 0 or self.top_k >= 1:
+            raise ValueError("STARFeatureExtractor top_k must satisfy 0 < value < 1")
         self._trend_cache: dict[bytes, np.ndarray] = {}
         self._trend_cache_order: list[bytes] = []
         self._trend_cache_limit = 4096
@@ -149,7 +149,7 @@ class STARFeatureExtractor(nn.Module):
         tail_modes: tuple[str, ...],
     ) -> tuple[torch.Tensor, torch.Tensor]:
         batch, seq_len, channels = ranking_score.shape
-        selected_count = max(1, math.ceil(self.p_value * seq_len))
+        selected_count = max(1, math.ceil(self.top_k * seq_len))
         if selected_count >= seq_len:
             cutoff = ranking_score.min(dim=1, keepdim=True).values
         else:

@@ -421,7 +421,7 @@ models:
         - 5
         - 7
         - 9
-    p_value:
+    top_k:
       type: categorical
       choices:
         - 0.005

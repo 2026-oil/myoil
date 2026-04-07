@@ -41,7 +41,7 @@ TARGET_TAILS = {
 DEFAULT_LOWESS_FRAC = 0.6
 DEFAULT_LOWESS_DELTA = 0.01
 DEFAULT_SEASON_LENGTH = 4
-DEFAULT_P_VALUE = 0.05
+DEFAULT_TOP_K = 0.05
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot AA-Forecast STAR decomposition for WTI and Brent from data/df.csv."
@@ -75,10 +75,10 @@ def parse_args() -> argparse.Namespace:
         help=f"STAR seasonal period (default: {DEFAULT_SEASON_LENGTH}).",
     )
     parser.add_argument(
-        "--p-value",
+        "--top-k",
         type=float,
-        default=DEFAULT_P_VALUE,
-        help=f"Shared STAR anomaly p-value (default: {DEFAULT_P_VALUE}).",
+        default=DEFAULT_TOP_K,
+        help=f"Shared STAR anomaly top-k (default: {DEFAULT_TOP_K}).",
     )
     parser.add_argument(
         "--targets",
@@ -150,12 +150,12 @@ def compute_signed_robustness_score(raw_residual: np.ndarray) -> np.ndarray:
     return 0.6745 * (raw_residual - residual_center) / mad
 
 
-def compute_selected_count(sequence_length: int, p_value: float) -> int:
+def compute_selected_count(sequence_length: int, top_k: float) -> int:
     if sequence_length <= 0:
         raise ValueError("sequence_length must be positive")
-    if not 0 < p_value < 1:
-        raise ValueError("p_value must satisfy 0 < p_value < 1")
-    return max(1, math.ceil(p_value * sequence_length))
+    if not 0 < top_k < 1:
+        raise ValueError("top_k must satisfy 0 < top_k < 1")
+    return max(1, math.ceil(top_k * sequence_length))
 
 
 def compute_tail_priority(raw_residual: np.ndarray, *, tail: str) -> np.ndarray:
@@ -170,10 +170,10 @@ def compute_tail_priority(raw_residual: np.ndarray, *, tail: str) -> np.ndarray:
 def select_tail_anomaly_mask(
     raw_residual: np.ndarray,
     *,
-    p_value: float,
+    top_k: float,
     tail: str,
 ) -> tuple[np.ndarray, np.ndarray, int]:
-    selected_count = compute_selected_count(len(raw_residual), p_value)
+    selected_count = compute_selected_count(len(raw_residual), top_k)
     priority = compute_tail_priority(raw_residual, tail=tail)
     candidate_order = np.argsort(priority, kind="stable")
     selected_idx = candidate_order[-selected_count:]
@@ -192,7 +192,7 @@ def render_target_plot(
     target_frame: pd.DataFrame,
     components: dict[str, np.ndarray],
     output_path: Path,
-    p_value: float,
+    top_k: float,
     tail: str,
 ) -> None:
     dt = target_frame["dt"]
@@ -203,7 +203,7 @@ def render_target_plot(
     raw_residual = np.where(legacy_mask, components["anomalies"], components["residual"])
     anomaly_mask, tail_priority, selected_count = select_tail_anomaly_mask(
         raw_residual,
-        p_value=p_value,
+        top_k=top_k,
         tail=tail,
     )
     anomalies = np.where(anomaly_mask, raw_residual, 1.0)
@@ -214,7 +214,7 @@ def render_target_plot(
     fig.suptitle(
         (
             f"{label.upper()} STAR decomposition ({column}) | "
-            f"tail={tail} | p_value={p_value} | selected_count={selected_count}"
+            f"tail={tail} | top_k={top_k} | selected_count={selected_count}"
         ),
         fontsize=16,
     )
@@ -313,7 +313,7 @@ def run(args: argparse.Namespace) -> dict[str, str]:
         season_length=args.season_length,
         lowess_frac=args.lowess_frac,
         lowess_delta=args.lowess_delta,
-        p_value=args.p_value,
+        top_k=args.top_k,
     )
 
     output_paths: dict[str, str] = {}
@@ -329,7 +329,7 @@ def run(args: argparse.Namespace) -> dict[str, str]:
             target_frame=target_frame,
             components=components,
             output_path=output_path,
-            p_value=args.p_value,
+            top_k=args.top_k,
             tail=TARGET_TAILS[label],
         )
         output_paths[label] = str(output_path)

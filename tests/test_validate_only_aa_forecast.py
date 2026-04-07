@@ -203,7 +203,7 @@ def test_runtime_validate_only_accepts_aaforecast_auto_path(
         "decoder_layers",
         "season_length",
         "trend_kernel_size",
-        "p_value",
+        "top_k",
     ]
 
 
@@ -240,7 +240,7 @@ def test_runtime_validate_only_accepts_aaforecast_auto_model_only_path(
         "decoder_layers",
         "season_length",
         "trend_kernel_size",
-        "p_value",
+        "top_k",
     ]
     assert manifest["training_search"] == {
         "requested_mode": "training_fixed",
@@ -277,7 +277,7 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_auto_model_only_path(
         "decoder_layers",
         "season_length",
         "trend_kernel_size",
-        "p_value",
+        "top_k",
     ]
     assert manifest["training_search"] == {
         "requested_mode": "training_fixed",

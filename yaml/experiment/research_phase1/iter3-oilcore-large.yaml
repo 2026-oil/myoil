@@ -38,4 +38,4 @@ jobs:
     encoder_dropout: 0.2
     season_length: 4
     trend_kernel_size: 7
-    p_value: 0.05
+    top_k: 0.05

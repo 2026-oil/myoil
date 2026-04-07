@@ -709,7 +709,6 @@ def _apply_aa_forecast_legacy_compatibility(
         compat_block["lowess_delta"] = 0.01
         compat_block["uncertainty"] = {
             "enabled": False,
-            "dropout_candidates": [round(step / 10.0, 1) for step in range(1, 10)],
             "sample_count": 8,
         }
     compat_payload["aa_forecast"] = compat_block
@@ -1354,12 +1353,12 @@ def _normalize_job(
     params = dict(job.get("params", {}))
     if model_name == "AAForecast" and "anomaly_threshold" in params:
         raise ValueError(
-            "AAForecast.anomaly_threshold has been removed; migrate to aa_forecast.p_value and aa_forecast.star_anomaly_tails"
+            "AAForecast.anomaly_threshold has been removed; migrate to aa_forecast.top_k and aa_forecast.star_anomaly_tails"
         )
     params_for_mode = params
     if stage_scope == "aa_forecast" and model_name == "AAForecast":
         structural_keys = {
-            "p_value",
+            "top_k",
             "lowess_frac",
             "lowess_delta",
             "uncertainty_enabled",
@@ -1482,7 +1481,6 @@ def _apply_aa_forecast_legacy_compatibility(
         compat_block["lowess_delta"] = 0.01
         compat_block["uncertainty"] = {
             "enabled": False,
-            "dropout_candidates": [round(step / 10.0, 1) for step in range(1, 10)],
             "sample_count": 8,
         }
     compat_payload["aa_forecast"] = compat_block

@@ -52,7 +52,7 @@ jobs:
     encoder_dropout: 0.15
     season_length: 8
     trend_kernel_size: 7
-    p_value: 0.05
+    top_k: 0.05
 aa_forecast:
   star_anomaly_tails:
     upward:

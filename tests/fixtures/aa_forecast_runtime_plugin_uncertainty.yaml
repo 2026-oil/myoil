@@ -19,4 +19,4 @@ aa_forecast:
     upward:
     - event
     two_sided: []
-  p_value: 0.01
+  top_k: 0.01

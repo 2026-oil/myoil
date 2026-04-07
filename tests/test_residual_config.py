@@ -3984,7 +3984,7 @@ def test_load_app_config_marks_auto_requested_and_validated_modes(tmp_path: Path
                     "decoder_layers",
                     "season_length",
                     "trend_kernel_size",
-                    "p_value",
+                    "top_k",
                 ]
             },
             "training": ["input_size", "model_step_size"],
@@ -4019,7 +4019,7 @@ def test_load_app_config_marks_aaforecast_auto_requested_and_validated_modes(
         "enabled": True,
         "mode": "learned_auto",
         "tune_training": False,
-        "p_value": 0.05,
+        "top_k": 0.05,
         "star_anomaly_tails": {"upward": ["event"], "two_sided": []},
         "lowess_frac": 0.6,
         "lowess_delta": 0.01,
@@ -4050,7 +4050,7 @@ def test_load_app_config_marks_aaforecast_auto_requested_and_validated_modes(
                     "decoder_layers",
                     "season_length",
                     "trend_kernel_size",
-                    "p_value",
+                    "top_k",
                 ]
             },
             "training": [],
@@ -4071,7 +4071,7 @@ def test_load_app_config_marks_aaforecast_auto_requested_and_validated_modes(
         "decoder_layers",
         "season_length",
         "trend_kernel_size",
-        "p_value",
+        "top_k",
     ]
     assert loaded.config.training_search.requested_mode == "training_fixed"
     assert loaded.config.training_search.validated_mode == "training_fixed"
@@ -4089,7 +4089,7 @@ def test_load_app_config_allows_disabling_training_search_for_aaforecast_auto(
         "enabled": True,
         "mode": "learned_auto",
         "tune_training": False,
-        "p_value": 0.05,
+        "top_k": 0.05,
         "star_anomaly_tails": {"upward": ["event"], "two_sided": []},
         "lowess_frac": 0.6,
         "lowess_delta": 0.01,
@@ -4120,7 +4120,7 @@ def test_load_app_config_allows_disabling_training_search_for_aaforecast_auto(
                     "decoder_layers",
                     "season_length",
                     "trend_kernel_size",
-                    "p_value",
+                    "top_k",
                 ]
             },
             "training": ["input_size", "model_step_size"],
@@ -4141,7 +4141,7 @@ def test_load_app_config_allows_disabling_training_search_for_aaforecast_auto(
         "decoder_layers",
         "season_length",
         "trend_kernel_size",
-        "p_value",
+        "top_k",
     ]
     assert loaded.config.training_search.requested_mode == "training_fixed"
     assert loaded.config.training_search.validated_mode == "training_fixed"
@@ -4156,7 +4156,7 @@ def test_load_app_config_routes_aa_forecast_plugin_model_only_auto(
         "aa_forecast:\n"
         "  mode: learned_auto\n"
         "  tune_training: false\n"
-        "  p_value: 0.05\n"
+        "  top_k: 0.05\n"
         "  star_anomaly_tails:\n"
         "    upward:\n"
         "      - event\n"
@@ -4193,7 +4193,7 @@ def test_load_app_config_routes_aa_forecast_plugin_model_only_auto(
                     "decoder_layers",
                     "season_length",
                     "trend_kernel_size",
-                    "p_value",
+                    "top_k",
                 ]
             },
             "training": ["input_size", "model_step_size"],
@@ -4217,7 +4217,7 @@ def test_load_app_config_routes_aa_forecast_plugin_model_only_auto(
                 "decoder_layers",
                 "season_length",
                 "trend_kernel_size",
-                "p_value",
+                "top_k",
             ),
         ),
     )
@@ -4282,7 +4282,7 @@ def test_load_app_config_resolves_inline_aa_forecast_star_groups(
                     "decoder_layers",
                     "season_length",
                     "trend_kernel_size",
-                    "p_value",
+                    "top_k",
                 ]
             },
             "training": ["input_size", "model_step_size"],
@@ -4316,7 +4316,7 @@ def test_load_app_config_rejects_yaml_managed_aaforecast_dropout_candidates(
         "enabled": True,
         "mode": "learned_auto",
         "tune_training": False,
-        "p_value": 0.05,
+        "top_k": 0.05,
         "star_anomaly_tails": {"upward": ["event"], "two_sided": []},
         "lowess_frac": 0.6,
         "lowess_delta": 0.01,
@@ -4361,7 +4361,7 @@ def test_load_app_config_routes_aa_forecast_plugin_best_fixed(
         "    decoder_layers: 3\n"
         "    season_length: 52\n"
         "    trend_kernel_size: 3\n"
-        "    p_value: 0.005\n",
+        "    top_k: 0.005\n",
     )
     payload = _payload()
     payload["dataset"]["hist_exog_cols"] = ["event", "macro"]
@@ -4392,7 +4392,7 @@ def test_load_app_config_routes_aa_forecast_plugin_best_fixed(
                     "decoder_layers",
                     "season_length",
                     "trend_kernel_size",
-                    "p_value",
+                    "top_k",
                 ]
             },
             "training": ["input_size", "model_step_size"],
@@ -4499,7 +4499,7 @@ def test_load_app_config_aa_forecast_legacy_inline_requires_canonical_star_group
                     "decoder_layers",
                     "season_length",
                     "trend_kernel_size",
-                    "p_value",
+                    "top_k",
                 ]
             },
             "training": ["input_size", "model_step_size"],
@@ -7676,7 +7676,7 @@ def test_build_model_supports_new_official_model_ports(tmp_path: Path):
                 "decoder_layers": 1,
                 "season_length": 52,
                 "trend_kernel_size": 3,
-                "p_value": 0.01,
+                "top_k": 0.01,
             },
         },
     ]
@@ -7708,7 +7708,7 @@ def test_aaforecast_save_and_load_roundtrip_preserves_state(tmp_path: Path):
         decoder_layers=1,
         season_length=2,
         trend_kernel_size=3,
-        p_value=0.01,
+        top_k=0.01,
     )
 
     checkpoint_path = tmp_path / "aaforecast.ckpt"
@@ -8416,7 +8416,7 @@ EXPECTED_REPO_AUTO_SELECTORS = {
         "decoder_layers",
         "season_length",
         "trend_kernel_size",
-        "p_value",
+        "top_k",
     ],
     "iTransformer": [
         "hidden_size",

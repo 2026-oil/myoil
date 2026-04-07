@@ -70,7 +70,7 @@ jobs:
     encoder_dropout: 0.1
     season_length: 4
     trend_kernel_size: 5
-    p_value: 0.01
+    top_k: 0.01
 - model: PatchTST
   params:
     hidden_size: 128

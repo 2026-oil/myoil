@@ -66,7 +66,7 @@ def materialize_aa_forecast_stage(
 def _aa_params_override(loaded: Any) -> dict[str, Any]:
     stage_cfg = loaded.config.stage_plugin_config
     return {
-        "p_value": stage_cfg.p_value,
+        "top_k": stage_cfg.top_k,
         "star_hist_exog_list": list(stage_cfg.star_hist_exog_cols_resolved),
         "non_star_hist_exog_list": list(stage_cfg.non_star_hist_exog_cols_resolved),
         "star_hist_exog_tail_modes": list(stage_cfg.star_anomaly_tail_modes_resolved),
@@ -173,7 +173,7 @@ def _write_uncertainty_artifacts(
         summary_path,
         {
             "train_end_ds": str(pd.Timestamp(train_end_ds)),
-            "p_value": stage_cfg.p_value,
+            "top_k": stage_cfg.top_k,
             "star_hist_exog_cols_resolved": list(stage_cfg.star_hist_exog_cols_resolved),
             "non_star_hist_exog_cols_resolved": list(
                 stage_cfg.non_star_hist_exog_cols_resolved
