@@ -7644,6 +7644,31 @@ def test_narrowed_model_param_ranges_are_explicit_for_selected_auto_models():
             assert trial.integer[name] == bounds
 
 
+def test_aaforecast_model_param_ranges_match_brent_sized_optuna_window():
+    class _RangeRecordingTrial:
+        def __init__(self) -> None:
+            self.categorical: dict[str, tuple[Any, ...]] = {}
+
+        def suggest_categorical(self, name, options):
+            self.categorical[name] = tuple(options)
+            return options[0]
+
+    trial = _RangeRecordingTrial()
+    suggested = suggest_model_params(
+        "AAForecast", tuple(MODEL_PARAM_REGISTRY["AAForecast"]), trial
+    )
+
+    assert set(suggested) == set(MODEL_PARAM_REGISTRY["AAForecast"])
+    assert trial.categorical["encoder_hidden_size"] == (128, 256)
+    assert trial.categorical["encoder_n_layers"] == (2,)
+    assert trial.categorical["encoder_dropout"] == (0.0, 0.1, 0.2, 0.3)
+    assert trial.categorical["decoder_hidden_size"] == (64, 128, 256)
+    assert trial.categorical["decoder_layers"] == (1, 2, 3)
+    assert trial.categorical["season_length"] == (4, 8, 12)
+    assert trial.categorical["trend_kernel_size"] == (3, 5, 7)
+    assert trial.categorical["top_k"] == (0.005, 0.01, 0.02, 0.05)
+
+
 def test_priority_models_have_narrowed_training_range_overrides():
     class _RangeRecordingTrial:
         def __init__(self) -> None:

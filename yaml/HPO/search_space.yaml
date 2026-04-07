@@ -230,15 +230,12 @@ models:
     encoder_hidden_size:
       type: categorical
       choices:
-      - 64
       - 128
       - 256
     encoder_n_layers:
       type: categorical
       choices:
-      - 1
       - 2
-      - 3
     encoder_dropout:
       type: categorical
       choices:
