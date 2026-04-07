@@ -4025,7 +4025,6 @@ def test_load_app_config_marks_aaforecast_auto_requested_and_validated_modes(
         "lowess_delta": 0.01,
         "uncertainty": {
             "enabled": False,
-            "dropout_candidates": [0.1, 0.2, 0.3],
             "sample_count": 3,
         },
     }
@@ -4096,7 +4095,6 @@ def test_load_app_config_allows_disabling_training_search_for_aaforecast_auto(
         "lowess_delta": 0.01,
         "uncertainty": {
             "enabled": False,
-            "dropout_candidates": [0.1, 0.2, 0.3],
             "sample_count": 3,
         },
     }
@@ -4259,7 +4257,6 @@ def test_load_app_config_resolves_inline_aa_forecast_star_groups(
         "lowess_delta": 0.01,
         "uncertainty": {
             "enabled": False,
-            "dropout_candidates": [0.1, 0.2, 0.3],
             "sample_count": 3,
         },
     }
@@ -4307,6 +4304,41 @@ def test_load_app_config_resolves_inline_aa_forecast_star_groups(
     assert loaded.config.stage_plugin_config.non_star_hist_exog_cols_resolved == (
         "macro",
     )
+
+
+def test_load_app_config_rejects_yaml_managed_aaforecast_dropout_candidates(
+    tmp_path: Path,
+) -> None:
+    payload = _payload()
+    payload["dataset"]["hist_exog_cols"] = ["event"]
+    payload["jobs"] = [{"model": "AAForecast", "params": {}}]
+    payload["aa_forecast"] = {
+        "enabled": True,
+        "mode": "learned_auto",
+        "tune_training": False,
+        "p_value": 0.05,
+        "star_anomaly_tails": {"upward": ["event"], "two_sided": []},
+        "lowess_frac": 0.6,
+        "lowess_delta": 0.01,
+        "uncertainty": {
+            "enabled": False,
+            "dropout_candidates": [0.1, 0.2, 0.3],
+            "sample_count": 3,
+        },
+    }
+    payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
+    (tmp_path / "data.csv").write_text(
+        "dt,target,event\n"
+        "2020-01-01,1,0\n"
+        "2020-01-08,2,1\n"
+        "2020-01-15,3,0\n"
+        "2020-01-22,4,2\n",
+        encoding="utf-8",
+    )
+    config_path = _write_config(tmp_path, payload, ".yaml")
+
+    with pytest.raises(ValueError, match=r"unsupported key\(s\): dropout_candidates"):
+        load_app_config(tmp_path, config_path=config_path)
 
 
 def test_load_app_config_routes_aa_forecast_plugin_best_fixed(

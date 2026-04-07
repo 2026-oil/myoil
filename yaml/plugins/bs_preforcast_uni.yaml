@@ -1,7 +1,0 @@
-bs_preforcast:
-  target_columns:
-  - BS_Core_Index_Integrated
-  task:
-    multivariable: false
-  hist_columns: []
-jobs: yaml/jobs/bs_preforcast/bs_preforcast_jobs_uni.yaml

@@ -1,4 +1,4 @@
-task:
+$task:
   name: brentoil_case1_aaforecast_best
 dataset:
   path: data/df.csv
@@ -12,9 +12,6 @@ dataset:
     - BS_Core_Index_C
     - Com_LMEX
     - Com_BloombergCommodity_BCOM
-    - GPRD_THREAT
-    - GPRD
-    - GPRD_ACT
   futr_exog_cols: []
   static_exog_cols: []
 residual:

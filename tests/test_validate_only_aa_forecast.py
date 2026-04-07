@@ -611,7 +611,7 @@ def test_runtime_smoke_emits_aaforecast_uncertainty_artifacts(
     assert csv_files
     summary = json.loads(json_files[0].read_text())
     assert summary["sample_count"] == 3
-    assert summary["dropout_candidates"] == [0.1, 0.2, 0.3]
+    assert summary["dropout_candidates"] == [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     assert summary["star_anomaly_tails"] == {"upward": ["event"], "two_sided": []}
     assert summary["non_star_hist_exog_cols_resolved"] == []
     _assert_no_event_column(summary)
@@ -642,7 +642,6 @@ def test_validate_only_aaforecast_multi_study_catalog_and_projection(
         "lowess_delta": 0.01,
         "uncertainty": {
             "enabled": False,
-            "dropout_candidates": [0.1, 0.2, 0.3],
             "sample_count": 3,
         },
     }
@@ -728,12 +727,33 @@ def test_runtime_aaforecast_plugin_uncertainty_smoke(
     distribution_files = sorted(uncertainty_dir.glob("*.json"))
     assert distribution_files
     payload = json.loads(distribution_files[0].read_text())
-    assert payload["dropout_candidates"] == [0.1, 0.3]
+    assert payload["dropout_candidates"] == [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     assert payload["star_anomaly_tails"] == {"upward": ["event"], "two_sided": []}
     assert payload["non_star_hist_exog_cols_resolved"] == []
     _assert_no_event_column(payload)
     assert len(payload["selected_dropout_by_horizon"]) == 1
     assert len(payload["selected_std_by_horizon"]) == 1
+
+
+def test_validate_only_rejects_yaml_managed_aaforecast_dropout_candidates(
+    tmp_path: Path,
+) -> None:
+    payload = yaml.safe_load(AUTO_CONFIG.read_text(encoding="utf-8"))
+    payload["dataset"]["path"] = str((AUTO_CONFIG.parent / payload["dataset"]["path"]).resolve())
+    payload["aa_forecast"]["uncertainty"]["dropout_candidates"] = [0.1, 0.2, 0.3]
+    config_path = tmp_path / "aaforecast-invalid-dropout-candidates.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"unsupported key\(s\): dropout_candidates"):
+        runtime.main(
+            [
+                "--config",
+                str(config_path),
+                "--output-root",
+                str(tmp_path / "invalid-dropout-candidates"),
+                "--validate-only",
+            ]
+        )
 
 
 def test_runtime_validate_only_direct_target_preserves_grouped_tails(

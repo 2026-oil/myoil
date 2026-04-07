@@ -5,9 +5,6 @@ aa_forecast:
   lowess_delta: 0.01
   uncertainty:
     enabled: true
-    dropout_candidates:
-    - 0.1
-    - 0.3
     sample_count: 2
   model_params:
     encoder_hidden_size: 16

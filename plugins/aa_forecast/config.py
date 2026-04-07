@@ -34,7 +34,7 @@ AA_FORECAST_LINKED_KEYS = {
     "lowess_delta",
     "uncertainty",
 }
-AA_FORECAST_UNCERTAINTY_KEYS = {"enabled", "dropout_candidates", "sample_count"}
+AA_FORECAST_UNCERTAINTY_KEYS = {"enabled", "sample_count"}
 AA_FORECAST_STAR_ANOMALY_TAIL_KEYS = {"upward", "two_sided"}
 
 
@@ -259,22 +259,7 @@ def _normalize_uncertainty_config(
         field_name=f"{section}.enabled",
         default=False,
     )
-    raw_candidates = payload.get("dropout_candidates")
-    if raw_candidates is None:
-        dropout_candidates = AAForecastUncertaintyConfig().dropout_candidates
-    else:
-        if not isinstance(raw_candidates, list) or not raw_candidates:
-            raise ValueError(f"{section}.dropout_candidates must be a non-empty list")
-        normalized = tuple(
-            _coerce_probability(
-                candidate,
-                field_name=f"{section}.dropout_candidates",
-            )
-            for candidate in raw_candidates
-        )
-        if len(set(normalized)) != len(normalized):
-            raise ValueError(f"{section}.dropout_candidates must not contain duplicates")
-        dropout_candidates = normalized
+    dropout_candidates = AAForecastUncertaintyConfig().dropout_candidates
     sample_count = _coerce_positive_int(
         payload.get("sample_count", AAForecastUncertaintyConfig().sample_count),
         field_name=f"{section}.sample_count",
