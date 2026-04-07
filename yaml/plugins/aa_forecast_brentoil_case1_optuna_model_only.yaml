@@ -17,7 +17,9 @@ aa_forecast:
     - 0.9
     sample_count: 5
   model_params: {}
-  star_hist_exog_cols:
-  - GPRD_THREAT
-  - GPRD
-  - GPRD_ACT
+  star_anomaly_tails:
+    upward:
+    - GPRD_THREAT
+    - GPRD
+    - GPRD_ACT
+    two_sided: []

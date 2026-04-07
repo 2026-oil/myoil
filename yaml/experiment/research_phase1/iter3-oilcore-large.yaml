@@ -28,6 +28,8 @@ residual:
     subsample: 0.8
     colsample_bytree: 0.8
 jobs:
+# NOTE: This research config is intentionally left outside the active AA grouped-tail
+# contract until it is migrated to an explicit aa_forecast plugin block.
 - model: AAForecast
   params:
     encoder_hidden_size: 512
@@ -36,4 +38,4 @@ jobs:
     encoder_dropout: 0.2
     season_length: 4
     trend_kernel_size: 7
-    anomaly_threshold: 2.0
+    p_value: 0.05

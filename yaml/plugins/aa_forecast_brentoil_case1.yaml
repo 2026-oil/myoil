@@ -24,8 +24,10 @@ aa_forecast:
     decoder_layers: 2
     attention_hidden_size: 32
     season_length: 4
-    anomaly_threshold: 2.0
-  star_hist_exog_cols:
-  - GPRD_THREAT
-  - GPRD
-  - GPRD_ACT
+  star_anomaly_tails:
+    upward:
+    - GPRD_THREAT
+    - GPRD
+    - GPRD_ACT
+    two_sided: []
+  p_value: 0.05

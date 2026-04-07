@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -33,13 +34,15 @@ class STARFeatureExtractor(nn.Module):
         season_length: int = 12,
         lowess_frac: float = 0.6,
         lowess_delta: float = 0.01,
-        anomaly_threshold: float = 3.5,
+        p_value: float = 0.05,
     ):
         super().__init__()
         self.season_length = max(2, int(season_length))
         self.lowess_frac = float(lowess_frac)
         self.lowess_delta = float(lowess_delta)
-        self.anomaly_threshold = float(anomaly_threshold)
+        self.p_value = float(p_value)
+        if self.p_value <= 0 or self.p_value >= 1:
+            raise ValueError("STARFeatureExtractor p_value must satisfy 0 < value < 1")
         self._trend_cache: dict[bytes, np.ndarray] = {}
         self._trend_cache_order: list[bytes] = []
         self._trend_cache_limit = 4096
@@ -89,12 +92,29 @@ class STARFeatureExtractor(nn.Module):
             )
         return seasonal
 
-    def forward(self, insample_y: torch.Tensor) -> dict[str, torch.Tensor]:
-        trend = self._trend(insample_y)
-        detrended = _safe_divide(insample_y, trend)
-        seasonal = self._seasonal(detrended)
-        residual = _safe_divide(detrended, seasonal)
+    @staticmethod
+    def _normalize_tail_modes(
+        tail_modes: tuple[str, ...] | list[str] | None,
+        *,
+        channels: int,
+    ) -> tuple[str, ...]:
+        if tail_modes is None:
+            return tuple("two_sided" for _ in range(channels))
+        normalized = tuple(str(mode).strip().lower() for mode in tail_modes)
+        if len(normalized) != channels:
+            raise ValueError(
+                f"STARFeatureExtractor tail_modes length must equal channels ({channels})"
+            )
+        invalid = sorted(set(normalized).difference({"two_sided", "upward"}))
+        if invalid:
+            raise ValueError(
+                "STARFeatureExtractor tail_modes contain unsupported value(s): "
+                + ", ".join(invalid)
+            )
+        return normalized
 
+    @staticmethod
+    def _robust_scores(residual: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         residual_center = residual.median(dim=1, keepdim=True).values
         mad = (
             (residual - residual_center)
@@ -102,8 +122,70 @@ class STARFeatureExtractor(nn.Module):
             .median(dim=1, keepdim=True)
             .values.clamp_min(1e-4)
         )
-        robustness = 0.6745 * (residual - residual_center).abs() / mad
-        anomaly_mask = robustness > self.anomaly_threshold
+        signed_score = 0.6745 * (residual - residual_center) / mad
+        abs_score = signed_score.abs()
+        return signed_score, abs_score
+
+    def _ranking_score(
+        self,
+        signed_score: torch.Tensor,
+        *,
+        tail_modes: tuple[str, ...],
+    ) -> torch.Tensor:
+        score_parts: list[torch.Tensor] = []
+        for channel_idx, mode in enumerate(tail_modes):
+            channel_score = signed_score[:, :, channel_idx : channel_idx + 1]
+            if mode == "upward":
+                score_parts.append(channel_score.clamp_min(0.0))
+            else:
+                score_parts.append(channel_score.abs())
+        return torch.cat(score_parts, dim=2)
+
+    def _anomaly_mask(
+        self,
+        signed_score: torch.Tensor,
+        ranking_score: torch.Tensor,
+        *,
+        tail_modes: tuple[str, ...],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        batch, seq_len, channels = ranking_score.shape
+        selected_count = max(1, math.ceil(self.p_value * seq_len))
+        if selected_count >= seq_len:
+            cutoff = ranking_score.min(dim=1, keepdim=True).values
+        else:
+            topk = torch.topk(ranking_score, k=selected_count, dim=1).values
+            cutoff = topk[:, -1:, :]
+
+        anomaly_mask = ranking_score >= cutoff
+        for channel_idx, mode in enumerate(tail_modes):
+            if mode == "upward":
+                anomaly_mask[:, :, channel_idx] &= signed_score[:, :, channel_idx] > 0
+        return anomaly_mask, cutoff
+
+    def forward(
+        self,
+        insample_y: torch.Tensor,
+        *,
+        tail_modes: tuple[str, ...] | list[str] | None = None,
+    ) -> dict[str, torch.Tensor]:
+        trend = self._trend(insample_y)
+        detrended = _safe_divide(insample_y, trend)
+        seasonal = self._seasonal(detrended)
+        residual = _safe_divide(detrended, seasonal)
+        normalized_tail_modes = self._normalize_tail_modes(
+            tail_modes,
+            channels=residual.size(2),
+        )
+        signed_score, abs_score = self._robust_scores(residual)
+        ranking_score = self._ranking_score(
+            signed_score,
+            tail_modes=normalized_tail_modes,
+        )
+        anomaly_mask, cutoff = self._anomaly_mask(
+            signed_score,
+            ranking_score,
+            tail_modes=normalized_tail_modes,
+        )
 
         anomalies = torch.where(anomaly_mask, residual, torch.ones_like(residual))
         cleaned_residual = torch.where(
@@ -117,6 +199,10 @@ class STARFeatureExtractor(nn.Module):
             "anomalies": anomalies,
             "residual": cleaned_residual,
             "critical_mask": anomaly_mask,
+            "robust_score_signed": signed_score,
+            "robust_score_abs": abs_score,
+            "ranking_score": ranking_score,
+            "ranking_cutoff": cutoff,
         }
 
 

@@ -16,7 +16,8 @@ AA_FORECAST_MAIN_KEYS = {
     "mode",
     "tune_training",
     "model_params",
-    "star_hist_exog_cols",
+    "p_value",
+    "star_anomaly_tails",
     "lowess_frac",
     "lowess_delta",
     "uncertainty",
@@ -27,12 +28,14 @@ AA_FORECAST_LINKED_KEYS = {
     "mode",
     "tune_training",
     "model_params",
-    "star_hist_exog_cols",
+    "p_value",
+    "star_anomaly_tails",
     "lowess_frac",
     "lowess_delta",
     "uncertainty",
 }
 AA_FORECAST_UNCERTAINTY_KEYS = {"enabled", "dropout_candidates", "sample_count"}
+AA_FORECAST_STAR_ANOMALY_TAIL_KEYS = {"upward", "two_sided"}
 
 
 @dataclass(frozen=True)
@@ -52,6 +55,10 @@ class AAForecastUncertaintyConfig:
     sample_count: int = 5
 
 
+def _default_star_anomaly_tails() -> dict[str, tuple[str, ...]]:
+    return {"upward": (), "two_sided": ()}
+
+
 @dataclass(frozen=True)
 class AAForecastPluginConfig:
     enabled: bool = False
@@ -59,9 +66,16 @@ class AAForecastPluginConfig:
     mode: Literal["fixed", "learned_auto"] = "learned_auto"
     tune_training: bool = False
     model_params: dict[str, Any] = field(default_factory=dict)
-    star_hist_exog_cols: tuple[str, ...] = field(default_factory=tuple)
+    p_value: float = 0.05
     star_hist_exog_cols_resolved: tuple[str, ...] = field(default_factory=tuple)
     non_star_hist_exog_cols_resolved: tuple[str, ...] = field(default_factory=tuple)
+    star_anomaly_tails: dict[str, tuple[str, ...]] = field(
+        default_factory=_default_star_anomaly_tails
+    )
+    star_anomaly_tails_resolved: dict[str, tuple[str, ...]] = field(
+        default_factory=_default_star_anomaly_tails
+    )
+    star_anomaly_tail_modes_resolved: tuple[str, ...] = field(default_factory=tuple)
     lowess_frac: float = 0.6
     lowess_delta: float = 0.01
     uncertainty: AAForecastUncertaintyConfig = field(
@@ -100,9 +114,18 @@ def aa_forecast_uncertainty_public_dict(
 
 def aa_forecast_plugin_tuning_public_dict(cfg: AAForecastPluginConfig) -> dict[str, Any]:
     return {
-        "star_hist_exog_cols": list(cfg.star_hist_exog_cols),
+        "p_value": cfg.p_value,
         "star_hist_exog_cols_resolved": list(cfg.star_hist_exog_cols_resolved),
         "non_star_hist_exog_cols_resolved": list(cfg.non_star_hist_exog_cols_resolved),
+        "star_anomaly_tails": {
+            "upward": list(cfg.star_anomaly_tails["upward"]),
+            "two_sided": list(cfg.star_anomaly_tails["two_sided"]),
+        },
+        "star_anomaly_tails_resolved": {
+            "upward": list(cfg.star_anomaly_tails_resolved["upward"]),
+            "two_sided": list(cfg.star_anomaly_tails_resolved["two_sided"]),
+        },
+        "star_anomaly_tail_modes_resolved": list(cfg.star_anomaly_tail_modes_resolved),
         "lowess_frac": cfg.lowess_frac,
         "lowess_delta": cfg.lowess_delta,
         "uncertainty": aa_forecast_uncertainty_public_dict(cfg.uncertainty),
@@ -263,6 +286,43 @@ def _normalize_uncertainty_config(
     )
 
 
+def _normalize_star_anomaly_tails(
+    value: Any,
+    *,
+    section: str,
+    unknown_keys: Any,
+) -> dict[str, tuple[str, ...]]:
+    if value is None:
+        return _default_star_anomaly_tails()
+    if not isinstance(value, dict):
+        raise ValueError(f"{section} must be a mapping")
+    payload = dict(value)
+    unknown_keys(payload, allowed=AA_FORECAST_STAR_ANOMALY_TAIL_KEYS, section=section)
+    upward = _coerce_name_tuple(
+        payload.get("upward"),
+        field_name=f"{section}.upward",
+    )
+    two_sided = _coerce_name_tuple(
+        payload.get("two_sided"),
+        field_name=f"{section}.two_sided",
+    )
+    if not upward and not two_sided:
+        return _default_star_anomaly_tails()
+    if len(set(upward)) != len(upward):
+        raise ValueError(f"{section}.upward must not contain duplicates")
+    if len(set(two_sided)) != len(two_sided):
+        raise ValueError(f"{section}.two_sided must not contain duplicates")
+    overlap = sorted(set(upward).intersection(two_sided))
+    if overlap:
+        raise ValueError(
+            f"{section} groups must be disjoint: {', '.join(overlap)}"
+        )
+    return {
+        "upward": upward,
+        "two_sided": two_sided,
+    }
+
+
 def _normalize_canonical_fields(
     payload: dict[str, Any],
     *,
@@ -283,14 +343,28 @@ def _normalize_canonical_fields(
         raise ValueError(
             f"{section}.mode=learned_auto must not set {section}.model_params"
         )
+    if "anomaly_threshold" in model_params:
+        raise ValueError(
+            f"{section}.model_params.anomaly_threshold has been removed; use {section}.p_value and {section}.star_anomaly_tails"
+        )
+    p_value_in_params = model_params.pop("p_value", None)
+    if p_value_in_params is not None and "p_value" in payload:
+        raise ValueError(
+            f"{section}.p_value cannot be set both top-level and inside {section}.model_params"
+        )
     tune_training = coerce_bool(
         payload.get("tune_training"),
         field_name=f"{section}.tune_training",
         default=False,
     )
-    star_hist_exog_cols = _coerce_name_tuple(
-        payload.get("star_hist_exog_cols"),
-        field_name=f"{section}.star_hist_exog_cols",
+    p_value = _coerce_probability(
+        payload.get("p_value", p_value_in_params if p_value_in_params is not None else 0.05),
+        field_name=f"{section}.p_value",
+    )
+    star_anomaly_tails = _normalize_star_anomaly_tails(
+        payload.get("star_anomaly_tails"),
+        section=f"{section}.star_anomaly_tails",
+        unknown_keys=unknown_keys,
     )
     lowess_frac = _coerce_probability(
         payload.get("lowess_frac", 0.6),
@@ -311,7 +385,8 @@ def _normalize_canonical_fields(
         mode=mode,  # type: ignore[arg-type]
         tune_training=tune_training,
         model_params=model_params,
-        star_hist_exog_cols=star_hist_exog_cols,
+        p_value=p_value,
+        star_anomaly_tails=star_anomaly_tails,
         lowess_frac=lowess_frac,
         lowess_delta=lowess_delta,
         uncertainty=uncertainty,
@@ -366,7 +441,8 @@ def normalize_aa_forecast_config(
             "mode",
             "tune_training",
             "model_params",
-            "star_hist_exog_cols",
+            "p_value",
+            "star_anomaly_tails",
             "lowess_frac",
             "lowess_delta",
             "uncertainty",
@@ -425,32 +501,64 @@ def resolve_aa_forecast_hist_exog(
     if not config.enabled:
         return config
     normalized_hist = tuple(column.strip() for column in hist_exog_cols if column.strip())
-    if not normalized_hist:
-        raise ValueError(
-            "AAForecast requires dataset.hist_exog_cols to be non-empty"
-        )
     if len(set(normalized_hist)) != len(normalized_hist):
         raise ValueError("dataset.hist_exog_cols must not contain duplicates")
-    if not config.star_hist_exog_cols:
-        raise ValueError("aa_forecast.star_hist_exog_cols is required and must be non-empty")
-    if len(set(config.star_hist_exog_cols)) != len(config.star_hist_exog_cols):
-        raise ValueError("aa_forecast.star_hist_exog_cols must not contain duplicates")
-    unknown = sorted(set(config.star_hist_exog_cols).difference(normalized_hist))
+    star_hist_exog_cols = (
+        config.star_anomaly_tails["upward"] + config.star_anomaly_tails["two_sided"]
+    )
+    if not normalized_hist:
+        if star_hist_exog_cols:
+            raise ValueError(
+                "aa_forecast.star_anomaly_tails cannot declare variables when dataset.hist_exog_cols is empty"
+            )
+        return replace(
+            config,
+            star_hist_exog_cols_resolved=(),
+            non_star_hist_exog_cols_resolved=(),
+            star_anomaly_tails_resolved=_default_star_anomaly_tails(),
+            star_anomaly_tail_modes_resolved=(),
+        )
+    if not star_hist_exog_cols:
+        raise ValueError(
+            "aa_forecast.star_anomaly_tails must assign at least one STAR variable"
+        )
+    unknown = sorted(set(star_hist_exog_cols).difference(normalized_hist))
     if unknown:
         raise ValueError(
-            "aa_forecast.star_hist_exog_cols contains unknown column(s): "
+            "aa_forecast.star_anomaly_tails contains unknown column(s): "
             + ", ".join(unknown)
         )
-    resolved_star = tuple(column for column in normalized_hist if column in config.star_hist_exog_cols)
+    resolved_star = tuple(column for column in normalized_hist if column in star_hist_exog_cols)
     resolved_non_star = tuple(
-        column for column in normalized_hist if column not in config.star_hist_exog_cols
+        column for column in normalized_hist if column not in star_hist_exog_cols
     )
     if not resolved_star:
-        raise ValueError("aa_forecast.star_hist_exog_cols must select at least one dataset.hist_exog_cols entry")
+        raise ValueError(
+            "aa_forecast.star_anomaly_tails must select at least one dataset.hist_exog_cols entry"
+        )
+    resolved_upward = tuple(
+        column for column in resolved_star if column in config.star_anomaly_tails["upward"]
+    )
+    resolved_two_sided = tuple(
+        column
+        for column in resolved_star
+        if column in config.star_anomaly_tails["two_sided"]
+    )
+    tail_modes_resolved = tuple(
+        "upward"
+        if column in config.star_anomaly_tails["upward"]
+        else "two_sided"
+        for column in resolved_star
+    )
     return replace(
         config,
         star_hist_exog_cols_resolved=resolved_star,
         non_star_hist_exog_cols_resolved=resolved_non_star,
+        star_anomaly_tails_resolved={
+            "upward": resolved_upward,
+            "two_sided": resolved_two_sided,
+        },
+        star_anomaly_tail_modes_resolved=tail_modes_resolved,
     )
 
 

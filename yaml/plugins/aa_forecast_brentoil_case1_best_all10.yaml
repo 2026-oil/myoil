@@ -6,15 +6,15 @@ aa_forecast:
   uncertainty:
     enabled: true
     dropout_candidates:
-      - 0.1
-      - 0.2
-      - 0.3
-      - 0.4
-      - 0.5
-      - 0.6
-      - 0.7
-      - 0.8
-      - 0.9
+    - 0.1
+    - 0.2
+    - 0.3
+    - 0.4
+    - 0.5
+    - 0.6
+    - 0.7
+    - 0.8
+    - 0.9
     sample_count: 5
   model_params:
     encoder_hidden_size: 256
@@ -23,8 +23,10 @@ aa_forecast:
     decoder_hidden_size: 256
     decoder_layers: 3
     season_length: 4
-    anomaly_threshold: 4.0
-  star_hist_exog_cols:
+  star_anomaly_tails:
+    upward:
     - GPRD_THREAT
     - GPRD
     - GPRD_ACT
+    two_sided: []
+  p_value: 0.005

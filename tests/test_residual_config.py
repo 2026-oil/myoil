@@ -3984,7 +3984,7 @@ def test_load_app_config_marks_auto_requested_and_validated_modes(tmp_path: Path
                     "decoder_layers",
                     "season_length",
                     "trend_kernel_size",
-                    "anomaly_threshold",
+                    "p_value",
                 ]
             },
             "training": ["input_size", "model_step_size"],
@@ -4015,6 +4015,20 @@ def test_load_app_config_marks_aaforecast_auto_requested_and_validated_modes(
     payload = _payload()
     payload["dataset"]["hist_exog_cols"] = ["event"]
     payload["jobs"] = [{"model": "AAForecast", "params": {}}]
+    payload["aa_forecast"] = {
+        "enabled": True,
+        "mode": "learned_auto",
+        "tune_training": False,
+        "p_value": 0.05,
+        "star_anomaly_tails": {"upward": ["event"], "two_sided": []},
+        "lowess_frac": 0.6,
+        "lowess_delta": 0.01,
+        "uncertainty": {
+            "enabled": False,
+            "dropout_candidates": [0.1, 0.2, 0.3],
+            "sample_count": 3,
+        },
+    }
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     (tmp_path / "data.csv").write_text(
         "dt,target,event\n"
@@ -4037,7 +4051,7 @@ def test_load_app_config_marks_aaforecast_auto_requested_and_validated_modes(
                     "decoder_layers",
                     "season_length",
                     "trend_kernel_size",
-                    "anomaly_threshold",
+                    "p_value",
                 ]
             },
             "training": [],
@@ -4058,7 +4072,7 @@ def test_load_app_config_marks_aaforecast_auto_requested_and_validated_modes(
         "decoder_layers",
         "season_length",
         "trend_kernel_size",
-        "anomaly_threshold",
+        "p_value",
     ]
     assert loaded.config.training_search.requested_mode == "training_fixed"
     assert loaded.config.training_search.validated_mode == "training_fixed"
@@ -4072,6 +4086,20 @@ def test_load_app_config_allows_disabling_training_search_for_aaforecast_auto(
     payload["dataset"]["hist_exog_cols"] = ["event"]
     payload["training_search"] = {"enabled": False}
     payload["jobs"] = [{"model": "AAForecast", "params": {}}]
+    payload["aa_forecast"] = {
+        "enabled": True,
+        "mode": "learned_auto",
+        "tune_training": False,
+        "p_value": 0.05,
+        "star_anomaly_tails": {"upward": ["event"], "two_sided": []},
+        "lowess_frac": 0.6,
+        "lowess_delta": 0.01,
+        "uncertainty": {
+            "enabled": False,
+            "dropout_candidates": [0.1, 0.2, 0.3],
+            "sample_count": 3,
+        },
+    }
     payload["residual"] = {"enabled": False, "model": "xgboost", "params": {}}
     (tmp_path / "data.csv").write_text(
         "dt,target,event\n"
@@ -4094,7 +4122,7 @@ def test_load_app_config_allows_disabling_training_search_for_aaforecast_auto(
                     "decoder_layers",
                     "season_length",
                     "trend_kernel_size",
-                    "anomaly_threshold",
+                    "p_value",
                 ]
             },
             "training": ["input_size", "model_step_size"],
@@ -4115,7 +4143,7 @@ def test_load_app_config_allows_disabling_training_search_for_aaforecast_auto(
         "decoder_layers",
         "season_length",
         "trend_kernel_size",
-        "anomaly_threshold",
+        "p_value",
     ]
     assert loaded.config.training_search.requested_mode == "training_fixed"
     assert loaded.config.training_search.validated_mode == "training_fixed"
@@ -4130,8 +4158,11 @@ def test_load_app_config_routes_aa_forecast_plugin_model_only_auto(
         "aa_forecast:\n"
         "  mode: learned_auto\n"
         "  tune_training: false\n"
-        "  star_hist_exog_cols:\n"
-        "    - event\n"
+        "  p_value: 0.05\n"
+        "  star_anomaly_tails:\n"
+        "    upward:\n"
+        "      - event\n"
+        "    two_sided: []\n"
         "  model_params: {}\n",
         encoding="utf-8",
     )
@@ -4164,7 +4195,7 @@ def test_load_app_config_routes_aa_forecast_plugin_model_only_auto(
                     "decoder_layers",
                     "season_length",
                     "trend_kernel_size",
-                    "anomaly_threshold",
+                    "p_value",
                 ]
             },
             "training": ["input_size", "model_step_size"],
@@ -4188,7 +4219,7 @@ def test_load_app_config_routes_aa_forecast_plugin_model_only_auto(
                 "decoder_layers",
                 "season_length",
                 "trend_kernel_size",
-                "anomaly_threshold",
+                "p_value",
             ),
         ),
     )
@@ -4196,8 +4227,14 @@ def test_load_app_config_routes_aa_forecast_plugin_model_only_auto(
     assert loaded.config.training_search.validated_mode == "training_fixed"
     assert list(loaded.config.training_search.selected_search_params) == []
     assert loaded.stage_plugin_loaded is not None
-    assert loaded.stage_plugin_loaded.config.star_hist_exog_cols == ("event",)
-    assert loaded.config.stage_plugin_config.star_hist_exog_cols_resolved == ("event",)
+    assert loaded.stage_plugin_loaded.config.star_anomaly_tails == {
+        "upward": ("event",),
+        "two_sided": (),
+    }
+    assert loaded.config.stage_plugin_config.star_anomaly_tails_resolved == {
+        "upward": ("event",),
+        "two_sided": (),
+    }
     assert loaded.config.stage_plugin_config.non_star_hist_exog_cols_resolved == (
         "macro",
     )
@@ -4217,7 +4254,7 @@ def test_load_app_config_resolves_inline_aa_forecast_star_groups(
         "mode": "learned_auto",
         "tune_training": False,
         "model_params": {},
-        "star_hist_exog_cols": ["event"],
+        "star_anomaly_tails": {"upward": ["event"], "two_sided": []},
         "lowess_frac": 0.6,
         "lowess_delta": 0.01,
         "uncertainty": {
@@ -4248,7 +4285,7 @@ def test_load_app_config_resolves_inline_aa_forecast_star_groups(
                     "decoder_layers",
                     "season_length",
                     "trend_kernel_size",
-                    "anomaly_threshold",
+                    "p_value",
                 ]
             },
             "training": ["input_size", "model_step_size"],
@@ -4259,8 +4296,14 @@ def test_load_app_config_resolves_inline_aa_forecast_star_groups(
     loaded = load_app_config(tmp_path, config_path=config_path)
 
     assert loaded.stage_plugin_loaded is None
-    assert loaded.config.stage_plugin_config.star_hist_exog_cols == ("event",)
-    assert loaded.config.stage_plugin_config.star_hist_exog_cols_resolved == ("event",)
+    assert loaded.config.stage_plugin_config.star_anomaly_tails == {
+        "upward": ("event",),
+        "two_sided": (),
+    }
+    assert loaded.config.stage_plugin_config.star_anomaly_tails_resolved == {
+        "upward": ("event",),
+        "two_sided": (),
+    }
     assert loaded.config.stage_plugin_config.non_star_hist_exog_cols_resolved == (
         "macro",
     )
@@ -4274,8 +4317,10 @@ def test_load_app_config_routes_aa_forecast_plugin_best_fixed(
         "aa_forecast:\n"
         "  mode: fixed\n"
         "  tune_training: false\n"
-        "  star_hist_exog_cols:\n"
-        "    - event\n"
+        "  star_anomaly_tails:\n"
+        "    upward:\n"
+        "      - event\n"
+        "    two_sided: []\n"
         "  model_params:\n"
         "    encoder_hidden_size: 256\n"
         "    encoder_n_layers: 3\n"
@@ -4284,8 +4329,7 @@ def test_load_app_config_routes_aa_forecast_plugin_best_fixed(
         "    decoder_layers: 3\n"
         "    season_length: 4\n"
         "    trend_kernel_size: 3\n"
-        "    anomaly_threshold: 4.0\n",
-        encoding="utf-8",
+        "    p_value: 0.005\n",
     )
     payload = _payload()
     payload["dataset"]["hist_exog_cols"] = ["event", "macro"]
@@ -4316,7 +4360,7 @@ def test_load_app_config_routes_aa_forecast_plugin_best_fixed(
                     "decoder_layers",
                     "season_length",
                     "trend_kernel_size",
-                    "anomaly_threshold",
+                    "p_value",
                 ]
             },
             "training": ["input_size", "model_step_size"],
@@ -4337,7 +4381,6 @@ def test_load_app_config_routes_aa_forecast_plugin_best_fixed(
                 "decoder_layers": 3,
                 "season_length": 4,
                 "trend_kernel_size": 3,
-                "anomaly_threshold": 4.0,
             },
             requested_mode="learned_fixed",
             validated_mode="learned_fixed",
@@ -4348,8 +4391,14 @@ def test_load_app_config_routes_aa_forecast_plugin_best_fixed(
     assert loaded.config.training_search.validated_mode == "training_fixed"
     assert list(loaded.config.training_search.selected_search_params) == []
     assert loaded.stage_plugin_loaded is not None
-    assert loaded.stage_plugin_loaded.config.star_hist_exog_cols == ("event",)
-    assert loaded.config.stage_plugin_config.star_hist_exog_cols_resolved == ("event",)
+    assert loaded.stage_plugin_loaded.config.star_anomaly_tails == {
+        "upward": ("event",),
+        "two_sided": (),
+    }
+    assert loaded.config.stage_plugin_config.star_anomaly_tails_resolved == {
+        "upward": ("event",),
+        "two_sided": (),
+    }
     assert loaded.config.stage_plugin_config.non_star_hist_exog_cols_resolved == (
         "macro",
     )
@@ -4418,7 +4467,7 @@ def test_load_app_config_aa_forecast_legacy_inline_requires_canonical_star_group
                     "decoder_layers",
                     "season_length",
                     "trend_kernel_size",
-                    "anomaly_threshold",
+                    "p_value",
                 ]
             },
             "training": ["input_size", "model_step_size"],
@@ -4426,7 +4475,7 @@ def test_load_app_config_aa_forecast_legacy_inline_requires_canonical_star_group
         },
     )
 
-    with pytest.raises(ValueError, match=r"star_hist_exog_cols|event_column"):
+    with pytest.raises(ValueError, match=r"star_anomaly_tails|event_column"):
         load_app_config(tmp_path, config_path=config_path)
 
 
@@ -7592,7 +7641,7 @@ def test_build_model_supports_new_official_model_ports(tmp_path: Path):
                 "decoder_layers": 1,
                 "season_length": 4,
                 "trend_kernel_size": 3,
-                "anomaly_threshold": 3.0,
+                "p_value": 0.01,
             },
         },
     ]
@@ -8304,7 +8353,7 @@ EXPECTED_REPO_AUTO_SELECTORS = {
         "decoder_layers",
         "season_length",
         "trend_kernel_size",
-        "anomaly_threshold",
+        "p_value",
     ],
     "iTransformer": [
         "hidden_size",

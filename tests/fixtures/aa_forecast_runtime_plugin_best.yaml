@@ -17,6 +17,8 @@ aa_forecast:
     decoder_hidden_size: 256
     decoder_layers: 3
     season_length: 4
-    anomaly_threshold: 4.0
-  star_hist_exog_cols:
-  - event
+  star_anomaly_tails:
+    upward:
+    - event
+    two_sided: []
+  p_value: 0.005

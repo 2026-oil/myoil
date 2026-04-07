@@ -5,29 +5,29 @@ dataset:
   target_col: Com_BrentCrudeOil
   dt_col: dt
   hist_exog_cols:
-    - Idx_OVX
-    - Com_Oil_Spread
-    - BS_Core_Index_A
-    - BS_Core_Index_B
-    - BS_Core_Index_C
-    - Com_LMEX
-    - Com_BloombergCommodity_BCOM
-    - GPRD_THREAT
-    - GPRD
-    - GPRD_ACT
+  - Idx_OVX
+  - Com_Oil_Spread
+  - BS_Core_Index_A
+  - BS_Core_Index_B
+  - BS_Core_Index_C
+  - Com_LMEX
+  - Com_BloombergCommodity_BCOM
+  - GPRD_THREAT
+  - GPRD
+  - GPRD_ACT
   futr_exog_cols: []
   static_exog_cols: []
 residual:
   enabled: false
 jobs:
-  - model: AAForecast
-    params:
-      encoder_hidden_size: 128
-      encoder_n_layers: 2
-      encoder_dropout: 0.0
-      decoder_hidden_size: 128
-      decoder_layers: 2
-      attention_hidden_size: 32
-      season_length: 4
-      trend_kernel_size: 3
-      anomaly_threshold: 2.0
+- model: AAForecast
+  params:
+    encoder_hidden_size: 128
+    encoder_n_layers: 2
+    encoder_dropout: 0.0
+    decoder_hidden_size: 128
+    decoder_layers: 2
+    attention_hidden_size: 32
+    season_length: 4
+    trend_kernel_size: 3
+    p_value: 0.05

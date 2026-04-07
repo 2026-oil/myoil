@@ -66,8 +66,10 @@ def materialize_aa_forecast_stage(
 def _aa_params_override(loaded: Any) -> dict[str, Any]:
     stage_cfg = loaded.config.stage_plugin_config
     return {
+        "p_value": stage_cfg.p_value,
         "star_hist_exog_list": list(stage_cfg.star_hist_exog_cols_resolved),
         "non_star_hist_exog_list": list(stage_cfg.non_star_hist_exog_cols_resolved),
+        "star_hist_exog_tail_modes": list(stage_cfg.star_anomaly_tail_modes_resolved),
         "lowess_frac": stage_cfg.lowess_frac,
         "lowess_delta": stage_cfg.lowess_delta,
         "uncertainty_enabled": stage_cfg.uncertainty.enabled,
@@ -171,9 +173,17 @@ def _write_uncertainty_artifacts(
         summary_path,
         {
             "train_end_ds": str(pd.Timestamp(train_end_ds)),
+            "p_value": stage_cfg.p_value,
             "star_hist_exog_cols_resolved": list(stage_cfg.star_hist_exog_cols_resolved),
             "non_star_hist_exog_cols_resolved": list(
                 stage_cfg.non_star_hist_exog_cols_resolved
+            ),
+            "star_anomaly_tails": {
+                "upward": list(stage_cfg.star_anomaly_tails_resolved["upward"]),
+                "two_sided": list(stage_cfg.star_anomaly_tails_resolved["two_sided"]),
+            },
+            "star_anomaly_tail_modes_resolved": list(
+                stage_cfg.star_anomaly_tail_modes_resolved
             ),
             "dropout_candidates": list(stage_cfg.uncertainty.dropout_candidates),
             "sample_count": stage_cfg.uncertainty.sample_count,

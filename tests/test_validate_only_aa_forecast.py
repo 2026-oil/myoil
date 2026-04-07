@@ -22,8 +22,11 @@ PLUGIN_BEST_MAIN_CONFIG = Path(
 PLUGIN_UNCERTAINTY_MAIN_CONFIG = Path(
     "tests/fixtures/aa_forecast_runtime_plugin_uncertainty_main.yaml"
 )
-COMPAT_BRNTOIL_CASE1_CONFIG = Path(
+DIRECT_BRNTOIL_CASE1_CONFIG = Path(
     "yaml/experiment/feature_set_aaforecast/brentoil-case1.yaml"
+)
+LEGACY_ANOMALY_THRESHOLD_PLUGIN_CONFIG = Path(
+    "tests/fixtures/aa_forecast_runtime_plugin_legacy_anomaly_threshold.yaml"
 )
 FEATURE_SET_AAFORECAST_VARIANTS = {
     "all10": {
@@ -44,7 +47,10 @@ FEATURE_SET_AAFORECAST_VARIANTS = {
             "GPRD",
             "GPRD_ACT",
         ],
-        "star_hist_exog_cols": ["GPRD_THREAT", "GPRD", "GPRD_ACT"],
+        "star_anomaly_tails": {
+            "upward": ["GPRD_THREAT", "GPRD", "GPRD_ACT"],
+            "two_sided": [],
+        },
         "non_star_hist_exog_cols": [
             "Idx_OVX",
             "Com_Oil_Spread",
@@ -70,7 +76,10 @@ FEATURE_SET_AAFORECAST_VARIANTS = {
             "GPRD",
             "GPRD_ACT",
         ],
-        "star_hist_exog_cols": ["GPRD_THREAT", "GPRD", "GPRD_ACT"],
+        "star_anomaly_tails": {
+            "upward": ["GPRD_THREAT", "GPRD", "GPRD_ACT"],
+            "two_sided": [],
+        },
         "non_star_hist_exog_cols": [
             "Idx_OVX",
             "Com_Oil_Spread",
@@ -93,11 +102,14 @@ FEATURE_SET_AAFORECAST_VARIANTS = {
             "Com_LMEX",
             "Com_BloombergCommodity_BCOM",
         ],
-        "star_hist_exog_cols": [
-            "BS_Core_Index_A",
-            "BS_Core_Index_B",
-            "BS_Core_Index_C",
-        ],
+        "star_anomaly_tails": {
+            "upward": [],
+            "two_sided": [
+                "BS_Core_Index_A",
+                "BS_Core_Index_B",
+                "BS_Core_Index_C",
+            ],
+        },
         "non_star_hist_exog_cols": [
             "Idx_OVX",
             "Com_Oil_Spread",
@@ -106,7 +118,7 @@ FEATURE_SET_AAFORECAST_VARIANTS = {
         ],
     },
 }
-LEGACY_TARGET_CONFIG = Path("yaml/experiment/feature_set_aaforecast/brentoil-case1.yaml")
+DIRECT_TARGET_CONFIG = Path("yaml/experiment/feature_set_aaforecast/brentoil-case1.yaml")
 
 
 def _assert_no_event_column(payload: dict[str, object]) -> None:
@@ -117,14 +129,13 @@ def _assert_grouping_payload(
     payload: dict[str, object],
     *,
     config_path: str | None,
-    star_hist_exog_cols: list[str],
+    star_anomaly_tails: dict[str, list[str]],
     non_star_hist_exog_cols: list[str],
     compatibility_mode: str | None = None,
     compatibility_source_path: str | None = None,
 ) -> None:
     assert payload["config_path"] == config_path
-    assert payload["star_hist_exog_cols"] == star_hist_exog_cols
-    assert payload["star_hist_exog_cols_resolved"] == star_hist_exog_cols
+    assert payload["star_anomaly_tails"] == star_anomaly_tails
     assert payload["non_star_hist_exog_cols_resolved"] == non_star_hist_exog_cols
     assert payload["compatibility_mode"] == compatibility_mode
     assert payload["compatibility_source_path"] == compatibility_source_path
@@ -192,7 +203,7 @@ def test_runtime_validate_only_accepts_aaforecast_auto_path(
         "decoder_layers",
         "season_length",
         "trend_kernel_size",
-        "anomaly_threshold",
+        "p_value",
     ]
 
 
@@ -229,7 +240,7 @@ def test_runtime_validate_only_accepts_aaforecast_auto_model_only_path(
         "decoder_layers",
         "season_length",
         "trend_kernel_size",
-        "anomaly_threshold",
+        "p_value",
     ]
     assert manifest["training_search"] == {
         "requested_mode": "training_fixed",
@@ -266,7 +277,7 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_auto_model_only_path(
         "decoder_layers",
         "season_length",
         "trend_kernel_size",
-        "anomaly_threshold",
+        "p_value",
     ]
     assert manifest["training_search"] == {
         "requested_mode": "training_fixed",
@@ -276,7 +287,7 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_auto_model_only_path(
     _assert_grouping_payload(
         manifest["aa_forecast"],
         config_path="tests/fixtures/aa_forecast_runtime_plugin_auto_model_only.yaml",
-        star_hist_exog_cols=["event"],
+        star_anomaly_tails={"upward": ["event"], "two_sided": []},
         non_star_hist_exog_cols=[],
     )
     assert manifest["aa_forecast"]["selected_config_path"].endswith(
@@ -314,7 +325,7 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_best_path(
     _assert_grouping_payload(
         manifest["aa_forecast"],
         config_path="tests/fixtures/aa_forecast_runtime_plugin_best.yaml",
-        star_hist_exog_cols=["event"],
+        star_anomaly_tails={"upward": ["event"], "two_sided": []},
         non_star_hist_exog_cols=[],
     )
     assert manifest["aa_forecast"]["selected_config_path"].endswith(
@@ -351,13 +362,13 @@ def test_feature_set_aaforecast_best_variants_validate_only(
     _assert_grouping_payload(
         resolved["aa_forecast"],
         config_path=expected["plugin_path"],
-        star_hist_exog_cols=expected["star_hist_exog_cols"],
+        star_anomaly_tails=expected["star_anomaly_tails"],
         non_star_hist_exog_cols=expected["non_star_hist_exog_cols"],
     )
     _assert_grouping_payload(
         manifest["aa_forecast"],
         config_path=expected["plugin_path"],
-        star_hist_exog_cols=expected["star_hist_exog_cols"],
+        star_anomaly_tails=expected["star_anomaly_tails"],
         non_star_hist_exog_cols=expected["non_star_hist_exog_cols"],
     )
 
@@ -393,11 +404,14 @@ def test_feature_set_aaforecast_best_validate_only(
         _assert_grouping_payload(
             payload,
             config_path="yaml/plugins/aa_forecast_brentoil_case1_best.yaml",
-            star_hist_exog_cols=[
-                "BS_Core_Index_A",
-                "BS_Core_Index_B",
-                "BS_Core_Index_C",
-            ],
+            star_anomaly_tails={
+                "upward": [],
+                "two_sided": [
+                    "BS_Core_Index_A",
+                    "BS_Core_Index_B",
+                    "BS_Core_Index_C",
+                ],
+            },
             non_star_hist_exog_cols=[
                 "Idx_OVX",
                 "Com_Oil_Spread",
@@ -407,14 +421,14 @@ def test_feature_set_aaforecast_best_validate_only(
         )
 
 
-def test_validate_only_brentoil_case1_routes_through_plugin_compatibility(
+def test_validate_only_brentoil_case1_accepts_direct_grouped_tails(
     tmp_path: Path,
 ) -> None:
-    output_root = tmp_path / "validate-only-aa-forecast-compat-brentoil-case1"
+    output_root = tmp_path / "validate-only-aa-forecast-direct-brentoil-case1"
     code = runtime.main(
         [
             "--config",
-            str(COMPAT_BRNTOIL_CASE1_CONFIG),
+            str(DIRECT_BRNTOIL_CASE1_CONFIG),
             "--output-root",
             str(output_root),
             "--validate-only",
@@ -424,31 +438,11 @@ def test_validate_only_brentoil_case1_routes_through_plugin_compatibility(
     assert code == 0
     resolved = json.loads((output_root / "config" / "config.resolved.json").read_text())
     manifest = json.loads((output_root / "manifest" / "run_manifest.json").read_text())
-    for payload in (resolved["aa_forecast"], manifest["aa_forecast"]):
-        _assert_grouping_payload(
-            payload,
-            config_path="yaml/plugins/aa_forecast_brentoil_case1.yaml",
-            star_hist_exog_cols=["GPRD_THREAT", "GPRD", "GPRD_ACT"],
-            non_star_hist_exog_cols=[
-                "Idx_OVX",
-                "Com_Oil_Spread",
-                "BS_Core_Index_A",
-                "BS_Core_Index_B",
-                "BS_Core_Index_C",
-                "Com_LMEX",
-                "Com_BloombergCommodity_BCOM",
-            ],
-            compatibility_mode="legacy_direct_job_route",
-            compatibility_source_path=(
-                "yaml/experiment/feature_set_aaforecast/brentoil-case1.yaml"
-            ),
-        )
-    assert resolved["aa_forecast"]["stage1"]["star_hist_exog_cols_resolved"] == [
-        "GPRD_THREAT",
-        "GPRD",
-        "GPRD_ACT",
-    ]
-    assert resolved["aa_forecast"]["stage1"]["non_star_hist_exog_cols_resolved"] == [
+    expected_tails = {
+        "upward": ["GPRD_THREAT", "GPRD", "GPRD_ACT"],
+        "two_sided": [],
+    }
+    expected_non_star = [
         "Idx_OVX",
         "Com_Oil_Spread",
         "BS_Core_Index_A",
@@ -457,7 +451,68 @@ def test_validate_only_brentoil_case1_routes_through_plugin_compatibility(
         "Com_LMEX",
         "Com_BloombergCommodity_BCOM",
     ]
-    _assert_no_event_column(resolved["aa_forecast"]["stage1"])
+    for payload in (resolved["aa_forecast"], manifest["aa_forecast"]):
+        _assert_grouping_payload(
+            payload,
+            config_path="yaml/plugins/aa_forecast_brentoil_case1.yaml",
+            star_anomaly_tails=expected_tails,
+            non_star_hist_exog_cols=expected_non_star,
+            compatibility_mode="legacy_direct_job_route",
+            compatibility_source_path=(
+                "yaml/experiment/feature_set_aaforecast/brentoil-case1.yaml"
+            ),
+        )
+
+
+def test_validate_only_aaforecast_legacy_plugin_anomaly_threshold_fails_fast(
+    tmp_path: Path,
+) -> None:
+    payload = yaml.safe_load(PLUGIN_BEST_MAIN_CONFIG.read_text(encoding="utf-8"))
+    payload["dataset"]["path"] = str(
+        (PLUGIN_BEST_MAIN_CONFIG.parent / payload["dataset"]["path"]).resolve()
+    )
+    payload["aa_forecast"] = {
+        "enabled": True,
+        "config_path": str(LEGACY_ANOMALY_THRESHOLD_PLUGIN_CONFIG),
+    }
+    config_path = tmp_path / "legacy-anomaly-threshold-main.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="anomaly_threshold"):
+        runtime.main(
+            [
+                "--config",
+                str(config_path),
+                "--output-root",
+                str(tmp_path / "legacy-anomaly-threshold-out"),
+                "--validate-only",
+            ]
+        )
+
+
+def test_validate_only_aaforecast_grouped_tail_missing_dataset_var_fails_fast(
+    tmp_path: Path,
+) -> None:
+    payload = yaml.safe_load(AUTO_CONFIG.read_text(encoding="utf-8"))
+    payload["dataset"]["path"] = str((AUTO_CONFIG.parent / payload["dataset"]["path"]).resolve())
+    payload["dataset"]["hist_exog_cols"] = []
+    payload["aa_forecast"]["star_anomaly_tails"] = {
+        "upward": ["event"],
+        "two_sided": [],
+    }
+    config_path = tmp_path / "missing-grouped-var.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"event|hist_exog_cols|star_anomaly_tails"):
+        runtime.main(
+            [
+                "--config",
+                str(config_path),
+                "--output-root",
+                str(tmp_path / "missing-grouped-var-out"),
+                "--validate-only",
+            ]
+        )
 
 
 def test_validate_only_aaforecast_legacy_inline_without_star_grouping_fails_fast(
@@ -505,7 +560,7 @@ def test_validate_only_aaforecast_legacy_inline_without_star_grouping_fails_fast
     config_path = tmp_path / "legacy_inline.yaml"
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
-    with pytest.raises(ValueError, match=r"star_hist_exog_cols|event_column"):
+    with pytest.raises(ValueError, match=r"star_anomaly_tails|event_column"):
         runtime.main(
             [
                 "--config",
@@ -557,7 +612,7 @@ def test_runtime_smoke_emits_aaforecast_uncertainty_artifacts(
     summary = json.loads(json_files[0].read_text())
     assert summary["sample_count"] == 3
     assert summary["dropout_candidates"] == [0.1, 0.2, 0.3]
-    assert summary["star_hist_exog_cols_resolved"] == ["event"]
+    assert summary["star_anomaly_tails"] == {"upward": ["event"], "two_sided": []}
     assert summary["non_star_hist_exog_cols_resolved"] == []
     _assert_no_event_column(summary)
     assert len(summary["selected_dropout_by_horizon"]) == 2
@@ -582,7 +637,7 @@ def test_validate_only_aaforecast_multi_study_catalog_and_projection(
         "mode": "learned_auto",
         "tune_training": False,
         "model_params": {},
-        "star_hist_exog_cols": ["event"],
+        "star_anomaly_tails": {"upward": ["event"], "two_sided": []},
         "lowess_frac": 0.6,
         "lowess_delta": 0.01,
         "uncertainty": {
@@ -646,7 +701,7 @@ def test_validate_only_aaforecast_multi_study_catalog_and_projection(
     _assert_grouping_payload(
         selected_manifest["aa_forecast"],
         config_path=None,
-        star_hist_exog_cols=["event"],
+        star_anomaly_tails={"upward": ["event"], "two_sided": []},
         non_star_hist_exog_cols=[],
     )
     assert (selected_output_root / "models" / "AAForecast" / "visualizations" / "cross_study_dashboard.html").exists()
@@ -674,21 +729,21 @@ def test_runtime_aaforecast_plugin_uncertainty_smoke(
     assert distribution_files
     payload = json.loads(distribution_files[0].read_text())
     assert payload["dropout_candidates"] == [0.1, 0.3]
-    assert payload["star_hist_exog_cols_resolved"] == ["event"]
+    assert payload["star_anomaly_tails"] == {"upward": ["event"], "two_sided": []}
     assert payload["non_star_hist_exog_cols_resolved"] == []
     _assert_no_event_column(payload)
     assert len(payload["selected_dropout_by_horizon"]) == 1
     assert len(payload["selected_std_by_horizon"]) == 1
 
 
-def test_runtime_validate_only_legacy_target_routes_to_canonical_plugin(
+def test_runtime_validate_only_direct_target_preserves_grouped_tails(
     tmp_path: Path,
 ) -> None:
-    output_root = tmp_path / "validate-only-aa-forecast-legacy-target"
+    output_root = tmp_path / "validate-only-aa-forecast-direct-target"
     code = runtime.main(
         [
             "--config",
-            str(LEGACY_TARGET_CONFIG),
+            str(DIRECT_TARGET_CONFIG),
             "--output-root",
             str(output_root),
             "--validate-only",
@@ -701,20 +756,25 @@ def test_runtime_validate_only_legacy_target_routes_to_canonical_plugin(
     capability = json.loads(
         (output_root / "config" / "capability_report.json").read_text()
     )
+    expected_tails = {
+        "upward": ["GPRD_THREAT", "GPRD", "GPRD_ACT"],
+        "two_sided": [],
+    }
+    expected_non_star = [
+        "Idx_OVX",
+        "Com_Oil_Spread",
+        "BS_Core_Index_A",
+        "BS_Core_Index_B",
+        "BS_Core_Index_C",
+        "Com_LMEX",
+        "Com_BloombergCommodity_BCOM",
+    ]
     for payload in (resolved["aa_forecast"], manifest["aa_forecast"], capability["aa_forecast"]):
         _assert_grouping_payload(
             payload,
             config_path="yaml/plugins/aa_forecast_brentoil_case1.yaml",
-            star_hist_exog_cols=["GPRD_THREAT", "GPRD", "GPRD_ACT"],
-            non_star_hist_exog_cols=[
-                "Idx_OVX",
-                "Com_Oil_Spread",
-                "BS_Core_Index_A",
-                "BS_Core_Index_B",
-                "BS_Core_Index_C",
-                "Com_LMEX",
-                "Com_BloombergCommodity_BCOM",
-            ],
+            star_anomaly_tails=expected_tails,
+            non_star_hist_exog_cols=expected_non_star,
             compatibility_mode="legacy_direct_job_route",
             compatibility_source_path=(
                 "yaml/experiment/feature_set_aaforecast/brentoil-case1.yaml"

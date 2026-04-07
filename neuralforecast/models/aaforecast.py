@@ -42,9 +42,10 @@ class AAForecast(BaseModel):
         trend_kernel_size: int | None = None,
         lowess_frac: float = 0.6,
         lowess_delta: float = 0.01,
-        anomaly_threshold: float = 3.5,
+        p_value: float = 0.05,
         star_hist_exog_list=None,
         non_star_hist_exog_list=None,
+        star_hist_exog_tail_modes=None,
         uncertainty_enabled: bool = False,
         uncertainty_dropout_candidates=None,
         uncertainty_sample_count: int = 5,
@@ -112,7 +113,7 @@ class AAForecast(BaseModel):
         self.trend_kernel_size = trend_kernel_size
         self.lowess_frac = lowess_frac
         self.lowess_delta = lowess_delta
-        self.anomaly_threshold = anomaly_threshold
+        self.p_value = float(p_value)
         self.exclude_insample_y = exclude_insample_y
         self.uncertainty_enabled = bool(uncertainty_enabled)
         self.uncertainty_dropout_candidates = tuple(
@@ -124,9 +125,11 @@ class AAForecast(BaseModel):
 
         self.star_hist_exog_list = tuple(star_hist_exog_list or ())
         self.non_star_hist_exog_list = tuple(non_star_hist_exog_list or ())
+        self.star_hist_exog_tail_modes = tuple(star_hist_exog_tail_modes or ())
         self.star_hist_exog_indices, self.non_star_hist_exog_indices = (
             self._resolve_hist_exog_groups()
         )
+        self.star_hist_exog_tail_modes = self._resolve_star_hist_exog_tail_modes()
 
         feature_size = (
             (0 if exclude_insample_y else 1)
@@ -137,7 +140,7 @@ class AAForecast(BaseModel):
             season_length=season_length,
             lowess_frac=lowess_frac,
             lowess_delta=lowess_delta,
-            anomaly_threshold=anomaly_threshold,
+            p_value=p_value,
         )
         self.encoder = nn.GRU(
             input_size=feature_size,
@@ -246,6 +249,27 @@ class AAForecast(BaseModel):
             tuple(hist_lookup[name] for name in self.non_star_hist_exog_list),
         )
 
+    def _resolve_star_hist_exog_tail_modes(self) -> tuple[str, ...]:
+        if not self.star_hist_exog_list:
+            if self.star_hist_exog_tail_modes:
+                raise ValueError(
+                    "AAForecast received star_hist_exog_tail_modes without STAR hist exog"
+                )
+            return ()
+        if len(self.star_hist_exog_tail_modes) != len(self.star_hist_exog_list):
+            raise ValueError(
+                "AAForecast star_hist_exog_tail_modes must align with star_hist_exog_list"
+            )
+        invalid = sorted(
+            set(self.star_hist_exog_tail_modes).difference({"two_sided", "upward"})
+        )
+        if invalid:
+            raise ValueError(
+                "AAForecast star_hist_exog_tail_modes contain unsupported value(s): "
+                + ", ".join(invalid)
+            )
+        return self.star_hist_exog_tail_modes
+
     @staticmethod
     def _select_hist_exog(hist_exog: torch.Tensor, indices: tuple[int, ...]) -> torch.Tensor | None:
         if not indices:
@@ -267,9 +291,16 @@ class AAForecast(BaseModel):
         insample_y = windows_batch["insample_y"]
         hist_exog = windows_batch["hist_exog"]
 
-        target_star = self.star(insample_y)
+        target_star = self.star(insample_y, tail_modes=("two_sided",))
         star_hist_exog = self._select_hist_exog(hist_exog, self.star_hist_exog_indices)
-        star_hist_outputs = self.star(star_hist_exog) if star_hist_exog is not None else None
+        star_hist_outputs = (
+            self.star(
+                star_hist_exog,
+                tail_modes=self.star_hist_exog_tail_modes,
+            )
+            if star_hist_exog is not None
+            else None
+        )
         encoder_parts = []
         if not self.exclude_insample_y:
             encoder_parts.append(insample_y)

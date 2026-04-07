@@ -76,4 +76,14 @@ jobs:
     encoder_dropout: 0.1
     season_length: 4
     trend_kernel_size: 5
-    anomaly_threshold: 3.0
+    p_value: 0.01
+aa_forecast:
+  star_anomaly_tails:
+    upward:
+    - GPRD
+    - GPRD_ACT
+    - GPRD_THREAT
+    two_sided:
+    - BS_Core_Index_A
+    - BS_Core_Index_B
+    - BS_Core_Index_Integrated

@@ -70,6 +70,9 @@ jobs:
     dropout: 0.05
     use_norm: true
 - model: AAForecast
+  # NOTE: This mixed-model research config is intentionally left outside the
+  # active AA grouped-tail contract until it is split into an explicit
+  # aa_forecast plugin path.
   params:
     encoder_hidden_size: 128
     decoder_hidden_size: 128
@@ -77,7 +80,7 @@ jobs:
     encoder_dropout: 0.1
     season_length: 4
     trend_kernel_size: 5
-    anomaly_threshold: 3.0
+    p_value: 0.01
 - model: PatchTST
   params:
     hidden_size: 128

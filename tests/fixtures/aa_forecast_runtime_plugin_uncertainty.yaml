@@ -17,7 +17,9 @@ aa_forecast:
     decoder_layers: 1
     season_length: 4
     trend_kernel_size: 3
-    anomaly_threshold: 3.0
     start_padding_enabled: true
-  star_hist_exog_cols:
-  - event
+  star_anomaly_tails:
+    upward:
+    - event
+    two_sided: []
+  p_value: 0.01
