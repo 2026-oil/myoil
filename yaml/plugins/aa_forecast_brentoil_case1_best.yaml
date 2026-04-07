@@ -15,9 +15,9 @@ aa_forecast:
     attention_hidden_size: 32
     season_length: 52
   star_anomaly_tails:
-    upward:
-    - GPRD_THREAT
-    - GPRD
-    - GPRD_ACT
-    two_sided: []
+    upward: []
+    two_sided:
+    - BS_Core_Index_A
+    - BS_Core_Index_B
+    - BS_Core_Index_C
   top_k: 0.05

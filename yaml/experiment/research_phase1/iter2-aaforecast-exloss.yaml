@@ -43,23 +43,6 @@ residual:
     max_depth: 6
     subsample: 0.8
     colsample_bytree: 0.8
-jobs:
-- model: AAForecast
-  params:
-    encoder_hidden_size: 256
-    decoder_hidden_size: 256
-    encoder_n_layers: 3
-    encoder_dropout: 0.15
-    season_length: 8
-    trend_kernel_size: 7
-    top_k: 0.05
 aa_forecast:
-  star_anomaly_tails:
-    upward:
-    - GPRD
-    - GPRD_ACT
-    - GPRD_THREAT
-    two_sided:
-    - BS_Core_Index_A
-    - BS_Core_Index_B
-    - BS_Core_Index_Integrated
+  enabled: true
+  config_path: yaml/plugins/aa_forecast_iter2_aaforecast_exloss.yaml

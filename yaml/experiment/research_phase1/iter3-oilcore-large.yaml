@@ -27,15 +27,6 @@ residual:
     max_depth: 8
     subsample: 0.8
     colsample_bytree: 0.8
-jobs:
-# NOTE: This research config is intentionally left outside the active AA grouped-tail
-# contract until it is migrated to an explicit aa_forecast plugin block.
-- model: AAForecast
-  params:
-    encoder_hidden_size: 512
-    decoder_hidden_size: 512
-    encoder_n_layers: 4
-    encoder_dropout: 0.2
-    season_length: 4
-    trend_kernel_size: 7
-    top_k: 0.05
+aa_forecast:
+  enabled: true
+  config_path: yaml/plugins/aa_forecast_iter3_oilcore_large.yaml

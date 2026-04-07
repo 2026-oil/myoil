@@ -14,8 +14,8 @@ aa_forecast:
     decoder_layers: 1
     season_length: 52
     trend_kernel_size: 3
-    anomaly_threshold: 3.0
   star_anomaly_tails:
     upward:
     - event
     two_sided: []
+  top_k: 0.01

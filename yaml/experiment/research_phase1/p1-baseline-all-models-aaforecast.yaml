@@ -1,5 +1,5 @@
 task:
-  name: research_iter5_allvars_6win
+  name: research_baseline_all_models_aaforecast
 dataset:
   path: data/df.csv
   target_col: Com_CrudeOil
@@ -36,13 +36,8 @@ dataset:
   futr_exog_cols: []
   static_exog_cols: []
 residual:
-  enabled: true
-  model: xgboost
-  params:
-    n_estimators: 128
-    max_depth: 6
-    subsample: 0.8
-    colsample_bytree: 0.8
+  enabled: false
+jobs: []
 aa_forecast:
   enabled: true
-  config_path: yaml/plugins/aa_forecast_iter5_allvars_6win.yaml
+  config_path: yaml/plugins/aa_forecast_p1_baseline_all_models_aaforecast.yaml

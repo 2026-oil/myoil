@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 AA_FORECAST_MAIN_KEYS = {
     "enabled",
     "config_path",
-    "mode",
+    "model",
     "tune_training",
     "model_params",
     "top_k",
@@ -21,11 +21,9 @@ AA_FORECAST_MAIN_KEYS = {
     "lowess_frac",
     "lowess_delta",
     "uncertainty",
-    "compatibility_mode",
-    "compatibility_source_path",
 }
 AA_FORECAST_LINKED_KEYS = {
-    "mode",
+    "model",
     "tune_training",
     "model_params",
     "top_k",
@@ -63,7 +61,7 @@ def _default_star_anomaly_tails() -> dict[str, tuple[str, ...]]:
 class AAForecastPluginConfig:
     enabled: bool = False
     config_path: str | None = None
-    mode: Literal["fixed", "learned_auto"] = "learned_auto"
+    model: str = "gru"
     tune_training: bool = False
     model_params: dict[str, Any] = field(default_factory=dict)
     top_k: float = 0.05
@@ -81,8 +79,6 @@ class AAForecastPluginConfig:
     uncertainty: AAForecastUncertaintyConfig = field(
         default_factory=AAForecastUncertaintyConfig
     )
-    compatibility_mode: str | None = None
-    compatibility_source_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -114,6 +110,7 @@ def aa_forecast_uncertainty_public_dict(
 
 def aa_forecast_plugin_tuning_public_dict(cfg: AAForecastPluginConfig) -> dict[str, Any]:
     return {
+        "model": cfg.model,
         "top_k": cfg.top_k,
         "star_hist_exog_cols_resolved": list(cfg.star_hist_exog_cols_resolved),
         "non_star_hist_exog_cols_resolved": list(cfg.non_star_hist_exog_cols_resolved),
@@ -129,8 +126,6 @@ def aa_forecast_plugin_tuning_public_dict(cfg: AAForecastPluginConfig) -> dict[s
         "lowess_frac": cfg.lowess_frac,
         "lowess_delta": cfg.lowess_delta,
         "uncertainty": aa_forecast_uncertainty_public_dict(cfg.uncertainty),
-        "compatibility_mode": cfg.compatibility_mode,
-        "compatibility_source_path": cfg.compatibility_source_path,
     }
 
 
@@ -152,7 +147,6 @@ def aa_forecast_plugin_state_dict(
         "enabled": cfg.enabled,
         "config_path": cfg.config_path,
         "selected_config_path": selected_config_path,
-        "mode": cfg.mode,
         "tune_training": cfg.tune_training,
         "model_params": dict(cfg.model_params),
         **aa_forecast_plugin_tuning_public_dict(cfg),
@@ -178,13 +172,17 @@ def _normalize_model_params(value: Any, *, field_name: str) -> dict[str, Any]:
     return dict(value)
 
 
-def _coerce_optional_name_string(value: Any, *, field_name: str) -> str | None:
+def _normalize_model_name(value: Any, *, field_name: str) -> str:
     if value is None:
-        return None
+        return "gru"
     if not isinstance(value, str):
         raise ValueError(f"{field_name} must be a string")
-    normalized = value.strip()
-    return normalized or None
+    model = value.strip().lower()
+    if not model:
+        raise ValueError(f"{field_name} must not be empty")
+    if model != "gru":
+        raise ValueError(f"{field_name} must be one of: gru")
+    return model
 
 
 def _coerce_name_tuple(value: Any, *, field_name: str) -> tuple[str, ...]:
@@ -319,19 +317,14 @@ def _normalize_canonical_fields(
         raise ValueError(
             f"{section}.p_value has been removed; use {section}.top_k"
         )
-    mode = str(payload.get("mode", "learned_auto")).strip().lower()
-    if mode not in {"fixed", "learned_auto"}:
-        raise ValueError(f"{section}.mode must be one of: fixed, learned_auto")
+    model = _normalize_model_name(
+        payload.get("model"),
+        field_name=f"{section}.model",
+    )
     model_params = _normalize_model_params(
         payload.get("model_params"),
         field_name=f"{section}.model_params",
     )
-    if mode == "fixed" and not model_params:
-        raise ValueError(f"{section}.mode=fixed requires {section}.model_params")
-    if mode == "learned_auto" and model_params:
-        raise ValueError(
-            f"{section}.mode=learned_auto must not set {section}.model_params"
-        )
     if "anomaly_threshold" in model_params:
         raise ValueError(
             f"{section}.model_params.anomaly_threshold has been removed; use {section}.top_k and {section}.star_anomaly_tails"
@@ -375,7 +368,7 @@ def _normalize_canonical_fields(
     )
     return AAForecastPluginConfig(
         enabled=True,
-        mode=mode,  # type: ignore[arg-type]
+        model=model,
         tune_training=tune_training,
         model_params=model_params,
         top_k=top_k,
@@ -410,30 +403,14 @@ def normalize_aa_forecast_config(
         payload.get("config_path"),
         field_name="aa_forecast.config_path",
     )
-    compatibility_mode = _coerce_optional_name_string(
-        payload.get("compatibility_mode"),
-        field_name="aa_forecast.compatibility_mode",
-    )
-    compatibility_source_path = _coerce_optional_name_string(
-        payload.get("compatibility_source_path"),
-        field_name="aa_forecast.compatibility_source_path",
-    )
     if not enabled:
         return AAForecastPluginConfig(
             enabled=False,
             config_path=config_path,
-            compatibility_mode=compatibility_mode,
-            compatibility_source_path=compatibility_source_path,
         )
-    canonical = _normalize_canonical_fields(
-        payload,
-        section="aa_forecast",
-        unknown_keys=unknown_keys,
-        coerce_bool=coerce_bool,
-    )
     if config_path is not None:
         inline_keys = {
-            "mode",
+            "model",
             "tune_training",
             "model_params",
             "top_k",
@@ -446,16 +423,25 @@ def normalize_aa_forecast_config(
             raise ValueError(
                 "aa_forecast.config_path cannot be combined with inline canonical fields"
             )
-        return replace(
-            AAForecastPluginConfig(enabled=True, config_path=config_path),
-            compatibility_mode=compatibility_mode,
-            compatibility_source_path=compatibility_source_path,
+        return AAForecastPluginConfig(enabled=True, config_path=config_path)
+    if any(
+        key in payload
+        for key in {
+            "model",
+            "tune_training",
+            "model_params",
+            "top_k",
+            "star_anomaly_tails",
+            "lowess_frac",
+            "lowess_delta",
+            "uncertainty",
+        }
+    ):
+        raise ValueError(
+            "aa_forecast.enabled=true requires aa_forecast.config_path; top-level inline canonical fields are no longer supported"
         )
-    return replace(
-        canonical,
-        config_path=None,
-        compatibility_mode=compatibility_mode,
-        compatibility_source_path=compatibility_source_path,
+    raise ValueError(
+        "aa_forecast.enabled=true requires aa_forecast.config_path"
     )
 
 
@@ -560,7 +546,7 @@ def resolve_aa_forecast_hist_exog(
 
 
 def aa_forecast_jobs_payload(config: AAForecastPluginConfig) -> list[dict[str, Any]]:
-    params = dict(config.model_params) if config.mode == "fixed" else {}
+    params = dict(config.model_params) if config.model_params else {}
     return [{"model": "AAForecast", "params": params}]
 
 
@@ -586,19 +572,7 @@ def load_aa_forecast_stage1(
     )
 
     if aa_forecast.config_path is None:
-        normalized_payload = {"aa_forecast": aa_forecast_to_dict(aa_forecast)}
-        inline_text = json.dumps(normalized_payload, sort_keys=True, ensure_ascii=False)
-        return AAForecastStageLoadedConfig(
-            config=aa_forecast,
-            source_path=source_path,
-            source_type=source_type,
-            normalized_payload=normalized_payload,
-            input_hash=_hash_text(inline_text),
-            resolved_hash=_hash_text(inline_text),
-            search_space_path=search_space_contract.path if search_space_contract else None,
-            search_space_hash=search_space_contract.sha256 if search_space_contract else None,
-            search_space_payload=search_space_contract.payload if search_space_contract else None,
-        )
+        raise ValueError("aa_forecast enabled route requires config_path")
     stage_source_path = _resolve_relative_config_reference(
         repo_root,
         source_path,
@@ -623,8 +597,6 @@ def load_aa_forecast_stage1(
     config = replace(
         linked,
         config_path=aa_forecast.config_path,
-        compatibility_mode=aa_forecast.compatibility_mode,
-        compatibility_source_path=aa_forecast.compatibility_source_path,
     )
     normalized_payload = {
         "aa_forecast": {

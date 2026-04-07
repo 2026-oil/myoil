@@ -62,15 +62,6 @@ jobs:
     d_ff: 256
     dropout: 0.05
     use_norm: true
-- model: AAForecast
-  params:
-    encoder_hidden_size: 128
-    decoder_hidden_size: 128
-    encoder_n_layers: 2
-    encoder_dropout: 0.1
-    season_length: 4
-    trend_kernel_size: 5
-    top_k: 0.01
 - model: PatchTST
   params:
     hidden_size: 128
@@ -102,13 +93,3 @@ jobs:
     decoder_hidden_size: 128
     encoder_n_layers: 3
     encoder_dropout: 0.1
-aa_forecast:
-  star_anomaly_tails:
-    upward:
-    - GPRD
-    - GPRD_ACT
-    - GPRD_THREAT
-    two_sided:
-    - BS_Core_Index_A
-    - BS_Core_Index_B
-    - BS_Core_Index_Integrated

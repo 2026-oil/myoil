@@ -1,5 +1,5 @@
 aa_forecast:
-  mode: learned_auto
+  model: gru
   tune_training: false
   lowess_frac: 0.6
   lowess_delta: 0.01

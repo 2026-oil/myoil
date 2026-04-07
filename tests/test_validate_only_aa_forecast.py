@@ -137,8 +137,10 @@ def _assert_grouping_payload(
     non_star_hist_exog_cols: list[str],
 ) -> None:
     assert payload["config_path"] == config_path
+    assert payload["model"] == "gru"
     assert payload["star_anomaly_tails"] == star_anomaly_tails
     assert payload["non_star_hist_exog_cols_resolved"] == non_star_hist_exog_cols
+    assert "mode" not in payload
     assert "compatibility_mode" not in payload
     assert "compatibility_source_path" not in payload
     _assert_no_event_column(payload)
@@ -346,6 +348,11 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_auto_model_only_path(
         "tests/fixtures/aa_forecast_runtime_plugin_auto_model_only.yaml"
     )
     assert manifest["aa_forecast"]["uncertainty"]["enabled"] is False
+    stage_config = json.loads(
+        (output_root / "aa_forecast" / "config" / "stage_config.json").read_text()
+    )
+    assert stage_config["model"] == "gru"
+    assert "mode" not in stage_config
 
 
 def test_runtime_validate_only_accepts_aaforecast_plugin_best_path(
@@ -384,6 +391,11 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_best_path(
         "tests/fixtures/aa_forecast_runtime_plugin_best.yaml"
     )
     assert manifest["aa_forecast"]["uncertainty"]["enabled"] is True
+    stage_config = json.loads(
+        (output_root / "aa_forecast" / "config" / "stage_config.json").read_text()
+    )
+    assert stage_config["model"] == "gru"
+    assert "mode" not in stage_config
 
 
 @pytest.mark.parametrize(

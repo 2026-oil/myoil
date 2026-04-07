@@ -361,12 +361,16 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
     caps_by_model: dict[str, Any] = {}
     for job in selected_jobs:
         caps = _job_capabilities_for(loaded, job)
+        plugin_owned = _plugin_owned_top_level_job(loaded, job.model)
         if loaded.config.residual.enabled and (
             is_direct_top_level_model(job.model)
-            or _plugin_owned_top_level_job(loaded, job.model) is not None
+            or (
+                plugin_owned is not None
+                and getattr(plugin_owned, "config_key", None) != "aa_forecast"
+            )
         ):
             raise ValueError(
-                "Top-level direct/plugin-managed models do not yet support residual-enabled runs; "
+                "Top-level direct models and non-AA plugin-managed models do not yet support residual-enabled runs; "
                 "disable residual or use a learned top-level model / bs_preforcast path."
             )
         caps_by_model[job.model] = caps

@@ -41,17 +41,4 @@ residual:
   params: {}
 aa_forecast:
   enabled: true
-  mode: learned_auto
-  tune_training: false
-  lowess_frac: 0.6
-  lowess_delta: 0.01
-  uncertainty:
-    enabled: false
-    sample_count: 3
-  star_anomaly_tails:
-    upward:
-    - event
-    two_sided: []
-jobs:
-- model: AAForecast
-  params: {}
+  config_path: tests/fixtures/aa_forecast_runtime_plugin_auto_model_only.yaml

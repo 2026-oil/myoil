@@ -667,52 +667,24 @@ def _repo_relative_path(repo_root: Path, path: Path) -> str:
         return str(path.resolve())
 
 
-def _aa_forecast_legacy_plugin_path(repo_root: Path, source_path: Path) -> str | None:
-    slug = source_path.stem.replace("-", "_")
-    candidate = (repo_root / "yaml" / "plugins" / f"aa_forecast_{slug}.yaml").resolve()
-    if not candidate.exists():
-        return None
-    return _repo_relative_path(repo_root, candidate)
-
-
-def _apply_aa_forecast_legacy_compatibility(
-    payload: dict[str, Any],
-    *,
-    repo_root: Path,
-    source_path: Path,
-) -> dict[str, Any]:
-    if "aa_forecast" in payload:
-        return payload
-    jobs = payload.get("jobs")
-    if not isinstance(jobs, list) or len(jobs) != 1:
-        return payload
-    job = jobs[0]
-    if not isinstance(job, dict) or str(job.get("model")) != "AAForecast":
-        return payload
-    compat_payload = deepcopy(payload)
-    compat_block: dict[str, Any] = {
-        "enabled": True,
-        "compatibility_mode": "legacy_direct_job_route",
-        "compatibility_source_path": _repo_relative_path(repo_root, source_path),
-    }
-    plugin_path = _aa_forecast_legacy_plugin_path(repo_root, source_path)
-    if plugin_path is not None:
-        compat_block["config_path"] = plugin_path
-    else:
-        compat_block["compatibility_mode"] = "legacy_direct_job_inline"
-        compat_block["mode"] = (
-            "learned_auto" if not dict(job.get("params", {})) else "fixed"
+def _reject_legacy_or_mixed_aaforecast_jobs(payload: dict[str, Any]) -> None:
+    jobs_value = payload.get("jobs")
+    if not isinstance(jobs_value, list) or not jobs_value:
+        return
+    models = [
+        str(job.get("model")).strip()
+        for job in jobs_value
+        if isinstance(job, dict) and job.get("model") is not None
+    ]
+    if "AAForecast" in models:
+        raise ValueError(
+            "Direct top-level AAForecast jobs are no longer supported; use aa_forecast.enabled with aa_forecast.config_path"
         )
-        compat_block["tune_training"] = False
-        compat_block["model_params"] = dict(job.get("params", {}))
-        compat_block["lowess_frac"] = 0.6
-        compat_block["lowess_delta"] = 0.01
-        compat_block["uncertainty"] = {
-            "enabled": False,
-            "sample_count": 8,
-        }
-    compat_payload["aa_forecast"] = compat_block
-    return compat_payload
+    aa_forecast_payload = payload.get("aa_forecast")
+    if isinstance(aa_forecast_payload, dict) and bool(aa_forecast_payload.get("enabled")):
+        raise ValueError(
+            "aa_forecast plugin route cannot be combined with top-level jobs; split AAForecast into its own plugin-routed config"
+        )
 
 
 def _as_tuple(value: Any) -> tuple[str, ...]:
@@ -1340,6 +1312,10 @@ def _normalize_job(
     stage_scope: str | None = None,
 ) -> JobConfig:
     model_name = str(job["model"])
+    if stage_scope != "aa_forecast" and model_name == "AAForecast":
+        raise ValueError(
+            "Direct top-level AAForecast jobs are no longer supported; use aa_forecast.enabled with aa_forecast.config_path"
+        )
     _ensure_plugins_loaded()
     stage_plugin = get_stage_plugin(stage_scope) if stage_scope else None
     if stage_plugin is not None:
@@ -1429,64 +1405,6 @@ def _relative_config_reference(repo_root: Path, target_path: Path) -> str:
     return str(resolved_target)
 
 
-def _infer_aa_forecast_plugin_path(
-    repo_root: Path,
-    *,
-    source_path: Path,
-) -> str | None:
-    stem_slug = source_path.stem.replace("-", "_")
-    candidate = repo_root / "yaml" / "plugins" / f"aa_forecast_{stem_slug}.yaml"
-    if candidate.exists():
-        return _relative_config_reference(repo_root, candidate)
-    return None
-
-
-def _apply_aa_forecast_legacy_compatibility(
-    payload: dict[str, Any],
-    *,
-    repo_root: Path,
-    source_path: Path,
-) -> dict[str, Any]:
-    if "aa_forecast" in payload:
-        return payload
-    jobs_value = payload.get("jobs")
-    if not isinstance(jobs_value, list) or len(jobs_value) != 1:
-        return payload
-    only_job = jobs_value[0]
-    if not isinstance(only_job, dict) or str(only_job.get("model")).strip() != "AAForecast":
-        return payload
-    dataset_payload = payload.get("dataset")
-    if not isinstance(dataset_payload, dict):
-        return payload
-
-    compat_payload = deepcopy(payload)
-    compat_block: dict[str, Any] = {
-        "enabled": True,
-        "compatibility_source_path": _relative_config_reference(repo_root, source_path),
-    }
-    inferred_plugin_path = _infer_aa_forecast_plugin_path(
-        repo_root,
-        source_path=source_path,
-    )
-    if inferred_plugin_path is not None:
-        compat_block["compatibility_mode"] = "legacy_direct_job_route"
-        compat_block["config_path"] = inferred_plugin_path
-    else:
-        compat_block["compatibility_mode"] = "legacy_direct_job_inline"
-        params = dict(only_job.get("params", {}))
-        compat_block["mode"] = "fixed" if params else "learned_auto"
-        compat_block["tune_training"] = False
-        compat_block["model_params"] = params
-        compat_block["lowess_frac"] = 0.6
-        compat_block["lowess_delta"] = 0.01
-        compat_block["uncertainty"] = {
-            "enabled": False,
-            "sample_count": 8,
-        }
-    compat_payload["aa_forecast"] = compat_block
-    return compat_payload
-
-
 def _normalize_payload(
     payload: dict[str, Any],
     base_dir: Path,
@@ -1499,12 +1417,6 @@ def _normalize_payload(
     repo_root: Path | None = None,
     source_path: Path | None = None,
 ) -> AppConfig:
-    if repo_root is not None and source_path is not None:
-        payload = _apply_aa_forecast_legacy_compatibility(
-            payload,
-            repo_root=repo_root,
-            source_path=source_path,
-        )
     task = dict(payload.get("task", {}))
     dataset = dict(payload.get("dataset", {}))
     runtime = dict(payload.get("runtime", {}))
@@ -2132,11 +2044,8 @@ def load_app_config(
             effective_shared_settings,
             owned_paths=effective_owned_paths,
         )
-    payload = _apply_aa_forecast_legacy_compatibility(
-        dict(payload),
-        repo_root=repo_root,
-        source_path=source_path,
-    )
+    payload = dict(payload)
+    _reject_legacy_or_mixed_aaforecast_jobs(payload)
     jobs_fanout_specs = _resolve_jobs_fanout_specs(
         repo_root,
         source_path=source_path,
@@ -2178,6 +2087,16 @@ def load_app_config(
         jobs_payload_candidates = [
             [dict(job) for job in spec.jobs_payload] for spec in jobs_fanout_specs
         ]
+        if (
+            stage_plugin is not None
+            and getattr(stage_plugin, "config_key", None) == "aa_forecast"
+            and raw_stage_config is not None
+            and stage_plugin.is_enabled(raw_stage_config)
+            and payload["jobs"]
+        ):
+            raise ValueError(
+                "aa_forecast plugin route cannot be combined with top-level jobs; split AAForecast into its own plugin-routed config"
+            )
     else:
         payload["jobs"] = _resolve_jobs_reference(
             repo_root,
@@ -2185,6 +2104,16 @@ def load_app_config(
             jobs_value=payload.get("jobs", []),
         )
         jobs_payload_candidates = [payload["jobs"]]
+        if (
+            stage_plugin is not None
+            and getattr(stage_plugin, "config_key", None) == "aa_forecast"
+            and raw_stage_config is not None
+            and stage_plugin.is_enabled(raw_stage_config)
+            and payload["jobs"]
+        ):
+            raise ValueError(
+                "aa_forecast plugin route cannot be combined with top-level jobs; split AAForecast into its own plugin-routed config"
+            )
         stage_fanout_probe = (
             tuple(stage_payload_probe.get("jobs_fanout_specs", ()))
             if isinstance(stage_payload_probe, dict)

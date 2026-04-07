@@ -39,33 +39,4 @@ residual:
   params: {}
 aa_forecast:
   enabled: true
-  mode: fixed
-  tune_training: false
-  lowess_frac: 0.6
-  lowess_delta: 0.01
-  uncertainty:
-    enabled: false
-    sample_count: 3
-  model_params:
-    encoder_hidden_size: 16
-    encoder_n_layers: 1
-    encoder_dropout: 0.1
-    decoder_hidden_size: 16
-    decoder_layers: 1
-    season_length: 52
-    trend_kernel_size: 3
-  star_anomaly_tails:
-    upward:
-    - event
-    two_sided: []
-  top_k: 0.01
-jobs:
-- model: AAForecast
-  params:
-    encoder_hidden_size: 16
-    encoder_n_layers: 1
-    encoder_dropout: 0.1
-    decoder_hidden_size: 16
-    decoder_layers: 1
-    season_length: 52
-    trend_kernel_size: 3
+  config_path: tests/fixtures/aa_forecast_runtime_plugin_fixed.yaml

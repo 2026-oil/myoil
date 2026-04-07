@@ -27,20 +27,6 @@ residual:
     max_depth: 6
     subsample: 0.8
     colsample_bytree: 0.8
-jobs:
-- model: AAForecast
-  params:
-    encoder_hidden_size: 256
-    decoder_hidden_size: 256
-    encoder_n_layers: 3
-    encoder_dropout: 0.15
-    season_length: 4
-    trend_kernel_size: 5
-    top_k: 0.02
 aa_forecast:
-  star_anomaly_tails:
-    upward:
-    - GPRD_THREAT
-    - GPRD_ACT
-    two_sided:
-    - BS_Core_Index_Integrated
+  enabled: true
+  config_path: yaml/plugins/aa_forecast_iter4_oilcore_tuned.yaml

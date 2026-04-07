@@ -1,5 +1,5 @@
 task:
-  name: research_iter5_allvars_6win
+  name: research_p2_wti_latehorizon_aaforecast
 dataset:
   path: data/df.csv
   target_col: Com_CrudeOil
@@ -39,10 +39,11 @@ residual:
   enabled: true
   model: xgboost
   params:
-    n_estimators: 128
-    max_depth: 6
+    n_estimators: 64
+    max_depth: 4
     subsample: 0.8
     colsample_bytree: 0.8
+jobs: []
 aa_forecast:
   enabled: true
-  config_path: yaml/plugins/aa_forecast_iter5_allvars_6win.yaml
+  config_path: yaml/plugins/aa_forecast_p2_wti_latehorizon_aaforecast.yaml
