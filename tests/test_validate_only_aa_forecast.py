@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import json
+import tempfile
 from pathlib import Path
 
-import app_config
-import plugin_contracts.stage_registry as stage_registry
 import pytest
+import torch
 import runtime_support.runner as runtime
 import yaml
+
+from app_config import load_app_config
+from plugins.aa_forecast.runtime import _aa_params_override
+from runtime_support.forecast_models import build_model
 
 
 FIXED_CONFIG = Path("tests/fixtures/aa_forecast_runtime_smoke.yaml")
@@ -131,15 +135,69 @@ def _assert_grouping_payload(
     config_path: str | None,
     star_anomaly_tails: dict[str, list[str]],
     non_star_hist_exog_cols: list[str],
-    compatibility_mode: str | None = None,
-    compatibility_source_path: str | None = None,
 ) -> None:
     assert payload["config_path"] == config_path
     assert payload["star_anomaly_tails"] == star_anomaly_tails
     assert payload["non_star_hist_exog_cols_resolved"] == non_star_hist_exog_cols
-    assert payload["compatibility_mode"] == compatibility_mode
-    assert payload["compatibility_source_path"] == compatibility_source_path
+    assert "compatibility_mode" not in payload
+    assert "compatibility_source_path" not in payload
     _assert_no_event_column(payload)
+
+
+def _build_aaforecast_plugin_model(*, training_scaler_type: str | None):
+    repo_root = Path.cwd()
+    payload = yaml.safe_load((repo_root / FIXED_CONFIG).read_text(encoding="utf-8"))
+    if training_scaler_type is None:
+        payload.get("training", {}).pop("scaler_type", None)
+    else:
+        payload.setdefault("training", {})["scaler_type"] = training_scaler_type
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_path = Path(tmpdir) / "config.yaml"
+        config_path.write_text(
+            yaml.safe_dump(payload, sort_keys=False),
+            encoding="utf-8",
+        )
+        loaded = load_app_config(repo_root, config_path=config_path)
+    job = loaded.config.jobs[0]
+    model = build_model(
+        loaded.config,
+        job,
+        n_series=1,
+        params_override=_aa_params_override(loaded),
+    )
+    return loaded, model
+
+
+def test_aaforecast_plugin_ignores_shared_robust_scaler() -> None:
+    loaded, model = _build_aaforecast_plugin_model(training_scaler_type="robust")
+
+    assert loaded.config.training.scaler_type == "robust"
+    assert model.hparams.scaler_type is None
+
+
+def test_aaforecast_plugin_preserves_non_robust_shared_scaler() -> None:
+    loaded, model = _build_aaforecast_plugin_model(training_scaler_type="standard")
+
+    assert loaded.config.training.scaler_type == "standard"
+    assert model.hparams.scaler_type == "standard"
+
+
+def test_aaforecast_plugin_uses_shared_setting_adamw_optimizer() -> None:
+    repo_root = Path.cwd()
+    loaded = load_app_config(repo_root, config_path=str(repo_root / FIXED_CONFIG))
+    job = loaded.config.jobs[0]
+
+    model = build_model(
+        loaded.config,
+        job,
+        n_series=1,
+        params_override=_aa_params_override(loaded),
+    )
+
+    assert loaded.config.training.optimizer.name == "adamw"
+    assert model.optimizer is torch.optim.AdamW
+    assert model.optimizer_kwargs == {}
+    assert isinstance(model.configure_optimizers()["optimizer"], torch.optim.AdamW)
 
 
 def test_runtime_validate_only_accepts_aaforecast_fixed_path(
@@ -147,8 +205,6 @@ def test_runtime_validate_only_accepts_aaforecast_fixed_path(
     monkeypatch,
 ):
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
-    monkeypatch.setattr(app_config, "_ensure_plugins_loaded", lambda: None)
-    monkeypatch.setattr(stage_registry, "_ensure_plugins_loaded", lambda: None)
 
     output_root = tmp_path / "validate-only-aa-forecast-fixed"
     code = runtime.main(
@@ -175,8 +231,6 @@ def test_runtime_validate_only_accepts_aaforecast_auto_path(
     monkeypatch,
 ):
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
-    monkeypatch.setattr(app_config, "_ensure_plugins_loaded", lambda: None)
-    monkeypatch.setattr(stage_registry, "_ensure_plugins_loaded", lambda: None)
 
     output_root = tmp_path / "validate-only-aa-forecast-auto"
     code = runtime.main(
@@ -212,8 +266,6 @@ def test_runtime_validate_only_accepts_aaforecast_auto_model_only_path(
     monkeypatch,
 ):
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
-    monkeypatch.setattr(app_config, "_ensure_plugins_loaded", lambda: None)
-    monkeypatch.setattr(stage_registry, "_ensure_plugins_loaded", lambda: None)
 
     output_root = tmp_path / "validate-only-aa-forecast-auto-model-only"
     code = runtime.main(
@@ -421,7 +473,7 @@ def test_feature_set_aaforecast_best_validate_only(
         )
 
 
-def test_validate_only_brentoil_case1_accepts_direct_grouped_tails(
+def test_validate_only_brentoil_case1_accepts_plugin_grouped_tails(
     tmp_path: Path,
 ) -> None:
     output_root = tmp_path / "validate-only-aa-forecast-direct-brentoil-case1"
@@ -457,10 +509,6 @@ def test_validate_only_brentoil_case1_accepts_direct_grouped_tails(
             config_path="yaml/plugins/aa_forecast_brentoil_case1.yaml",
             star_anomaly_tails=expected_tails,
             non_star_hist_exog_cols=expected_non_star,
-            compatibility_mode="legacy_direct_job_route",
-            compatibility_source_path=(
-                "yaml/experiment/feature_set_aaforecast/brentoil-case1.yaml"
-            ),
         )
 
 
@@ -496,10 +544,18 @@ def test_validate_only_aaforecast_grouped_tail_missing_dataset_var_fails_fast(
     payload = yaml.safe_load(AUTO_CONFIG.read_text(encoding="utf-8"))
     payload["dataset"]["path"] = str((AUTO_CONFIG.parent / payload["dataset"]["path"]).resolve())
     payload["dataset"]["hist_exog_cols"] = []
-    payload["aa_forecast"]["star_anomaly_tails"] = {
+    plugin_payload = yaml.safe_load(
+        (AUTO_CONFIG.parent / "aa_forecast_runtime_plugin_auto_model_only.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    plugin_payload["aa_forecast"]["star_anomaly_tails"] = {
         "upward": ["event"],
         "two_sided": [],
     }
+    plugin_path = tmp_path / "missing-grouped-var-plugin.yaml"
+    plugin_path.write_text(yaml.safe_dump(plugin_payload, sort_keys=False), encoding="utf-8")
+    payload["aa_forecast"]["config_path"] = str(plugin_path)
     config_path = tmp_path / "missing-grouped-var.yaml"
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
@@ -560,7 +616,10 @@ def test_validate_only_aaforecast_legacy_inline_without_star_grouping_fails_fast
     config_path = tmp_path / "legacy_inline.yaml"
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
-    with pytest.raises(ValueError, match=r"star_anomaly_tails|event_column"):
+    with pytest.raises(
+        ValueError,
+        match=r"Direct top-level AAForecast jobs are no longer supported",
+    ):
         runtime.main(
             [
                 "--config",
@@ -624,26 +683,22 @@ def test_validate_only_aaforecast_multi_study_catalog_and_projection(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
-    monkeypatch.setattr(app_config, "_ensure_plugins_loaded", lambda: None)
-    monkeypatch.setattr(stage_registry, "_ensure_plugins_loaded", lambda: None)
 
     payload = yaml.safe_load(AUTO_CONFIG.read_text(encoding="utf-8"))
     payload["dataset"]["path"] = str(
         (AUTO_CONFIG.parent / payload["dataset"]["path"]).resolve()
     )
+    plugin_payload = yaml.safe_load(
+        (AUTO_CONFIG.parent / "aa_forecast_runtime_plugin_auto_model_only.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    plugin_path = tmp_path / "aaforecast_multi_plugin.yaml"
+    plugin_path.write_text(yaml.safe_dump(plugin_payload, sort_keys=False), encoding="utf-8")
     payload["jobs"] = []
     payload["aa_forecast"] = {
         "enabled": True,
-        "mode": "learned_auto",
-        "tune_training": False,
-        "model_params": {},
-        "star_anomaly_tails": {"upward": ["event"], "two_sided": []},
-        "lowess_frac": 0.6,
-        "lowess_delta": 0.01,
-        "uncertainty": {
-            "enabled": False,
-            "sample_count": 3,
-        },
+        "config_path": str(plugin_path),
     }
     payload.setdefault("runtime", {})["opt_study_count"] = 2
     payload["dataset"]["path"] = str((AUTO_CONFIG.parent / payload["dataset"]["path"]).resolve())
@@ -699,7 +754,7 @@ def test_validate_only_aaforecast_multi_study_catalog_and_projection(
     assert selected_catalog["canonical_projection_study_index"] == 2
     _assert_grouping_payload(
         selected_manifest["aa_forecast"],
-        config_path=None,
+        config_path=str(plugin_path),
         star_anomaly_tails={"upward": ["event"], "two_sided": []},
         non_star_hist_exog_cols=[],
     )
@@ -740,7 +795,15 @@ def test_validate_only_rejects_yaml_managed_aaforecast_dropout_candidates(
 ) -> None:
     payload = yaml.safe_load(AUTO_CONFIG.read_text(encoding="utf-8"))
     payload["dataset"]["path"] = str((AUTO_CONFIG.parent / payload["dataset"]["path"]).resolve())
-    payload["aa_forecast"]["uncertainty"]["dropout_candidates"] = [0.1, 0.2, 0.3]
+    plugin_payload = yaml.safe_load(
+        (AUTO_CONFIG.parent / "aa_forecast_runtime_plugin_auto_model_only.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    plugin_payload["aa_forecast"]["uncertainty"]["dropout_candidates"] = [0.1, 0.2, 0.3]
+    plugin_path = tmp_path / "aaforecast-invalid-dropout-plugin.yaml"
+    plugin_path.write_text(yaml.safe_dump(plugin_payload, sort_keys=False), encoding="utf-8")
+    payload["aa_forecast"]["config_path"] = str(plugin_path)
     config_path = tmp_path / "aaforecast-invalid-dropout-candidates.yaml"
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
@@ -756,7 +819,7 @@ def test_validate_only_rejects_yaml_managed_aaforecast_dropout_candidates(
         )
 
 
-def test_runtime_validate_only_direct_target_preserves_grouped_tails(
+def test_runtime_validate_only_plugin_target_preserves_grouped_tails(
     tmp_path: Path,
 ) -> None:
     output_root = tmp_path / "validate-only-aa-forecast-direct-target"
@@ -795,8 +858,4 @@ def test_runtime_validate_only_direct_target_preserves_grouped_tails(
             config_path="yaml/plugins/aa_forecast_brentoil_case1.yaml",
             star_anomaly_tails=expected_tails,
             non_star_hist_exog_cols=expected_non_star,
-            compatibility_mode="legacy_direct_job_route",
-            compatibility_source_path=(
-                "yaml/experiment/feature_set_aaforecast/brentoil-case1.yaml"
-            ),
         )

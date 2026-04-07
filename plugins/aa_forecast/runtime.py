@@ -58,13 +58,15 @@ def materialize_aa_forecast_stage(
             "main_capability_path": str(main_capability_path),
             "main_manifest_path": str(main_manifest_path),
             "selected_jobs": [job.model for job in selected_jobs],
-            "compatibility_mapping_applied": bool(stage_cfg.compatibility_mode),
         },
     )
 
 
 def _aa_params_override(loaded: Any) -> dict[str, Any]:
     stage_cfg = loaded.config.stage_plugin_config
+    scaler_type = loaded.config.training.scaler_type
+    if scaler_type == "robust":
+        scaler_type = None
     return {
         "top_k": stage_cfg.top_k,
         "star_hist_exog_list": list(stage_cfg.star_hist_exog_cols_resolved),
@@ -77,6 +79,7 @@ def _aa_params_override(loaded: Any) -> dict[str, Any]:
             stage_cfg.uncertainty.dropout_candidates
         ),
         "uncertainty_sample_count": stage_cfg.uncertainty.sample_count,
+        "scaler_type": scaler_type,
     }
 
 
