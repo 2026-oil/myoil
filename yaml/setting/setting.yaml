@@ -32,7 +32,7 @@ training:
 cv:
   gap: 0
   horizon: 4
-  step_size: 4
+  step_size: 6
   n_windows: 6
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean

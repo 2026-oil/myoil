@@ -1,0 +1,23 @@
+aa_forecast:
+  model: gru
+  tune_training: true
+  lowess_frac: 0.6
+  lowess_delta: 0.01
+  uncertainty:
+    enabled: true
+    sample_count: 100
+  model_params: {}
+  star_anomaly_tails:
+    upward:
+    - Idx_OVX
+    - BS_Core_Index_A
+    - GPRD_THREAT
+    - GPRD
+    - GPRD_ACT
+    two_sided:
+    - Com_Oil_Spread
+    - BS_Core_Index_B
+    - BS_Core_Index_C
+    - Com_LMEX
+    - Com_BloombergCommodity_BCOM
+  top_k: 0.05
