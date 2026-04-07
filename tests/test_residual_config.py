@@ -2117,7 +2117,9 @@ def test_runtime_logs_fold_errors_to_stdout(
     assert "synthetic failure" in captured.out
 
 
-def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
+def test_summary_builder_writes_leaderboard_and_last_fold_plots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     import runtime_support.runner as runtime
 
     run_root = tmp_path / "summary_run"
@@ -2171,7 +2173,11 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
             json.dumps(
                 {
                     "fold_idx": fold_idx,
-                    "cutoff": f"2020-01-{15 + (7 * fold_idx):02d}",
+                    "cutoff": (
+                        "2020-01-15"
+                        if fold_idx == 0
+                        else "2020-01-22T00:00:00+00:00"
+                    ),
                     "base_metrics": {},
                     "corrected_metrics": corrected_metrics,
                 }
@@ -2192,7 +2198,7 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
             },
             {
                 "fold_idx": 1,
-                "cutoff": "2020-01-22",
+                "cutoff": "2020-01-22T00:00:00+00:00",
                 "MAE": 0.5,
                 "MSE": 0.25,
                 "RMSE": 0.5,
@@ -2216,7 +2222,7 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
             },
             {
                 "fold_idx": 1,
-                "cutoff": "2020-01-22",
+                "cutoff": "2020-01-22T00:00:00+00:00",
                 "MAE": 1.5,
                 "MSE": 2.25,
                 "RMSE": 1.5,
@@ -2226,42 +2232,131 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
             },
         ]
     ).to_csv(cv_dir / "ModelB_metrics_by_cutoff.csv", index=False)
-    for model_name, values in {
-        "ModelA": [10.0, 11.0],
-        "ModelB": [9.5, 10.5],
+    recorded_plot_calls: list[dict[str, object]] = []
+    original_plot_overlay = runtime._plot_last_fold_overlay
+
+    def _record_plot_overlay(
+        forecasts: pd.DataFrame,
+        selected_models: list[str],
+        plot_path: Path,
+        *,
+        title: str,
+    ) -> None:
+        def _normalize_cutoff(value: object) -> str:
+            timestamp = pd.Timestamp(value)
+            if timestamp.tzinfo is not None:
+                timestamp = timestamp.tz_convert(None)
+            return timestamp.isoformat()
+
+        recorded_plot_calls.append(
+            {
+                "path": str(plot_path.relative_to(run_root)),
+                "fold_idx_values": sorted(
+                    {
+                        int(value)
+                        for value in pd.to_numeric(
+                            forecasts["fold_idx"], errors="coerce"
+                        ).dropna()
+                    }
+                ),
+                "cutoff_values": sorted({str(value) for value in forecasts["cutoff"]}),
+                "normalized_cutoff_values": sorted(
+                    {_normalize_cutoff(value) for value in forecasts["cutoff"]}
+                ),
+                "selected_models": list(selected_models),
+                "title": title,
+            }
+        )
+        original_plot_overlay(
+            forecasts, selected_models, plot_path, title=title
+        )
+
+    monkeypatch.setattr(runtime, "_plot_last_fold_overlay", _record_plot_overlay)
+
+    for model_name, values_by_fold in {
+        "ModelA": {
+            0: [20.0, 21.0],
+            1: [10.0, 11.0],
+        },
+        "ModelB": {
+            0: [19.5, 20.5],
+            1: [9.5, 10.5],
+        },
     }.items():
         pd.DataFrame(
             [
                 {
                     "model": model_name,
-                    "fold_idx": 1,
-                    "cutoff": "2020-01-22",
-                    "train_end_ds": "2020-01-22",
+                    "fold_idx": 0,
+                    "cutoff": "2020-01-15",
+                    "train_end_ds": "2020-01-15",
+                    "unique_id": "target",
+                    "ds": "2020-01-22",
+                    "horizon_step": 1,
+                    "y": 20.0,
+                    "y_hat": values_by_fold[0][0],
+                },
+                {
+                    "model": model_name,
+                    "fold_idx": 0,
+                    "cutoff": "2020-01-15",
+                    "train_end_ds": "2020-01-15",
                     "unique_id": "target",
                     "ds": "2020-01-29",
-                    "horizon_step": 1,
-                    "y": 10.0,
-                    "y_hat": values[0],
+                    "horizon_step": 2,
+                    "y": 21.0,
+                    "y_hat": values_by_fold[0][1],
                 },
                 {
                     "model": model_name,
                     "fold_idx": 1,
-                    "cutoff": "2020-01-22",
-                    "train_end_ds": "2020-01-22",
+                    "cutoff": "2020-01-22T00:00:00+00:00",
+                    "train_end_ds": "2020-01-22T00:00:00+00:00",
+                    "unique_id": "target",
+                    "ds": "2020-01-29",
+                    "horizon_step": 1,
+                    "y": 10.0,
+                    "y_hat": values_by_fold[1][0],
+                },
+                {
+                    "model": model_name,
+                    "fold_idx": 1,
+                    "cutoff": "2020-01-22T00:00:00+00:00",
+                    "train_end_ds": "2020-01-22T00:00:00+00:00",
                     "unique_id": "target",
                     "ds": "2020-02-05",
                     "horizon_step": 2,
                     "y": 11.0,
-                    "y_hat": values[1],
+                    "y_hat": values_by_fold[1][1],
                 },
             ]
         ).to_csv(cv_dir / f"{model_name}_forecasts.csv", index=False)
     pd.DataFrame(
         [
             {
+                "fold_idx": 0,
+                "cutoff": "2020-01-15",
+                "train_end_ds": "2020-01-15",
+                "unique_id": "target",
+                "ds": "2020-01-22",
+                "horizon_step": 1,
+                "y": 20.0,
+                "y_hat_corrected": 20.2,
+            },
+            {
+                "fold_idx": 0,
+                "cutoff": "2020-01-15",
+                "train_end_ds": "2020-01-15",
+                "unique_id": "target",
+                "ds": "2020-01-29",
+                "horizon_step": 2,
+                "y": 21.0,
+                "y_hat_corrected": 20.8,
+            },
+            {
                 "fold_idx": 1,
-                "cutoff": "2020-01-22",
-                "train_end_ds": "2020-01-22",
+                "cutoff": "2020-01-22T00:00:00+00:00",
+                "train_end_ds": "2020-01-22T00:00:00+00:00",
                 "unique_id": "target",
                 "ds": "2020-01-29",
                 "horizon_step": 1,
@@ -2318,6 +2413,15 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
     assert artifacts["leaderboard"] == str(leaderboard_path)
     assert artifacts["loss_artifacts"] == str(loss_artifacts_path)
     assert artifacts["markdown"] == str(markdown_path)
+    assert set(artifacts) == {
+        "leaderboard",
+        "markdown",
+        "loss_artifacts",
+        "all_models",
+        "top3",
+        "top5",
+        "residual_ModelA",
+    }
     assert leaderboard_path.exists()
     assert loss_artifacts_path.exists()
     assert markdown_path.exists()
@@ -2362,6 +2466,66 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(tmp_path: Path):
     assert (run_root / "summary" / "last_fold_top5.png").exists()
     assert (run_root / "summary" / "residual" / "ModelA.png").exists()
     assert not (run_root / "summary" / "residual" / "ModelB.png").exists()
+    test_1_dir = run_root / "summary" / "test_1"
+    test_2_dir = run_root / "summary" / "test_2"
+    for summary_dir in (test_1_dir, test_2_dir):
+        assert (summary_dir / "leaderboard.csv").exists()
+        assert (summary_dir / "sample.md").exists()
+        assert (summary_dir / "last_fold_all_models.png").exists()
+        assert (summary_dir / "last_fold_top3.png").exists()
+        assert (summary_dir / "last_fold_top5.png").exists()
+        assert (summary_dir / "residual" / "ModelA.png").exists()
+
+    test_1_leaderboard = pd.read_csv(test_1_dir / "leaderboard.csv")
+    test_2_leaderboard = pd.read_csv(test_2_dir / "leaderboard.csv")
+    assert test_1_leaderboard["model"].tolist() == ["ModelA_res", "ModelA", "ModelB"]
+    assert test_2_leaderboard["model"].tolist() == ["ModelA_res", "ModelA", "ModelB"]
+    assert test_1_leaderboard.loc[0, "mean_fold_mae"] == pytest.approx(0.4)
+    assert test_1_leaderboard.loc[0, "mean_fold_mape"] == pytest.approx(0.04)
+    assert test_1_leaderboard.loc[0, "mean_fold_nrmse"] == pytest.approx(0.08)
+    assert test_1_leaderboard.loc[0, "mean_fold_r2"] == pytest.approx(0.95)
+    assert test_2_leaderboard.loc[0, "mean_fold_mae"] == pytest.approx(0.2)
+    assert test_2_leaderboard.loc[0, "mean_fold_mape"] == pytest.approx(0.02)
+    assert test_2_leaderboard.loc[0, "mean_fold_nrmse"] == pytest.approx(0.04)
+    assert test_2_leaderboard.loc[0, "mean_fold_r2"] == pytest.approx(0.98)
+
+    test_1_report = (test_1_dir / "sample.md").read_text(encoding="utf-8")
+    test_2_report = (test_2_dir / "sample.md").read_text(encoding="utf-8")
+    assert "| 1 | ModelA_res | 4.00% | 0.08 | 0.40 | 0.95 |" in test_1_report
+    assert "| 1 | ModelA_res | 3.00% | 0.06 | 0.30 | 0.97 |" not in test_1_report
+    assert "| 1 | ModelA_res | 2.00% | 0.04 | 0.20 | 0.98 |" in test_2_report
+    assert "| 1 | ModelA_res | 3.00% | 0.06 | 0.30 | 0.97 |" not in test_2_report
+
+    top_level_plot_calls = [
+        call
+        for call in recorded_plot_calls
+        if call["path"].startswith("summary/")
+        and not call["path"].startswith("summary/test_")
+    ]
+    test_1_plot_calls = [
+        call
+        for call in recorded_plot_calls
+        if call["path"].startswith("summary/test_1/")
+    ]
+    test_2_plot_calls = [
+        call
+        for call in recorded_plot_calls
+        if call["path"].startswith("summary/test_2/")
+    ]
+    assert top_level_plot_calls
+    assert test_1_plot_calls
+    assert test_2_plot_calls
+    assert all(call["fold_idx_values"] == [1] for call in top_level_plot_calls)
+    assert all(call["fold_idx_values"] == [0] for call in test_1_plot_calls)
+    assert all(call["fold_idx_values"] == [1] for call in test_2_plot_calls)
+    assert all(
+        call["normalized_cutoff_values"] == ["2020-01-15T00:00:00"]
+        for call in test_1_plot_calls
+    )
+    assert all(
+        call["normalized_cutoff_values"] == ["2020-01-22T00:00:00"]
+        for call in test_2_plot_calls
+    )
 
 
 def test_summary_builder_leaves_missing_report_values_blank(tmp_path: Path):
@@ -2410,6 +2574,151 @@ def test_summary_builder_leaves_missing_report_values_blank(tmp_path: Path):
     assert "## **Case 9 | WTI**" in report
     assert "| 1 | ModelA | 10.00% |  | 1.00 |  |" in report
     assert "| Case 9 \\| WTI | 10.00% |  | 1.00 |  |" in report
+    assert set(artifacts) == {"leaderboard", "markdown"}
+    assert not (run_root / "summary" / "last_fold_all_models.png").exists()
+    assert not (run_root / "summary" / "test_1").exists()
+
+
+def test_summary_builder_fails_fast_when_forecast_window_is_missing_from_metrics(
+    tmp_path: Path,
+):
+    import runtime_support.runner as runtime
+
+    run_root = tmp_path / "invalid_extra_forecast_window"
+    cv_dir = run_root / "cv"
+    cv_dir.mkdir(parents=True)
+    (run_root / "config").mkdir(parents=True)
+    (run_root / "config" / "config.resolved.json").write_text(
+        json.dumps(
+            {
+                "task": {"name": "brentoil_case1"},
+                "dataset": {
+                    "target_col": "Com_BrentCrudeOil",
+                    "hist_exog_cols": ["Com_Gasoline"],
+                },
+                "cv": {
+                    "horizon": 2,
+                    "step_size": 2,
+                    "n_windows": 1,
+                    "gap": 0,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    pd.DataFrame(
+        [
+            {
+                "fold_idx": 0,
+                "cutoff": "2020-01-15",
+                "MAE": 1.0,
+                "MSE": 1.0,
+                "RMSE": 1.0,
+                "MAPE": 0.1,
+                "NRMSE": 0.25,
+                "R2": 0.8,
+            }
+        ]
+    ).to_csv(cv_dir / "ModelA_metrics_by_cutoff.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                "model": "ModelA",
+                "fold_idx": 1,
+                "cutoff": "2020-01-22",
+                "train_end_ds": "2020-01-22",
+                "unique_id": "target",
+                "ds": "2020-01-29",
+                "horizon_step": 1,
+                "y": 10.0,
+                "y_hat": 9.8,
+            }
+        ]
+    ).to_csv(cv_dir / "ModelA_forecasts.csv", index=False)
+
+    with pytest.raises(
+        ValueError,
+        match="summary forecasts contain windows absent from summary metrics",
+    ):
+        runtime._build_summary_artifacts(run_root)
+
+
+def test_summary_builder_fails_fast_when_ranked_model_lacks_forecast_slice(
+    tmp_path: Path,
+):
+    import runtime_support.runner as runtime
+
+    run_root = tmp_path / "missing_model_slice"
+    cv_dir = run_root / "cv"
+    cv_dir.mkdir(parents=True)
+    (run_root / "config").mkdir(parents=True)
+    (run_root / "config" / "config.resolved.json").write_text(
+        json.dumps(
+            {
+                "task": {"name": "brentoil_case1"},
+                "dataset": {
+                    "target_col": "Com_BrentCrudeOil",
+                    "hist_exog_cols": ["Com_Gasoline"],
+                },
+                "cv": {
+                    "horizon": 2,
+                    "step_size": 2,
+                    "n_windows": 1,
+                    "gap": 0,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    pd.DataFrame(
+        [
+            {
+                "fold_idx": 0,
+                "cutoff": "2020-01-15",
+                "MAE": 1.0,
+                "MSE": 1.0,
+                "RMSE": 1.0,
+                "MAPE": 0.1,
+                "NRMSE": 0.25,
+                "R2": 0.8,
+            }
+        ]
+    ).to_csv(cv_dir / "ModelA_metrics_by_cutoff.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                "fold_idx": 0,
+                "cutoff": "2020-01-15",
+                "MAE": 1.2,
+                "MSE": 1.44,
+                "RMSE": 1.2,
+                "MAPE": 0.12,
+                "NRMSE": 0.30,
+                "R2": 0.7,
+            }
+        ]
+    ).to_csv(cv_dir / "ModelB_metrics_by_cutoff.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                "model": "ModelA",
+                "fold_idx": 0,
+                "cutoff": "2020-01-15",
+                "train_end_ds": "2020-01-15",
+                "unique_id": "target",
+                "ds": "2020-01-22",
+                "horizon_step": 1,
+                "y": 10.0,
+                "y_hat": 9.8,
+            }
+        ]
+    ).to_csv(cv_dir / "ModelA_forecasts.csv", index=False)
+
+    with pytest.raises(
+        ValueError,
+        match="summary forecasts missing required slices",
+    ):
+        runtime._build_summary_artifacts(run_root)
 
 
 def test_compute_metrics_includes_range_normalized_nrmse_and_r2():

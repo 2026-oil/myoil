@@ -2409,6 +2409,64 @@ def _load_metrics_for_summary(run_root: Path) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _normalize_summary_window_frame(
+    frame: pd.DataFrame, *, frame_name: str
+) -> pd.DataFrame:
+    if frame.empty:
+        return frame.copy()
+    if "fold_idx" not in frame.columns:
+        raise ValueError(f"{frame_name} must contain a fold_idx column")
+    if "cutoff" not in frame.columns:
+        raise ValueError(f"{frame_name} must contain a cutoff column")
+    normalized = frame.copy()
+    normalized["fold_idx"] = pd.to_numeric(normalized["fold_idx"], errors="coerce")
+    if normalized["fold_idx"].isna().any():
+        raise ValueError(f"{frame_name} contains invalid fold_idx values")
+    normalized["fold_idx"] = normalized["fold_idx"].astype(int)
+
+    def _normalize_cutoff(value: object) -> pd.Timestamp:
+        timestamp = pd.Timestamp(value)
+        if pd.isna(timestamp):
+            return pd.NaT
+        if timestamp.tzinfo is not None:
+            return timestamp.tz_convert(None)
+        return timestamp
+
+    normalized["normalized_cutoff"] = normalized["cutoff"].map(_normalize_cutoff)
+    if normalized["normalized_cutoff"].isna().any():
+        raise ValueError(f"{frame_name} contains invalid cutoff values")
+    return normalized
+
+
+def _ordered_summary_windows(metrics_frame: pd.DataFrame) -> pd.DataFrame:
+    if metrics_frame.empty:
+        return pd.DataFrame(columns=["normalized_cutoff", "fold_idx"])
+    normalized_metrics = _normalize_summary_window_frame(
+        metrics_frame, frame_name="summary metrics"
+    )
+    return (
+        normalized_metrics[["normalized_cutoff", "fold_idx"]]
+        .drop_duplicates()
+        .sort_values(["normalized_cutoff", "fold_idx"], kind="stable")
+        .reset_index(drop=True)
+    )
+
+
+def _summary_window_mask(
+    frame: pd.DataFrame, *, normalized_cutoff: pd.Timestamp, fold_idx: int
+) -> pd.Series:
+    return (frame["normalized_cutoff"] == normalized_cutoff) & (
+        frame["fold_idx"] == fold_idx
+    )
+
+
+def _window_label(normalized_cutoff: pd.Timestamp, fold_idx: int) -> str:
+    return (
+        f"cutoff={normalized_cutoff.isoformat(sep=' ')}"
+        f", fold_idx={fold_idx}"
+    )
+
+
 def _build_leaderboard(metrics_frame: pd.DataFrame) -> pd.DataFrame:
     def _safe_mean(series: pd.Series) -> float:
         values = pd.to_numeric(series, errors="coerce").replace([np.inf, -np.inf], np.nan)
@@ -2521,8 +2579,10 @@ def _markdown_table_cell(value: object) -> str:
     return " ".join(text.splitlines()).replace("|", "\\|")
 
 
-def _build_summary_markdown(run_root: Path, leaderboard: pd.DataFrame) -> Path:
-    summary_dir = run_root / "summary"
+def _build_summary_markdown(
+    run_root: Path, leaderboard: pd.DataFrame, *, summary_dir: Path | None = None
+) -> Path:
+    summary_dir = summary_dir or (run_root / "summary")
     summary_dir.mkdir(parents=True, exist_ok=True)
     report_path = summary_dir / SUMMARY_REPORT_FILENAME
 
@@ -2675,11 +2735,11 @@ def _load_last_fold_forecasts(run_root: Path) -> pd.DataFrame:
 
 
 def _build_residual_comparison_plots(
-    run_root: Path, last_fold_forecasts: pd.DataFrame
+    summary_dir: Path, scoped_forecasts: pd.DataFrame
 ) -> dict[str, str]:
-    residual_dir = run_root / "summary" / "residual"
+    residual_dir = summary_dir / "residual"
     plot_paths: dict[str, str] = {}
-    available_models = set(last_fold_forecasts["model"])
+    available_models = set(scoped_forecasts["model"])
     residual_models = sorted(
         model.removesuffix("_res")
         for model in available_models
@@ -2691,13 +2751,169 @@ def _build_residual_comparison_plots(
     for model_name in residual_models:
         plot_path = residual_dir / f"{model_name}.png"
         _plot_last_fold_overlay(
-            last_fold_forecasts,
+            scoped_forecasts,
             [model_name, _residual_summary_model_name(model_name)],
             plot_path,
             title=f"Last fold predictions ({model_name}: base vs base+residual)",
         )
         plot_paths[f"residual_{model_name}"] = str(plot_path)
     return plot_paths
+
+
+def _build_summary_plot_bundle(
+    summary_dir: Path,
+    leaderboard: pd.DataFrame,
+    scoped_forecasts: pd.DataFrame,
+    *,
+    title_prefix: str,
+) -> dict[str, str]:
+    plot_paths: dict[str, str] = {}
+    ordered_models = [
+        model
+        for model in leaderboard["model"].tolist()
+        if model in set(scoped_forecasts["model"])
+    ]
+    plot_specs = [
+        ("all_models", ordered_models, f"{title_prefix} (all models)"),
+        ("top3", ordered_models[:3], f"{title_prefix} (top 3)"),
+        ("top5", ordered_models[:5], f"{title_prefix} (top 5)"),
+    ]
+    for slug, models, title in plot_specs:
+        if not models:
+            continue
+        plot_path = summary_dir / f"last_fold_{slug}.png"
+        _plot_last_fold_overlay(scoped_forecasts, models, plot_path, title=title)
+        plot_paths[slug] = str(plot_path)
+    plot_paths.update(_build_residual_comparison_plots(summary_dir, scoped_forecasts))
+    return plot_paths
+
+
+def _write_summary_bundle(
+    run_root: Path,
+    summary_dir: Path,
+    metrics_frame: pd.DataFrame,
+    *,
+    scoped_forecasts: pd.DataFrame | None = None,
+    title_prefix: str,
+) -> tuple[pd.DataFrame, dict[str, str]]:
+    leaderboard = _build_leaderboard(metrics_frame)
+    workbook_path = summary_dir / "leaderboard.csv"
+    _write_leaderboard_workbook(leaderboard, workbook_path)
+    markdown_path = _build_summary_markdown(
+        run_root, leaderboard, summary_dir=summary_dir
+    )
+    artifact_paths: dict[str, str] = {
+        "leaderboard": str(workbook_path),
+        "markdown": str(markdown_path),
+    }
+    if scoped_forecasts is not None and not scoped_forecasts.empty:
+        artifact_paths.update(
+            _build_summary_plot_bundle(
+                summary_dir,
+                leaderboard,
+                scoped_forecasts,
+                title_prefix=title_prefix,
+            )
+        )
+    return leaderboard, artifact_paths
+
+
+def _validate_summary_window_contract(
+    metrics_frame: pd.DataFrame, forecasts_frame: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    normalized_metrics = _normalize_summary_window_frame(
+        metrics_frame, frame_name="summary metrics"
+    )
+    normalized_forecasts = _normalize_summary_window_frame(
+        forecasts_frame, frame_name="summary forecasts"
+    )
+    windows = _ordered_summary_windows(normalized_metrics)
+    metric_window_set = {
+        (row.normalized_cutoff, int(row.fold_idx))
+        for row in windows.itertuples(index=False)
+    }
+    forecast_window_set = {
+        (row.normalized_cutoff, int(row.fold_idx))
+        for row in normalized_forecasts[["normalized_cutoff", "fold_idx"]]
+        .drop_duplicates()
+        .itertuples(index=False)
+    }
+    extra_windows = sorted(
+        forecast_window_set - metric_window_set,
+        key=lambda item: (item[0], item[1]),
+    )
+    if extra_windows:
+        rendered = ", ".join(
+            _window_label(cutoff, fold_idx) for cutoff, fold_idx in extra_windows
+        )
+        raise ValueError(
+            "summary forecasts contain windows absent from summary metrics: "
+            f"{rendered}"
+        )
+    for window in windows.itertuples(index=False):
+        metrics_window = normalized_metrics[
+            _summary_window_mask(
+                normalized_metrics,
+                normalized_cutoff=window.normalized_cutoff,
+                fold_idx=int(window.fold_idx),
+            )
+        ]
+        forecasts_window = normalized_forecasts[
+            _summary_window_mask(
+                normalized_forecasts,
+                normalized_cutoff=window.normalized_cutoff,
+                fold_idx=int(window.fold_idx),
+            )
+        ]
+        leaderboard_window = _build_leaderboard(metrics_window)
+        required_models = [
+            model
+            for model in leaderboard_window["model"].tolist()
+            if not str(model).endswith("_res")
+        ]
+        available_models = set(forecasts_window["model"])
+        missing_models = sorted(
+            model for model in required_models if model not in available_models
+        )
+        if missing_models:
+            raise ValueError(
+                "summary forecasts missing required slices for "
+                f"{_window_label(window.normalized_cutoff, int(window.fold_idx))}: "
+                + ", ".join(missing_models)
+            )
+    return normalized_metrics, normalized_forecasts, windows
+
+
+def _write_per_window_summary_bundles(
+    run_root: Path, metrics_frame: pd.DataFrame, forecasts_frame: pd.DataFrame
+) -> None:
+    normalized_metrics, normalized_forecasts, windows = _validate_summary_window_contract(
+        metrics_frame, forecasts_frame
+    )
+    summary_root = run_root / "summary"
+    for index, window in enumerate(windows.itertuples(index=False), start=1):
+        summary_dir = summary_root / f"test_{index}"
+        metrics_window = normalized_metrics[
+            _summary_window_mask(
+                normalized_metrics,
+                normalized_cutoff=window.normalized_cutoff,
+                fold_idx=int(window.fold_idx),
+            )
+        ].copy()
+        forecasts_window = normalized_forecasts[
+            _summary_window_mask(
+                normalized_forecasts,
+                normalized_cutoff=window.normalized_cutoff,
+                fold_idx=int(window.fold_idx),
+            )
+        ].copy()
+        _write_summary_bundle(
+            run_root,
+            summary_dir,
+            metrics_window,
+            scoped_forecasts=forecasts_window,
+            title_prefix=f"Test window {index} predictions",
+        )
 
 
 def _plot_last_fold_overlay(
@@ -2902,38 +3118,34 @@ def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
     metrics = _load_metrics_for_summary(run_root)
     if metrics.empty:
         return {}
-    leaderboard = _build_leaderboard(metrics)
-    workbook_path = summary_dir / "leaderboard.csv"
-    _write_leaderboard_workbook(leaderboard, workbook_path)
-    markdown_path = _build_summary_markdown(run_root, leaderboard)
-
     forecasts = _load_last_fold_forecasts(run_root)
-    plot_paths: dict[str, str] = {
-        "leaderboard": str(workbook_path),
-        "markdown": str(markdown_path),
-    }
+    leaderboard, plot_paths = _write_summary_bundle(
+        run_root,
+        summary_dir,
+        metrics,
+        title_prefix="Last fold predictions",
+    )
     loss_artifact_summary_path = _write_loss_artifact_summary(run_root)
     if loss_artifact_summary_path is not None:
         plot_paths["loss_artifacts"] = str(loss_artifact_summary_path)
     if forecasts.empty:
         return plot_paths
-    last_fold = int(forecasts["fold_idx"].max())
-    last_fold_forecasts = forecasts[forecasts["fold_idx"] == last_fold].copy()
-    ordered_models = [
-        model for model in leaderboard["model"].tolist() if model in set(last_fold_forecasts["model"])
-    ]
-    plot_specs = [
-        ("all_models", ordered_models, "Last fold predictions (all models)"),
-        ("top3", ordered_models[:3], "Last fold predictions (top 3)"),
-        ("top5", ordered_models[:5], "Last fold predictions (top 5)"),
-    ]
-    for slug, models, title in plot_specs:
-        if not models:
-            continue
-        plot_path = summary_dir / f"last_fold_{slug}.png"
-        _plot_last_fold_overlay(last_fold_forecasts, models, plot_path, title=title)
-        plot_paths[slug] = str(plot_path)
-    plot_paths.update(_build_residual_comparison_plots(run_root, last_fold_forecasts))
+    normalized_forecasts = _normalize_summary_window_frame(
+        forecasts, frame_name="summary forecasts"
+    )
+    last_fold = int(normalized_forecasts["fold_idx"].max())
+    last_fold_forecasts = normalized_forecasts[
+        normalized_forecasts["fold_idx"] == last_fold
+    ].copy()
+    plot_paths.update(
+        _build_summary_plot_bundle(
+            summary_dir,
+            leaderboard,
+            last_fold_forecasts,
+            title_prefix="Last fold predictions",
+        )
+    )
+    _write_per_window_summary_bundles(run_root, metrics, forecasts)
     return plot_paths
 
 
