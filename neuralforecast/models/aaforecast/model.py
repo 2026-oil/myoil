@@ -1,16 +1,18 @@
+from __future__ import annotations
+
 __all__ = ["AAForecast"]
 
 from typing import Optional
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from plugins.aa_forecast import CriticalSparseAttention, STARFeatureExtractor
 
-from ..common._base_model import BaseModel
-from ..common._modules import MLP
-from ..losses.pytorch import MAE
+from ...common._base_model import BaseModel
+from ...common._modules import MLP
+from ...losses.pytorch import MAE
+from .gru import _align_horizon, _apply_stochastic_dropout, _build_encoder
 
 
 class AAForecast(BaseModel):
@@ -142,12 +144,11 @@ class AAForecast(BaseModel):
             lowess_delta=lowess_delta,
             p_value=p_value,
         )
-        self.encoder = nn.GRU(
-            input_size=feature_size,
+        self.encoder = _build_encoder(
+            feature_size=feature_size,
             hidden_size=encoder_hidden_size,
             num_layers=encoder_n_layers,
-            batch_first=True,
-            dropout=encoder_dropout if encoder_n_layers > 1 else 0.0,
+            dropout=encoder_dropout,
         )
         self.attention = CriticalSparseAttention(
             hidden_size=encoder_hidden_size,
@@ -174,23 +175,6 @@ class AAForecast(BaseModel):
         self._stochastic_inference_enabled = bool(enabled)
         if dropout_p is not None:
             self._stochastic_dropout_p = float(dropout_p)
-
-    def _apply_stochastic_dropout(self, tensor: torch.Tensor) -> torch.Tensor:
-        training = self.training or self._stochastic_inference_enabled
-        if not training:
-            return tensor
-        p = self.encoder_dropout if self.training else self._stochastic_dropout_p
-        if p <= 0:
-            return tensor
-        return F.dropout(tensor, p=p, training=True)
-
-    def _align_horizon(self, hidden: torch.Tensor) -> torch.Tensor:
-        if self.h > self.input_size:
-            hidden = hidden.permute(0, 2, 1)
-            hidden = self.sequence_adapter(hidden)
-            hidden = hidden.permute(0, 2, 1)
-            return hidden
-        return hidden[:, -self.h :]
 
     def _resolve_hist_exog_groups(self) -> tuple[tuple[int, ...], tuple[int, ...]]:
         if self.hist_exog_size == 0:
@@ -337,10 +321,38 @@ class AAForecast(BaseModel):
         critical_mask = target_mask | star_hist_mask
         attended_states, _ = self.attention(hidden_states, critical_mask)
 
-        hidden_aligned = self._align_horizon(hidden_states)
-        attended_aligned = self._align_horizon(attended_states)
-        hidden_aligned = self._apply_stochastic_dropout(hidden_aligned)
-        attended_aligned = self._apply_stochastic_dropout(attended_aligned)
+        hidden_aligned = _align_horizon(
+            hidden_states,
+            h=self.h,
+            input_size=self.input_size,
+            sequence_adapter=self.sequence_adapter,
+        )
+        attended_aligned = _align_horizon(
+            attended_states,
+            h=self.h,
+            input_size=self.input_size,
+            sequence_adapter=self.sequence_adapter,
+        )
+        hidden_aligned = _apply_stochastic_dropout(
+            hidden_aligned,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
+        attended_aligned = _apply_stochastic_dropout(
+            attended_aligned,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
         decoder_input = torch.cat([hidden_aligned, attended_aligned], dim=-1)
-        decoder_input = self._apply_stochastic_dropout(decoder_input)
+        decoder_input = _apply_stochastic_dropout(
+            decoder_input,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
         return self.decoder(decoder_input)[:, -self.h :]

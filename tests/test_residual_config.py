@@ -7537,6 +7537,8 @@ def test_repo_search_space_bs_preforcast_sections_are_unique_and_include_stage_o
 
 
 def test_package_exports_and_intentional_omissions_are_explicit():
+    from neuralforecast.models.aaforecast import AAForecast as package_aaforecast
+
     for model_name in NEWLY_SUPPORTED_MODEL_ALIASES:
         assert hasattr(nf_models, model_name)
     for auto_name in (
@@ -7557,6 +7559,7 @@ def test_package_exports_and_intentional_omissions_are_explicit():
     assert hasattr(nf_models, "DeformTime")
     assert not hasattr(nf_models, "DeepEDM")
     assert hasattr(nf_models, "AAForecast")
+    assert nf_models.AAForecast is package_aaforecast
     assert hasattr(nf_models, "NonstationaryTransformer")
     assert hasattr(nf_models, "DeformableTST")
     assert "AAForecast" in SUPPORTED_AUTO_MODEL_NAMES
@@ -7692,6 +7695,34 @@ def test_build_model_supports_new_official_model_ports(tmp_path: Path):
     assert modern.__class__.__name__ == "ModernTCN"
     assert nonstationary.__class__.__name__ == "NonstationaryTransformer"
     assert aa_forecast.__class__.__name__ == "AAForecast"
+
+
+def test_aaforecast_save_and_load_roundtrip_preserves_state(tmp_path: Path):
+    aa_forecast = nf_models.AAForecast(
+        h=2,
+        input_size=4,
+        encoder_hidden_size=16,
+        encoder_n_layers=1,
+        encoder_dropout=0.1,
+        decoder_hidden_size=16,
+        decoder_layers=1,
+        season_length=2,
+        trend_kernel_size=3,
+        p_value=0.01,
+    )
+
+    checkpoint_path = tmp_path / "aaforecast.ckpt"
+    aa_forecast.save(checkpoint_path)
+
+    reloaded = MODEL_FILENAME_DICT["aaforecast"].load(checkpoint_path)
+
+    assert reloaded.__class__.__name__ == "AAForecast"
+    assert reloaded.hparams["encoder_hidden_size"] == aa_forecast.hparams["encoder_hidden_size"]
+    assert reloaded.hparams["encoder_n_layers"] == aa_forecast.hparams["encoder_n_layers"]
+    assert reloaded.hparams["decoder_hidden_size"] == aa_forecast.hparams["decoder_hidden_size"]
+    assert reloaded.state_dict().keys() == aa_forecast.state_dict().keys()
+    for name, value in aa_forecast.state_dict().items():
+        assert torch.equal(reloaded.state_dict()[name], value), name
 
 
 def test_should_use_multivariate_for_no_exog_multivariate_model(tmp_path: Path):
