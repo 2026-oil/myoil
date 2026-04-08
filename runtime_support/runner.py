@@ -2775,8 +2775,6 @@ def _build_summary_plot_bundle(
     ]
     plot_specs = [
         ("all_models", ordered_models, f"{title_prefix} (all models)"),
-        ("top3", ordered_models[:3], f"{title_prefix} (top 3)"),
-        ("top5", ordered_models[:5], f"{title_prefix} (top 5)"),
     ]
     for slug, models, title in plot_specs:
         if not models:

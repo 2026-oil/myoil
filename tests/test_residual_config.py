@@ -2418,8 +2418,6 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(
         "markdown",
         "loss_artifacts",
         "all_models",
-        "top3",
-        "top5",
         "residual_ModelA",
     }
     assert leaderboard_path.exists()
@@ -2462,8 +2460,8 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(
     assert "| Case 1 \\| BrentCrude | 3.00% | 0.06 | 0.30 | 0.97 |" in report
     assert "hist_exog_cols:" in report
     assert (run_root / "summary" / "last_fold_all_models.png").exists()
-    assert (run_root / "summary" / "last_fold_top3.png").exists()
-    assert (run_root / "summary" / "last_fold_top5.png").exists()
+    assert not (run_root / "summary" / "last_fold_top3.png").exists()
+    assert not (run_root / "summary" / "last_fold_top5.png").exists()
     assert (run_root / "summary" / "residual" / "ModelA.png").exists()
     assert not (run_root / "summary" / "residual" / "ModelB.png").exists()
     test_1_dir = run_root / "summary" / "test_1"
@@ -2472,8 +2470,8 @@ def test_summary_builder_writes_leaderboard_and_last_fold_plots(
         assert (summary_dir / "leaderboard.csv").exists()
         assert (summary_dir / "sample.md").exists()
         assert (summary_dir / "last_fold_all_models.png").exists()
-        assert (summary_dir / "last_fold_top3.png").exists()
-        assert (summary_dir / "last_fold_top5.png").exists()
+        assert not (summary_dir / "last_fold_top3.png").exists()
+        assert not (summary_dir / "last_fold_top5.png").exists()
         assert (summary_dir / "residual" / "ModelA.png").exists()
 
     test_1_leaderboard = pd.read_csv(test_1_dir / "leaderboard.csv")
@@ -2807,8 +2805,8 @@ def test_runtime_smoke_writes_summary_artifacts_for_dummy_model(tmp_path: Path):
     assert leaderboard_path.exists()
     assert markdown_path.exists()
     assert (output_root / "summary" / "last_fold_all_models.png").exists()
-    assert (output_root / "summary" / "last_fold_top3.png").exists()
-    assert (output_root / "summary" / "last_fold_top5.png").exists()
+    assert not (output_root / "summary" / "last_fold_top3.png").exists()
+    assert not (output_root / "summary" / "last_fold_top5.png").exists()
     leaderboard = pd.read_csv(leaderboard_path)
     assert "rank" in leaderboard.columns
     assert (
