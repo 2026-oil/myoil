@@ -257,22 +257,37 @@ models:
       - 1
       - 2
       - 4
-    season_length:
+  GRU:
+    encoder_hidden_size:
       type: categorical
       choices:
-      - 52
-    trend_kernel_size:
+      - 128
+      - 256
+    encoder_n_layers:
       type: categorical
       choices:
-      - 3
-      - 5
-      - 7
-    top_k:
+      - 2
+      - 4
+      - 8
+    encoder_dropout:
       type: categorical
       choices:
-      - 0.01
-      - 0.02
-      - 0.05
+      - 0.0
+      - 0.1
+      - 0.2
+      - 0.3
+    decoder_hidden_size:
+      type: categorical
+      choices:
+      - 64
+      - 128
+      - 256
+    decoder_layers:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 4
   ARIMA:
     order:
       type: categorical

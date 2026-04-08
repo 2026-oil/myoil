@@ -6,6 +6,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import torch
 from neuralforecast import NeuralForecast
 
 from . import config as _cfg
@@ -16,6 +17,7 @@ def _stage_root(run_root: Path) -> Path:
     (root / "config").mkdir(parents=True, exist_ok=True)
     (root / "manifest").mkdir(parents=True, exist_ok=True)
     (root / "uncertainty").mkdir(parents=True, exist_ok=True)
+    (root / "context").mkdir(parents=True, exist_ok=True)
     return root
 
 
@@ -100,6 +102,99 @@ def _extract_target_prediction_frame(
         prediction_col=model_name,
         diff_context=diff_context,
     )
+
+
+def _context_slug(train_end_ds: pd.Timestamp) -> str:
+    return pd.Timestamp(train_end_ds).strftime("%Y%m%dT%H%M%S")
+
+
+def _build_fold_context_frame(
+    *,
+    model: Any,
+    train_df: pd.DataFrame,
+    dt_col: str,
+    target_col: str,
+) -> tuple[pd.DataFrame, bool]:
+    insample_y = torch.as_tensor(
+        train_df[target_col].to_numpy(dtype=np.float32),
+        dtype=torch.float32,
+    ).reshape(1, -1, 1)
+    hist_exog = None
+    if getattr(model, "hist_exog_list", ()):
+        hist_exog = torch.as_tensor(
+            train_df[list(model.hist_exog_list)].to_numpy(dtype=np.float32),
+            dtype=torch.float32,
+        ).reshape(1, len(train_df), -1)
+    with torch.no_grad():
+        target_star = model.star(insample_y, tail_modes=("two_sided",))
+        target_mask = model._reduce_critical_mask(
+            target_star["critical_mask"],
+            template=insample_y,
+        )
+        star_hist_exog = (
+            model._select_hist_exog(hist_exog, model.star_hist_exog_indices)
+            if hist_exog is not None
+            else None
+        )
+        star_hist_outputs = (
+            model.star(
+                star_hist_exog,
+                tail_modes=model.star_hist_exog_tail_modes,
+            )
+            if star_hist_exog is not None
+            else None
+        )
+        star_hist_mask = model._reduce_critical_mask(
+            None if star_hist_outputs is None else star_hist_outputs["critical_mask"],
+            template=insample_y,
+        )
+        context_mask = (
+            (target_mask | star_hist_mask)
+            .squeeze(0)
+            .squeeze(-1)
+            .detach()
+            .cpu()
+            .numpy()
+            .astype(bool)
+        )
+    frame = pd.DataFrame(
+        {
+            "ds": pd.to_datetime(train_df[dt_col]).reset_index(drop=True),
+            "context_active": context_mask.astype(int),
+            "context_label": np.where(
+                context_mask,
+                "anomaly_context",
+                "normal_context",
+            ),
+        }
+    )
+    return frame, bool(context_mask.any())
+
+
+def _write_context_artifacts(
+    *,
+    run_root: Path,
+    train_end_ds: pd.Timestamp,
+    context_frame: pd.DataFrame,
+    context_active: bool,
+) -> str:
+    stage_root = _stage_root(run_root)
+    slug = _context_slug(train_end_ds)
+    relative_csv_path = Path("aa_forecast") / "context" / f"{slug}.csv"
+    csv_path = run_root / relative_csv_path
+    json_path = stage_root / "context" / f"{slug}.json"
+    context_frame.to_csv(csv_path, index=False)
+    _write_json(
+        json_path,
+        {
+            "train_end_ds": str(pd.Timestamp(train_end_ds)),
+            "context_active": bool(context_active),
+            "context_points": int(len(context_frame)),
+            "active_points": int(context_frame["context_active"].sum()),
+            "csv_path": str(relative_csv_path),
+        },
+    )
+    return str(relative_csv_path)
 
 
 def _predict_with_adapter(nf: NeuralForecast, adapter_inputs: Any) -> pd.DataFrame:
@@ -313,6 +408,26 @@ def predict_aa_forecast_fold(
         restore_target_predictions=_restore_target_predictions,
     )
     stage_cfg = loaded.config.stage_plugin_config
+    context_frame, context_active = _build_fold_context_frame(
+        model=nf.models[0],
+        train_df=transformed_train_df,
+        dt_col=dt_col,
+        target_col=target_col,
+    )
+    context_artifact = None
+    if run_root is not None:
+        context_artifact = _write_context_artifacts(
+            run_root=run_root,
+            train_end_ds=pd.to_datetime(train_df[dt_col].iloc[-1]),
+            context_frame=context_frame,
+            context_active=context_active,
+        )
+    target_predictions["aaforecast_context_active"] = bool(context_active)
+    target_predictions["aaforecast_context_label"] = (
+        "anomaly_context" if context_active else "normal_context"
+    )
+    if context_artifact is not None:
+        target_predictions["aaforecast_context_artifact"] = context_artifact
     if stage_cfg.uncertainty.enabled:
         summary = _select_uncertainty_predictions(
             nf=nf,

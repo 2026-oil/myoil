@@ -33,6 +33,13 @@ DIRECT_BRNTOIL_CASE1_CONFIG = Path(
 LEGACY_ANOMALY_THRESHOLD_PLUGIN_CONFIG = Path(
     "tests/fixtures/aa_forecast_runtime_plugin_legacy_anomaly_threshold.yaml"
 )
+PARITY_SHARED_MODEL_SELECTORS = [
+    "encoder_hidden_size",
+    "encoder_n_layers",
+    "encoder_dropout",
+    "decoder_hidden_size",
+    "decoder_layers",
+]
 FEATURE_SET_AAFORECAST_VARIANTS = {
     "all10": {
         "config_path": Path(
@@ -252,16 +259,7 @@ def test_runtime_validate_only_accepts_aaforecast_auto_path(
     assert manifest["jobs"][0]["model"] == "AAForecast"
     assert manifest["jobs"][0]["requested_mode"] == "learned_auto_requested"
     assert manifest["jobs"][0]["validated_mode"] == "learned_auto"
-    assert manifest["jobs"][0]["selected_search_params"] == [
-        "encoder_hidden_size",
-        "encoder_n_layers",
-        "encoder_dropout",
-        "decoder_hidden_size",
-        "decoder_layers",
-        "season_length",
-        "trend_kernel_size",
-        "top_k",
-    ]
+    assert manifest["jobs"][0]["selected_search_params"] == PARITY_SHARED_MODEL_SELECTORS
 
 
 def test_runtime_validate_only_accepts_aaforecast_auto_model_only_path(
@@ -287,16 +285,7 @@ def test_runtime_validate_only_accepts_aaforecast_auto_model_only_path(
     assert manifest["jobs"][0]["model"] == "AAForecast"
     assert manifest["jobs"][0]["requested_mode"] == "learned_auto_requested"
     assert manifest["jobs"][0]["validated_mode"] == "learned_auto"
-    assert manifest["jobs"][0]["selected_search_params"] == [
-        "encoder_hidden_size",
-        "encoder_n_layers",
-        "encoder_dropout",
-        "decoder_hidden_size",
-        "decoder_layers",
-        "season_length",
-        "trend_kernel_size",
-        "top_k",
-    ]
+    assert manifest["jobs"][0]["selected_search_params"] == PARITY_SHARED_MODEL_SELECTORS
     assert manifest["training_search"] == {
         "requested_mode": "training_fixed",
         "validated_mode": "training_fixed",
@@ -324,16 +313,7 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_auto_model_only_path(
     assert manifest["jobs"][0]["model"] == "AAForecast"
     assert manifest["jobs"][0]["requested_mode"] == "learned_auto_requested"
     assert manifest["jobs"][0]["validated_mode"] == "learned_auto"
-    assert manifest["jobs"][0]["selected_search_params"] == [
-        "encoder_hidden_size",
-        "encoder_n_layers",
-        "encoder_dropout",
-        "decoder_hidden_size",
-        "decoder_layers",
-        "season_length",
-        "trend_kernel_size",
-        "top_k",
-    ]
+    assert manifest["jobs"][0]["selected_search_params"] == PARITY_SHARED_MODEL_SELECTORS
     assert manifest["training_search"] == {
         "requested_mode": "training_fixed",
         "validated_mode": "training_fixed",

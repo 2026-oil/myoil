@@ -11,12 +11,14 @@ def _build_encoder(
     hidden_size: int,
     num_layers: int,
     dropout: float,
+    bias: bool = True,
 ) -> nn.GRU:
     return nn.GRU(
         input_size=feature_size,
         hidden_size=hidden_size,
         num_layers=num_layers,
         batch_first=True,
+        bias=bias,
         dropout=dropout if num_layers > 1 else 0.0,
     )
 
