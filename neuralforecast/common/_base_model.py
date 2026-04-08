@@ -2,6 +2,7 @@ __all__ = ["DistributedConfig", "BaseModel"]
 
 
 import inspect
+import logging
 import math
 import random
 import warnings
@@ -29,6 +30,26 @@ from neuralforecast.tsdataset import (
 
 from ..losses.pytorch import BasePointLoss, DistributionLoss
 from ..utils import get_indexer_raise_missing
+
+
+@contextmanager
+def _suppress_lightning_info_logs():
+    logger_names = (
+        "pytorch_lightning",
+        "pytorch_lightning.accelerators.cuda",
+        "lightning_fabric",
+        "lightning_utilities",
+    )
+    previous_levels = {
+        name: logging.getLogger(name).level for name in logger_names
+    }
+    try:
+        for name in logger_names:
+            logging.getLogger(name).setLevel(logging.WARNING)
+        yield
+    finally:
+        for name, level in previous_levels.items():
+            logging.getLogger(name).setLevel(level)
 
 
 class _MinStepsEarlyStopping(EarlyStopping):
@@ -521,14 +542,15 @@ class BaseModel(pl.LightningModule):
             model.test_size = test_size
             for arg in ("devices", "num_nodes"):
                 trainer_kwargs.pop(arg, None)
-            trainer = pl.Trainer(
-                strategy=DDPStrategy(process_group_backend="gloo"),
-                use_distributed_sampler=False,  # to ensure our dataloaders are used as-is
-                num_nodes=num_tasks,
-                devices=num_proc_per_task,
-                **trainer_kwargs,
-            )
-            trainer.fit(model=model, datamodule=datamodule)
+            with _suppress_lightning_info_logs():
+                trainer = pl.Trainer(
+                    strategy=DDPStrategy(process_group_backend="gloo"),
+                    use_distributed_sampler=False,  # to ensure our dataloaders are used as-is
+                    num_nodes=num_tasks,
+                    devices=num_proc_per_task,
+                    **trainer_kwargs,
+                )
+                trainer.fit(model=model, datamodule=datamodule)
             model._restore_best_val_state()
             model.metrics = trainer.callback_metrics
             model.__dict__.pop("_trainer", None)
@@ -632,8 +654,9 @@ class BaseModel(pl.LightningModule):
 
         if is_local:
             model = self
-            trainer = pl.Trainer(**model.trainer_kwargs)
-            trainer.fit(model, datamodule=datamodule)
+            with _suppress_lightning_info_logs():
+                trainer = pl.Trainer(**model.trainer_kwargs)
+                trainer.fit(model, datamodule=datamodule)
             model._restore_best_val_state()
             model.metrics = trainer.callback_metrics
             model.__dict__.pop("_trainer", None)
