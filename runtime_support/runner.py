@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import logging
 from dataclasses import dataclass, replace
 from decimal import Decimal, ROUND_HALF_UP
 import fcntl
@@ -9,7 +8,6 @@ import json
 import os
 from pathlib import Path
 import shutil
-from tempfile import TemporaryDirectory
 from typing import Any, Mapping, Sequence
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -71,6 +69,7 @@ from runtime_support.optuna_studies import (
     resolve_study_selection,
     selection_manifest_payload,
     study_catalog_entry,
+    study_label,
     trial_dir_name,
     write_study_catalog,
 )
@@ -111,6 +110,18 @@ class _OptunaTrialFailure(RuntimeError):
 @dataclass(frozen=True)
 class _CurveFrameCarrier:
     curve_frame: pd.DataFrame
+
+
+@dataclass(frozen=True)
+class _RollingOriginWindow:
+    test_index: int
+    anchor_train_end_ds: pd.Timestamp
+    origin_ds: pd.Timestamp
+    forecast_start_ds: pd.Timestamp
+    forecast_end_ds: pd.Timestamp
+    observed_steps: int
+    forecast_only: bool
+    future_df: pd.DataFrame
 
 
 def _now_iso() -> str:
@@ -308,6 +319,26 @@ def _prune_model_run_artifacts(run_root: Path, model_name: str) -> None:
         _remove_existing_artifact(worker_root)
 
 
+def _sync_study_roots(
+    source_models_dir: Path,
+    target_models_dir: Path,
+    *,
+    study_indices: Sequence[int],
+) -> None:
+    target_studies_root = target_models_dir / "studies"
+    target_studies_root.mkdir(parents=True, exist_ok=True)
+    for study_index in study_indices:
+        label = study_label(study_index)
+        source_study_root = source_models_dir / "studies" / label
+        if not source_study_root.exists():
+            raise FileNotFoundError(
+                f"parallel tuning study root missing: {source_study_root}"
+            )
+        target_study_root = target_studies_root / label
+        _remove_existing_artifact(target_study_root)
+        shutil.copytree(source_study_root, target_study_root)
+
+
 def _should_prune_model_run_artifacts(job: JobConfig, *, main_stage: str) -> bool:
     if main_stage == "tune-main-only":
         return False
@@ -348,7 +379,6 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
     caps_by_model: dict[str, Any] = {}
     for job in selected_jobs:
         caps = _job_capabilities_for(loaded, job)
-        plugin_owned = _plugin_owned_top_level_job(loaded, job.model)
         caps_by_model[job.model] = caps
         payload[job.model] = {
             **caps.__dict__,
@@ -534,6 +564,31 @@ def _validate_adapters(loaded: LoadedConfig, selected_jobs) -> None:
                 dt_col=dt_col,
                 future_df=future_df,
             )
+
+
+def _build_adapter_inputs(
+    loaded: LoadedConfig,
+    train_df: pd.DataFrame,
+    future_df: pd.DataFrame | None,
+    job: JobConfig,
+    dt_col: str,
+):
+    if _should_use_multivariate(loaded, job):
+        return build_multivariate_inputs(
+            train_df,
+            job,
+            dataset=loaded.config.dataset,
+            dt_col=dt_col,
+            future_df=future_df,
+        )
+    return build_univariate_inputs(
+        train_df,
+        job,
+        dataset=loaded.config.dataset,
+        dt_col=dt_col,
+        future_df=future_df,
+    )
+
 
 def _resolve_freq(loaded: LoadedConfig, source_df: pd.DataFrame) -> str:
     if loaded.config.dataset.freq:
@@ -846,6 +901,569 @@ def _objective_stage_label(loaded: LoadedConfig) -> str:
     return "tuning_pre_replay_direct_predictions"
 
 
+def _selected_optuna_study(args: argparse.Namespace | None) -> int | None:
+    value = getattr(args, "optuna_study", None) if args is not None else None
+    return None if value is None else int(value)
+
+
+def _active_study_selection(
+    loaded: LoadedConfig,
+    args: argparse.Namespace | None = None,
+) -> StudySelection:
+    return resolve_study_selection(
+        loaded,
+        cli_selected_study=_selected_optuna_study(args),
+    )
+
+
+def _study_context(
+    loaded: LoadedConfig,
+    *,
+    run_root: Path,
+    stage: str,
+    job_name: str,
+    worker_index: int = 0,
+) -> StudyContext:
+    selection = _active_study_selection(loaded)
+    selected_index = selection.selected_study_index
+    if selected_index is None:
+        selected_index = selection.canonical_projection_study_index
+    return build_study_context(
+        loaded,
+        selection=selection,
+        run_root=run_root,
+        stage=stage,
+        job_name=job_name,
+        study_index=selected_index,
+        base_seed=optuna_seed(loaded.config.runtime.random_seed),
+        worker_index=worker_index,
+    )
+
+
+def _open_persistent_study(
+    study_context: StudyContext,
+    *,
+    sampler: optuna.samplers.BaseSampler,
+) -> tuple[optuna.Study, dict[str, Any]]:
+    study_context.storage_path.parent.mkdir(parents=True, exist_ok=True)
+    storage = optuna.storages.JournalStorage(
+        optuna.storages.journal.JournalFileBackend(str(study_context.storage_path))
+    )
+    study = optuna.create_study(
+        storage=storage,
+        study_name=study_context.study_name,
+        load_if_exists=True,
+        sampler=sampler,
+        direction=DEFAULT_OPTUNA_STUDY_DIRECTION,
+    )
+    metadata = {
+        "study_index": study_context.study_index,
+        "study_label": study_context.study_label,
+        "study_name": study_context.study_name,
+        "storage_backend": "journal",
+        "storage_path": str(study_context.storage_path.resolve()),
+        "sampler_seed": study_context.sampler_seed,
+        "proposal_flow_id": study_context.proposal_flow_id,
+        "canonical_projection_study_index": (
+            study_context.selection.canonical_projection_study_index
+        ),
+        "selected_study_index": study_context.selection.selected_study_index,
+    }
+    study.set_user_attr("study_index", study_context.study_index)
+    study.set_user_attr("sampler_seed", study_context.sampler_seed)
+    study.set_user_attr("proposal_flow_id", study_context.proposal_flow_id)
+    return study, metadata
+
+
+def _finished_trial_count(study: optuna.Study) -> int:
+    return sum(1 for trial in study.trials if trial.state.is_finished())
+
+
+def _shared_budget_state_path(study_metadata: dict[str, Any]) -> Path:
+    storage_path = Path(str(study_metadata["storage_path"]))
+    return storage_path.with_suffix(f"{storage_path.suffix}.budget.json")
+
+
+def _reserve_shared_optuna_trial_slot(
+    study: optuna.Study,
+    *,
+    target_trial_count: int,
+    study_metadata: dict[str, Any],
+) -> int | None:
+    budget_path = _shared_budget_state_path(study_metadata)
+    budget_path.parent.mkdir(parents=True, exist_ok=True)
+    with budget_path.open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        handle.seek(0)
+        raw = handle.read().strip()
+        state = json.loads(raw) if raw else {}
+        finished_trial_count = _finished_trial_count(study)
+        reserved_count = max(
+            int(state.get("reserved_trial_count", 0)), finished_trial_count
+        )
+        if reserved_count >= target_trial_count:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            return None
+        slot_index = reserved_count
+        state.update(
+            {
+                "reserved_trial_count": reserved_count + 1,
+                "target_trial_count": target_trial_count,
+                "updated_at": _now_iso(),
+            }
+        )
+        handle.seek(0)
+        handle.truncate()
+        handle.write(json.dumps(state, indent=2))
+        handle.flush()
+        os.fsync(handle.fileno())
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        return slot_index
+
+
+def _optimize_study_with_resume(
+    study: optuna.Study,
+    *,
+    objective,
+    target_trial_count: int,
+) -> dict[str, int]:
+    existing_trial_count = len(study.trials)
+    existing_finished_trial_count = _finished_trial_count(study)
+    remaining_trial_count = max(target_trial_count - existing_finished_trial_count, 0)
+    if remaining_trial_count > 0:
+        study.optimize(
+            objective,
+            n_trials=remaining_trial_count,
+            show_progress_bar=False,
+            catch=(_OptunaTrialFailure,),
+        )
+    return {
+        "requested_trial_count": target_trial_count,
+        "existing_trial_count_before_optimize": existing_trial_count,
+        "existing_finished_trial_count_before_optimize": (
+            existing_finished_trial_count
+        ),
+        "remaining_trial_count": remaining_trial_count,
+    }
+
+
+def _parallel_optimize_study_with_shared_budget(
+    study: optuna.Study,
+    *,
+    objective,
+    target_trial_count: int,
+    study_metadata: dict[str, Any],
+) -> dict[str, int]:
+    existing_trial_count = len(study.trials)
+    existing_finished_trial_count = _finished_trial_count(study)
+    reserved_slots = 0
+    while True:
+        slot_index = _reserve_shared_optuna_trial_slot(
+            study,
+            target_trial_count=target_trial_count,
+            study_metadata=study_metadata,
+        )
+        if slot_index is None:
+            break
+        reserved_slots += 1
+        study.optimize(
+            objective,
+            n_trials=1,
+            show_progress_bar=False,
+            catch=(_OptunaTrialFailure,),
+        )
+    return {
+        "requested_trial_count": target_trial_count,
+        "existing_trial_count_before_optimize": existing_trial_count,
+        "existing_finished_trial_count_before_optimize": (
+            existing_finished_trial_count
+        ),
+        "remaining_trial_count": max(
+            target_trial_count - existing_finished_trial_count, 0
+        ),
+        "reserved_trial_slots": reserved_slots,
+    }
+
+
+def _require_complete_best_trial(
+    study: optuna.Study, *, label: str
+) -> optuna.FrozenTrial:
+    if not any(trial.state == TrialState.COMPLETE for trial in study.trials):
+        raise RuntimeError(
+            f"{label} finished without a successful Optuna trial; inspect study summary for failed/pruned states"
+        )
+    return study.best_trial
+
+
+def _trial_dir_from_context(study_context: StudyContext, trial_number: int) -> Path:
+    return study_context.study_root / "trials" / trial_dir_name(trial_number)
+
+
+def _write_trial_result(
+    trial_dir: Path,
+    *,
+    status: str,
+    study_context: StudyContext,
+    payload: dict[str, Any],
+) -> None:
+    trial_dir.mkdir(parents=True, exist_ok=True)
+    output = {
+        "status": status,
+        "study_index": study_context.study_index,
+        "study_name": study_context.study_name,
+        "proposal_flow_id": study_context.proposal_flow_id,
+        **payload,
+    }
+    (trial_dir / "trial_result.json").write_text(
+        json.dumps(output, indent=2), encoding="utf-8"
+    )
+
+
+def _main_job_objective(
+    loaded: LoadedConfig,
+    job: JobConfig,
+    *,
+    study_context: StudyContext,
+    source_df: pd.DataFrame,
+    freq: str,
+    splits: list[tuple[list[int], list[int]]],
+    progress: _ProgressLogger | None = None,
+) -> Any:
+    trial_count = optuna_num_trials(loaded.config.runtime.opt_n_trial)
+
+    def objective(trial: optuna.Trial) -> float:
+        trial_dir = _trial_dir_from_context(study_context, trial.number)
+        trial.set_user_attr("trial_dir", str(trial_dir))
+        trial.set_user_attr("study_index", study_context.study_index)
+        trial.set_user_attr("sampler_seed", study_context.sampler_seed)
+        trial.set_user_attr("proposal_flow_id", study_context.proposal_flow_id)
+        candidate_params = suggest_model_params(
+            job.model,
+            job.selected_search_params,
+            trial,
+            param_specs=(
+                None
+                if loaded.search_space_payload is None
+                else loaded.search_space_payload["models"][job.model]
+            ),
+        )
+        candidate_training_params = suggest_training_params(
+            loaded.config.training_search.selected_search_params,
+            trial,
+            model_name=job.model,
+            param_specs=training_param_registry_for_model(
+                job.model,
+                search_space_payload=loaded.search_space_payload,
+            ),
+        )
+        trial.set_user_attr("best_params", candidate_params)
+        trial.set_user_attr("best_training_params", candidate_training_params)
+        fold_mape: list[float] = []
+        _write_trial_result(
+            trial_dir,
+            status="running",
+            study_context=study_context,
+            payload={
+                "trial_number": trial.number,
+                "best_params": candidate_params,
+                "best_training_params": candidate_training_params,
+                "fold_mape": fold_mape,
+            },
+        )
+        for fold_idx, (train_idx, test_idx) in enumerate(splits):
+            phase = f"tune-trial-{trial.number + 1}/{trial_count}"
+            if progress is not None:
+                progress.fold_started(
+                    fold_idx, total_folds=len(splits), phase=phase
+                )
+            try:
+                fit_kwargs: dict[str, Any] = {
+                    "source_df": source_df,
+                    "freq": freq,
+                    "train_idx": train_idx,
+                    "test_idx": test_idx,
+                    "params_override": candidate_params,
+                    "training_override": candidate_training_params,
+                }
+                if get_active_stage_plugin(loaded.config) is not None:
+                    fit_kwargs["run_root"] = None
+                (
+                    target_predictions,
+                    target_actuals,
+                    train_end_ds,
+                    train_df,
+                    nf,
+                ) = _fit_and_predict_fold(
+                    loaded,
+                    job,
+                    **fit_kwargs,
+                )
+                metric = _compute_metrics(
+                    target_actuals, target_predictions[job.model]
+                )["MAPE"]
+                fold_mape.append(metric)
+                interim_metric = _mean_fold_metric(fold_mape, metric_name="mape")
+                trial.set_user_attr("fold_mape", fold_mape.copy())
+                _write_trial_result(
+                    trial_dir,
+                    status="running",
+                    study_context=study_context,
+                    payload={
+                        "trial_number": trial.number,
+                        "best_params": candidate_params,
+                        "best_training_params": candidate_training_params,
+                        "fold_mape": fold_mape.copy(),
+                        "last_completed_fold": fold_idx,
+                        "interim_metric": interim_metric,
+                    },
+                )
+                trial.report(interim_metric, step=fold_idx)
+                if trial.should_prune():
+                    trial.set_user_attr("pruned_after_fold", fold_idx)
+                    if progress is not None:
+                        progress.fold_completed(
+                            fold_idx,
+                            total_folds=len(splits),
+                            phase=phase,
+                            detail=f"pruned mean_mape={interim_metric:.4f}",
+                        )
+                    raise optuna.TrialPruned(
+                        f"Pruned after fold {fold_idx} with mean_mape={interim_metric:.4f}"
+                    )
+                if progress is not None:
+                    progress.fold_completed(
+                        fold_idx,
+                        total_folds=len(splits),
+                        phase=phase,
+                        detail=f"mape={metric:.4f}",
+                    )
+            except optuna.TrialPruned:
+                _write_trial_result(
+                    trial_dir,
+                    status="pruned",
+                    study_context=study_context,
+                    payload={
+                        "trial_number": trial.number,
+                        "best_params": candidate_params,
+                        "best_training_params": candidate_training_params,
+                        "fold_mape": fold_mape,
+                    },
+                )
+                raise
+            except Exception as exc:
+                if progress is not None:
+                    progress.error(
+                        fold_idx,
+                        total_folds=len(splits),
+                        phase=phase,
+                        exc=exc,
+                    )
+                trial.set_user_attr(
+                    "failure_reason",
+                    f"fold={fold_idx} {type(exc).__name__}: {exc}",
+                )
+                _write_trial_result(
+                    trial_dir,
+                    status="failed",
+                    study_context=study_context,
+                    payload={
+                        "trial_number": trial.number,
+                        "best_params": candidate_params,
+                        "best_training_params": candidate_training_params,
+                        "fold_mape": fold_mape,
+                        "failure_reason": f"{type(exc).__name__}: {exc}",
+                    },
+                )
+                raise _OptunaTrialFailure(
+                    f"{job.model} tuning failed on fold {fold_idx}: {type(exc).__name__}: {exc}"
+                ) from exc
+        metric = _mean_fold_metric(fold_mape, metric_name="mape")
+        trial.set_user_attr("fold_mape", fold_mape)
+        _write_trial_result(
+            trial_dir,
+            status="complete",
+            study_context=study_context,
+            payload={
+                "trial_number": trial.number,
+                "best_params": candidate_params,
+                "best_training_params": candidate_training_params,
+                "fold_mape": fold_mape,
+                "objective_value": metric,
+            },
+        )
+        return metric
+
+    return objective
+
+
+def _collect_main_tuning_result(
+    study: optuna.Study,
+    *,
+    loaded: LoadedConfig,
+    job: JobConfig,
+    study_metadata: dict[str, Any],
+    optimize_metadata: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    best_trial = _require_complete_best_trial(
+        study, label=f"{job.model} main Optuna study"
+    )
+    best_params = dict(best_trial.user_attrs["best_params"])
+    best_training_params = dict(best_trial.user_attrs["best_training_params"])
+    summary = {
+        **_trial_metrics_summary(study, objective_metric="mean_fold_mape"),
+        **study_metadata,
+        **optimize_metadata,
+        "requested_mode": job.requested_mode,
+        "validated_mode": job.validated_mode,
+        "selected_search_params": list(job.selected_search_params),
+        "selected_training_search_params": list(
+            loaded.config.training_search.selected_search_params
+        ),
+        "training_range_source": training_range_source_for_model(
+            job.model,
+            search_space_payload=loaded.search_space_payload,
+        ),
+        "best_params": best_params,
+        "best_training_params": best_training_params,
+        "fold_mape": best_trial.user_attrs["fold_mape"],
+        "objective_stage": _objective_stage_label(loaded),
+    }
+    return best_params, best_training_params, summary
+
+
+def _tune_main_job(
+    loaded: LoadedConfig,
+    job: JobConfig,
+    models_dir: Path,
+    *,
+    study_context: StudyContext,
+    source_df: pd.DataFrame,
+    freq: str,
+    splits: list[tuple[list[int], list[int]]],
+    progress: _ProgressLogger | None = None,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    sampler = build_optuna_sampler(study_context.sampler_seed)
+    objective = _main_job_objective(
+        loaded,
+        job,
+        study_context=study_context,
+        source_df=source_df,
+        freq=freq,
+        splits=splits,
+        progress=progress,
+    )
+    study, study_metadata = _open_persistent_study(
+        study_context,
+        sampler=sampler,
+    )
+    optimize_metadata = _optimize_study_with_resume(
+        study,
+        objective=objective,
+        target_trial_count=optuna_num_trials(loaded.config.runtime.opt_n_trial),
+    )
+    return _collect_main_tuning_result(
+        study,
+        loaded=loaded,
+        job=job,
+        study_metadata=study_metadata,
+        optimize_metadata=optimize_metadata,
+    )
+
+
+def _parallel_tune_main_job_worker(
+    loaded: LoadedConfig,
+    job: JobConfig,
+    models_dir: Path,
+    *,
+    study_context: StudyContext,
+    source_df: pd.DataFrame,
+    freq: str,
+    splits: list[tuple[list[int], list[int]]],
+    progress: _ProgressLogger | None = None,
+) -> dict[str, Any]:
+    worker_index = int(os.environ.get("NEURALFORECAST_OPTUNA_WORKER_INDEX", "0"))
+    worker_study_context = replace(
+        study_context,
+        sampler_seed=study_context.sampler_seed + worker_index,
+    )
+    sampler = build_optuna_sampler(worker_study_context.sampler_seed)
+    objective = _main_job_objective(
+        loaded,
+        job,
+        study_context=worker_study_context,
+        source_df=source_df,
+        freq=freq,
+        splits=splits,
+        progress=progress,
+    )
+    study, study_metadata = _open_persistent_study(
+        worker_study_context,
+        sampler=sampler,
+    )
+    return _parallel_optimize_study_with_shared_budget(
+        study,
+        objective=objective,
+        target_trial_count=optuna_num_trials(loaded.config.runtime.opt_n_trial),
+        study_metadata=study_metadata,
+    )
+
+
+def _load_main_tuning_result(
+    loaded: LoadedConfig,
+    job: JobConfig,
+    models_dir: Path,
+    *,
+    study_context: StudyContext,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    sampler = build_optuna_sampler(study_context.sampler_seed)
+    study, study_metadata = _open_persistent_study(
+        study_context,
+        sampler=sampler,
+    )
+    optimize_metadata = {
+        "requested_trial_count": optuna_num_trials(loaded.config.runtime.opt_n_trial),
+        "existing_trial_count_before_optimize": len(study.trials),
+        "existing_finished_trial_count_before_optimize": _finished_trial_count(study),
+        "remaining_trial_count": max(
+            optuna_num_trials(loaded.config.runtime.opt_n_trial)
+            - _finished_trial_count(study),
+            0,
+        ),
+    }
+    return _collect_main_tuning_result(
+        study,
+        loaded=loaded,
+        job=job,
+        study_metadata=study_metadata,
+        optimize_metadata=optimize_metadata,
+    )
+
+
+def _copy_projection_file(source: Path, target: Path) -> None:
+    if not source.exists():
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, target)
+
+
+def _write_stage_study_catalog(
+    stage_root: Path,
+    selection: StudySelection,
+    *,
+    summary_by_study: Mapping[int, Mapping[str, Any]] | None = None,
+) -> Path:
+    catalog_path = stage_root / "study_catalog.json"
+    write_study_catalog(
+        catalog_path,
+        build_study_catalog_payload(
+            stage_root,
+            selection,
+            study_summaries=summary_by_study,
+        ),
+    )
+    return catalog_path
+
+
 def _initialize_study_catalogs(
     run_root: Path,
     loaded: LoadedConfig,
@@ -853,11 +1471,7 @@ def _initialize_study_catalogs(
 ) -> None:
     selection = resolve_study_selection(loaded)
     for job in jobs:
-        stage_root = run_root / "models" / job.model
-        write_study_catalog(
-            stage_root / "study_catalog.json",
-            build_study_catalog_payload(stage_root, selection),
-        )
+        _write_stage_study_catalog(run_root / "models" / job.model, selection)
 
 
 def _baseline_cross_validation(
@@ -919,6 +1533,22 @@ def _baseline_cross_validation(
     return metrics_rows, forecast_rows
 
 
+def _predict_with_fitted_model(nf: NeuralForecast, adapter_inputs) -> pd.DataFrame:
+    predict_kwargs = {
+        "df": adapter_inputs.fit_df,
+        "static_df": adapter_inputs.static_df,
+    }
+    if adapter_inputs.futr_df is not None:
+        predict_kwargs["futr_df"] = adapter_inputs.futr_df
+    return nf.predict(**predict_kwargs)
+
+
+def _prediction_column(predictions: pd.DataFrame, model_name: str) -> str:
+    if model_name in predictions.columns:
+        return model_name
+    raise KeyError(f"Could not find prediction column for {model_name}")
+
+
 def _artifact_model_name(path: Path, suffix: str) -> str:
     return path.name.removesuffix(suffix)
 
@@ -949,6 +1579,15 @@ def _load_metrics_for_summary(run_root: Path) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _normalize_summary_timestamp(value: object) -> pd.Timestamp:
+    timestamp = pd.Timestamp(value)
+    if pd.isna(timestamp):
+        return pd.NaT
+    if timestamp.tzinfo is not None:
+        return timestamp.tz_convert(None)
+    return timestamp
+
+
 def _normalize_summary_window_frame(
     frame: pd.DataFrame, *, frame_name: str
 ) -> pd.DataFrame:
@@ -964,15 +1603,9 @@ def _normalize_summary_window_frame(
         raise ValueError(f"{frame_name} contains invalid fold_idx values")
     normalized["fold_idx"] = normalized["fold_idx"].astype(int)
 
-    def _normalize_cutoff(value: object) -> pd.Timestamp:
-        timestamp = pd.Timestamp(value)
-        if pd.isna(timestamp):
-            return pd.NaT
-        if timestamp.tzinfo is not None:
-            return timestamp.tz_convert(None)
-        return timestamp
-
-    normalized["normalized_cutoff"] = normalized["cutoff"].map(_normalize_cutoff)
+    normalized["normalized_cutoff"] = normalized["cutoff"].map(
+        _normalize_summary_timestamp
+    )
     if normalized["normalized_cutoff"].isna().any():
         raise ValueError(f"{frame_name} contains invalid cutoff values")
     return normalized
@@ -1008,6 +1641,20 @@ def _window_label(normalized_cutoff: pd.Timestamp, fold_idx: int) -> str:
 
 
 def _build_leaderboard(metrics_frame: pd.DataFrame) -> pd.DataFrame:
+    if metrics_frame.empty or "model" not in metrics_frame.columns:
+        columns = [
+            "rank",
+            "model",
+            "mean_fold_mae",
+            "mean_fold_mse",
+            "mean_fold_rmse",
+            "fold_count",
+            "mean_fold_mape",
+            "mean_fold_nrmse",
+            "mean_fold_r2",
+        ]
+        return pd.DataFrame(columns=columns)
+
     def _safe_mean(series: pd.Series) -> float:
         values = pd.to_numeric(series, errors="coerce").replace([np.inf, -np.inf], np.nan)
         return float(values.mean())
@@ -1120,7 +1767,11 @@ def _markdown_table_cell(value: object) -> str:
 
 
 def _build_summary_markdown(
-    run_root: Path, leaderboard: pd.DataFrame, *, summary_dir: Path | None = None
+    run_root: Path,
+    leaderboard: pd.DataFrame,
+    *,
+    summary_dir: Path | None = None,
+    report_context_lines: Sequence[str] | None = None,
 ) -> Path:
     summary_dir = summary_dir or (run_root / "summary")
     summary_dir.mkdir(parents=True, exist_ok=True)
@@ -1216,6 +1867,7 @@ def _build_summary_markdown(
                 f"(h={horizon if horizon is not None else ''}, step={step_size if step_size is not None else ''}, gap={gap if gap is not None else ''}) 구조로 설계했다."
             ),
             f"- overlap_eval_policy: {overlap_eval_policy or ''}",
+            *(report_context_lines or ()),
             "",
             sample_structure["section_results"],
             "",
@@ -1249,6 +1901,7 @@ def _load_last_fold_forecasts(run_root: Path) -> pd.DataFrame:
             model_name = _artifact_model_name(path, "_forecasts.csv")
             if "model" not in frame.columns:
                 frame["model"] = model_name
+            frame["_summary_source_root"] = str(root)
             frame["fold_idx"] = pd.to_numeric(frame["fold_idx"], errors="coerce")
             frames.append(frame)
     if not frames:
@@ -1260,6 +1913,7 @@ def _load_last_fold_forecasts(run_root: Path) -> pd.DataFrame:
 
 
 def _build_summary_plot_bundle(
+    run_root: Path,
     summary_dir: Path,
     leaderboard: pd.DataFrame,
     scoped_forecasts: pd.DataFrame,
@@ -1267,11 +1921,14 @@ def _build_summary_plot_bundle(
     title_prefix: str,
 ) -> dict[str, str]:
     plot_paths: dict[str, str] = {}
-    ordered_models = [
-        model
-        for model in leaderboard["model"].tolist()
-        if model in set(scoped_forecasts["model"])
-    ]
+    if leaderboard.empty:
+        ordered_models = list(dict.fromkeys(scoped_forecasts["model"].tolist()))
+    else:
+        ordered_models = [
+            model
+            for model in leaderboard["model"].tolist()
+            if model in set(scoped_forecasts["model"])
+        ]
     plot_specs = [
         ("all_models", ordered_models, f"{title_prefix} (all models)"),
     ]
@@ -1279,7 +1936,13 @@ def _build_summary_plot_bundle(
         if not models:
             continue
         plot_path = summary_dir / f"last_fold_{slug}.png"
-        _plot_last_fold_overlay(scoped_forecasts, models, plot_path, title=title)
+        _plot_last_fold_overlay(
+            scoped_forecasts,
+            models,
+            plot_path,
+            title=title,
+            run_root=run_root,
+        )
         plot_paths[slug] = str(plot_path)
     return plot_paths
 
@@ -1291,12 +1954,16 @@ def _write_summary_bundle(
     *,
     scoped_forecasts: pd.DataFrame | None = None,
     title_prefix: str,
+    report_context_lines: Sequence[str] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, str]]:
     leaderboard = _build_leaderboard(metrics_frame)
     workbook_path = summary_dir / "leaderboard.csv"
     _write_leaderboard_workbook(leaderboard, workbook_path)
     markdown_path = _build_summary_markdown(
-        run_root, leaderboard, summary_dir=summary_dir
+        run_root,
+        leaderboard,
+        summary_dir=summary_dir,
+        report_context_lines=report_context_lines,
     )
     artifact_paths: dict[str, str] = {
         "leaderboard": str(workbook_path),
@@ -1305,6 +1972,7 @@ def _write_summary_bundle(
     if scoped_forecasts is not None and not scoped_forecasts.empty:
         artifact_paths.update(
             _build_summary_plot_bundle(
+                run_root,
                 summary_dir,
                 leaderboard,
                 scoped_forecasts,
@@ -1314,101 +1982,405 @@ def _write_summary_bundle(
     return leaderboard, artifact_paths
 
 
-def _validate_summary_window_contract(
-    metrics_frame: pd.DataFrame, forecasts_frame: pd.DataFrame
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    normalized_metrics = _normalize_summary_window_frame(
-        metrics_frame, frame_name="summary metrics"
-    )
-    normalized_forecasts = _normalize_summary_window_frame(
-        forecasts_frame, frame_name="summary forecasts"
-    )
-    windows = _ordered_summary_windows(normalized_metrics)
-    metric_window_set = {
-        (row.normalized_cutoff, int(row.fold_idx))
-        for row in windows.itertuples(index=False)
-    }
-    forecast_window_set = {
-        (row.normalized_cutoff, int(row.fold_idx))
-        for row in normalized_forecasts[["normalized_cutoff", "fold_idx"]]
-        .drop_duplicates()
-        .itertuples(index=False)
-    }
-    extra_windows = sorted(
-        forecast_window_set - metric_window_set,
-        key=lambda item: (item[0], item[1]),
-    )
-    if extra_windows:
-        rendered = ", ".join(
-            _window_label(cutoff, fold_idx) for cutoff, fold_idx in extra_windows
+def _load_summary_manifest(run_root: Path) -> dict[str, Any]:
+    manifest_path = run_root / "manifest" / "run_manifest.json"
+    if not manifest_path.exists():
+        raise FileNotFoundError(
+            f"summary generation requires {manifest_path} to exist"
         )
+    return json.loads(manifest_path.read_text(encoding="utf-8"))
+
+
+def _summary_repo_root(config_source_path: str | os.PathLike[str]) -> Path:
+    config_path = Path(config_source_path).expanduser().resolve()
+    for parent in (config_path.parent, *config_path.parents):
+        if (parent / "pyproject.toml").exists():
+            return parent
+    return Path.cwd()
+
+
+def _load_summary_loaded_config(run_root: Path) -> LoadedConfig:
+    manifest = _load_summary_manifest(run_root)
+    config_source_path = manifest.get("config_source_path")
+    if not config_source_path:
         raise ValueError(
-            "summary forecasts contain windows absent from summary metrics: "
-            f"{rendered}"
+            "summary generation requires manifest.config_source_path to be set"
         )
-    for window in windows.itertuples(index=False):
-        metrics_window = normalized_metrics[
-            _summary_window_mask(
-                normalized_metrics,
-                normalized_cutoff=window.normalized_cutoff,
-                fold_idx=int(window.fold_idx),
-            )
-        ]
-        forecasts_window = normalized_forecasts[
-            _summary_window_mask(
-                normalized_forecasts,
-                normalized_cutoff=window.normalized_cutoff,
-                fold_idx=int(window.fold_idx),
-            )
-        ]
-        leaderboard_window = _build_leaderboard(metrics_window)
-        required_models = [
-            model
-            for model in leaderboard_window["model"].tolist()
-            if not str(model).endswith("_res")
-        ]
-        available_models = set(forecasts_window["model"])
-        missing_models = sorted(
-            model for model in required_models if model not in available_models
+    repo_root = _summary_repo_root(config_source_path)
+    return load_app_config(repo_root, config_path=str(config_source_path))
+
+
+def _summary_available_model_names(
+    metrics_frame: pd.DataFrame, forecasts_frame: pd.DataFrame
+) -> set[str]:
+    models: set[str] = set()
+    if not metrics_frame.empty and "model" in metrics_frame.columns:
+        models.update(str(model) for model in metrics_frame["model"].dropna().tolist())
+    if not forecasts_frame.empty and "model" in forecasts_frame.columns:
+        models.update(
+            str(model) for model in forecasts_frame["model"].dropna().tolist()
         )
-        if missing_models:
-            raise ValueError(
-                "summary forecasts missing required slices for "
-                f"{_window_label(window.normalized_cutoff, int(window.fold_idx))}: "
-                + ", ".join(missing_models)
+    return models
+
+
+def _last_holdout_anchor(source_df: pd.DataFrame, loaded: LoadedConfig) -> tuple[pd.Timestamp, int]:
+    dt_col = loaded.config.dataset.dt_col
+    splits = _build_tscv_splits(len(source_df), loaded.config.cv)
+    if not splits:
+        raise ValueError("summary rolling-origin forecast requires at least one split")
+    anchor_idx = splits[-1][0][-1]
+    anchor_ds = _normalize_summary_timestamp(source_df[dt_col].iloc[anchor_idx])
+    return anchor_ds, int(anchor_idx)
+
+
+def _build_rolling_origin_windows(
+    source_df: pd.DataFrame,
+    loaded: LoadedConfig,
+    *,
+    freq: str,
+) -> list[_RollingOriginWindow]:
+    dt_col = loaded.config.dataset.dt_col
+    target_col = loaded.config.dataset.target_col
+    normalized_ds = pd.Index(
+        pd.to_datetime(source_df[dt_col]).map(_normalize_summary_timestamp)
+    )
+    if normalized_ds.has_duplicates:
+        raise ValueError(
+            "summary rolling-origin forecast requires unique dataset.dt_col timestamps"
+        )
+    anchor_ds, anchor_idx = _last_holdout_anchor(source_df, loaded)
+    available_future_origins = len(source_df) - anchor_idx - 1
+    required_origins = loaded.config.cv.n_windows
+    if available_future_origins < required_origins:
+        raise ValueError(
+            "summary rolling-origin forecast requires at least "
+            f"{required_origins} observed timestamps after anchor {anchor_ds}, "
+            f"but only found {available_future_origins}"
+        )
+    row_lookup = {
+        normalized_ds[idx]: source_df.iloc[idx].to_dict() for idx in range(len(source_df))
+    }
+    windows: list[_RollingOriginWindow] = []
+    future_dates_per_window = loaded.config.cv.horizon + 1
+    for test_index in range(1, required_origins + 1):
+        origin_idx = anchor_idx + test_index
+        origin_ds = normalized_ds[origin_idx]
+        forecast_dates = pd.date_range(
+            start=origin_ds,
+            periods=future_dates_per_window,
+            freq=freq,
+        )[1:]
+        rows: list[dict[str, Any]] = []
+        observed_steps = 0
+        for forecast_ds in forecast_dates:
+            normalized_forecast_ds = _normalize_summary_timestamp(forecast_ds)
+            row = dict(row_lookup.get(normalized_forecast_ds, {}))
+            if not row:
+                row = {column: np.nan for column in source_df.columns}
+                row[target_col] = np.nan
+            row[dt_col] = normalized_forecast_ds
+            if pd.notna(row.get(target_col)):
+                observed_steps += 1
+            rows.append(row)
+        future_df = pd.DataFrame(rows, columns=source_df.columns)
+        windows.append(
+            _RollingOriginWindow(
+                test_index=test_index,
+                anchor_train_end_ds=anchor_ds,
+                origin_ds=origin_ds,
+                forecast_start_ds=_normalize_summary_timestamp(forecast_dates[0]),
+                forecast_end_ds=_normalize_summary_timestamp(forecast_dates[-1]),
+                observed_steps=observed_steps,
+                forecast_only=observed_steps == 0,
+                future_df=future_df,
             )
-    return normalized_metrics, normalized_forecasts, windows
+        )
+    return windows
+
+
+def _resolve_summary_replay_job(
+    run_root: Path, job: JobConfig
+) -> tuple[JobConfig, dict[str, Any], bool]:
+    if job.validated_mode != "learned_auto":
+        return job, {}, False
+    models_dir = run_root / "models" / job.model
+    best_params_path = models_dir / "best_params.json"
+    training_best_params_path = models_dir / "training_best_params.json"
+    if not best_params_path.exists() or not training_best_params_path.exists():
+        raise FileNotFoundError(
+            "summary rolling-origin forecast requires resolved Optuna artifacts for "
+            f"{job.model}: {best_params_path} and {training_best_params_path}"
+        )
+    best_params = json.loads(best_params_path.read_text(encoding="utf-8"))
+    training_best_params = json.loads(
+        training_best_params_path.read_text(encoding="utf-8")
+    )
+    return replace(job, params=best_params), training_best_params, True
+
+
+def _validate_rolling_origin_future_requirements(
+    loaded: LoadedConfig,
+    job: JobConfig,
+    window: _RollingOriginWindow,
+) -> None:
+    missing_future_steps = loaded.config.cv.horizon - window.observed_steps
+    if missing_future_steps <= 0:
+        return
+    if loaded.config.dataset.futr_exog_cols:
+        raise ValueError(
+            "summary rolling-origin forecast cannot extend beyond observed data when "
+            f"dataset.futr_exog_cols are configured for {job.model}; "
+            "provide explicit future exogenous values first"
+        )
+    if (
+        job.model in {"xgboost", "lightgbm"}
+        and loaded.config.dataset.hist_exog_cols
+    ):
+        raise ValueError(
+            "summary rolling-origin forecast cannot extend beyond observed data for "
+            f"{job.model} when dataset.hist_exog_cols are configured; "
+            "future historic-exogenous rows are unavailable"
+        )
+
+
+def _baseline_predict_window(
+    loaded: LoadedConfig,
+    model_name: str,
+    *,
+    train_df: pd.DataFrame,
+    future_df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, None]:
+    dt_col = loaded.config.dataset.dt_col
+    target_col = loaded.config.dataset.target_col
+    history = train_df[target_col].astype(float).reset_index(drop=True)
+    future_actual = future_df[target_col].reset_index(drop=True)
+    future_dates = pd.to_datetime(future_df[dt_col]).reset_index(drop=True)
+    train_end_ds = pd.to_datetime(train_df[dt_col].iloc[-1])
+    diff_context = _build_fold_diff_context(loaded, train_df, target_col=target_col)
+    working_history = _transform_training_series(history, diff_context)
+    if model_name == "Naive":
+        pred_values = pd.Series([float(working_history.iloc[-1])] * len(future_df))
+    elif model_name == "SeasonalNaive":
+        season = min(len(working_history), len(future_df))
+        tail = working_history.iloc[-season:].reset_index(drop=True)
+        pred_values = pd.Series(
+            (list(tail) * ((len(future_df) // len(tail)) + 1))[: len(future_df)]
+        )
+    else:
+        pred_values = pd.Series([float(working_history.mean())] * len(future_df))
+    pred_values = _restore_prediction_series(pred_values, diff_context)
+    target_predictions = pd.DataFrame(
+        {
+            "unique_id": [target_col] * len(future_df),
+            "ds": future_dates,
+            model_name: pred_values,
+        }
+    )
+    return target_predictions, future_actual, train_end_ds, train_df, None
+
+
+def _compute_observed_metrics(
+    actual: pd.Series, predicted: pd.Series
+) -> tuple[dict[str, float] | None, int]:
+    observed_mask = actual.notna()
+    observed_steps = int(observed_mask.sum())
+    if observed_steps == 0:
+        return None, 0
+    metrics = _compute_metrics(
+        actual[observed_mask].reset_index(drop=True),
+        predicted[observed_mask].reset_index(drop=True),
+    )
+    return metrics, observed_steps
+
+
+def _rolling_origin_context_lines(
+    window: _RollingOriginWindow, *, horizon: int
+) -> list[str]:
+    lines = [
+        "- summary/test_k는 마지막 holdout anchor 이후 rolling-origin forecast 결과다.",
+        f"- anchor train_end_ds: {window.anchor_train_end_ds.date()}",
+        f"- origin ds: {window.origin_ds.date()}",
+        (
+            f"- 예측 구간: {window.forecast_start_ds.date()} ~ "
+            f"{window.forecast_end_ds.date()}"
+        ),
+        f"- 관측 가능한 horizon step: {window.observed_steps}/{horizon}",
+        "- metric은 실제값이 존재하는 step만 사용한다.",
+    ]
+    if window.forecast_only:
+        lines.append("- 이 test window는 forecast-only 구간이다.")
+    return lines
+
+
+def _write_rolling_origin_manifest(
+    summary_dir: Path,
+    window: _RollingOriginWindow,
+    *,
+    horizon: int,
+) -> None:
+    payload = {
+        "anchor_train_end_ds": str(window.anchor_train_end_ds),
+        "origin_ds": str(window.origin_ds),
+        "forecast_start_ds": str(window.forecast_start_ds),
+        "forecast_end_ds": str(window.forecast_end_ds),
+        "observed_steps": int(window.observed_steps),
+        "forecast_only": bool(window.forecast_only),
+        "horizon": int(horizon),
+    }
+    (summary_dir / "window_manifest.json").write_text(
+        json.dumps(payload, indent=2),
+        encoding="utf-8",
+    )
 
 
 def _write_per_window_summary_bundles(
     run_root: Path, metrics_frame: pd.DataFrame, forecasts_frame: pd.DataFrame
 ) -> None:
-    normalized_metrics, normalized_forecasts, windows = _validate_summary_window_contract(
-        metrics_frame, forecasts_frame
-    )
+    loaded = _load_summary_loaded_config(run_root)
+    source_df = pd.read_csv(loaded.config.dataset.path)
+    source_df = source_df.sort_values(loaded.config.dataset.dt_col).reset_index(drop=True)
+    freq = _resolve_freq(loaded, source_df)
+    windows = _build_rolling_origin_windows(source_df, loaded, freq=freq)
+    available_models = _summary_available_model_names(metrics_frame, forecasts_frame)
+    jobs = [
+        job
+        for job in loaded.config.jobs
+        if not available_models or job.model in available_models
+    ]
+
+    rolling_metrics_rows: list[dict[str, object]] = []
+    rolling_forecast_rows: list[dict[str, object]] = []
+    cv_dir = run_root / "cv"
+    cv_dir.mkdir(parents=True, exist_ok=True)
+
+    for job in jobs:
+        effective_job, training_override, used_best_params = _resolve_summary_replay_job(
+            run_root, job
+        )
+        job_metric_rows: list[dict[str, object]] = []
+        job_forecast_rows: list[dict[str, object]] = []
+        for window in windows:
+            _validate_rolling_origin_future_requirements(loaded, effective_job, window)
+            origin_mask = pd.to_datetime(source_df[loaded.config.dataset.dt_col]).map(
+                _normalize_summary_timestamp
+            ) <= window.origin_ds
+            train_df = source_df.loc[origin_mask].reset_index(drop=True)
+            future_df = window.future_df.copy()
+            if effective_job.model in BASELINE_MODEL_NAMES:
+                (
+                    target_predictions,
+                    target_actuals,
+                    train_end_ds,
+                    _train_df,
+                    _,
+                ) = _baseline_predict_window(
+                    loaded,
+                    effective_job.model,
+                    train_df=train_df,
+                    future_df=future_df,
+                )
+            else:
+                combined_df = pd.concat([train_df, future_df], ignore_index=True)
+                train_idx = list(range(len(train_df)))
+                test_idx = list(range(len(train_df), len(combined_df)))
+                (
+                    target_predictions,
+                    target_actuals,
+                    train_end_ds,
+                    _train_df,
+                    _,
+                ) = _fit_and_predict_fold(
+                    loaded,
+                    effective_job,
+                    source_df=combined_df,
+                    freq=freq,
+                    train_idx=train_idx,
+                    test_idx=test_idx,
+                    training_override=training_override,
+                )
+            pred_col = _prediction_column(target_predictions, effective_job.model)
+            metrics, observed_steps = _compute_observed_metrics(
+                target_actuals,
+                target_predictions[pred_col],
+            )
+            if metrics is not None:
+                metric_row = {
+                    "model": effective_job.model,
+                    "requested_mode": job.requested_mode,
+                    "validated_mode": job.validated_mode,
+                    "test_index": window.test_index,
+                    "fold_idx": window.test_index - 1,
+                    "cutoff": str(window.origin_ds),
+                    "train_end_ds": str(train_end_ds),
+                    "anchor_train_end_ds": str(window.anchor_train_end_ds),
+                    "origin_ds": str(window.origin_ds),
+                    "observed_steps": observed_steps,
+                    "used_best_params": used_best_params,
+                    **metrics,
+                }
+                job_metric_rows.append(metric_row)
+                rolling_metrics_rows.append(metric_row)
+            for row_idx, ds in enumerate(target_predictions["ds"]):
+                actual_value = target_actuals.iloc[row_idx]
+                forecast_row = {
+                    "model": effective_job.model,
+                    "requested_mode": job.requested_mode,
+                    "validated_mode": job.validated_mode,
+                    "test_index": window.test_index,
+                    "fold_idx": window.test_index - 1,
+                    "cutoff": str(window.origin_ds),
+                    "train_end_ds": str(train_end_ds),
+                    "anchor_train_end_ds": str(window.anchor_train_end_ds),
+                    "origin_ds": str(window.origin_ds),
+                    "unique_id": loaded.config.dataset.target_col,
+                    "ds": str(pd.Timestamp(ds)),
+                    "horizon_step": row_idx + 1,
+                    "y": None if pd.isna(actual_value) else float(actual_value),
+                    "y_hat": float(target_predictions[pred_col].iloc[row_idx]),
+                    "observed": bool(pd.notna(actual_value)),
+                    "used_best_params": used_best_params,
+                }
+                job_forecast_rows.append(forecast_row)
+                rolling_forecast_rows.append(forecast_row)
+        pd.DataFrame(job_forecast_rows).to_csv(
+            cv_dir / f"{effective_job.model}_rolling_origin_forecasts.csv",
+            index=False,
+        )
+        pd.DataFrame(job_metric_rows).to_csv(
+            cv_dir / f"{effective_job.model}_rolling_origin_metrics.csv",
+            index=False,
+        )
+
+    rolling_metrics = pd.DataFrame(rolling_metrics_rows)
+    rolling_forecasts = pd.DataFrame(rolling_forecast_rows)
     summary_root = run_root / "summary"
-    for index, window in enumerate(windows.itertuples(index=False), start=1):
-        summary_dir = summary_root / f"test_{index}"
-        metrics_window = normalized_metrics[
-            _summary_window_mask(
-                normalized_metrics,
-                normalized_cutoff=window.normalized_cutoff,
-                fold_idx=int(window.fold_idx),
-            )
-        ].copy()
-        forecasts_window = normalized_forecasts[
-            _summary_window_mask(
-                normalized_forecasts,
-                normalized_cutoff=window.normalized_cutoff,
-                fold_idx=int(window.fold_idx),
-            )
-        ].copy()
+    for window in windows:
+        summary_dir = summary_root / f"test_{window.test_index}"
+        summary_dir.mkdir(parents=True, exist_ok=True)
+        metrics_window = (
+            rolling_metrics[rolling_metrics["test_index"] == window.test_index].copy()
+            if not rolling_metrics.empty
+            else pd.DataFrame()
+        )
+        forecasts_window = (
+            rolling_forecasts[rolling_forecasts["test_index"] == window.test_index].copy()
+            if not rolling_forecasts.empty
+            else pd.DataFrame()
+        )
         _write_summary_bundle(
             run_root,
             summary_dir,
             metrics_window,
             scoped_forecasts=forecasts_window,
-            title_prefix=f"Test window {index} predictions",
+            title_prefix=f"Rolling-origin test {window.test_index} predictions",
+            report_context_lines=_rolling_origin_context_lines(
+                window, horizon=loaded.config.cv.horizon
+            ),
+        )
+        _write_rolling_origin_manifest(
+            summary_dir,
+            window,
+            horizon=loaded.config.cv.horizon,
         )
 
 
@@ -1418,18 +2390,86 @@ def _plot_last_fold_overlay(
     plot_path: Path,
     *,
     title: str,
+    run_root: Path,
 ) -> None:
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    def _normalize_optional_path(
+        value: object, *, source_root: Path | None
+    ) -> Path | None:
+        if value is None or pd.isna(value):
+            return None
+        candidate = Path(str(value))
+        if candidate.is_absolute():
+            return candidate
+        if source_root is not None:
+            return source_root / candidate
+        return run_root / candidate
+
+    def _load_aaforecast_context_frame(selected_frame: pd.DataFrame) -> pd.DataFrame | None:
+        if "aaforecast_context_artifact" not in selected_frame.columns:
+            return None
+        aaf_frame = selected_frame[selected_frame["model"] == "AAForecast"].copy()
+        if aaf_frame.empty:
+            return None
+        artifact_paths: list[Path] = []
+        for row in aaf_frame.itertuples(index=False):
+            source_root = None
+            if hasattr(row, "_summary_source_root") and getattr(row, "_summary_source_root"):
+                source_root = Path(getattr(row, "_summary_source_root"))
+            resolved = _normalize_optional_path(
+                getattr(row, "aaforecast_context_artifact", None),
+                source_root=source_root,
+            )
+            if resolved is not None:
+                artifact_paths.append(resolved)
+        if not artifact_paths:
+            return None
+        unique_paths = list(dict.fromkeys(artifact_paths))
+        if len(unique_paths) != 1:
+            raise ValueError(
+                "AAForecast summary plot requires a single context artifact per scoped window"
+            )
+        context_path = unique_paths[0]
+        if not context_path.exists():
+            raise FileNotFoundError(
+                f"AAForecast context artifact does not exist: {context_path}"
+            )
+        context_frame = pd.read_csv(context_path)
+        required_columns = {"ds", "context_active"}
+        if not required_columns.issubset(context_frame.columns):
+            raise ValueError(
+                "AAForecast context artifact must contain ds and context_active columns"
+            )
+        context_frame = context_frame.copy()
+        context_frame["ds"] = pd.Index(
+            [pd.Timestamp(value) for value in context_frame["ds"]]
+        )
+        context_frame["context_active"] = pd.to_numeric(
+            context_frame["context_active"], errors="coerce"
+        ).fillna(0)
+        return context_frame
+
     plot_path.parent.mkdir(parents=True, exist_ok=True)
     selected = forecasts[forecasts["model"].isin(selected_models)].copy()
     if selected.empty:
         return
     selected["ds"] = pd.Index([pd.Timestamp(value) for value in selected["ds"]])
-    fig, ax = plt.subplots(figsize=(12, 6))
+    context_frame = _load_aaforecast_context_frame(selected)
+    if context_frame is None:
+        fig, ax = plt.subplots(figsize=(12, 6))
+        price_ax = ax
+        context_ax = None
+    else:
+        fig, (price_ax, context_ax) = plt.subplots(
+            2,
+            1,
+            figsize=(12, 8),
+            gridspec_kw={"height_ratios": [3, 1]},
+        )
     for model_name in selected_models:
         model_frame = (
             selected[selected["model"] == model_name]
@@ -1438,11 +2478,31 @@ def _plot_last_fold_overlay(
         )
         if model_frame.empty:
             continue
-        ax.plot(model_frame["ds"], model_frame["y_hat"], label=model_name, linewidth=1.8)
-    ax.set_title(title)
-    ax.set_xlabel("ds")
-    ax.set_ylabel("y")
-    ax.legend(loc="best")
+        price_ax.plot(
+            model_frame["ds"],
+            model_frame["y_hat"],
+            label=model_name,
+            linewidth=1.8,
+        )
+    price_ax.set_title(title)
+    price_ax.set_ylabel("y")
+    price_ax.legend(loc="best")
+    if context_ax is None:
+        price_ax.set_xlabel("ds")
+    else:
+        context_ax.step(
+            context_frame["ds"],
+            context_frame["context_active"],
+            where="mid",
+            label="AAForecast anomaly context",
+            linewidth=1.6,
+        )
+        context_ax.set_ylabel("context")
+        context_ax.set_xlabel("context ds")
+        context_ax.set_yticks([0, 1])
+        context_ax.set_yticklabels(["normal", "anomaly"])
+        context_ax.set_ylim(-0.05, 1.05)
+        context_ax.legend(loc="best")
     fig.autofmt_xdate()
     fig.tight_layout()
     fig.savefig(plot_path, dpi=150)
@@ -1679,6 +2739,50 @@ def _write_loss_artifact_summary(run_root: Path) -> Path | None:
     return summary_path
 
 
+def _build_tscv_splits(total_rows: int, cv_config) -> list[tuple[list[int], list[int]]]:
+    if cv_config.step_size < 1:
+        raise ValueError("cv.step_size must be at least 1")
+
+    required_rows = (
+        cv_config.gap
+        + cv_config.horizon
+        + cv_config.step_size * (cv_config.n_windows - 1)
+        + 1
+    )
+    if total_rows < required_rows:
+        raise ValueError(
+            "Dataset is too short for the configured TSCV policy "
+            f"(n_windows={cv_config.n_windows}, horizon={cv_config.horizon}, "
+            f"step_size={cv_config.step_size}, gap={cv_config.gap}, "
+            f"max_train_size={cv_config.max_train_size})"
+        )
+
+    splits: list[tuple[list[int], list[int]]] = []
+    for fold_idx in range(cv_config.n_windows):
+        train_end = (
+            total_rows
+            - cv_config.gap
+            - cv_config.horizon
+            - cv_config.step_size * (cv_config.n_windows - 1 - fold_idx)
+        )
+        if train_end <= 0:
+            raise ValueError(
+                "Dataset is too short for the configured TSCV policy "
+                f"(n_windows={cv_config.n_windows}, horizon={cv_config.horizon}, "
+                f"step_size={cv_config.step_size}, gap={cv_config.gap}, "
+                f"max_train_size={cv_config.max_train_size})"
+            )
+        train_start = 0
+        if cv_config.max_train_size is not None:
+            train_start = max(0, train_end - cv_config.max_train_size)
+        test_start = train_end + cv_config.gap
+        test_end = test_start + cv_config.horizon
+        splits.append(
+            (list(range(train_start, train_end)), list(range(test_start, test_end)))
+        )
+    return splits
+
+
 def _run_single_job(
     loaded: LoadedConfig,
     job: JobConfig,
@@ -1818,7 +2922,6 @@ def _run_single_job(
                 study_summary = current_study_summary
         if projection_context is None or best_params is None or best_training_params is None or study_summary is None:
             raise RuntimeError("failed to resolve canonical Optuna study projection")
-        projection_study_context = projection_context
         projection_sources = per_study_projection_sources[projection_context.study_index]
         _copy_projection_file(projection_sources["best_params"], models_dir / "best_params.json")
         _copy_projection_file(
@@ -1901,13 +3004,12 @@ def _run_single_job(
                     fold_idx, total_folds=len(splits), phase="replay", exc=exc
                 )
                 raise
-            loss_curve_path = _write_loss_curve_artifact(
+            _write_loss_curve_artifact(
                 run_root,
                 effective_job.model,
                 fold_idx,
                 nf=nf,
             )
-            future_df = source_df.iloc[test_idx].reset_index(drop=True)
             metrics = _compute_metrics(
                 target_actuals, target_predictions[effective_job.model]
             )
