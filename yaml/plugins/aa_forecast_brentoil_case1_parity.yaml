@@ -1,7 +1,7 @@
 aa_forecast:
   model: gru
-  tune_training: false
-  lowess_frac: 0.6
+  tune_training: true
+  lowess_frac: 0.35
   lowess_delta: 0.01
   uncertainty:
     enabled: true
@@ -17,13 +17,13 @@ aa_forecast:
     upward:
     - Idx_OVX
     - BS_Core_Index_A
+    - BS_Core_Index_B
+    - BS_Core_Index_C
     - GPRD_THREAT
     - GPRD
     - GPRD_ACT
     two_sided:
     - Com_Oil_Spread
-    - BS_Core_Index_B
-    - BS_Core_Index_C
     - Com_LMEX
     - Com_BloombergCommodity_BCOM
-  top_k: 0.05
+  top_k: 0.15

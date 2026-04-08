@@ -254,13 +254,13 @@ def test_brent_case1_parity_experiment_configs_share_dataset_contract() -> None:
     assert aa_payload["aa_forecast"]["enabled"] is True
     assert aa_payload["aa_forecast"]["config_path"] == str(BRENT_CASE1_PARITY_AA_PLUGIN)
     assert aa_plugin_payload["aa_forecast"]["model"] == "gru"
-    assert aa_plugin_payload["aa_forecast"]["tune_training"] is False
+    assert aa_plugin_payload["aa_forecast"]["tune_training"] is True
     assert aa_plugin_payload["aa_forecast"]["model_params"] == BRENT_CASE1_PARITY_AA_PARAMS
     assert aa_plugin_payload["aa_forecast"]["uncertainty"] == {
         "enabled": True,
         "sample_count": 50,
     }
-    assert aa_plugin_payload["aa_forecast"]["top_k"] == 0.05
+    assert aa_plugin_payload["aa_forecast"]["top_k"] == 0.15
 
 
 def test_runtime_validate_only_accepts_brent_case1_fixed_parity_experiments(
@@ -331,7 +331,7 @@ def test_runtime_validate_only_accepts_brent_case1_fixed_parity_experiments(
     assert aa_resolved["jobs"] == [
         {
             "model": "AAForecast",
-            "params": BRENT_CASE1_PARITY_PARAMS,
+            "params": BRENT_CASE1_PARITY_AA_PARAMS,
             "requested_mode": "learned_fixed",
             "validated_mode": "learned_fixed",
             "selected_search_params": [],
@@ -344,7 +344,7 @@ def test_runtime_validate_only_accepts_brent_case1_fixed_parity_experiments(
     }
     assert aa_manifest["aa_forecast"]["config_path"] == str(BRENT_CASE1_PARITY_AA_PLUGIN)
     assert aa_stage_config["model"] == "gru"
-    assert aa_stage_config["model_params"] == BRENT_CASE1_PARITY_PARAMS
+    assert aa_stage_config["model_params"] == BRENT_CASE1_PARITY_AA_PARAMS
     assert aa_stage_config["uncertainty"]["enabled"] is True
     assert aa_stage_config["uncertainty"]["sample_count"] == 50
     assert aa_stage_config["uncertainty"]["dropout_candidates"] == [

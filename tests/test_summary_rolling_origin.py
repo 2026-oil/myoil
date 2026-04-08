@@ -207,7 +207,7 @@ def test_write_per_window_summary_bundles_replays_best_params_and_writes_manifes
         training_override=None,
         run_root=None,
     ):
-        del loaded, freq, params_override, run_root
+        del loaded, freq, params_override
         train_df = source_df.iloc[train_idx].reset_index(drop=True)
         future_df = source_df.iloc[test_idx].reset_index(drop=True)
         calls.append(
@@ -215,6 +215,7 @@ def test_write_per_window_summary_bundles_replays_best_params_and_writes_manifes
                 "job_params": dict(job.params),
                 "training_override": dict(training_override or {}),
                 "train_end_ds": str(pd.Timestamp(train_df["dt"].iloc[-1]).date()),
+                "run_root": str(run_root) if run_root is not None else None,
             }
         )
         predictions = pd.DataFrame(
@@ -222,6 +223,8 @@ def test_write_per_window_summary_bundles_replays_best_params_and_writes_manifes
                 "unique_id": ["target"] * len(future_df),
                 "ds": pd.to_datetime(future_df["dt"]),
                 job.model: [100.0 + idx for idx in range(len(future_df))],
+                "aaforecast_context_artifact": ["aa_forecast/context/test.csv"]
+                * len(future_df),
             }
         )
         actuals = future_df["target"].reset_index(drop=True)
@@ -242,11 +245,13 @@ def test_write_per_window_summary_bundles_replays_best_params_and_writes_manifes
             "job_params": {"best": "param"},
             "training_override": {"lr": 0.01},
             "train_end_ds": "2024-02-18",
+            "run_root": str(run_root),
         },
         {
             "job_params": {"best": "param"},
             "training_override": {"lr": 0.01},
             "train_end_ds": "2024-02-25",
+            "run_root": str(run_root),
         },
     ]
 
@@ -266,6 +271,12 @@ def test_write_per_window_summary_bundles_replays_best_params_and_writes_manifes
     assert rolling_metrics["used_best_params"].tolist() == [True]
     assert rolling_forecasts["test_index"].tolist() == [1, 1, 2, 2]
     assert rolling_forecasts["used_best_params"].tolist() == [True, True, True, True]
+    assert rolling_forecasts["aaforecast_context_artifact"].tolist() == [
+        "aa_forecast/context/test.csv",
+        "aa_forecast/context/test.csv",
+        "aa_forecast/context/test.csv",
+        "aa_forecast/context/test.csv",
+    ]
     if "aaforecast_context_active" in rolling_forecasts.columns:
         assert rolling_forecasts["aaforecast_context_active"].isna().all()
     if "aaforecast_context_label" in rolling_forecasts.columns:
@@ -629,6 +640,87 @@ def test_plot_last_fold_overlay_adds_lower_context_subplot_for_aaforecast(
     assert len(price_axis.plot_calls) == 1
     assert len(price_axis.step_calls) == 0
     assert len(context_axis.step_calls) == 1
+
+
+def test_plot_last_fold_overlay_clips_context_subplot_to_input_dates(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    price_axis = _FakeAxis()
+    context_axis = _FakeAxis()
+    context_csv = tmp_path / "aa_forecast" / "context" / "20240301T000000.csv"
+    context_csv.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "ds": pd.to_datetime(
+                [
+                    "2024-02-04",
+                    "2024-02-11",
+                    "2024-02-18",
+                    "2024-02-25",
+                    "2024-03-03",
+                ]
+            ),
+            "context_active": [0, 1, 0, 1, 1],
+        }
+    ).to_csv(context_csv, index=False)
+
+    monkeypatch.setattr(matplotlib, "use", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        plt,
+        "subplots",
+        lambda *args, **kwargs: (_FakeFigure(), (price_axis, context_axis)),
+    )
+    monkeypatch.setattr(plt, "close", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        runtime,
+        "_summary_overlay_actual_frames",
+        lambda *_args, **_kwargs: (
+            pd.DataFrame(
+                {
+                    "ds": pd.to_datetime(["2024-02-11", "2024-02-18"]),
+                    "y": [90.0, 91.0],
+                }
+            ),
+            pd.DataFrame(
+                {
+                    "ds": pd.to_datetime(["2024-02-25", "2024-03-03"]),
+                    "y": [92.0, 93.0],
+                }
+            ),
+        ),
+    )
+
+    forecasts = pd.DataFrame(
+        {
+            "model": ["AAForecast", "AAForecast"],
+            "ds": ["2024-02-25", "2024-03-03"],
+            "y_hat": [100.0, 101.0],
+            "fold_idx": [0, 0],
+            "cutoff": ["2024-02-18", "2024-02-18"],
+            "train_end_ds": ["2024-02-18", "2024-02-18"],
+            "aaforecast_context_artifact": [
+                "aa_forecast/context/20240301T000000.csv",
+                "aa_forecast/context/20240301T000000.csv",
+            ],
+        }
+    )
+
+    runtime._plot_last_fold_overlay(
+        forecasts,
+        ["AAForecast"],
+        tmp_path / "context-clipped.png",
+        title="context-clipped",
+        run_root=tmp_path,
+    )
+
+    assert len(context_axis.step_calls) == 1
+    context_x, context_y = context_axis.step_calls[0]
+    assert [str(value.date()) for value in context_x.tolist()] == [
+        "2024-02-11",
+        "2024-02-18",
+    ]
+    assert context_y.tolist() == [1, 0]
 
 
 def test_plot_last_fold_overlay_fails_fast_when_context_artifact_is_missing(

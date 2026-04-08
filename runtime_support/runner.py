@@ -2572,6 +2572,7 @@ def _write_per_window_summary_bundles(
                 ) = _fit_and_predict_fold(
                     loaded,
                     effective_job,
+                    run_root=run_root,
                     source_df=combined_df,
                     freq=freq,
                     train_idx=train_idx,
@@ -2735,6 +2736,24 @@ def _plot_last_fold_overlay(
         ).fillna(0)
         return context_frame
 
+    def _selected_train_end_ds(selected_frame: pd.DataFrame) -> pd.Timestamp | None:
+        if "train_end_ds" not in selected_frame.columns:
+            return None
+        train_end_values = (
+            pd.Series(selected_frame["train_end_ds"])
+            .dropna()
+            .map(_normalize_summary_timestamp)
+            .dropna()
+            .drop_duplicates()
+        )
+        if train_end_values.empty:
+            return None
+        if len(train_end_values) != 1:
+            raise ValueError(
+                "summary plot requires a single train_end_ds value for the scoped forecast frame"
+            )
+        return pd.Timestamp(train_end_values.iloc[0])
+
     def _anchor_point(frame: pd.DataFrame) -> pd.DataFrame:
         if frame.empty:
             return pd.DataFrame(columns=["ds", "y"])
@@ -2770,15 +2789,18 @@ def _plot_last_fold_overlay(
         output_actual_frame = pd.DataFrame()
     actual_anchor_frame = _anchor_point(input_actual_frame)
     context_frame = _load_aaforecast_context_frame(selected)
-    if (
-        context_frame is not None
-        and not input_actual_frame.empty
-    ):
-        input_start = input_actual_frame["ds"].min()
-        input_end = input_actual_frame["ds"].max()
-        context_frame = context_frame[
-            (context_frame["ds"] >= input_start) & (context_frame["ds"] <= input_end)
-        ].reset_index(drop=True)
+    train_end_ds = _selected_train_end_ds(selected)
+    if context_frame is not None:
+        if train_end_ds is not None:
+            context_frame = context_frame[
+                context_frame["ds"] <= train_end_ds
+            ].reset_index(drop=True)
+        if not input_actual_frame.empty:
+            input_start = input_actual_frame["ds"].min()
+            input_end = input_actual_frame["ds"].max()
+            context_frame = context_frame[
+                (context_frame["ds"] >= input_start) & (context_frame["ds"] <= input_end)
+            ].reset_index(drop=True)
     if context_frame is None:
         fig, ax = plt.subplots(figsize=(12, 6))
         price_ax = ax
