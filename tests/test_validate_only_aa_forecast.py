@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -11,6 +12,7 @@ import runtime_support.runner as runtime
 import yaml
 
 from app_config import load_app_config
+import plugins.aa_forecast.runtime as aa_runtime
 from plugins.aa_forecast.runtime import _aa_params_override
 from runtime_support.forecast_models import build_model
 
@@ -925,6 +927,57 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
         "sample_idx",
         "prediction",
     }.issubset(candidate_samples.columns)
+    assert candidate_stats["prediction_std"].gt(0).any()
+    assert candidate_samples["prediction"].nunique() > 1
+
+
+def test_select_uncertainty_predictions_uses_distinct_prediction_seeds(monkeypatch) -> None:
+    seen_seeds: list[int] = []
+
+    def fake_predict_with_adapter(_nf, _adapter_inputs, *, random_seed=None):
+        seen_seeds.append(int(random_seed))
+        return pd.DataFrame({"unique_id": ["series"], "AAForecast": [float(random_seed)]})
+
+    def fake_extract_target_prediction_frame(
+        predictions,
+        *,
+        target_col,
+        model_name,
+        diff_context,
+        restore_target_predictions,
+    ):
+        del target_col, model_name, diff_context, restore_target_predictions
+        return predictions.rename(columns={"AAForecast": "y_hat"})
+
+    monkeypatch.setattr(aa_runtime, "_predict_with_adapter", fake_predict_with_adapter)
+    monkeypatch.setattr(
+        aa_runtime,
+        "_extract_target_prediction_frame",
+        fake_extract_target_prediction_frame,
+    )
+
+    model = SimpleNamespace(
+        random_seed=7,
+        configure_stochastic_inference=lambda **_kwargs: None,
+    )
+    summary = aa_runtime._select_uncertainty_predictions(
+        nf=object(),
+        adapter_inputs=object(),
+        model=model,
+        model_name="AAForecast",
+        target_col="series",
+        diff_context=None,
+        restore_target_predictions=None,
+        prediction_column="y_hat",
+        dropout_candidates=(0.1, 0.2),
+        sample_count=3,
+    )
+
+    assert seen_seeds == [7, 8, 9, 11, 12, 13]
+    assert summary["candidate_samples"]["0.10"] == [[7.0], [8.0], [9.0]]
+    assert summary["candidate_samples"]["0.20"] == [[11.0], [12.0], [13.0]]
+    assert summary["candidate_std_grid"][0, 0] > 0
+    assert summary["candidate_std_grid"][1, 0] > 0
 
 
 def test_validate_only_rejects_yaml_managed_aaforecast_dropout_candidates(

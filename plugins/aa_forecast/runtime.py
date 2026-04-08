@@ -213,13 +213,20 @@ def _write_context_artifacts(
     return str(relative_csv_path)
 
 
-def _predict_with_adapter(nf: NeuralForecast, adapter_inputs: Any) -> pd.DataFrame:
+def _predict_with_adapter(
+    nf: NeuralForecast,
+    adapter_inputs: Any,
+    *,
+    random_seed: int | None = None,
+) -> pd.DataFrame:
     predict_kwargs = {
         "df": adapter_inputs.fit_df,
         "static_df": adapter_inputs.static_df,
     }
     if adapter_inputs.futr_df is not None:
         predict_kwargs["futr_df"] = adapter_inputs.futr_df
+    if random_seed is not None:
+        predict_kwargs["random_seed"] = int(random_seed)
     return nf.predict(**predict_kwargs)
 
 
@@ -239,11 +246,18 @@ def _select_uncertainty_predictions(
     candidate_means: list[np.ndarray] = []
     candidate_stds: list[np.ndarray] = []
     candidate_samples: dict[str, list[list[float]]] = {}
-    for dropout_p in dropout_candidates:
+    base_seed = int(getattr(model, "random_seed", 1) or 1)
+    seed_stride = max(sample_count, 1) + 1
+    for dropout_idx, dropout_p in enumerate(dropout_candidates):
         model.configure_stochastic_inference(enabled=True, dropout_p=dropout_p)
         samples: list[np.ndarray] = []
-        for _ in range(sample_count):
-            predictions = _predict_with_adapter(nf, adapter_inputs)
+        for sample_idx in range(sample_count):
+            sample_seed = base_seed + dropout_idx * seed_stride + sample_idx
+            predictions = _predict_with_adapter(
+                nf,
+                adapter_inputs,
+                random_seed=sample_seed,
+            )
             restored = _extract_target_prediction_frame(
                 predictions,
                 target_col=target_col,
