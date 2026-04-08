@@ -782,6 +782,62 @@ def test_runtime_aaforecast_plugin_uncertainty_smoke(
     assert len(payload["selected_std_by_horizon"]) == 1
 
 
+def test_runtime_aaforecast_writes_context_annotation_and_sidecar(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+
+    payload = yaml.safe_load(PLUGIN_BEST_MAIN_CONFIG.read_text(encoding="utf-8"))
+    payload["dataset"]["path"] = str(
+        (PLUGIN_BEST_MAIN_CONFIG.parent / payload["dataset"]["path"]).resolve()
+    )
+    payload["training"]["input_size"] = 2
+    payload["training"]["batch_size"] = 1
+    payload["training"]["valid_batch_size"] = 1
+    payload["training"]["windows_batch_size"] = 2
+    payload["training"]["inference_windows_batch_size"] = 2
+    payload["training"]["max_steps"] = 1
+    payload["training"]["val_size"] = 2
+    payload["cv"]["horizon"] = 2
+    payload["cv"]["n_windows"] = 1
+    payload["cv"]["step_size"] = 1
+
+    config_path = tmp_path / "aa_forecast_context_main.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    output_root = tmp_path / "aa-forecast-context-smoke"
+
+    code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    assert code == 0
+    forecast_frame = pd.read_csv(output_root / "cv" / "AAForecast_forecasts.csv")
+    assert {
+        "aaforecast_context_active",
+        "aaforecast_context_label",
+        "aaforecast_context_artifact",
+    }.issubset(forecast_frame.columns)
+    assert forecast_frame["aaforecast_context_label"].isin(
+        ["anomaly_context", "normal_context"]
+    ).all()
+    artifact_relpath = forecast_frame["aaforecast_context_artifact"].dropna().iloc[0]
+    context_path = output_root / artifact_relpath
+    assert context_path.exists()
+    context_frame = pd.read_csv(context_path)
+    assert {"ds", "context_active", "context_label"}.issubset(context_frame.columns)
+    assert (output_root / "summary" / "last_fold_all_models.png").exists()
+    assert (output_root / "summary" / "last_fold_all_models_window_16.png").exists()
+    assert (
+        output_root / "summary" / "test_1" / "last_fold_all_models_window_16.png"
+    ).exists()
+
+
 def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     tmp_path: Path,
     monkeypatch,
@@ -839,14 +895,20 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
         / "trial-0000"
     )
     prediction_frame = pd.read_csv(trial_root / "predictions.csv")
+    common_fold_root = trial_root / "folds" / "fold_000"
     fold_root = trial_root / "folds" / "fold_000" / "aa_forecast" / "uncertainty"
     candidate_stats_files = sorted(fold_root.glob("*.candidate_stats.csv"))
     candidate_sample_files = sorted(fold_root.glob("*.candidate_samples.csv"))
+    metrics_payload = json.loads((common_fold_root / "metrics.json").read_text(encoding="utf-8"))
 
     assert code == 0
     assert {"y", "y_hat", "y_hat_uncertainty_std", "y_hat_selected_dropout"}.issubset(
         prediction_frame.columns
     )
+    assert (common_fold_root / "predictions.csv").exists()
+    assert (common_fold_root / "plot.png").exists()
+    assert (common_fold_root / "checkpoint.pt").exists()
+    assert {"MAE", "MSE", "RMSE", "MAPE", "NRMSE", "R2"}.issubset(metrics_payload)
     assert candidate_stats_files
     assert candidate_sample_files
 

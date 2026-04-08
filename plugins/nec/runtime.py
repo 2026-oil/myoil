@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 import json
 from pathlib import Path
+import tempfile
 from typing import Any, Iterable
 
 import numpy as np
@@ -29,6 +30,37 @@ class _BranchRunResult:
     actual: np.ndarray
     sampled_series_count: int
     oversampled_window_count: int
+    fitted_model: Any | None = None
+
+
+@dataclass(frozen=True)
+class _NecCheckpointBundle:
+    branch_results: dict[str, _BranchRunResult]
+
+    def save(self, path: str | Path) -> None:
+        import fsspec
+        import torch
+
+        payload: dict[str, Any] = {
+            "format": "nec-branch-checkpoint-bundle-v1",
+            "branches": {},
+        }
+        for branch_name, branch_result in self.branch_results.items():
+            fitted_model = branch_result.fitted_model
+            if fitted_model is None or not hasattr(fitted_model, "save"):
+                raise TypeError(
+                    f"NEC branch {branch_name} does not expose a savable fitted model"
+                )
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                checkpoint_path = Path(tmp_dir) / f"{branch_name}.pt"
+                fitted_model.save(checkpoint_path)
+                payload["branches"][branch_name] = {
+                    "model_name": branch_result.model_name,
+                    "variables": list(branch_result.variables),
+                    "checkpoint_bytes": checkpoint_path.read_bytes(),
+                }
+        with fsspec.open(path, "wb") as handle:
+            torch.save(payload, handle)
 
 
 def _stage_root(run_root: Path) -> Path:
@@ -334,6 +366,7 @@ class _NecPredictor:
                 actual=self.actual_classifier,
                 sampled_series_count=sampled_series_count,
                 oversampled_window_count=oversampled_window_count,
+                fitted_model=nf.models[0],
             )
         level_predictions = self._diff_denormalize(prediction_values)
         return _BranchRunResult(
@@ -345,6 +378,7 @@ class _NecPredictor:
             actual=self.actual_target,
             sampled_series_count=sampled_series_count,
             oversampled_window_count=oversampled_window_count,
+            fitted_model=nf.models[0],
         )
 
     def _diff_denormalize(self, pred_diff_norm: np.ndarray) -> np.ndarray:
@@ -528,7 +562,8 @@ def predict_nec_fold(
             ds=predictions["ds"],
             branch_results=branch_results,
         )
-    return predictions, actuals, train_end_ds, prepared_train_df, curve_frame
+    checkpoint_bundle = _NecCheckpointBundle(branch_results=branch_results)
+    return predictions, actuals, train_end_ds, prepared_train_df, checkpoint_bundle
 
 
 def materialize_nec_stage(

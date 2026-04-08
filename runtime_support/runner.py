@@ -89,6 +89,10 @@ SUMMARY_REPORT_FILENAME = "sample.md"
 LOSS_CURVE_PLOT_FILENAME = "loss_curve.png"
 LOSS_CURVE_SAMPLE_FILENAME = "loss_curve_every_10_global_steps.csv"
 SUMMARY_LOSS_ARTIFACTS_FILENAME = "loss_curve_artifacts.csv"
+TRIAL_PREDICTIONS_FILENAME = "predictions.csv"
+TRIAL_FOLD_PLOT_FILENAME = "plot.png"
+TRIAL_FOLD_METRICS_FILENAME = "metrics.json"
+TRIAL_FOLD_CHECKPOINT_FILENAME = "checkpoint.pt"
 LOSS_CURVE_SAMPLE_EVERY_N_STEPS = 10
 TARGET_DISPLAY_NAMES = {
     "Com_BrentCrudeOil": "BrentCrude",
@@ -1159,6 +1163,7 @@ def _main_job_objective(
         trial.set_user_attr("best_params", candidate_params)
         trial.set_user_attr("best_training_params", candidate_training_params)
         fold_mape: list[float] = []
+        trial_prediction_frames: list[pd.DataFrame] = []
         _write_trial_result(
             trial_dir,
             status="running",
@@ -1177,7 +1182,9 @@ def _main_job_objective(
                     fold_idx, total_folds=len(splits), phase=phase
                 )
             try:
+                fold_root = _trial_fold_artifact_dir(trial_dir, fold_idx)
                 fit_kwargs: dict[str, Any] = {
+                    "run_root": fold_root,
                     "source_df": source_df,
                     "freq": freq,
                     "train_idx": train_idx,
@@ -1185,8 +1192,6 @@ def _main_job_objective(
                     "params_override": candidate_params,
                     "training_override": candidate_training_params,
                 }
-                if get_active_stage_plugin(loaded.config) is not None:
-                    fit_kwargs["run_root"] = None
                 (
                     target_predictions,
                     target_actuals,
@@ -1198,11 +1203,30 @@ def _main_job_objective(
                     job,
                     **fit_kwargs,
                 )
-                metric = _compute_metrics(
-                    target_actuals, target_predictions[job.model]
-                )["MAPE"]
+                pred_col = _prediction_column(target_predictions, job.model)
+                metrics = _compute_metrics(target_actuals, target_predictions[pred_col])
+                metric = metrics["MAPE"]
+                completed_fold_mape = fold_mape + [metric]
+                interim_metric = _mean_fold_metric(
+                    completed_fold_mape, metric_name="mape"
+                )
+                fold_prediction_frame = _write_trial_fold_artifacts(
+                    trial_dir=trial_dir,
+                    fold_root=fold_root,
+                    model_name=job.model,
+                    fold_idx=fold_idx,
+                    train_end_ds=train_end_ds,
+                    target_predictions=target_predictions,
+                    target_actuals=target_actuals,
+                    metrics=metrics,
+                    fitted_model=nf,
+                )
+                trial_prediction_frames.append(fold_prediction_frame)
+                pd.concat(trial_prediction_frames, ignore_index=True).to_csv(
+                    trial_dir / TRIAL_PREDICTIONS_FILENAME,
+                    index=False,
+                )
                 fold_mape.append(metric)
-                interim_metric = _mean_fold_metric(fold_mape, metric_name="mape")
                 trial.set_user_attr("fold_mape", fold_mape.copy())
                 _write_trial_result(
                     trial_dir,
@@ -1547,6 +1571,189 @@ def _prediction_column(predictions: pd.DataFrame, model_name: str) -> str:
     if model_name in predictions.columns:
         return model_name
     raise KeyError(f"Could not find prediction column for {model_name}")
+
+
+def _trial_fold_artifact_dir(trial_dir: Path, fold_idx: int) -> Path:
+    return trial_dir / "folds" / f"fold_{fold_idx:03d}"
+
+
+def _serialize_artifact_value(value: object) -> object:
+    if pd.isna(value):
+        return None
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
+def _trial_prediction_extra_columns(
+    prediction_frame: pd.DataFrame,
+    row_idx: int,
+    *,
+    prediction_col: str,
+) -> dict[str, object]:
+    extras: dict[str, object] = {}
+    ignored = {"unique_id", "ds", prediction_col}
+    for column in prediction_frame.columns:
+        column_name = str(column)
+        if column_name in ignored:
+            continue
+        output_name = column_name
+        if column_name.startswith(f"{prediction_col}__"):
+            output_name = "y_hat_" + column_name.removeprefix(f"{prediction_col}__")
+        extras[output_name] = _serialize_artifact_value(
+            prediction_frame.iloc[row_idx][column]
+        )
+    return extras
+
+
+def _trial_fold_prediction_frame(
+    *,
+    model_name: str,
+    fold_idx: int,
+    train_end_ds: pd.Timestamp,
+    target_predictions: pd.DataFrame,
+    target_actuals: pd.Series,
+) -> pd.DataFrame:
+    pred_col = _prediction_column(target_predictions, model_name)
+    unique_id = (
+        str(target_predictions["unique_id"].iloc[0])
+        if "unique_id" in target_predictions.columns and not target_predictions.empty
+        else ""
+    )
+    rows: list[dict[str, object]] = []
+    for row_idx, ds in enumerate(target_predictions["ds"]):
+        actual_value = target_actuals.iloc[row_idx]
+        rows.append(
+            {
+                "model": model_name,
+                "fold_idx": fold_idx,
+                "train_end_ds": str(pd.Timestamp(train_end_ds)),
+                "unique_id": unique_id,
+                "ds": str(pd.Timestamp(ds)),
+                "horizon_step": row_idx + 1,
+                "y": None if pd.isna(actual_value) else float(actual_value),
+                "y_hat": float(target_predictions[pred_col].iloc[row_idx]),
+                **_trial_prediction_extra_columns(
+                    target_predictions,
+                    row_idx,
+                    prediction_col=pred_col,
+                ),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _write_trial_fold_metrics_json(
+    fold_root: Path,
+    *,
+    model_name: str,
+    fold_idx: int,
+    train_end_ds: pd.Timestamp,
+    metrics: Mapping[str, float],
+    row_count: int,
+) -> Path:
+    metrics_path = fold_root / TRIAL_FOLD_METRICS_FILENAME
+    payload = {
+        "model": model_name,
+        "fold_idx": fold_idx,
+        "train_end_ds": str(pd.Timestamp(train_end_ds)),
+        "row_count": row_count,
+        **{name: float(value) for name, value in metrics.items()},
+    }
+    metrics_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return metrics_path
+
+
+def _write_trial_fold_plot(
+    fold_root: Path,
+    *,
+    model_name: str,
+    target_predictions: pd.DataFrame,
+    target_actuals: pd.Series,
+) -> Path:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    pred_col = _prediction_column(target_predictions, model_name)
+    ds = pd.to_datetime(target_predictions["ds"]).reset_index(drop=True)
+    actual_series = target_actuals.reset_index(drop=True).astype(float)
+    predicted_series = target_predictions[pred_col].reset_index(drop=True).astype(float)
+
+    figure, axis = plt.subplots(figsize=(10, 5))
+    axis.plot(ds, actual_series, label="actual", linewidth=1.8, linestyle="--")
+    axis.plot(ds, predicted_series, label=model_name, linewidth=1.8)
+    axis.set_title(f"{model_name} fold predictions")
+    axis.set_xlabel("ds")
+    axis.set_ylabel("y")
+    axis.legend(loc="best")
+    figure.autofmt_xdate()
+    figure.tight_layout()
+    plot_path = fold_root / TRIAL_FOLD_PLOT_FILENAME
+    figure.savefig(plot_path, dpi=150)
+    plt.close(figure)
+    return plot_path
+
+
+def _write_trial_fold_checkpoint(
+    fold_root: Path,
+    *,
+    fitted_model: Any | None,
+) -> Path:
+    checkpoint_path = fold_root / TRIAL_FOLD_CHECKPOINT_FILENAME
+    if fitted_model is None:
+        raise TypeError("trial fold checkpoint export requires a fitted model object")
+    models = getattr(fitted_model, "models", None)
+    if models and hasattr(models[0], "save"):
+        models[0].save(str(checkpoint_path))
+        return checkpoint_path
+    if hasattr(fitted_model, "save"):
+        fitted_model.save(str(checkpoint_path))
+        return checkpoint_path
+    raise TypeError(
+        f"trial fold checkpoint export does not support {type(fitted_model).__name__}"
+    )
+
+
+def _write_trial_fold_artifacts(
+    *,
+    trial_dir: Path,
+    fold_root: Path,
+    model_name: str,
+    fold_idx: int,
+    train_end_ds: pd.Timestamp,
+    target_predictions: pd.DataFrame,
+    target_actuals: pd.Series,
+    metrics: Mapping[str, float],
+    fitted_model: Any | None,
+) -> pd.DataFrame:
+    del trial_dir
+    fold_root.mkdir(parents=True, exist_ok=True)
+    prediction_frame = _trial_fold_prediction_frame(
+        model_name=model_name,
+        fold_idx=fold_idx,
+        train_end_ds=train_end_ds,
+        target_predictions=target_predictions,
+        target_actuals=target_actuals,
+    )
+    prediction_frame.to_csv(fold_root / TRIAL_PREDICTIONS_FILENAME, index=False)
+    _write_trial_fold_plot(
+        fold_root,
+        model_name=model_name,
+        target_predictions=target_predictions,
+        target_actuals=target_actuals,
+    )
+    _write_trial_fold_metrics_json(
+        fold_root,
+        model_name=model_name,
+        fold_idx=fold_idx,
+        train_end_ds=train_end_ds,
+        metrics=metrics,
+        row_count=len(prediction_frame),
+    )
+    _write_trial_fold_checkpoint(fold_root, fitted_model=fitted_model)
+    return prediction_frame
 
 
 def _artifact_model_name(path: Path, suffix: str) -> str:
@@ -1930,9 +2137,15 @@ def _build_summary_plot_bundle(
             if model in set(scoped_forecasts["model"])
         ]
     plot_specs = [
-        ("all_models", ordered_models, f"{title_prefix} (all models)"),
+        ("all_models", ordered_models, f"{title_prefix} (all models)", None),
+        (
+            "all_models_window_16",
+            ordered_models,
+            f"{title_prefix} (all models, input window=16)",
+            16,
+        ),
     ]
-    for slug, models, title in plot_specs:
+    for slug, models, title, history_steps_override in plot_specs:
         if not models:
             continue
         plot_path = summary_dir / f"last_fold_{slug}.png"
@@ -1942,6 +2155,7 @@ def _build_summary_plot_bundle(
             plot_path,
             title=title,
             run_root=run_root,
+            history_steps_override=history_steps_override,
         )
         plot_paths[slug] = str(plot_path)
     return plot_paths
@@ -2008,6 +2222,70 @@ def _load_summary_loaded_config(run_root: Path) -> LoadedConfig:
         )
     repo_root = _summary_repo_root(config_source_path)
     return load_app_config(repo_root, config_path=str(config_source_path))
+
+
+def _summary_overlay_actual_frames(
+    run_root: Path,
+    forecasts: pd.DataFrame,
+    *,
+    history_steps_override: int | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if forecasts.empty or "train_end_ds" not in forecasts.columns:
+        return pd.DataFrame(), pd.DataFrame()
+    loaded = _load_summary_loaded_config(run_root)
+    dt_col = loaded.config.dataset.dt_col
+    target_col = loaded.config.dataset.target_col
+    if history_steps_override is None:
+        history_steps = int(getattr(loaded.config.training, "input_size", 0) or 0)
+    else:
+        history_steps = int(history_steps_override)
+    if history_steps < 1:
+        return pd.DataFrame(), pd.DataFrame()
+    source_df = pd.read_csv(loaded.config.dataset.path)
+    if source_df.empty:
+        return pd.DataFrame(), pd.DataFrame()
+    source_df = source_df.sort_values(dt_col).reset_index(drop=True)
+    normalized_ds = pd.Index(
+        pd.to_datetime(source_df[dt_col]).map(_normalize_summary_timestamp)
+    )
+    train_end_values = (
+        pd.Series(forecasts["train_end_ds"])
+        .dropna()
+        .map(_normalize_summary_timestamp)
+        .dropna()
+        .drop_duplicates()
+    )
+    if train_end_values.empty:
+        return pd.DataFrame(), pd.DataFrame()
+    if len(train_end_values) != 1:
+        raise ValueError(
+            "summary overlay requires a single train_end_ds value for the scoped forecast frame"
+        )
+    train_end_ds = train_end_values.iloc[0]
+    matching = np.flatnonzero(normalized_ds == train_end_ds)
+    if len(matching) == 0:
+        raise ValueError(
+            f"summary overlay could not locate train_end_ds {train_end_ds} in source dataset"
+        )
+    anchor_idx = int(matching[-1])
+    history_start = max(0, anchor_idx - history_steps + 1)
+    history_frame = source_df.iloc[history_start : anchor_idx + 1][[dt_col, target_col]].copy()
+    history_frame.rename(columns={dt_col: "ds", target_col: "y"}, inplace=True)
+    history_frame["ds"] = pd.Index(
+        pd.to_datetime(history_frame["ds"]).map(_normalize_summary_timestamp)
+    )
+
+    output_frame = forecasts[["ds", "y"]].copy()
+    output_frame["ds"] = pd.Index(
+        pd.to_datetime(output_frame["ds"]).map(_normalize_summary_timestamp)
+    )
+    output_frame["y"] = pd.to_numeric(output_frame["y"], errors="coerce")
+    output_frame = (
+        output_frame.drop_duplicates(subset=["ds"])
+        .sort_values("ds", kind="stable")
+        .reset_index(drop=True)
+    )
+    return history_frame.reset_index(drop=True), output_frame
 
 
 def _summary_available_model_names(
@@ -2339,6 +2617,7 @@ def _write_per_window_summary_bundles(
                     "y_hat": float(target_predictions[pred_col].iloc[row_idx]),
                     "observed": bool(pd.notna(actual_value)),
                     "used_best_params": used_best_params,
+                    **_prediction_additive_fields(target_predictions, row_idx),
                 }
                 job_forecast_rows.append(forecast_row)
                 rolling_forecast_rows.append(forecast_row)
@@ -2391,6 +2670,7 @@ def _plot_last_fold_overlay(
     *,
     title: str,
     run_root: Path,
+    history_steps_override: int | None = None,
 ) -> None:
     import matplotlib
 
@@ -2416,12 +2696,12 @@ def _plot_last_fold_overlay(
         if aaf_frame.empty:
             return None
         artifact_paths: list[Path] = []
-        for row in aaf_frame.itertuples(index=False):
+        for row in aaf_frame.to_dict(orient="records"):
             source_root = None
-            if hasattr(row, "_summary_source_root") and getattr(row, "_summary_source_root"):
-                source_root = Path(getattr(row, "_summary_source_root"))
+            if row.get("_summary_source_root"):
+                source_root = Path(str(row["_summary_source_root"]))
             resolved = _normalize_optional_path(
-                getattr(row, "aaforecast_context_artifact", None),
+                row.get("aaforecast_context_artifact"),
                 source_root=source_root,
             )
             if resolved is not None:
@@ -2453,12 +2733,50 @@ def _plot_last_fold_overlay(
         ).fillna(0)
         return context_frame
 
+    def _anchor_point(frame: pd.DataFrame) -> pd.DataFrame:
+        if frame.empty:
+            return pd.DataFrame(columns=["ds", "y"])
+        return frame.tail(1)[["ds", "y"]].copy()
+
+    def _connected_plot_frame(
+        anchor_frame: pd.DataFrame,
+        frame: pd.DataFrame,
+        *,
+        value_col: str,
+    ) -> pd.DataFrame:
+        plot_frame = frame[["ds", value_col]].copy()
+        plot_frame[value_col] = pd.to_numeric(plot_frame[value_col], errors="coerce")
+        plot_frame = plot_frame.dropna(subset=[value_col]).reset_index(drop=True)
+        if anchor_frame.empty or plot_frame.empty:
+            return plot_frame
+        anchor = anchor_frame.rename(columns={"y": value_col})
+        return pd.concat([anchor, plot_frame], ignore_index=True)
+
     plot_path.parent.mkdir(parents=True, exist_ok=True)
     selected = forecasts[forecasts["model"].isin(selected_models)].copy()
     if selected.empty:
         return
     selected["ds"] = pd.Index([pd.Timestamp(value) for value in selected["ds"]])
+    try:
+        input_actual_frame, output_actual_frame = _summary_overlay_actual_frames(
+            run_root,
+            selected,
+            history_steps_override=history_steps_override,
+        )
+    except FileNotFoundError:
+        input_actual_frame = pd.DataFrame()
+        output_actual_frame = pd.DataFrame()
+    actual_anchor_frame = _anchor_point(input_actual_frame)
     context_frame = _load_aaforecast_context_frame(selected)
+    if (
+        context_frame is not None
+        and not input_actual_frame.empty
+    ):
+        input_start = input_actual_frame["ds"].min()
+        input_end = input_actual_frame["ds"].max()
+        context_frame = context_frame[
+            (context_frame["ds"] >= input_start) & (context_frame["ds"] <= input_end)
+        ].reset_index(drop=True)
     if context_frame is None:
         fig, ax = plt.subplots(figsize=(12, 6))
         price_ax = ax
@@ -2470,6 +2788,28 @@ def _plot_last_fold_overlay(
             figsize=(12, 8),
             gridspec_kw={"height_ratios": [3, 1]},
         )
+    if not input_actual_frame.empty:
+        price_ax.plot(
+            input_actual_frame["ds"],
+            input_actual_frame["y"],
+            label="actual (input)",
+            linewidth=2.0,
+            color="black",
+        )
+    if not output_actual_frame.empty and output_actual_frame["y"].notna().any():
+        observed_output = _connected_plot_frame(
+            actual_anchor_frame,
+            output_actual_frame,
+            value_col="y",
+        )
+        price_ax.plot(
+            observed_output["ds"],
+            observed_output["y"],
+            label="actual (output)",
+            linewidth=1.8,
+            linestyle="--",
+            color="dimgray",
+        )
     for model_name in selected_models:
         model_frame = (
             selected[selected["model"] == model_name]
@@ -2478,9 +2818,16 @@ def _plot_last_fold_overlay(
         )
         if model_frame.empty:
             continue
+        connected_model_frame = _connected_plot_frame(
+            actual_anchor_frame,
+            model_frame,
+            value_col="y_hat",
+        )
+        if connected_model_frame.empty:
+            continue
         price_ax.plot(
-            model_frame["ds"],
-            model_frame["y_hat"],
+            connected_model_frame["ds"],
+            connected_model_frame["y_hat"],
             label=model_name,
             linewidth=1.8,
         )
@@ -2688,6 +3035,7 @@ def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
     ].copy()
     plot_paths.update(
         _build_summary_plot_bundle(
+            run_root,
             summary_dir,
             leaderboard,
             last_fold_forecasts,
@@ -2727,6 +3075,26 @@ def _load_loss_artifacts_for_summary(run_root: Path) -> pd.DataFrame:
                 }
             )
     return pd.DataFrame(rows)
+
+
+def _prediction_additive_fields(
+    prediction_frame: pd.DataFrame,
+    row_idx: int,
+    *,
+    prefix: str = "aaforecast_",
+) -> dict[str, object]:
+    extras: dict[str, object] = {}
+    for column in prediction_frame.columns:
+        if not str(column).startswith(prefix):
+            continue
+        value = prediction_frame.iloc[row_idx][column]
+        if pd.isna(value):
+            extras[str(column)] = None
+        elif isinstance(value, np.generic):
+            extras[str(column)] = value.item()
+        else:
+            extras[str(column)] = value
+    return extras
 
 
 def _write_loss_artifact_summary(run_root: Path) -> Path | None:
@@ -3043,6 +3411,7 @@ def _run_single_job(
                         "horizon_step": row_idx + 1,
                         "y": float(target_actuals.iloc[row_idx]),
                         "y_hat": float(target_predictions[effective_job.model].iloc[row_idx]),
+                        **_prediction_additive_fields(target_predictions, row_idx),
                     }
                 )
 

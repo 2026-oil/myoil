@@ -231,7 +231,8 @@ def test_nec_runtime_produces_predictions_and_fold_artifacts(tmp_path: Path) -> 
     assert actuals.tolist() == source_df.loc[[12, 13], "target"].tolist()
     assert train_df["target"].tolist() == source_df.loc[list(range(12)), "target"].tolist()
     assert str(train_end_ds) == "2020-03-18 00:00:00"
-    assert nf is None
+    assert nf is not None
+    assert hasattr(nf, "save")
 
     artifact = json.loads((run_root / "nec" / "nec_fold_summary.json").read_text())
     assert artifact["history_steps_source"] == "training.input_size"

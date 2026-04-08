@@ -115,6 +115,22 @@ def _build_fold_context_frame(
     dt_col: str,
     target_col: str,
 ) -> tuple[pd.DataFrame, bool]:
+    required_attrs = (
+        "star",
+        "_reduce_critical_mask",
+        "_select_hist_exog",
+        "star_hist_exog_indices",
+        "star_hist_exog_tail_modes",
+    )
+    if any(not hasattr(model, attr) for attr in required_attrs):
+        empty_frame = pd.DataFrame(
+            {
+                "ds": pd.to_datetime(train_df[dt_col]).reset_index(drop=True),
+                "context_active": np.zeros(len(train_df), dtype=int),
+                "context_label": ["normal_context"] * len(train_df),
+            }
+        )
+        return empty_frame, False
     insample_y = torch.as_tensor(
         train_df[target_col].to_numpy(dtype=np.float32),
         dtype=torch.float32,

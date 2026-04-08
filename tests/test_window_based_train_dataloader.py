@@ -65,6 +65,9 @@ def test_aaforecast_single_batch_loader_repeats_by_available_windows() -> None:
         loaded.config.jobs[0],
         params_override=_aa_params_override(effective),
     )
+    assert model.trainer_kwargs["enable_model_summary"] is False
+    assert model.trainer_kwargs["enable_progress_bar"] is False
+    assert model.trainer_kwargs["logger"] is False
     batch = next(iter(datamodule.train_dataloader()))
     _, _, _, final_condition = model._create_windows(batch, step="train")
     expected_window_count = len(final_condition)

@@ -384,6 +384,7 @@ def build_model(
         "alias": job.model,
         "enable_checkpointing": False,
         "enable_progress_bar": False,
+        "enable_model_summary": False,
         "logger": False,
         "loss": loss_override
         if loss_override is not None
