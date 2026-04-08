@@ -6,7 +6,9 @@ import pytorch_lightning as pl
 
 from neuralforecast.common._base_model import (
     DistributedConfig,
+    _predict_with_suppressed_lightning_info_logs,
     _suppress_lightning_info_logs,
+    _trainer_with_suppressed_lightning_info_logs,
 )
 from tests.dummy.dummy_models import DummyUnivariate
 
@@ -136,3 +138,67 @@ def test_fit_distributed_applies_lightning_log_suppression(monkeypatch) -> None:
                 sys.modules.pop(name, None)
             else:
                 sys.modules[name] = module
+
+
+def test_trainer_creation_applies_lightning_log_suppression(monkeypatch) -> None:
+    original_levels = _capture_logger_levels()
+    original_trainer = pl.Trainer
+
+    class FakeTrainer:
+        init_levels = None
+
+        def __init__(self, *args, **kwargs):
+            FakeTrainer.init_levels = {
+                name: logging.getLogger(name).getEffectiveLevel() for name in LOGGER_NAMES
+            }
+
+    try:
+        _set_logger_level(logging.INFO)
+        info_levels = _capture_logger_levels()
+        monkeypatch.setattr(pl, "Trainer", FakeTrainer)
+
+        _trainer_with_suppressed_lightning_info_logs(logger=False)
+
+        assert FakeTrainer.init_levels is not None
+        for name in LOGGER_NAMES:
+            assert FakeTrainer.init_levels[name] == logging.WARNING
+        for name, level in info_levels.items():
+            assert logging.getLogger(name).level == level
+    finally:
+        monkeypatch.setattr(pl, "Trainer", original_trainer)
+        for name, level in original_levels.items():
+            logging.getLogger(name).setLevel(level)
+
+
+def test_trainer_predict_applies_lightning_log_suppression(monkeypatch) -> None:
+    original_levels = _capture_logger_levels()
+
+    class FakeTrainer:
+        predict_levels = None
+
+        def predict(self, model, datamodule=None):
+            FakeTrainer.predict_levels = {
+                name: logging.getLogger(name).getEffectiveLevel() for name in LOGGER_NAMES
+            }
+            return []
+
+    try:
+        _set_logger_level(logging.INFO)
+        info_levels = _capture_logger_levels()
+
+        trainer = FakeTrainer()
+        result = _predict_with_suppressed_lightning_info_logs(
+            trainer,
+            model=object(),
+            datamodule=object(),
+        )
+
+        assert result == []
+        assert FakeTrainer.predict_levels is not None
+        for name in LOGGER_NAMES:
+            assert FakeTrainer.predict_levels[name] == logging.WARNING
+        for name, level in info_levels.items():
+            assert logging.getLogger(name).level == level
+    finally:
+        for name, level in original_levels.items():
+            logging.getLogger(name).setLevel(level)

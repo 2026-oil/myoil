@@ -52,6 +52,18 @@ def _suppress_lightning_info_logs():
             logging.getLogger(name).setLevel(level)
 
 
+def _trainer_with_suppressed_lightning_info_logs(**trainer_kwargs):
+    with _suppress_lightning_info_logs():
+        return pl.Trainer(**trainer_kwargs)
+
+
+def _predict_with_suppressed_lightning_info_logs(
+    trainer: "pl.Trainer", model: "BaseModel", *, datamodule
+):
+    with _suppress_lightning_info_logs():
+        return trainer.predict(model, datamodule=datamodule)
+
+
 class _MinStepsEarlyStopping(EarlyStopping):
     def __init__(self, *args, min_steps_before_early_stop: int = 0, **kwargs):
         super().__init__(*args, **kwargs)
@@ -533,7 +545,6 @@ class BaseModel(pl.LightningModule):
             val_size,
             test_size,
         ):
-            import pytorch_lightning as pl
             from pytorch_lightning.strategies import DDPStrategy
 
             # we instantiate here to avoid pickling large tensors (weights)
@@ -542,14 +553,14 @@ class BaseModel(pl.LightningModule):
             model.test_size = test_size
             for arg in ("devices", "num_nodes"):
                 trainer_kwargs.pop(arg, None)
+            trainer = _trainer_with_suppressed_lightning_info_logs(
+                strategy=DDPStrategy(process_group_backend="gloo"),
+                use_distributed_sampler=False,  # to ensure our dataloaders are used as-is
+                num_nodes=num_tasks,
+                devices=num_proc_per_task,
+                **trainer_kwargs,
+            )
             with _suppress_lightning_info_logs():
-                trainer = pl.Trainer(
-                    strategy=DDPStrategy(process_group_backend="gloo"),
-                    use_distributed_sampler=False,  # to ensure our dataloaders are used as-is
-                    num_nodes=num_tasks,
-                    devices=num_proc_per_task,
-                    **trainer_kwargs,
-                )
                 trainer.fit(model=model, datamodule=datamodule)
             model._restore_best_val_state()
             model.metrics = trainer.callback_metrics
@@ -654,8 +665,10 @@ class BaseModel(pl.LightningModule):
 
         if is_local:
             model = self
+            trainer = _trainer_with_suppressed_lightning_info_logs(
+                **model.trainer_kwargs
+            )
             with _suppress_lightning_info_logs():
-                trainer = pl.Trainer(**model.trainer_kwargs)
                 trainer.fit(model, datamodule=datamodule)
             model._restore_best_val_state()
             model.metrics = trainer.callback_metrics
@@ -2211,8 +2224,14 @@ class BaseModel(pl.LightningModule):
         if self.explain:
             pred_trainer_kwargs["inference_mode"] = False
             self.explainer_config = explainer_config
-            trainer = pl.Trainer(**pred_trainer_kwargs)
-            out = trainer.predict(self, datamodule=datamodule)
+            trainer = _trainer_with_suppressed_lightning_info_logs(
+                **pred_trainer_kwargs
+            )
+            out = _predict_with_suppressed_lightning_info_logs(
+                trainer,
+                self,
+                datamodule=datamodule,
+            )
             fcsts = []
             insample_explanations = []
             futr_exog_explanations = []
@@ -2268,10 +2287,16 @@ class BaseModel(pl.LightningModule):
                 not hasattr(self, "_pred_trainer")
                 or self._pred_trainer_kwargs != pred_trainer_kwargs
             ):
-                self._pred_trainer = pl.Trainer(**pred_trainer_kwargs)
+                self._pred_trainer = _trainer_with_suppressed_lightning_info_logs(
+                    **pred_trainer_kwargs
+                )
                 self._pred_trainer_kwargs = pred_trainer_kwargs
             trainer = self._pred_trainer
-            fcsts = trainer.predict(self, datamodule=datamodule)
+            fcsts = _predict_with_suppressed_lightning_info_logs(
+                trainer,
+                self,
+                datamodule=datamodule,
+            )
             fcsts = torch.vstack(fcsts)
             self.explanations = None
             if h is not None:
@@ -2328,8 +2353,14 @@ class BaseModel(pl.LightningModule):
             valid_batch_size=self.valid_batch_size,
             **data_module_kwargs,
         )
-        trainer = pl.Trainer(**self.trainer_kwargs)
-        fcsts = trainer.predict(self, datamodule=datamodule)
+        trainer = _trainer_with_suppressed_lightning_info_logs(
+            **self.trainer_kwargs
+        )
+        fcsts = _predict_with_suppressed_lightning_info_logs(
+            trainer,
+            self,
+            datamodule=datamodule,
+        )
         self.decompose_forecast = False  # Default decomposition back to false
         fcsts = torch.vstack(fcsts)
         return tensor_to_numpy(fcsts)
