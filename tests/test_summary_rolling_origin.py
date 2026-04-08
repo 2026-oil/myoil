@@ -419,6 +419,39 @@ def test_summary_overlay_actual_frames_supports_history_override(
     ]
 
 
+def test_load_last_fold_forecasts_skips_rolling_origin_artifacts(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    cv_dir = run_root / "cv"
+    cv_dir.mkdir(parents=True)
+
+    pd.DataFrame(
+        {
+            "fold_idx": [0, 1],
+            "cutoff": ["2024-01-07", "2024-01-14"],
+            "train_end_ds": ["2024-01-07", "2024-01-14"],
+            "ds": ["2024-01-14", "2024-01-21"],
+            "y": [1.0, 2.0],
+            "y_hat": [1.5, 2.5],
+        }
+    ).to_csv(cv_dir / "AAForecast_forecasts.csv", index=False)
+    pd.DataFrame(
+        {
+            "fold_idx": [1],
+            "cutoff": ["2024-01-21"],
+            "train_end_ds": ["2024-01-21"],
+            "ds": ["2024-01-28"],
+            "y": [3.0],
+            "y_hat": [3.5],
+        }
+    ).to_csv(cv_dir / "AAForecast_rolling_origin_forecasts.csv", index=False)
+
+    forecasts = runtime._load_last_fold_forecasts(run_root)
+
+    assert forecasts["fold_idx"].tolist() == [0, 1]
+    assert forecasts["train_end_ds"].tolist() == ["2024-01-07", "2024-01-14"]
+    assert len(forecasts) == 2
+
+
 def test_plot_last_fold_overlay_connects_input_actual_to_output_and_predictions(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

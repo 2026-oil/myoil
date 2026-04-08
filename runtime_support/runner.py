@@ -2102,6 +2102,8 @@ def _load_last_fold_forecasts(run_root: Path) -> pd.DataFrame:
     frames: list[pd.DataFrame] = []
     for root in _summary_job_roots(run_root):
         for path in sorted((root / "cv").glob("*_forecasts.csv")):
+            if path.name.endswith("_rolling_origin_forecasts.csv"):
+                continue
             frame = pd.read_csv(path)
             if frame.empty:
                 continue
