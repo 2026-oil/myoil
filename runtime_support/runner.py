@@ -2811,6 +2811,7 @@ def _plot_last_fold_overlay(
             1,
             figsize=(12, 8),
             gridspec_kw={"height_ratios": [3, 1]},
+            sharex=True,
         )
     if not input_actual_frame.empty:
         price_ax.plot(

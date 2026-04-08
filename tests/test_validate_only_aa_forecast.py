@@ -660,8 +660,10 @@ def test_runtime_smoke_emits_aaforecast_uncertainty_artifacts(
     uncertainty_dir = output_root / "aa_forecast" / "uncertainty"
     json_files = sorted(uncertainty_dir.glob("*.json"))
     csv_files = sorted(uncertainty_dir.glob("*.csv"))
+    png_files = sorted(uncertainty_dir.glob("*.dropout_mae_sd.png"))
     assert json_files
     assert csv_files
+    assert png_files
     summary = json.loads(json_files[0].read_text())
     assert summary["sample_count"] == 3
     assert summary["dropout_candidates"] == [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
@@ -774,7 +776,9 @@ def test_runtime_aaforecast_plugin_uncertainty_smoke(
     assert code == 0
     uncertainty_dir = output_root / "aa_forecast" / "uncertainty"
     distribution_files = sorted(uncertainty_dir.glob("*.json"))
+    png_files = sorted(uncertainty_dir.glob("*.dropout_mae_sd.png"))
     assert distribution_files
+    assert png_files
     payload = json.loads(distribution_files[0].read_text())
     assert payload["dropout_candidates"] == [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     assert payload["star_anomaly_tails"] == {"upward": ["event"], "two_sided": []}
@@ -900,6 +904,7 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     fold_root = trial_root / "folds" / "fold_000" / "aa_forecast" / "uncertainty"
     candidate_stats_files = sorted(fold_root.glob("*.candidate_stats.csv"))
     candidate_sample_files = sorted(fold_root.glob("*.candidate_samples.csv"))
+    candidate_plot_files = sorted(fold_root.glob("*.dropout_mae_sd.png"))
     metrics_payload = json.loads((common_fold_root / "metrics.json").read_text(encoding="utf-8"))
 
     assert code == 0
@@ -912,6 +917,7 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     assert {"MAE", "MSE", "RMSE", "MAPE", "NRMSE", "R2"}.issubset(metrics_payload)
     assert candidate_stats_files
     assert candidate_sample_files
+    assert candidate_plot_files
 
     candidate_stats = pd.read_csv(candidate_stats_files[0])
     candidate_samples = pd.read_csv(candidate_sample_files[0])
@@ -929,6 +935,22 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     }.issubset(candidate_samples.columns)
     assert candidate_stats["prediction_std"].gt(0).any()
     assert candidate_samples["prediction"].nunique() > 1
+
+
+def test_build_uncertainty_error_summary_aggregates_dropout_mae_and_sd() -> None:
+    summary = aa_runtime._build_uncertainty_error_summary(
+        candidate_samples={
+            "0.10": [[1.0, 3.0], [3.0, 5.0]],
+            "0.20": [[2.0, 4.0], [2.0, 6.0]],
+        },
+        target_actuals=pd.Series([2.0, 4.0]),
+    )
+
+    assert list(summary["dropout_p"]) == [0.1, 0.2]
+    assert summary.loc[0, "mae_mean"] == pytest.approx(1.0)
+    assert summary.loc[0, "mae_sd"] == pytest.approx(0.0)
+    assert summary.loc[1, "mae_mean"] == pytest.approx(0.5)
+    assert summary.loc[1, "mae_sd"] == pytest.approx(0.5)
 
 
 def test_select_uncertainty_predictions_uses_distinct_prediction_seeds(monkeypatch) -> None:

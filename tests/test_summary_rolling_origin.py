@@ -322,6 +322,7 @@ def test_plot_last_fold_overlay_uses_single_panel_without_aaforecast_context(
 
     assert calls["args"] == ()
     assert calls["kwargs"]["figsize"] == (12, 6)
+    assert "sharex" not in calls["kwargs"]
 
 
 def test_summary_overlay_actual_frames_limit_to_input_and_output_windows(
@@ -637,6 +638,7 @@ def test_plot_last_fold_overlay_adds_lower_context_subplot_for_aaforecast(
     )
 
     assert calls["args"] == (2, 1)
+    assert calls["kwargs"]["sharex"] is True
     assert len(price_axis.plot_calls) == 1
     assert len(price_axis.step_calls) == 0
     assert len(context_axis.step_calls) == 1

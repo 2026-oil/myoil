@@ -3,7 +3,7 @@ runtime:
   opt_study_count: 2
   opt_n_trial: 2
 training:
-  input_size: 96
+  input_size: 24
   batch_size: 32
   valid_batch_size: 4
   windows_batch_size: 64

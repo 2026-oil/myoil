@@ -296,6 +296,7 @@ def _write_uncertainty_artifacts(
     stage_cfg: Any,
     train_end_ds: pd.Timestamp,
     summary: dict[str, Any],
+    target_actuals: pd.Series,
 ) -> None:
     stage_root = _stage_root(run_root)
     slug = pd.Timestamp(train_end_ds).strftime("%Y%m%dT%H%M%S")
@@ -303,6 +304,7 @@ def _write_uncertainty_artifacts(
     csv_path = stage_root / "uncertainty" / f"{slug}.csv"
     candidate_stats_path = stage_root / "uncertainty" / f"{slug}.candidate_stats.csv"
     candidate_samples_path = stage_root / "uncertainty" / f"{slug}.candidate_samples.csv"
+    candidate_plot_path = stage_root / "uncertainty" / f"{slug}.dropout_mae_sd.png"
     _write_json(
         summary_path,
         {
@@ -362,6 +364,74 @@ def _write_uncertainty_artifacts(
                     }
                 )
     pd.DataFrame(candidate_sample_rows).to_csv(candidate_samples_path, index=False)
+    error_summary = _build_uncertainty_error_summary(
+        candidate_samples=summary["candidate_samples"],
+        target_actuals=target_actuals,
+    )
+    _write_uncertainty_error_plot(
+        error_summary=error_summary,
+        plot_path=candidate_plot_path,
+    )
+
+
+def _build_uncertainty_error_summary(
+    *,
+    candidate_samples: dict[str, list[list[float]]],
+    target_actuals: pd.Series | np.ndarray,
+) -> pd.DataFrame:
+    actual_values = np.asarray(target_actuals, dtype=float).reshape(-1)
+    error_rows: list[dict[str, float]] = []
+    for dropout_key, sample_grid in candidate_samples.items():
+        sample_array = np.asarray(sample_grid, dtype=float)
+        if sample_array.ndim != 2:
+            raise ValueError("uncertainty candidate samples must be a 2D array")
+        if sample_array.shape[1] != len(actual_values):
+            raise ValueError(
+                "uncertainty candidate sample horizon width must match target actuals"
+            )
+        absolute_errors = np.abs(sample_array - actual_values.reshape(1, -1))
+        sample_mae = absolute_errors.mean(axis=1)
+        error_rows.append(
+            {
+                "dropout_p": float(dropout_key),
+                "mae_mean": float(sample_mae.mean()),
+                "mae_sd": float(sample_mae.std(ddof=0)),
+            }
+        )
+    return pd.DataFrame(error_rows).sort_values("dropout_p").reset_index(drop=True)
+
+
+def _write_uncertainty_error_plot(
+    *,
+    error_summary: pd.DataFrame,
+    plot_path: Path,
+) -> None:
+    if error_summary.empty:
+        raise ValueError("uncertainty error summary must not be empty")
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    plot_frame = error_summary.copy()
+    plot_frame["dropout_p"] = pd.to_numeric(plot_frame["dropout_p"], errors="raise")
+    plot_frame["mae_mean"] = pd.to_numeric(plot_frame["mae_mean"], errors="raise")
+    plot_frame["mae_sd"] = pd.to_numeric(plot_frame["mae_sd"], errors="raise")
+    x = plot_frame["dropout_p"].to_numpy(dtype=float)
+    y = plot_frame["mae_mean"].to_numpy(dtype=float)
+    sd = plot_frame["mae_sd"].to_numpy(dtype=float)
+
+    figure, axis = plt.subplots(figsize=(10, 6))
+    axis.plot(x, y, label="MAE", linewidth=2.0)
+    axis.fill_between(x, y - sd, y + sd, alpha=0.2, label="SD")
+    axis.set_title("AAForecast dropout uncertainty error summary")
+    axis.set_xlabel("Dynamic Dropout Probability")
+    axis.set_ylabel("Error")
+    axis.legend(loc="best")
+    figure.tight_layout()
+    figure.savefig(plot_path, dpi=150)
+    plt.close(figure)
 
 
 def predict_aa_forecast_fold(
@@ -486,6 +556,7 @@ def predict_aa_forecast_fold(
                 stage_cfg=stage_cfg,
                 train_end_ds=pd.to_datetime(train_df[dt_col].iloc[-1]),
                 summary=summary,
+                target_actuals=future_df[target_col].reset_index(drop=True),
             )
     target_actuals = future_df[target_col].reset_index(drop=True)
     train_end_ds = pd.to_datetime(train_df[dt_col].iloc[-1])

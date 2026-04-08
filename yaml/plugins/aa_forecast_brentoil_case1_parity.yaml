@@ -8,22 +8,14 @@ aa_forecast:
     sample_count: 50
   model_params:
     encoder_hidden_size: 128
-    encoder_n_layers: 3
+    encoder_n_layers: 4
     encoder_dropout: 0.1
     decoder_hidden_size: 128
-    decoder_layers: 2
+    decoder_layers: 4
     season_length: 52
   star_anomaly_tails:
     upward:
-    - Idx_OVX
-    - BS_Core_Index_A
-    - BS_Core_Index_B
-    - BS_Core_Index_C
     - GPRD_THREAT
-    - GPRD
-    - GPRD_ACT
-    two_sided:
-    - Com_Oil_Spread
-    - Com_LMEX
-    - Com_BloombergCommodity_BCOM
-  top_k: 0.15
+    - BS_Core_Index_A
+    two_sided: []
+  top_k: 0.1
