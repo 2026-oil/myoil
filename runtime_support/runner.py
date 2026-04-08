@@ -2818,6 +2818,10 @@ def _plot_last_fold_overlay(
         )
         if model_frame.empty:
             continue
+        if "y" in model_frame.columns:
+            model_frame = model_frame[model_frame["y"].notna()].reset_index(drop=True)
+        if model_frame.empty:
+            continue
         connected_model_frame = _connected_plot_frame(
             actual_anchor_frame,
             model_frame,

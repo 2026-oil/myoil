@@ -38,6 +38,10 @@ BRENT_CASE1_PARITY_PARAMS = {
     "decoder_hidden_size": 128,
     "decoder_layers": 2,
 }
+BRENT_CASE1_PARITY_AA_PARAMS = {
+    **BRENT_CASE1_PARITY_PARAMS,
+    "season_length": 52,
+}
 BRENT_CASE1_PARITY_HIST_EXOG = [
     "Idx_OVX",
     "Com_Oil_Spread",
@@ -251,7 +255,7 @@ def test_brent_case1_parity_experiment_configs_share_dataset_contract() -> None:
     assert aa_payload["aa_forecast"]["config_path"] == str(BRENT_CASE1_PARITY_AA_PLUGIN)
     assert aa_plugin_payload["aa_forecast"]["model"] == "gru"
     assert aa_plugin_payload["aa_forecast"]["tune_training"] is False
-    assert aa_plugin_payload["aa_forecast"]["model_params"] == BRENT_CASE1_PARITY_PARAMS
+    assert aa_plugin_payload["aa_forecast"]["model_params"] == BRENT_CASE1_PARITY_AA_PARAMS
     assert aa_plugin_payload["aa_forecast"]["uncertainty"] == {
         "enabled": True,
         "sample_count": 50,

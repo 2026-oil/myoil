@@ -438,9 +438,13 @@ def predict_aa_forecast_fold(
             context_frame=context_frame,
             context_active=context_active,
         )
-    target_predictions["aaforecast_context_active"] = bool(context_active)
-    target_predictions["aaforecast_context_label"] = (
-        "anomaly_context" if context_active else "normal_context"
+    target_predictions["aaforecast_context_active"] = pd.Series(
+        [pd.NA] * len(target_predictions),
+        dtype="boolean",
+    )
+    target_predictions["aaforecast_context_label"] = pd.Series(
+        [None] * len(target_predictions),
+        dtype="object",
     )
     if context_artifact is not None:
         target_predictions["aaforecast_context_artifact"] = context_artifact

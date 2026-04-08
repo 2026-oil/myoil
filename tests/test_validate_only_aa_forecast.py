@@ -823,9 +823,8 @@ def test_runtime_aaforecast_writes_context_annotation_and_sidecar(
         "aaforecast_context_label",
         "aaforecast_context_artifact",
     }.issubset(forecast_frame.columns)
-    assert forecast_frame["aaforecast_context_label"].isin(
-        ["anomaly_context", "normal_context"]
-    ).all()
+    assert forecast_frame["aaforecast_context_active"].isna().all()
+    assert forecast_frame["aaforecast_context_label"].isna().all()
     artifact_relpath = forecast_frame["aaforecast_context_artifact"].dropna().iloc[0]
     context_path = output_root / artifact_relpath
     assert context_path.exists()

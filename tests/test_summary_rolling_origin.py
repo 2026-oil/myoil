@@ -266,6 +266,10 @@ def test_write_per_window_summary_bundles_replays_best_params_and_writes_manifes
     assert rolling_metrics["used_best_params"].tolist() == [True]
     assert rolling_forecasts["test_index"].tolist() == [1, 1, 2, 2]
     assert rolling_forecasts["used_best_params"].tolist() == [True, True, True, True]
+    if "aaforecast_context_active" in rolling_forecasts.columns:
+        assert rolling_forecasts["aaforecast_context_active"].isna().all()
+    if "aaforecast_context_label" in rolling_forecasts.columns:
+        assert rolling_forecasts["aaforecast_context_label"].isna().all()
 
     sample_md = (run_root / "summary" / "test_2" / "sample.md").read_text(encoding="utf-8")
     assert "rolling-origin forecast" in sample_md
@@ -479,6 +483,65 @@ def test_plot_last_fold_overlay_connects_input_actual_to_output_and_predictions(
         "2024-03-03",
     ]
     assert pred_y.tolist() == [11.0, 12.5, 13.5]
+
+
+def test_plot_last_fold_overlay_skips_future_only_prediction_segment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    price_axis = _FakeAxis()
+
+    def fake_subplots(*args, **kwargs):
+        return _FakeFigure(), price_axis
+
+    monkeypatch.setattr(matplotlib, "use", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(plt, "subplots", fake_subplots)
+    monkeypatch.setattr(plt, "close", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        runtime,
+        "_summary_overlay_actual_frames",
+        lambda *_args, **_kwargs: (
+            pd.DataFrame(
+                {
+                    "ds": pd.to_datetime(["2024-02-11", "2024-02-18"]),
+                    "y": [10.0, 11.0],
+                }
+            ),
+            pd.DataFrame(
+                {
+                    "ds": pd.to_datetime(["2024-02-25"]),
+                    "y": [12.0],
+                }
+            ),
+        ),
+    )
+
+    forecasts = pd.DataFrame(
+        {
+            "model": ["Naive", "Naive"],
+            "ds": ["2024-02-25", "2024-03-03"],
+            "y": [12.0, None],
+            "y_hat": [12.5, 13.5],
+            "fold_idx": [0, 0],
+            "cutoff": ["2024-02-18", "2024-02-18"],
+        }
+    )
+
+    runtime._plot_last_fold_overlay(
+        forecasts,
+        ["Naive"],
+        tmp_path / "future-gap.png",
+        title="future-gap",
+        run_root=tmp_path,
+    )
+
+    assert len(price_axis.plot_calls) == 3
+    pred_x, pred_y = price_axis.plot_calls[2]
+    assert [str(value.date()) for value in pred_x.tolist()] == [
+        "2024-02-18",
+        "2024-02-25",
+    ]
+    assert pred_y.tolist() == [11.0, 12.5]
 
 
 def test_plot_last_fold_overlay_adds_lower_context_subplot_for_aaforecast(

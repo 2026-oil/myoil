@@ -12,6 +12,7 @@ aa_forecast:
     encoder_dropout: 0.1
     decoder_hidden_size: 128
     decoder_layers: 2
+    season_length: 52
   star_anomaly_tails:
     upward:
     - Idx_OVX
