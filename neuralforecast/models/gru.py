@@ -5,6 +5,7 @@ import warnings
 from typing import Optional
 
 import torch
+import torch.nn as nn
 
 from ..common._base_model import BaseModel
 from ..common._modules import MLP
@@ -133,6 +134,7 @@ class GRU(BaseModel):
         self.exclude_insample_y = exclude_insample_y
         self._stochastic_inference_enabled = False
         self._stochastic_dropout_p = float(encoder_dropout)
+        self.horizon_embedding_dim = min(16, max(4, self.encoder_hidden_size // 16))
 
         feature_size = (0 if exclude_insample_y else 1) + self.hist_exog_size
         if feature_size <= 0:
@@ -151,6 +153,14 @@ class GRU(BaseModel):
             torch.nn.Linear(self.input_size, self.h)
             if self.h > self.input_size
             else None
+        )
+        self.horizon_embeddings = nn.Embedding(
+            num_embeddings=self.h,
+            embedding_dim=self.horizon_embedding_dim,
+        )
+        self.horizon_context = nn.Linear(
+            self.horizon_embedding_dim,
+            self.encoder_hidden_size,
         )
         self.decoder = MLP(
             in_features=2 * encoder_hidden_size,
@@ -176,6 +186,17 @@ class GRU(BaseModel):
         if dropout_p is not None:
             self._stochastic_dropout_p = float(dropout_p)
 
+    def _build_horizon_context(
+        self,
+        *,
+        batch_size: int,
+        device: torch.device,
+    ) -> torch.Tensor:
+        horizon_ids = torch.arange(self.h, device=device)
+        horizon_embeddings = self.horizon_embeddings(horizon_ids)
+        horizon_embeddings = horizon_embeddings.unsqueeze(0).expand(batch_size, -1, -1)
+        return self.horizon_context(horizon_embeddings)
+
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]
         hist_exog = windows_batch["hist_exog"]
@@ -198,11 +219,9 @@ class GRU(BaseModel):
             input_size=self.input_size,
             sequence_adapter=self.sequence_adapter,
         )
-        context_aligned = _align_horizon(
-            hidden_states,
-            h=self.h,
-            input_size=self.input_size,
-            sequence_adapter=self.sequence_adapter,
+        context_aligned = self._build_horizon_context(
+            batch_size=hidden_aligned.shape[0],
+            device=hidden_aligned.device,
         )
         hidden_aligned = _apply_stochastic_dropout(
             hidden_aligned,
