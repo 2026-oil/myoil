@@ -69,7 +69,6 @@ def _payload() -> dict[str, Any]:
             "worker_devices": 1,
             "parallelize_single_job_tuning": False,
         },
-        "residual": {"enabled": False, "model": "xgboost", "params": {}},
         "jobs": [],
     }
 
@@ -89,7 +88,6 @@ def _write_search_space(
     payload = {
         "models": models,
         "training": training or [],
-        "residual": {"xgboost": ["n_estimators", "max_depth"]},
     }
     path = root / "yaml/HPO/search_space.yaml"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -161,7 +159,6 @@ def test_validate_only_repro_config_accepts_top_level_direct_models(tmp_path: Pa
     assert capability["ES"]["supports_hist_exog"] is False
     assert capability["xgboost"]["supports_hist_exog"] is True
     assert capability["lightgbm"]["supports_hist_exog"] is True
-    assert capability["residual"]["validated_mode"] == "residual_disabled"
 
 
 def test_fit_and_predict_fold_uses_direct_runtime_lane(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -351,24 +348,6 @@ def test_tree_warmup_sanitization_preserves_effective_supervised_matrix() -> Non
     assert raw_y_train.keys() == sanitized_y_train.keys()
     for step_key in raw_y_train:
         pd.testing.assert_series_equal(raw_y_train[step_key], sanitized_y_train[step_key])
-
-
-def test_validate_only_rejects_residual_enabled_top_level_direct_models(tmp_path: Path) -> None:
-    payload = _payload()
-    payload["residual"] = {
-        "enabled": True,
-        "model": "xgboost",
-        "params": {"n_estimators": 8, "max_depth": 2},
-    }
-    payload["jobs"] = [{"model": "ARIMA", "params": {"order": [1, 1, 0]}}]
-    _write_data(tmp_path)
-    config_path = _write_config(tmp_path, payload)
-
-    with pytest.raises(
-        ValueError,
-        match="Top-level direct models do not yet support residual-enabled runs",
-    ):
-        runtime.main(["--validate-only", "--config", str(config_path)])
 
 
 @pytest.mark.parametrize(

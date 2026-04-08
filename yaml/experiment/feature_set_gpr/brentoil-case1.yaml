@@ -17,8 +17,6 @@ dataset:
     - GPRD_ACT
   futr_exog_cols: []
   static_exog_cols: []
-residual:
-  enabled: false
 jobs:
 - yaml/jobs/main/jobs_tune.yaml
 

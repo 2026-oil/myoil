@@ -4,7 +4,7 @@
 # neuralforecast package
 
 ## Purpose
-This directory contains the forecasting library code: model classes, auto wrappers, shared modules, losses, dataset helpers, and core orchestration exposed to the residual runtime.
+This directory contains the forecasting library code: model classes, auto wrappers, shared modules, losses, dataset helpers, and core orchestration consumed by the local runtime.
 
 ## Key Files
 | File | Description |

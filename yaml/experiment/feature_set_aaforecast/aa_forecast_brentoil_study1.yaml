@@ -19,8 +19,6 @@ dataset:
   static_exog_cols: []
 runtime:
   opt_study_count: 1
-residual:
-  enabled: false
 aa_forecast:
   enabled: true
   config_path: yaml/plugins/aa_forecast_brentoil.yaml

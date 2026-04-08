@@ -31,7 +31,6 @@ def stage_search_space_payload(
         "training": training_payload,
         "bs_preforcast_models": model_payload,
         "bs_preforcast_training": training_payload,
-        "residual": search_space_payload.get("residual", {}),
     }
 
 

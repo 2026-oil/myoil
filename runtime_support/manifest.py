@@ -12,7 +12,6 @@ from app_config import (
     LoadedConfig,
 )
 from plugin_contracts.stage_registry import get_active_stage_plugin
-from plugins.residual.features import hist_exog_lag_feature_name
 
 
 def _coerce_mapping(value: Any) -> dict[str, Any]:
@@ -31,41 +30,6 @@ def _json_ready(value: Any) -> Any:
     if isinstance(value, dict):
         return {str(key): _json_ready(item) for key, item in value.items()}
     return value
-
-
-def residual_feature_policy_payload(feature_config: Any) -> dict[str, Any]:
-    return _json_ready(_coerce_mapping(feature_config))
-
-
-def residual_active_feature_columns(feature_config: Any) -> list[str]:
-    payload = residual_feature_policy_payload(feature_config)
-    lag_payload = _coerce_mapping(payload.get("lag_features"))
-    exog_payload = _coerce_mapping(payload.get("exog_sources"))
-
-    columns: list[str] = []
-    if payload.get("include_horizon_step", True):
-        columns.append("horizon_step")
-    if payload.get("include_base_prediction", True):
-        columns.append("y_hat_base")
-    if payload.get("include_date_features", False):
-        columns.extend(["cutoff_day", "ds_day"])
-
-    lag_sources = [str(item) for item in lag_payload.get("sources", [])]
-    lag_steps = [int(item) for item in lag_payload.get("steps", [])]
-    for source in lag_sources:
-        for step in lag_steps:
-            columns.append(f"{source}_lag_{step}")
-
-    for column in exog_payload.get("hist", []):
-        name = hist_exog_lag_feature_name(str(column))
-        if name not in columns:
-            columns.append(name)
-    for group in ("futr", "static"):
-        for column in exog_payload.get(group, []):
-            name = str(column)
-            if name not in columns:
-                columns.append(name)
-    return columns
 
 
 def _stage_plugin_manifest_block(loaded: LoadedConfig) -> dict[str, Any]:
@@ -122,19 +86,6 @@ def build_manifest(
             ),
         },
         **_stage_plugin_manifest_block(loaded),
-        "residual": {
-            "model": loaded.config.residual.model,
-            "target": loaded.config.residual.target,
-            "requested_mode": loaded.config.residual.requested_mode,
-            "validated_mode": loaded.config.residual.validated_mode,
-            "selected_search_params": list(loaded.config.residual.selected_search_params),
-            "feature_policy": residual_feature_policy_payload(
-                loaded.config.residual.features
-            ),
-            "active_feature_columns": residual_active_feature_columns(
-                loaded.config.residual.features
-            ),
-        },
         "training": {"loss": loaded.config.training.loss},
     }
     if optuna_payload is not None:

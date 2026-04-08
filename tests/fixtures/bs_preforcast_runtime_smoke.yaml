@@ -30,11 +30,6 @@ scheduler:
   gpu_ids:
   - 0
   parallelize_single_job_tuning: false
-residual:
-  enabled: false
-  model: xgboost
-  params:
-    n_estimators: 8
 jobs:
 - model: Naive
   params: {}

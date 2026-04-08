@@ -79,7 +79,6 @@ bs_preforcast:
 - `training`
 - `cv`
 - `scheduler`
-- `residual`
 
 예:
 
@@ -116,7 +115,6 @@ jobs:
 - `training`
 - `cv`
 - `scheduler`
-- `residual`
 
 즉 linked YAML은 **bs 대상 컬럼 / exog 컬럼 / multivariable 여부 / stage1 job**만 결정하고, 나머지 실행 contract는 main YAML이 소유합니다.
 

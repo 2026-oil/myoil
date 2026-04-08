@@ -23,8 +23,6 @@ dataset:
   - Com_Gold
   futr_exog_cols: []
   static_exog_cols: []
-residual:
-  enabled: false
 jobs:
 - yaml/jobs/main/jobs_1.yaml
 - yaml/jobs/main/jobs_2.yaml

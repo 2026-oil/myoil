@@ -198,7 +198,6 @@ def _write_main_config(path: Path, data_path: Path, plugin_path: Path) -> Path:
                 },
                 "cv": {"horizon": 2, "step_size": 2, "n_windows": 1, "gap": 0, "overlap_eval_policy": "by_cutoff_mean"},
                 "scheduler": {"gpu_ids": [0], "max_concurrent_jobs": 1, "worker_devices": 1},
-                "residual": {"enabled": False, "model": "xgboost", "params": {}},
                 "jobs": [{"model": "NEC"}],
                 "nec": {"enabled": True, "config_path": str(plugin_path)},
             },

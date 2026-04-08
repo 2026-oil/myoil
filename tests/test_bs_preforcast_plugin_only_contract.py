@@ -49,7 +49,6 @@ def _base_payload(data_path: Path) -> dict[str, object]:
             "worker_devices": 1,
             "parallelize_single_job_tuning": False,
         },
-        "residual": {"enabled": False, "model": "xgboost", "params": {}},
         "jobs": [{"model": "Naive", "params": {}}],
         "bs_preforcast": {"enabled": True, "config_path": "yaml/plugins/bs_preforcast.yaml"},
     }
@@ -76,7 +75,6 @@ def _write_search_space(tmp_path: Path, payload: dict[str, object] | None = None
     base = {
         "models": {},
         "training": [],
-        "residual": {"xgboost": ["n_estimators"]},
         "bs_preforcast_models": {},
         "bs_preforcast_training": [],
     }

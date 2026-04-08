@@ -30,10 +30,6 @@ scheduler:
   gpu_ids: [0]
   max_concurrent_jobs: 1
   worker_devices: 1
-residual:
-  enabled: false
-  model: xgboost
-  params: {}
 jobs:
   - model: Chronos2
     params:

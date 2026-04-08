@@ -7,6 +7,4 @@ dataset:
   hist_exog_cols: []
   futr_exog_cols: []
   static_exog_cols: []
-residual:
-  enabled: false
 jobs: yaml/jobs/bs_preforcast/bs_preforcast_jobs_uni.yaml

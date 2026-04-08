@@ -15,7 +15,7 @@ This directory holds the curated experiment configurations used by the local wra
 | `setting/` | Shared setting authority files for centralized YAML controls. |
 | `HPO/` | Central Optuna/search-space contracts. |
 | `plugins/` | Plugin-owned linked YAMLs such as `bs_preforcast.yaml`. |
-| `bomb/` | Case3 bomb sweep configs for exloss + diff/residual variations. |
+| `bomb/` | Case3 bomb sweep configs for exloss + transformation variations. |
 | `bomb_trans/` | Transformation-focused case3 bomb sweep configs used by `run_bomb_trans.sh`. |
 | `univar/` | Univariate baseline configs. |
 | `blackswan/` | Black-swan case configs and exploratory variants. |
@@ -26,7 +26,7 @@ This directory holds the curated experiment configurations used by the local wra
 ### Working In This Directory
 - Preserve family naming and Brent/WTI pairing conventions; downstream scripts depend on predictable file paths.
 - Prefer editing the narrowest family affected by the request instead of copying settings across unrelated trees.
-- Keep config semantics aligned with `residual/config.py` and `yaml/HPO/search_space.yaml`.
+- Keep config semantics aligned with `app_config.py` and `yaml/HPO/search_space.yaml`.
 - Do not silently add new top-level keys; runtime validation is strict.
 
 ### Testing Requirements
@@ -36,4 +36,4 @@ This directory holds the curated experiment configurations used by the local wra
 
 ### Common Patterns
 - `jobs[*].params` carries model-specific knobs; shared training/runtime knobs belong in top-level sections.
-- Case families often encode target, horizon/input-size, residual mode, and transformation mode directly in the filename.
+- Case families often encode target, horizon/input-size, and transformation mode directly in the filename.

@@ -22,13 +22,11 @@ from tuning.search_space import (
     DEFAULT_TRAINING_PARAMS,
     FIXED_TRAINING_KEYS,
     LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD,
-    ResidualMode,
     SearchSpaceContract,
     load_search_space_contract,
     normalize_search_space_payload,
     SUPPORTED_MODEL_AUTO_MODEL_NAMES,
     SUPPORTED_AUTO_MODEL_NAMES,
-    SUPPORTED_RESIDUAL_MODELS,
 )
 
 SHARED_SETTINGS_RELATIVE_PATH = Path("yaml/setting/setting.yaml")
@@ -123,16 +121,6 @@ SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
 SHARED_SETTINGS_MAPPING_DOTTED_PATHS = frozenset(
     {"training.lr_scheduler", "training.optimizer"}
 )
-RESIDUAL_FEATURE_KEYS = {
-    "include_base_prediction",
-    "include_horizon_step",
-    "include_date_features",
-    "lag_features",
-    "exog_sources",
-}
-RESIDUAL_LAG_FEATURE_KEYS = {"enabled", "sources", "steps", "transforms"}
-RESIDUAL_EXOG_SOURCE_KEYS = {"hist", "futr", "static"}
-SUPPORTED_RESIDUAL_LAG_TRANSFORMS = {"raw"}
 SUPPORTED_TRAINER_ACCELERATORS = {"auto", "cpu", "gpu"}
 SUPPORTED_DATALOADER_KWARGS = {
     "num_workers",
@@ -140,13 +128,6 @@ SUPPORTED_DATALOADER_KWARGS = {
     "persistent_workers",
     "prefetch_factor",
 }
-FORBIDDEN_RESIDUAL_LAG_SOURCES = {
-    "y",
-    "residual_target",
-    "cutoff_day",
-    "ds_day",
-}
-ResidualTargetMode = Literal["level", "delta"]
 RuntimeTransformationMode = Literal["diff"]
 
 
@@ -339,47 +320,6 @@ class SchedulerConfig:
 
 
 @dataclass(frozen=True)
-class ResidualLagFeatureConfig:
-    enabled: bool = False
-    sources: tuple[str, ...] = field(default_factory=tuple)
-    steps: tuple[int, ...] = field(default_factory=tuple)
-    transforms: tuple[str, ...] = ("raw",)
-
-
-@dataclass(frozen=True)
-class ResidualExogSourceConfig:
-    hist: tuple[str, ...] = field(default_factory=tuple)
-    futr: tuple[str, ...] = field(default_factory=tuple)
-    static: tuple[str, ...] = field(default_factory=tuple)
-
-
-@dataclass(frozen=True)
-class ResidualFeatureConfig:
-    include_base_prediction: bool = True
-    include_horizon_step: bool = True
-    include_date_features: bool = False
-    lag_features: ResidualLagFeatureConfig = field(
-        default_factory=ResidualLagFeatureConfig
-    )
-    exog_sources: ResidualExogSourceConfig = field(
-        default_factory=ResidualExogSourceConfig
-    )
-
-
-@dataclass(frozen=True)
-class ResidualConfig:
-    enabled: bool = True
-    model: str = "xgboost"
-    target: ResidualTargetMode = "level"
-    cpu_threads: int | None = None
-    params: dict[str, Any] = field(default_factory=dict)
-    features: ResidualFeatureConfig = field(default_factory=ResidualFeatureConfig)
-    requested_mode: ResidualMode = "residual_fixed"
-    validated_mode: ResidualMode = "residual_fixed"
-    selected_search_params: tuple[str, ...] = field(default_factory=tuple)
-
-
-@dataclass(frozen=True)
 class JobConfig:
     model: str
     params: dict[str, Any] = field(default_factory=dict)
@@ -401,7 +341,6 @@ class AppConfig:
     training_search: TrainingSearchConfig
     cv: CVConfig
     scheduler: SchedulerConfig
-    residual: ResidualConfig
     jobs: tuple[JobConfig, ...]
     stage_plugin_config: Any = None
 
@@ -433,18 +372,6 @@ class AppConfig:
         payload["jobs"] = list(payload["jobs"])
         for job in payload["jobs"]:
             job["selected_search_params"] = list(job["selected_search_params"])
-        payload["residual"]["selected_search_params"] = list(
-            payload["residual"]["selected_search_params"]
-        )
-        feature_payload = payload["residual"].get("features")
-        if feature_payload is not None:
-            lag_payload = feature_payload["lag_features"]
-            lag_payload["sources"] = list(lag_payload["sources"])
-            lag_payload["steps"] = list(lag_payload["steps"])
-            lag_payload["transforms"] = list(lag_payload["transforms"])
-            exog_payload = feature_payload["exog_sources"]
-            for key in ("hist", "futr", "static"):
-                exog_payload[key] = list(exog_payload[key])
         return payload
 
 
@@ -1065,162 +992,6 @@ def _normalize_dataloader_kwargs(value: Any) -> dict[str, Any]:
     return normalized
 
 
-def _normalize_residual_feature_config(
-    value: Any,
-    *,
-    hist_exog_cols: tuple[str, ...],
-    futr_exog_cols: tuple[str, ...],
-    static_exog_cols: tuple[str, ...],
-) -> ResidualFeatureConfig:
-    if value is None:
-        value = {}
-    if not isinstance(value, dict):
-        raise ValueError("residual.features must be a mapping")
-    features_payload = dict(value)
-    _unknown_keys(
-        features_payload, allowed=RESIDUAL_FEATURE_KEYS, section="residual.features"
-    )
-
-    raw_lag_payload = features_payload.get("lag_features")
-    raw_exog_payload = features_payload.get("exog_sources")
-    if not isinstance(raw_lag_payload, (dict, type(None))):
-        raise ValueError("residual.features.lag_features must be a mapping")
-    if not isinstance(raw_exog_payload, (dict, type(None))):
-        raise ValueError("residual.features.exog_sources must be a mapping")
-    lag_payload = dict(raw_lag_payload or {})
-    exog_payload = dict(raw_exog_payload or {})
-    _unknown_keys(
-        lag_payload,
-        allowed=RESIDUAL_LAG_FEATURE_KEYS,
-        section="residual.features.lag_features",
-    )
-    _unknown_keys(
-        exog_payload,
-        allowed=RESIDUAL_EXOG_SOURCE_KEYS,
-        section="residual.features.exog_sources",
-    )
-
-    hist_selected = _coerce_name_tuple(
-        exog_payload.get("hist", hist_exog_cols),
-        field_name="residual.features.exog_sources.hist",
-    )
-    futr_selected = _coerce_name_tuple(
-        exog_payload.get("futr"), field_name="residual.features.exog_sources.futr"
-    )
-    static_selected = _coerce_name_tuple(
-        exog_payload.get("static"), field_name="residual.features.exog_sources.static"
-    )
-    for field_name, selected, available in (
-        (
-            "residual.features.exog_sources.hist",
-            hist_selected,
-            hist_exog_cols,
-        ),
-        (
-            "residual.features.exog_sources.futr",
-            futr_selected,
-            futr_exog_cols,
-        ),
-        (
-            "residual.features.exog_sources.static",
-            static_selected,
-            static_exog_cols,
-        ),
-    ):
-        unknown = sorted(set(selected).difference(available))
-        if unknown:
-            dataset_field = field_name.rsplit(".", 1)[-1]
-            raise ValueError(
-                f"{field_name} must be selected from dataset.{dataset_field}_exog_cols; "
-                f"unknown value(s): {', '.join(unknown)}"
-            )
-
-    lag_enabled = _coerce_bool(
-        lag_payload.get("enabled"),
-        field_name="residual.features.lag_features.enabled",
-        default=False,
-    )
-    lag_sources = _coerce_name_tuple(
-        lag_payload.get("sources"), field_name="residual.features.lag_features.sources"
-    )
-    lag_steps = _coerce_positive_int_tuple(
-        lag_payload.get("steps"), field_name="residual.features.lag_features.steps"
-    )
-    lag_transforms = tuple(
-        item.lower()
-        for item in _coerce_name_tuple(
-            lag_payload.get("transforms", ("raw",)),
-            field_name="residual.features.lag_features.transforms",
-        )
-    )
-    unsupported_transforms = sorted(
-        set(lag_transforms).difference(SUPPORTED_RESIDUAL_LAG_TRANSFORMS)
-    )
-    if unsupported_transforms:
-        raise ValueError(
-            "residual.features.lag_features.transforms contains unsupported transform(s): "
-            + ", ".join(unsupported_transforms)
-        )
-    forbidden_sources = sorted(
-        set(lag_sources).intersection(FORBIDDEN_RESIDUAL_LAG_SOURCES)
-    )
-    if forbidden_sources:
-        raise ValueError(
-            "residual.features.lag_features.sources contains forbidden source(s): "
-            + ", ".join(forbidden_sources)
-        )
-    allowed_lag_sources = {"y_hat_base", *hist_selected, *futr_selected}
-    unknown_lag_sources = sorted(set(lag_sources).difference(allowed_lag_sources))
-    if unknown_lag_sources:
-        raise ValueError(
-            "residual.features.lag_features.sources must be y_hat_base or selected "
-            "hist/futr exog columns; unknown value(s): "
-            + ", ".join(unknown_lag_sources)
-        )
-    if lag_enabled:
-        if not lag_sources:
-            raise ValueError(
-                "residual.features.lag_features.sources must be non-empty when lag_features.enabled is true"
-            )
-        if not lag_steps:
-            raise ValueError(
-                "residual.features.lag_features.steps must be non-empty when lag_features.enabled is true"
-            )
-    elif lag_sources or lag_steps or lag_transforms != ("raw",):
-        raise ValueError(
-            "residual.features.lag_features.enabled must be true when sources, steps, or non-default transforms are provided"
-        )
-
-    return ResidualFeatureConfig(
-        include_base_prediction=_coerce_bool(
-            features_payload.get("include_base_prediction"),
-            field_name="residual.features.include_base_prediction",
-            default=True,
-        ),
-        include_horizon_step=_coerce_bool(
-            features_payload.get("include_horizon_step"),
-            field_name="residual.features.include_horizon_step",
-            default=True,
-        ),
-        include_date_features=_coerce_bool(
-            features_payload.get("include_date_features"),
-            field_name="residual.features.include_date_features",
-            default=False,
-        ),
-        lag_features=ResidualLagFeatureConfig(
-            enabled=lag_enabled,
-            sources=lag_sources,
-            steps=lag_steps,
-            transforms=lag_transforms,
-        ),
-        exog_sources=ResidualExogSourceConfig(
-            hist=hist_selected,
-            futr=futr_selected,
-            static=static_selected,
-        ),
-    )
-
-
 def resolve_config_path(
     repo_root: Path,
     config_path: str | Path | None = None,
@@ -1293,14 +1064,6 @@ def _requested_job_mode(
     if params:
         return "learned_fixed"
     return "learned_auto_requested"
-
-
-def _requested_residual_mode(enabled: bool, params: dict[str, Any]) -> ResidualMode:
-    if not enabled:
-        return "residual_disabled"
-    if params:
-        return "residual_fixed"
-    return "residual_auto_requested"
 
 
 def _normalize_job(
@@ -1446,7 +1209,10 @@ def _normalize_payload(
         )
 
     scheduler = dict(payload.get("scheduler", {}))
-    residual = dict(payload.get("residual", {}))
+    if "residual" in payload:
+        raise ValueError(
+            "legacy residual config is no longer supported; remove the top-level residual section"
+        )
     _ensure_plugins_loaded()
     stage_plugin = (
         get_stage_plugin(stage_scope) if stage_scope else None
@@ -1598,62 +1364,6 @@ def _normalize_payload(
         default=True,
     )
 
-    residual.setdefault("enabled", True)
-    residual.setdefault("model", "xgboost")
-    residual.setdefault("target", "level")
-    if "cpu_threads" in residual and residual["cpu_threads"] is not None:
-        residual["cpu_threads"] = _coerce_positive_int(
-            residual["cpu_threads"],
-            field_name="residual.cpu_threads",
-        )
-    residual.setdefault("params", {})
-    if "train_source" in residual:
-        raise ValueError(
-            "residual.train_source has been removed; residual training now "
-            "always uses fold-specific CV residual panels"
-        )
-    residual_model = str(residual["model"]).lower()
-    if residual_model not in SUPPORTED_RESIDUAL_MODELS:
-        raise ValueError(f"Unsupported residual model: {residual_model}")
-    residual_target = str(residual["target"]).lower()
-    if residual_target not in {"level", "delta"}:
-        raise ValueError("residual.target must be one of: level, delta")
-    residual["model"] = residual_model
-    residual["target"] = residual_target
-    residual["params"] = dict(residual.get("params", {}))
-    if "learning_rate" in residual["params"]:
-        raise ValueError(
-            "legacy residual optimizer-rate key has been removed; residual optimizer rates are now internal-only"
-        )
-    residual["features"] = _normalize_residual_feature_config(
-        residual.get("features"),
-        hist_exog_cols=hist_exog_cols,
-        futr_exog_cols=futr_exog_cols,
-        static_exog_cols=static_exog_cols,
-    )
-    residual_requested_mode = _requested_residual_mode(
-        bool(residual["enabled"]), residual["params"]
-    )
-    residual_selected: tuple[str, ...] = ()
-    if residual_requested_mode == "residual_auto_requested":
-        if residual_model not in SUPPORTED_RESIDUAL_MODELS:
-            raise ValueError(
-                f"residual[{residual_model}] has no supported auto-tuning mapping"
-            )
-        if search_space is None or residual_model not in search_space["residual"]:
-            if allow_missing_search_space:
-                residual_validated_mode = "residual_fixed"
-                residual_selected = ()
-            else:
-                raise ValueError(
-                    f"residual[{residual_model}] requires search_space.residual.{residual_model} for auto tuning"
-                )
-        else:
-            residual_selected = tuple(search_space["residual"][residual_model])
-            residual_validated_mode = "residual_auto"
-    else:
-        residual_validated_mode = residual_requested_mode
-
     if repo_root is None or source_path is None:
         jobs_payload = _resolve_jobs_reference(
             base_dir,
@@ -1773,12 +1483,6 @@ def _normalize_payload(
         ),
         cv=CVConfig(**cv),
         scheduler=SchedulerConfig(**scheduler),
-        residual=ResidualConfig(
-            **residual,
-            requested_mode=residual_requested_mode,
-            validated_mode=residual_validated_mode,
-            selected_search_params=residual_selected,
-        ),
         jobs=jobs,
         stage_plugin_config=stage_plugin_config,
     )
@@ -1971,11 +1675,6 @@ def _stage_payload_requests_search_space(
             job.get("params", {})
         ):
             return True
-    residual_payload = dict(stage_payload.get("residual", {}))
-    if residual_payload.get("enabled", True) and not dict(
-        residual_payload.get("params", {})
-    ):
-        return True
     return False
 
 
@@ -2148,7 +1847,9 @@ def load_app_config(
         if "training_search" in stage_payload_probe:
             payload["training_search"] = dict(stage_payload_probe["training_search"])
         if stage_payload_probe.get("residual"):
-            payload["residual"] = dict(stage_payload_probe["residual"])
+            raise ValueError(
+                "stage plugins may no longer inject residual config; residual support has been removed"
+            )
     for jobs_candidate in jobs_payload_candidates:
         for job in jobs_candidate:
             model_name = str(job.get("model"))
@@ -2164,11 +1865,6 @@ def load_app_config(
                 break
         if requested_search_space:
             break
-    residual_payload = dict(payload.get("residual", {}))
-    if residual_payload.get("enabled", True) and not dict(
-        residual_payload.get("params", {})
-    ):
-        requested_search_space = True
     if stage_payload_probe is not None:
         stage_jobs = stage_payload_probe.get("jobs", [])
         for sjob in stage_jobs:
@@ -2291,7 +1987,6 @@ def loaded_config_for_jobs_fanout(
         "training",
         "cv",
         "scheduler",
-        "residual",
         "jobs",
     }
     _ensure_plugins_loaded()
@@ -2307,20 +2002,6 @@ def loaded_config_for_jobs_fanout(
         sp_key = stage_plugin.config_key
         if isinstance(payload.get(sp_key), dict):
             payload[sp_key] = stage_plugin.fanout_filter_payload(payload[sp_key])
-    if isinstance(payload.get("residual"), dict):
-        payload["residual"] = {
-            key: value
-            for key, value in payload["residual"].items()
-            if key
-            in {
-                "enabled",
-                "model",
-                "target",
-                "cpu_threads",
-                "params",
-                "features",
-            }
-        }
     payload["jobs"] = [dict(job) for job in spec.jobs_payload]
     dataset_base_dir = _resolve_dataset_base_dir(
         repo_root,

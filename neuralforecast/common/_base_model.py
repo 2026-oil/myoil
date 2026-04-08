@@ -995,7 +995,26 @@ class BaseModel(pl.LightningModule):
             temporal_cols=temporal_cols,
             static=static,
             static_cols=static_cols,
+            window_ids=w_idxs_final,
         )
+        return windows_batch
+
+    def _maybe_attach_star_precomputed(self, batch, windows, windows_batch, *, phase: str):
+        window_ids = windows.get("window_ids")
+        if window_ids is None:
+            return windows_batch
+        materialize = getattr(self, "get_star_precomputed", None)
+        if materialize is None:
+            return windows_batch
+        payload = materialize(
+            batch=batch,
+            phase=phase,
+            window_ids=window_ids,
+            device=windows_batch["insample_y"].device,
+            dtype=windows_batch["insample_y"].dtype,
+        )
+        if payload is not None:
+            windows_batch["star_precomputed"] = payload
         return windows_batch
 
     def _parse_windows(self, batch, windows):
@@ -1351,7 +1370,14 @@ class BaseModel(pl.LightningModule):
         return y_hat, insample_y
 
     def _predict_step_direct_batch(
-        self, insample_y, insample_mask, hist_exog, futr_exog, stat_exog, y_idx
+        self,
+        insample_y,
+        insample_mask,
+        hist_exog,
+        futr_exog,
+        stat_exog,
+        y_idx,
+        star_precomputed=None,
     ):
         windows_batch = dict(
             insample_y=insample_y,
@@ -1360,6 +1386,8 @@ class BaseModel(pl.LightningModule):
             hist_exog=hist_exog,
             stat_exog=stat_exog,
         )
+        if star_precomputed is not None:
+            windows_batch["star_precomputed"] = star_precomputed
 
         # Model Predictions
         output_batch = self(windows_batch)
@@ -1721,6 +1749,19 @@ class BaseModel(pl.LightningModule):
                     self._parse_windows(batch, windows)
                 )
 
+                windows_batch = dict(
+                    insample_y=insample_y,
+                    insample_mask=insample_mask,
+                    futr_exog=futr_exog,
+                    hist_exog=hist_exog,
+                    stat_exog=stat_exog,
+                )
+                windows_batch = self._maybe_attach_star_precomputed(
+                    batch,
+                    windows,
+                    windows_batch,
+                    phase="predict",
+                )
                 y_hat = self._predict_step_direct_batch(
                     insample_y=insample_y,
                     insample_mask=insample_mask,
@@ -1728,6 +1769,7 @@ class BaseModel(pl.LightningModule):
                     hist_exog=hist_exog,
                     stat_exog=stat_exog,
                     y_idx=y_idx,
+                    star_precomputed=windows_batch.get("star_precomputed"),
                 )
 
                 if explain_state:
@@ -1852,6 +1894,12 @@ class BaseModel(pl.LightningModule):
             hist_exog=hist_exog,  # univariate: [Ws, L, X]; multivariate: [Ws, X, L, n_series]
             stat_exog=stat_exog,
         )  # univariate: [Ws, S]; multivariate: [n_series, S]
+        windows_batch = self._maybe_attach_star_precomputed(
+            batch,
+            windows,
+            windows_batch,
+            phase="train",
+        )
 
         # Model Predictions
         output = self(windows_batch)
@@ -1953,6 +2001,12 @@ class BaseModel(pl.LightningModule):
                     hist_exog=hist_exog,  # univariate: [Ws, L, X]; multivariate: [Ws, X, L, n_series]
                     stat_exog=stat_exog,
                 )  # univariate: [Ws, S]; multivariate: [n_series, S]
+                windows_batch = self._maybe_attach_star_precomputed(
+                    batch,
+                    windows,
+                    windows_batch,
+                    phase="val",
+                )
 
                 # Model Predictions
                 output_batch = self(windows_batch)

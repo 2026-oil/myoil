@@ -48,7 +48,6 @@ def _base_payload(data_path: Path) -> dict[str, object]:
             "worker_devices": 1,
             "parallelize_single_job_tuning": False,
         },
-        "residual": {"enabled": False, "model": "xgboost", "params": {}},
         "jobs": [{"model": "Naive", "params": {}}],
     }
 
@@ -80,7 +79,6 @@ def _write_search_space(tmp_path: Path, payload: dict[str, object] | None = None
     base = {
         "models": {},
         "training": [],
-        "residual": {"xgboost": ["n_estimators"]},
         "bs_preforcast_models": {},
         "bs_preforcast_training": [],
     }
@@ -475,7 +473,6 @@ def test_repo_default_bs_preforcast_path_is_loadable_with_defaults_yaml(
             {
                 "models": {},
                 "training": [],
-                "residual": {"xgboost": ["n_estimators"]},
                 "bs_preforcast_models": {
                     "ARIMA": {
                         "order": {
@@ -687,7 +684,6 @@ def test_load_app_config_rejects_bs_preforcast_autoarima_stage_job(
             {
                 "models": {},
                 "training": [],
-                "residual": {"xgboost": ["n_estimators"]},
                 "bs_preforcast_models": {},
                 "bs_preforcast_training": [],
             },

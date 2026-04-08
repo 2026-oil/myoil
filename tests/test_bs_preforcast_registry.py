@@ -13,15 +13,12 @@ from plugins.bs_preforcast.registry import (
     get_bs_preforcast_plugin,
     plugin_registry,
 )
-from plugins.residual import BACKEND_PLUGIN_CATEGORY, available_plugins as residual_plugins
 
 
-def test_bs_preforcast_registry_is_separate_from_residual_backend_registry() -> None:
-    assert BACKEND_PLUGIN_CATEGORY == "backend"
-    assert residual_plugins() == ("lightgbm", "randomforest", "xgboost")
+def test_bs_preforcast_registry_exposes_default_plugin_only() -> None:
     assert plugin_registry() == ("default",)
     assert available_plugins() == ("default",)
-    assert "separate from plugins.residual" in PLUGIN_EXTENSION_RULES[-1]
+    assert PLUGIN_EXTENSION_RULES
 
 
 @pytest.mark.usefixtures("monkeypatch")

@@ -43,7 +43,7 @@ Source: `main.py:46-135`, `app_config.py:283-350`, `app_config.py:1619-1814`
 - `tests/` 자체 설명
 - `experiments/` 문서화
 - `runs/`, `lightning_logs/` 등 생성 산출물 설명
-- residual 수식/알고리즘 내부 설명
+- 제거된 legacy feature의 내부 설명
 
 ## 빠른 지도
 

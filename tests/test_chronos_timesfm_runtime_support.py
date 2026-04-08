@@ -40,7 +40,6 @@ def _config_payload() -> dict:
             "max_concurrent_jobs": 1,
             "worker_devices": 1,
         },
-        "residual": {"enabled": False, "model": "xgboost", "params": {}},
         "jobs": [],
     }
 

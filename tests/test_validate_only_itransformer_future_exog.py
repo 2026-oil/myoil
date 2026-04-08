@@ -29,7 +29,7 @@ def test_runtime_validate_only_accepts_itransformer_future_exog(
 ):
     if _IMPORT_ERROR is not None:
         if "partially initialized module 'app_config'" in str(_IMPORT_ERROR):
-            pytest.skip(f"unrelated residual import blocker in current branch: {_IMPORT_ERROR}")
+            pytest.skip(f"unrelated legacy import blocker in current branch: {_IMPORT_ERROR}")
         raise _IMPORT_ERROR
 
     data_path = tmp_path / "data.csv"
@@ -46,7 +46,6 @@ def test_runtime_validate_only_accepts_itransformer_future_exog(
         {
             "models": {},
             "training": [],
-            "residual": {"xgboost": ["n_estimators"]},
             "bs_preforcast_models": {},
             "bs_preforcast_training": [],
         },
@@ -99,7 +98,6 @@ def test_runtime_validate_only_accepts_itransformer_future_exog(
                 "max_concurrent_jobs": 1,
                 "worker_devices": 1,
             },
-            "residual": {"enabled": False, "model": "xgboost", "params": {}},
             "jobs": [
                 {
                     "model": "iTransformer",

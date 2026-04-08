@@ -39,10 +39,6 @@ scheduler:
   max_concurrent_jobs: 1
   worker_devices: 1
   parallelize_single_job_tuning: false
-residual:
-  enabled: false
-  model: xgboost
-  params: {}
 jobs:
 - model: NEC
 nec:

@@ -150,7 +150,6 @@ top-level section:
 - `training`
 - `cv`
 - `scheduler`
-- `residual`
 - `jobs`
 
 ### `bs_preforcast`
@@ -236,15 +235,7 @@ Python 패키지 구현은 `plugins/bs_preforcast/` 아래에 있으며, 코드 
 | `max_concurrent_jobs` | int | no | 동시 실행 가능한 최대 job 수 |
 | `worker_devices` | int | no | worker당 device 수. 현재 `1`만 허용 |
 
-### 4.6 `residual`
-
-| Key | Type | Required | Meaning |
-| --- | --- | --- | --- |
-| `enabled` | bool | no | residual 보정 사용 여부 |
-| `model` | string | no | residual 모델명. 현재 `xgboost` |
-| `params` | object | no | residual 모델 파라미터 |
-
-### 4.7 `jobs`
+### 4.6 `jobs`
 
 `jobs`는 **모델 단위 실행 목록**입니다.
 공통 training control은 `training:`에 두고, `jobs`에는 learned model의
@@ -320,10 +311,6 @@ scheduler:
   max_concurrent_jobs: 2
   worker_devices: 1
 
-residual:
-  enabled: true
-  model: xgboost
-  params: { ... }
 ```
 
 ### `jobs` 예시
@@ -338,165 +325,6 @@ jobs:
 ```
 
 ---
-
-## 6. residual 관리
-
-residual plugin 관련 코드는 `plugins/residual/`에, 중립 런타임 코드는 `runtime_support/`와 `app_config.py`에 나뉘어 있습니다.
-
-주요 파일:
-
-- `app_config.py`: YAML/TOML을 typed config로 정규화
-- `runtime_support/adapters.py`: `fit_df`, `futr_df`, `static_df`, `channel_map` 생성
-- `runtime_support/forecast_models.py` / `plugins/residual/registry.py`: 모델 capability 검증 및 residual backend 선택
-- `runtime_support/manifest.py`: manifest / provenance 기록
-- `runtime_support/scheduler.py`: GPU lane 계획 및 subprocess worker 실행
-- `runtime_support/runner.py`: 전체 실행 진입점
-
-현재 residual 평가는 별도 holdout 없이 **config-driven TSCV fold**만 사용합니다.
-
-현재 기준으로 README에서 확실히 말할 수 있는 것:
-
-- residual은 wrapper의 1급 설정 영역입니다.
-- `residual.enabled`, `residual.model`, `residual.params`로 관리합니다.
-- manifest / provenance와 함께 실행 당시 설정을 추적합니다.
-
-manifest에 기록되는 대표 항목:
-
-- `manifest_version`
-- `artifact_schema_version`
-- `evaluation_protocol_version`
-- `config_source_type`
-- `config_source_path`
-- `config_resolved_path`
-- `config_input_sha256`
-- `config_resolved_sha256`
-- `entrypoint_version`
-- `compat_mode`
-- `training.loss`
-
-### 새로운 residual 모델 추가 방법
-
-새 residual 모델을 추가할 때는 **기존 base forecast / job / scheduler 구조는 건드리지 않고**
-`residual` 레이어에만 새 플러그인을 붙이면 됩니다.
-
-핵심 수정 지점:
-
-1. `plugins/residual/backends/<new_model>.py`
-   - 새 `ResidualPlugin` 구현 추가
-2. `plugins/residual/backends/__init__.py`
-   - 새 플러그인 export
-3. `plugins/residual/registry.py`
-   - `config.residual.model` 값에 따라 플러그인 선택
-4. `app_config.py`
-   - `SUPPORTED_RESIDUAL_MODELS`에 새 이름 추가
-
-설정 예시:
-
-```yaml
-residual:
-  enabled: true
-  model: mlp
-  params:
-    lookback: 8
-    hidden_size: 32
-    epochs: 50
-```
-
-스키마 예시:
-
-```python
-from dataclasses import dataclass
-from typing import Any
-
-import pandas as pd
-
-from plugins.residual.base import ResidualContext, ResidualPlugin
-
-
-@dataclass(frozen=True)
-class _MLPConfig:
-    lookback: int = 8
-    hidden_size: int = 32
-    epochs: int = 50
-
-
-class MLPResidualPlugin(ResidualPlugin):
-    name = "mlp"
-
-    def __init__(
-        self,
-        *,
-        lookback: int = 8,
-        hidden_size: int = 32,
-        epochs: int = 50,
-    ):
-        self.config = _MLPConfig(
-            lookback=lookback,
-            hidden_size=hidden_size,
-            epochs=epochs,
-        )
-
-    def fit(self, panel_df: pd.DataFrame, context: ResidualContext) -> None:
-        ...
-
-    def predict(self, panel_df: pd.DataFrame) -> pd.DataFrame:
-        ...
-
-    def metadata(self) -> dict[str, Any]:
-        return {
-            "plugin": self.name,
-            "lookback": self.config.lookback,
-            "hidden_size": self.config.hidden_size,
-            "epochs": self.config.epochs,
-        }
-```
-
-registry 연결 예시:
-
-```python
-from .plugins import MLPResidualPlugin, XGBoostResidualPlugin
-
-def build_residual_plugin(config: Any) -> ResidualPlugin:
-    ...
-    if name == "xgboost":
-        return XGBoostResidualPlugin(...)
-    if name == "mlp":
-        return MLPResidualPlugin(...)
-    raise ValueError(f"Unsupported residual model: {name}")
-```
-
-정리:
-
-- residual 모델 추가만 할 때는 `jobs:`는 그대로 둡니다.
-- 새 residual 모델은 `residual.model`과 `residual.params`만 추가하면 됩니다.
-- 자세한 단계별 문서는 `residual_guide.md`를 참고하세요.
-
----
-
-## 7. 현재 확인된 실행 예시
-
-### validate-only
-
-```bash
-cd neuralforecast
-uv run python main.py --validate-only --config yaml/experiment/feature_set/brentoil-case1.yaml
-```
-
-### single job smoke
-
-```bash
-cd neuralforecast
-uv run python main.py --config yaml/experiment/feature_set/brentoil-case1.yaml --jobs TFT
-```
-
-run root는 `task.name`과 config 위치를 기준으로 자동 파생됩니다.
-
-### two-gpu scheduler smoke
-
-```bash
-cd neuralforecast
-uv run python main.py --config yaml/experiment/feature_set/brentoil-case1.yaml
-```
 
 관련 산출물 예시:
 
@@ -515,7 +343,6 @@ uv run python main.py --config yaml/experiment/feature_set/brentoil-case1.yaml
 - 설정 중심: 명시적 `--config` / `--config-path` / `--config-toml`
 - 공통 loss: `training.loss = mse`
 - CV 방식: **expanding-window TS-CV**
-- residual plugin 관리 중심: `plugins/residual/`
 - multi-job 실행: scheduler가 GPU lane 분배
 - 각 worker는 `devices=1`만 사용
 

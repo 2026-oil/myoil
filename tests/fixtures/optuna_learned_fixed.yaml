@@ -5,10 +5,6 @@ dataset:
   hist_exog_cols: []
   futr_exog_cols: []
   static_exog_cols: []
-residual:
-  enabled: false
-  model: xgboost
-  params: {}
 jobs:
 - model: TFT
   params:

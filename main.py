@@ -9,7 +9,7 @@ from typing import Sequence
 
 WORKSPACE_ROOT = Path(__file__).resolve().parent
 VENV_PYTHON = WORKSPACE_ROOT / '.venv' / 'bin' / 'python'
-_BOOTSTRAP_ENV = 'NEURALFORECAST_RESIDUAL_BOOTSTRAPPED'
+_BOOTSTRAP_ENV = 'NEURALFORECAST_RUNTIME_BOOTSTRAPPED'
 _ALLOW_INTERNAL_OUTPUT_ROOT_ENV = 'NEURALFORECAST_ALLOW_INTERNAL_OUTPUT_ROOT'
 
 
@@ -52,7 +52,7 @@ def _reject_removed_args(args: Sequence[str]) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description='Residual wrapper runtime for neuralforecast.'
+        description='Config-driven wrapper runtime for neuralforecast.'
     )
     parser.add_argument('--config', default=None)
     parser.add_argument('--config-path', default=None)

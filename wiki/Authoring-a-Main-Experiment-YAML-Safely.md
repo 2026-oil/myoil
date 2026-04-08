@@ -14,7 +14,6 @@ yaml/experiment/feature_set_bs_preforcast/brentoil-case3.yaml
 
 - `task.name`: 실행 식별자
 - `dataset.*`: 데이터 경로와 컬럼
-- `residual.enabled`: residual 사용 여부
 - `jobs`: 별도 jobs YAML 연결
 - `bs_preforcast.enabled` + `config_path`: linked plugin YAML 활성화
 
@@ -32,7 +31,6 @@ Source: `yaml/experiment/feature_set_bs_preforcast/brentoil-case3.yaml:1-31`
 - `training_search`
 - `cv`
 - `scheduler`
-- `residual`
 - `jobs`
 - `stage_plugin_config`
 
@@ -43,7 +41,7 @@ Source: `app_config.py:283-295`
 메인 YAML은 다음을 담당합니다.
 
 - 이번 run의 정체성을 정함
-- 메인 dataset과 residual on/off를 정함
+- 메인 dataset과 jobs/plugin 활성화를 정함
 - 어떤 linked plugin YAML을 쓸지 정함
 - jobs 및 search/tuning 입력을 가리킴
 - 하지만 모든 세부 필드를 한 파일에 다 넣을 필요는 없음
@@ -52,7 +50,7 @@ Source: `app_config.py:283-295`
 
 | 파일/블록 | 소유 영역 | 메모 |
 |---|---|---|
-| 메인 실험 YAML | `task`, `dataset`, `residual`, `jobs`, plugin activation | 가장 먼저 복사/수정할 파일 |
+| 메인 실험 YAML | `task`, `dataset`, `jobs`, plugin activation | 가장 먼저 복사/수정할 파일 |
 | `yaml/setting/setting.yaml` | shared `runtime`, `training`, `cv`, `scheduler` 기본값 | 공통 기본값 레이어 |
 | `yaml/plugins/bs_preforcast*.yaml` | linked stage-plugin 설정 | stage-specific 필드와 stage jobs |
 | `yaml/jobs/bs_preforcast_jobs_default.yaml` | direct-model 기본값 | `ARIMA`, `ES`, `xgboost`, `lightgbm` 기준값 |

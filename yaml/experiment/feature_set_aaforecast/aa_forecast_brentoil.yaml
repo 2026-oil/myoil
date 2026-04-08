@@ -1,5 +1,5 @@
 task:
-  name: aa_forecast_brentoil
+  name: aa_forecast_final
 dataset:
   path: data/df.csv
   target_col: Com_BrentCrudeOil
@@ -17,10 +17,6 @@ dataset:
     - GPRD_ACT
   futr_exog_cols: []
   static_exog_cols: []
-runtime:
-  opt_study_count: 5
-residual:
-  enabled: false
 aa_forecast:
   enabled: true
   config_path: yaml/plugins/aa_forecast_brentoil.yaml

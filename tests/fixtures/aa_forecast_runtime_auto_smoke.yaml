@@ -33,10 +33,6 @@ scheduler:
   - 0
   max_concurrent_jobs: 1
   worker_devices: 1
-residual:
-  enabled: false
-  model: xgboost
-  params: {}
 aa_forecast:
   enabled: true
   config_path: tests/fixtures/aa_forecast_runtime_plugin_auto_model_only.yaml

@@ -19,14 +19,6 @@ dataset:
   - BS_Core_Index_Integrated
   futr_exog_cols: []
   static_exog_cols: []
-residual:
-  enabled: true
-  model: xgboost
-  params:
-    n_estimators: 256
-    max_depth: 8
-    subsample: 0.8
-    colsample_bytree: 0.8
 aa_forecast:
   enabled: true
   config_path: yaml/plugins/aa_forecast_iter3_oilcore_large.yaml

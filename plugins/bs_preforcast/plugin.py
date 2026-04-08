@@ -126,7 +126,6 @@ class BsPreforcastStagePlugin:
         return {
             "jobs": stage_jobs_payload,
             "jobs_fanout_specs": jobs_fanout_specs,
-            "residual": {},
         }
 
     def load_stage(
@@ -291,8 +290,10 @@ class BsPreforcastStagePlugin:
         train_df: pd.DataFrame,
         future_df: pd.DataFrame,
         run_root: Path | None,
+        params_override: dict[str, Any] | None = None,
+        training_override: dict[str, Any] | None = None,
     ) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, Any | None]:
-        del loaded, train_df, future_df, run_root
+        del loaded, train_df, future_df, run_root, params_override, training_override
         raise ValueError(
             f"bs_preforcast does not own top-level fold prediction for model {job.model!r}"
         )

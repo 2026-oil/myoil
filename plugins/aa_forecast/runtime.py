@@ -63,8 +63,9 @@ def materialize_aa_forecast_stage(
 
 
 def _aa_params_override(loaded: Any) -> dict[str, Any]:
-    stage_cfg = loaded.config.stage_plugin_config
-    scaler_type = loaded.config.training.scaler_type
+    config = getattr(loaded, "config", loaded)
+    stage_cfg = config.stage_plugin_config
+    scaler_type = config.training.scaler_type
     if scaler_type == "robust":
         scaler_type = None
     return {
@@ -157,6 +158,9 @@ def _select_uncertainty_predictions(
         "mean": selected_mean,
         "std": selected_std,
         "selected_dropout": selected_dropout,
+        "candidate_mean_grid": mean_grid,
+        "candidate_std_grid": std_grid,
+        "candidate_dropout_values": np.asarray(dropout_candidates, dtype=float),
         "candidate_samples": candidate_samples,
     }
 
@@ -172,6 +176,8 @@ def _write_uncertainty_artifacts(
     slug = pd.Timestamp(train_end_ds).strftime("%Y%m%dT%H%M%S")
     summary_path = stage_root / "uncertainty" / f"{slug}.json"
     csv_path = stage_root / "uncertainty" / f"{slug}.csv"
+    candidate_stats_path = stage_root / "uncertainty" / f"{slug}.candidate_stats.csv"
+    candidate_samples_path = stage_root / "uncertainty" / f"{slug}.candidate_samples.csv"
     _write_json(
         summary_path,
         {
@@ -202,6 +208,35 @@ def _write_uncertainty_artifacts(
             "prediction_mean": summary["mean"],
         }
     ).to_csv(csv_path, index=False)
+    candidate_stats_rows: list[dict[str, float]] = []
+    for dropout_idx, dropout_p in enumerate(summary["candidate_dropout_values"]):
+        for horizon_idx in range(len(summary["mean"])):
+            candidate_stats_rows.append(
+                {
+                    "horizon_step": horizon_idx + 1,
+                    "dropout_p": float(dropout_p),
+                    "prediction_mean": float(
+                        summary["candidate_mean_grid"][dropout_idx, horizon_idx]
+                    ),
+                    "prediction_std": float(
+                        summary["candidate_std_grid"][dropout_idx, horizon_idx]
+                    ),
+                }
+            )
+    pd.DataFrame(candidate_stats_rows).to_csv(candidate_stats_path, index=False)
+    candidate_sample_rows: list[dict[str, float]] = []
+    for dropout_key, sample_grid in summary["candidate_samples"].items():
+        for sample_idx, horizon_values in enumerate(sample_grid):
+            for horizon_idx, prediction in enumerate(horizon_values):
+                candidate_sample_rows.append(
+                    {
+                        "horizon_step": horizon_idx + 1,
+                        "dropout_p": float(dropout_key),
+                        "sample_idx": sample_idx,
+                        "prediction": float(prediction),
+                    }
+                )
+    pd.DataFrame(candidate_sample_rows).to_csv(candidate_samples_path, index=False)
 
 
 def predict_aa_forecast_fold(
@@ -211,6 +246,8 @@ def predict_aa_forecast_fold(
     train_df: pd.DataFrame,
     future_df: pd.DataFrame,
     run_root: Path | None,
+    params_override: dict[str, Any] | None = None,
+    training_override: dict[str, Any] | None = None,
 ) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, Any | None]:
     from runtime_support.forecast_models import build_model
     from runtime_support.runner import (
@@ -226,7 +263,7 @@ def predict_aa_forecast_fold(
     target_col = loaded.config.dataset.target_col
     source_df = pd.concat([train_df, future_df], ignore_index=True)
     freq = _resolve_freq(loaded, source_df)
-    effective_config = _effective_config(loaded)
+    effective_config = _effective_config(loaded, training_override)
     diff_context = _build_fold_diff_context(loaded, train_df)
     transformed_train_df = _transform_training_frame(train_df, diff_context)
     adapter_inputs = _build_adapter_inputs(
@@ -236,12 +273,31 @@ def predict_aa_forecast_fold(
         job,
         dt_col,
     )
+    merged_params_override = {
+        **_aa_params_override(effective_config),
+        **(params_override or {}),
+    }
     model = build_model(
         effective_config,
         job,
         n_series=adapter_inputs.metadata.get("n_series"),
-        params_override=_aa_params_override(loaded),
+        params_override=merged_params_override,
     )
+    if hasattr(model, "set_star_precompute_context"):
+        model.set_star_precompute_context(
+            enabled=True,
+            fold_key=json.dumps(
+                {
+                    "job": job.model,
+                    "train_rows": len(transformed_train_df),
+                    "train_end": str(train_df[dt_col].iloc[-1]),
+                    "params_override": merged_params_override,
+                    "training_override": training_override or {},
+                },
+                sort_keys=True,
+                ensure_ascii=False,
+            ),
+        )
     nf = NeuralForecast(models=[model], freq=freq)
     nf.fit(
         adapter_inputs.fit_df,

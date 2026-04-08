@@ -35,15 +35,6 @@ dataset:
   - BS_Core_Index_Integrated
   futr_exog_cols: []
   static_exog_cols: []
-residual:
-  enabled: true
-  model: lightgbm
-  params:
-    n_estimators: 64
-    max_depth: 6
-    num_leaves: 31
-    min_child_samples: 20
-    feature_fraction: 0.8
 jobs:
 - model: LSTM_new
   params:

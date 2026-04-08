@@ -52,7 +52,6 @@ def test_runtime_validate_only_accepts_chronos_timesfm(
         {
             "models": {},
             "training": [],
-            "residual": {"xgboost": ["n_estimators"]},
             "bs_preforcast_models": {},
             "bs_preforcast_training": [],
         },
@@ -95,7 +94,6 @@ def test_runtime_validate_only_accepts_chronos_timesfm(
                 "max_concurrent_jobs": 1,
                 "worker_devices": 1,
             },
-            "residual": {"enabled": False, "model": "xgboost", "params": {}},
             "jobs": [{"model": model_name, "params": params}],
         },
     )

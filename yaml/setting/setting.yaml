@@ -1,19 +1,20 @@
 runtime:
   random_seed: 1
+  opt_study_count: 2
   opt_n_trial: 100
 training:
   input_size: 96
   batch_size: 32
-  valid_batch_size: 64
+  valid_batch_size: 32
   windows_batch_size: 1024
   inference_windows_batch_size: 1024
-  max_steps: 1000
+  max_steps: 800
   val_size: 16
-  scaler_type: robust
-  val_check_steps: 1
-  min_steps_before_early_stop: 400
+  scaler_type: null
+  val_check_steps: 2
+  min_steps_before_early_stop: 200
   model_step_size: 1
-  early_stop_patience_steps: 20
+  early_stop_patience_steps: 4
   loss: mse
   optimizer:
     name: adamw
@@ -33,7 +34,7 @@ cv:
   gap: 0
   horizon: 4
   step_size: 6
-  n_windows: 6
+  n_windows: 4
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean
 scheduler:

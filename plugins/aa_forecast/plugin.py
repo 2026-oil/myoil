@@ -202,6 +202,8 @@ class AAForecastStagePlugin:
         train_df: pd.DataFrame,
         future_df: pd.DataFrame,
         run_root: Path | None,
+        params_override: dict[str, Any] | None = None,
+        training_override: dict[str, Any] | None = None,
     ) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, Any | None]:
         from .runtime import predict_aa_forecast_fold
 
@@ -211,6 +213,8 @@ class AAForecastStagePlugin:
             train_df=train_df,
             future_df=future_df,
             run_root=run_root,
+            params_override=params_override,
+            training_override=training_override,
         )
 
     def materialize_stage(

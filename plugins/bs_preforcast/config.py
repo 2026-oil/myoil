@@ -305,7 +305,6 @@ def load_bs_preforcast_stage1(
         "training": json.loads(json.dumps(main_payload.get("training", {}))),
         "cv": json.loads(json.dumps(main_payload.get("cv", {}))),
         "scheduler": json.loads(json.dumps(main_payload.get("scheduler", {}))),
-        "residual": json.loads(json.dumps(main_payload.get("residual", {}))),
         "jobs": [],
     }
     stage_jobs_payload, _stage_jobs_fanout_specs = _resolve_plugin_jobs_payload(

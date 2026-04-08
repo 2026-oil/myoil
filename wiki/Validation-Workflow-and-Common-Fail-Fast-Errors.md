@@ -75,7 +75,7 @@ Source: `tests/test_bs_preforcast_config.py:526-570`, `tests/test_bs_preforcast_
 Source: `plugins/bs_preforcast/plugin.py:202-206`, `tests/test_bs_preforcast_config.py:573-663`
 
 ### 7) 빈 params로 인해 search-space awareness 발생
-jobs 또는 residual params가 비어 있으면 loader가 `yaml/HPO/search_space.yaml`을 요청할 수 있습니다.
+jobs params가 비어 있으면 loader가 `yaml/HPO/search_space.yaml`을 요청할 수 있습니다.
 
 Source: `app_config.py:1708-1735`
 

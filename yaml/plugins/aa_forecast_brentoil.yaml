@@ -5,7 +5,7 @@ aa_forecast:
   lowess_delta: 0.01
   uncertainty:
     enabled: true
-    sample_count: 100
+    sample_count: 50
   model_params: {}
   star_anomaly_tails:
     upward:

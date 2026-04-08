@@ -36,8 +36,6 @@ dataset:
   - BS_Core_Index_Integrated
   futr_exog_cols: []
   static_exog_cols: []
-residual:
-  enabled: false
 jobs:
 - model: NEC
 nec:

@@ -4,6 +4,7 @@ import json
 import tempfile
 from pathlib import Path
 
+import pandas as pd
 import pytest
 import torch
 import runtime_support.runner as runtime
@@ -622,7 +623,6 @@ def test_validate_only_aaforecast_legacy_inline_without_star_grouping_fails_fast
             "max_concurrent_jobs": 1,
             "worker_devices": 1,
         },
-        "residual": {"enabled": False, "model": "xgboost", "params": {}},
         "jobs": [{"model": "AAForecast", "params": {}}],
     }
     config_path = tmp_path / "legacy_inline.yaml"
@@ -800,6 +800,90 @@ def test_runtime_aaforecast_plugin_uncertainty_smoke(
     _assert_no_event_column(payload)
     assert len(payload["selected_dropout_by_horizon"]) == 1
     assert len(payload["selected_std_by_horizon"]) == 1
+
+
+def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    monkeypatch.setattr(runtime, "_should_parallelize_single_job_tuning", lambda *_args: False)
+    monkeypatch.setattr(runtime, "_should_build_summary_artifacts", lambda: False)
+
+    payload = yaml.safe_load(PLUGIN_UNCERTAINTY_MAIN_CONFIG.read_text(encoding="utf-8"))
+    payload["dataset"]["path"] = str(
+        (PLUGIN_UNCERTAINTY_MAIN_CONFIG.parent / payload["dataset"]["path"]).resolve()
+    )
+    payload["training"]["input_size"] = 2
+    payload["training"]["batch_size"] = 1
+    payload["training"]["valid_batch_size"] = 1
+    payload["training"]["windows_batch_size"] = 4
+    payload["training"]["inference_windows_batch_size"] = 4
+    payload["training"]["max_steps"] = 1
+    payload["training"]["val_size"] = 1
+    payload["cv"]["horizon"] = 1
+    payload["cv"]["n_windows"] = 1
+    payload["cv"]["step_size"] = 1
+    payload.setdefault("runtime", {})["opt_n_trial"] = 1
+
+    plugin_payload = yaml.safe_load(
+        (PLUGIN_UNCERTAINTY_MAIN_CONFIG.parent / "aa_forecast_runtime_plugin_uncertainty.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    plugin_payload["aa_forecast"]["model_params"] = {}
+    plugin_path = tmp_path / "aa_forecast_trial_uncertainty.yaml"
+    plugin_path.write_text(yaml.safe_dump(plugin_payload, sort_keys=False), encoding="utf-8")
+    payload["aa_forecast"]["config_path"] = str(plugin_path)
+
+    config_path = tmp_path / "aa_forecast_trial_uncertainty_main.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    output_root = tmp_path / "aa-forecast-trial-artifacts"
+    code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--output-root",
+            str(output_root),
+        ]
+    )
+
+    trial_root = (
+        output_root
+        / "models"
+        / "AAForecast"
+        / "studies"
+        / "study-01"
+        / "trials"
+        / "trial-0000"
+    )
+    prediction_frame = pd.read_csv(trial_root / "predictions.csv")
+    fold_root = trial_root / "folds" / "fold_000" / "aa_forecast" / "uncertainty"
+    candidate_stats_files = sorted(fold_root.glob("*.candidate_stats.csv"))
+    candidate_sample_files = sorted(fold_root.glob("*.candidate_samples.csv"))
+
+    assert code == 0
+    assert {"y", "y_hat", "y_hat_uncertainty_std", "y_hat_selected_dropout"}.issubset(
+        prediction_frame.columns
+    )
+    assert candidate_stats_files
+    assert candidate_sample_files
+
+    candidate_stats = pd.read_csv(candidate_stats_files[0])
+    candidate_samples = pd.read_csv(candidate_sample_files[0])
+    assert {
+        "horizon_step",
+        "dropout_p",
+        "prediction_mean",
+        "prediction_std",
+    }.issubset(candidate_stats.columns)
+    assert {
+        "horizon_step",
+        "dropout_p",
+        "sample_idx",
+        "prediction",
+    }.issubset(candidate_samples.columns)
 
 
 def test_validate_only_rejects_yaml_managed_aaforecast_dropout_candidates(

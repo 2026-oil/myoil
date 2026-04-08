@@ -24,7 +24,6 @@ def _minimal_app_config_payload() -> dict[str, object]:
             'target_col': 'target',
             'dt_col': 'dt',
         },
-        'residual': {'enabled': False, 'model': 'xgboost', 'params': {}},
         'jobs': [{'model': 'Naive', 'params': {}}],
     }
 
@@ -36,6 +35,8 @@ def _write_yaml(path: Path, payload: dict[str, object]) -> Path:
 
 @pytest.fixture(autouse=True)
 def runtime_runner_stub(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
+    import runtime_support
+
     stub = ModuleType('runtime_support.runner')
     stub.load_app_config = lambda *args, **kwargs: SimpleNamespace(
         jobs_fanout_specs=[]
@@ -46,6 +47,7 @@ def runtime_runner_stub(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
         argv, repo_root=Path(__file__).resolve().parents[1]
     )
     monkeypatch.setitem(sys.modules, 'runtime_support.runner', stub)
+    monkeypatch.setattr(runtime_support, 'runner', stub, raising=False)
     return stub
 
 
@@ -215,15 +217,15 @@ def test_runtime_main_delegates_back_to_bootstrap_main(
 
 def test_bootstrap_owned_contracts_expose_direct_runtime_modules() -> None:
     import app_config
-    import app_config as residual_config
+    import app_config as config_module
     from plugin_contracts.stage_plugin import StagePlugin
     from plugin_contracts.stage_registry import get_active_stage_plugin
-    import plugin_contracts.stage_plugin as residual_stage_plugin
-    import plugin_contracts.stage_registry as residual_stage_registry
+    import plugin_contracts.stage_plugin as stage_plugin_module
+    import plugin_contracts.stage_registry as stage_registry_module
 
-    assert residual_config.load_app_config is app_config.load_app_config
-    assert residual_stage_plugin.StagePlugin is StagePlugin
-    assert residual_stage_registry.get_active_stage_plugin is get_active_stage_plugin
+    assert config_module.load_app_config is app_config.load_app_config
+    assert stage_plugin_module.StagePlugin is StagePlugin
+    assert stage_registry_module.get_active_stage_plugin is get_active_stage_plugin
 
 
 def test_main_reexecs_with_expected_args_and_bootstrap_env(

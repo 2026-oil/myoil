@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = ["AAForecast"]
 
+import os
 from typing import Optional
 
 import torch
@@ -124,6 +125,9 @@ class AAForecast(BaseModel):
         self.uncertainty_sample_count = int(uncertainty_sample_count)
         self._stochastic_inference_enabled = False
         self._stochastic_dropout_p = float(encoder_dropout)
+        self._star_precompute_enabled = True
+        self._star_precompute_fold_key: str | None = None
+        self._star_phase_cache: dict[str, dict[str, object]] = {}
 
         self.star_hist_exog_list = tuple(star_hist_exog_list or ())
         self.non_star_hist_exog_list = tuple(non_star_hist_exog_list or ())
@@ -175,6 +179,169 @@ class AAForecast(BaseModel):
         self._stochastic_inference_enabled = bool(enabled)
         if dropout_p is not None:
             self._stochastic_dropout_p = float(dropout_p)
+
+    def set_star_precompute_context(
+        self,
+        *,
+        enabled: bool = True,
+        fold_key: str | None = None,
+    ) -> None:
+        self._star_precompute_enabled = bool(enabled) and (
+            os.environ.get("NEURALFORECAST_AA_STAR_PRECOMPUTE", "1") != "0"
+        )
+        if fold_key != self._star_precompute_fold_key:
+            self._star_phase_cache.clear()
+        self._star_precompute_fold_key = fold_key
+
+    def _compute_star_outputs(
+        self,
+        insample_y: torch.Tensor,
+        hist_exog: torch.Tensor | None,
+    ) -> dict[str, torch.Tensor]:
+        target_star = self.star(insample_y, tail_modes=("two_sided",))
+        star_hist_exog = self._select_hist_exog(hist_exog, self.star_hist_exog_indices)
+        star_hist_outputs = (
+            self.star(
+                star_hist_exog,
+                tail_modes=self.star_hist_exog_tail_modes,
+            )
+            if star_hist_exog is not None
+            else None
+        )
+        target_mask = self._reduce_critical_mask(
+            target_star["critical_mask"],
+            template=insample_y,
+        )
+        star_hist_mask = self._reduce_critical_mask(
+            None if star_hist_outputs is None else star_hist_outputs["critical_mask"],
+            template=insample_y,
+        )
+        return {
+            "target_trend": target_star["trend"],
+            "target_seasonal": target_star["seasonal"],
+            "target_anomalies": target_star["anomalies"],
+            "target_residual": target_star["residual"],
+            "star_hist_trend": (
+                star_hist_outputs["trend"]
+                if star_hist_outputs is not None
+                else insample_y.new_empty(
+                    (insample_y.size(0), insample_y.size(1), 0)
+                )
+            ),
+            "star_hist_seasonal": (
+                star_hist_outputs["seasonal"]
+                if star_hist_outputs is not None
+                else insample_y.new_empty(
+                    (insample_y.size(0), insample_y.size(1), 0)
+                )
+            ),
+            "star_hist_anomalies": (
+                star_hist_outputs["anomalies"]
+                if star_hist_outputs is not None
+                else insample_y.new_empty(
+                    (insample_y.size(0), insample_y.size(1), 0)
+                )
+            ),
+            "star_hist_residual": (
+                star_hist_outputs["residual"]
+                if star_hist_outputs is not None
+                else insample_y.new_empty(
+                    (insample_y.size(0), insample_y.size(1), 0)
+                )
+            ),
+            "critical_mask": target_mask | star_hist_mask,
+        }
+
+    def _build_star_phase_cache(
+        self,
+        *,
+        batch,
+        phase: str,
+    ) -> dict[str, object]:
+        if phase == "predict":
+            return {"window_ids": torch.empty(0, dtype=torch.long), "payload": {}}
+        scaler_state = {}
+        had_shift = hasattr(self.scaler, "x_shift")
+        had_scale = hasattr(self.scaler, "x_scale")
+        if had_shift:
+            scaler_state["x_shift"] = self.scaler.x_shift.detach().clone()
+        if had_scale:
+            scaler_state["x_scale"] = self.scaler.x_scale.detach().clone()
+        windows_temporal, static, static_cols, final_condition = self._create_windows(
+            batch, step=phase
+        )
+        if len(final_condition) == 0:
+            return {"window_ids": torch.empty(0, dtype=torch.long), "payload": {}}
+        temporal_cols = batch["temporal_cols"]
+        w_idxs = torch.arange(len(final_condition), device=windows_temporal.device)
+        windows = self._sample_windows(
+            windows_temporal=windows_temporal,
+            static=static,
+            static_cols=static_cols,
+            temporal_cols=temporal_cols,
+            w_idxs=w_idxs,
+            final_condition=final_condition,
+        )
+        try:
+            windows = self._normalization(windows=windows, y_idx=batch["y_idx"])
+            (
+                insample_y,
+                _insample_mask,
+                _outsample_y,
+                _outsample_mask,
+                hist_exog,
+                _futr_exog,
+                _stat_exog,
+            ) = self._parse_windows(batch, windows)
+            payload = self._compute_star_outputs(insample_y, hist_exog)
+            cached_payload = {
+                name: value.detach().cpu()
+                for name, value in payload.items()
+            }
+            return {
+                "window_ids": windows["window_ids"].detach().cpu(),
+                "id_to_pos": {
+                    int(window_id): pos
+                    for pos, window_id in enumerate(
+                        windows["window_ids"].detach().cpu().tolist()
+                    )
+                },
+                "payload": cached_payload,
+            }
+        finally:
+            if had_shift:
+                self.scaler.x_shift = scaler_state["x_shift"]
+            elif hasattr(self.scaler, "x_shift"):
+                delattr(self.scaler, "x_shift")
+            if had_scale:
+                self.scaler.x_scale = scaler_state["x_scale"]
+            elif hasattr(self.scaler, "x_scale"):
+                delattr(self.scaler, "x_scale")
+
+    def get_star_precomputed(
+        self,
+        *,
+        batch,
+        phase: str,
+        window_ids: torch.Tensor,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> dict[str, torch.Tensor] | None:
+        if not self._star_precompute_enabled or phase == "predict":
+            return None
+        cache = self._star_phase_cache.get(phase)
+        if cache is None:
+            cache = self._build_star_phase_cache(batch=batch, phase=phase)
+            self._star_phase_cache[phase] = cache
+        payload = cache["payload"]
+        if not payload:
+            return None
+        positions = [cache["id_to_pos"][int(window_id)] for window_id in window_ids.detach().cpu().tolist()]
+        result: dict[str, torch.Tensor] = {}
+        for name, value in payload.items():
+            selected = value[positions]
+            result[name] = selected.to(device=device, dtype=dtype)
+        return result
 
     def _resolve_hist_exog_groups(self) -> tuple[tuple[int, ...], tuple[int, ...]]:
         if self.hist_exog_size == 0:
@@ -274,17 +441,9 @@ class AAForecast(BaseModel):
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]
         hist_exog = windows_batch["hist_exog"]
-
-        target_star = self.star(insample_y, tail_modes=("two_sided",))
-        star_hist_exog = self._select_hist_exog(hist_exog, self.star_hist_exog_indices)
-        star_hist_outputs = (
-            self.star(
-                star_hist_exog,
-                tail_modes=self.star_hist_exog_tail_modes,
-            )
-            if star_hist_exog is not None
-            else None
-        )
+        star_payload = windows_batch.get("star_precomputed")
+        if star_payload is None:
+            star_payload = self._compute_star_outputs(insample_y, hist_exog)
         encoder_parts = []
         if not self.exclude_insample_y:
             encoder_parts.append(insample_y)
@@ -292,33 +451,25 @@ class AAForecast(BaseModel):
             encoder_parts.append(hist_exog)
         encoder_parts.extend(
             [
-                target_star["trend"],
-                target_star["seasonal"],
-                target_star["anomalies"],
-                target_star["residual"],
+                star_payload["target_trend"],
+                star_payload["target_seasonal"],
+                star_payload["target_anomalies"],
+                star_payload["target_residual"],
             ]
         )
-        if star_hist_outputs is not None:
+        if star_payload["star_hist_trend"].size(-1) > 0:
             encoder_parts.extend(
                 [
-                    star_hist_outputs["trend"],
-                    star_hist_outputs["seasonal"],
-                    star_hist_outputs["anomalies"],
-                    star_hist_outputs["residual"],
+                    star_payload["star_hist_trend"],
+                    star_payload["star_hist_seasonal"],
+                    star_payload["star_hist_anomalies"],
+                    star_payload["star_hist_residual"],
                 ]
             )
         encoder_input = torch.cat(encoder_parts, dim=2)
 
         hidden_states, _ = self.encoder(encoder_input)
-        target_mask = self._reduce_critical_mask(
-            target_star["critical_mask"],
-            template=insample_y,
-        )
-        star_hist_mask = self._reduce_critical_mask(
-            None if star_hist_outputs is None else star_hist_outputs["critical_mask"],
-            template=insample_y,
-        )
-        critical_mask = target_mask | star_hist_mask
+        critical_mask = star_payload["critical_mask"].bool()
         attended_states, _ = self.attention(hidden_states, critical_mask)
 
         hidden_aligned = _align_horizon(

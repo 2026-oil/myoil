@@ -26,7 +26,6 @@ Source: `app_config.py:1667-1707`
 loader는 search space를 항상 로드하지 않습니다. 다음 같은 경우 `yaml/HPO/search_space.yaml`이 필요하다고 판단할 수 있습니다.
 
 - non-baseline job의 `params`가 비어 있음
-- residual이 켜져 있고 `params`가 비어 있음
 - probed stage job의 `params`가 비어 있음
 
 Source: `app_config.py:1708-1735`

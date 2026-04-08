@@ -4,13 +4,13 @@
 # tests
 
 ## Purpose
-Runtime wrapper/contract tests for configs, residual behavior, stage plugins, and YAML matrix validation. Upstream package tests (per-model, losses, scalers, backward compat) have been removed — those belong to the neuralforecast package itself.
+Runtime wrapper/contract tests for configs, stage plugins, and YAML matrix validation. Upstream package tests (per-model, losses, scalers, backward compat) have been removed — those belong to the neuralforecast package itself.
 
 ## Key Areas
 | Path | Description |
 |------|-------------|
-| `test_residual_config.py` | Residual config/search-space validation coverage (large integration). |
-| `test_residual_main.py` | Runtime entrypoint and validate-only behavior coverage. |
+| `test_legacy_residual_rejection.py` | Legacy residual-config rejection coverage. |
+| `test_main_runtime_bootstrap.py` | Runtime entrypoint/bootstrap and validate-only behavior coverage. |
 | `test_bs_preforcast_*.py` | Stage plugin config, runtime, registry, search space, and contract tests. |
 | `test_optimizer_plugins.py` | Optimizer plugin registry coverage. |
 | `test_top_level_direct_models.py` | Direct stage model support. |

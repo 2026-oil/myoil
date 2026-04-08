@@ -74,38 +74,8 @@ SUPPORTED_TOP_LEVEL_DIRECT_MODEL_NAMES = set(DIRECT_STAGE_MODEL_NAMES)
 SUPPORTED_MODEL_AUTO_MODEL_NAMES = (
     SUPPORTED_AUTO_MODEL_NAMES | SUPPORTED_TOP_LEVEL_DIRECT_MODEL_NAMES
 )
-SUPPORTED_RESIDUAL_MODELS = {"xgboost", "randomforest", "lightgbm"}
 DEFAULT_OPTUNA_NUM_TRIALS = 20
 DEFAULT_OPTUNA_STUDY_DIRECTION = "minimize"
-DEFAULT_RESIDUAL_PARAMS_BY_MODEL = {
-    "xgboost": {
-        "n_estimators": 32,
-        "max_depth": 3,
-        "subsample": 1.0,
-        "colsample_bytree": 1.0,
-    },
-    "randomforest": {
-        "n_estimators": 200,
-        "max_depth": 6,
-        "min_samples_leaf": 2,
-        "max_features": "sqrt",
-    },
-    "lightgbm": {
-        "n_estimators": 64,
-        "max_depth": 6,
-        "num_leaves": 31,
-        "min_child_samples": 20,
-        "feature_fraction": 1.0,
-    },
-}
-RESIDUAL_INTERNAL_OPTIMIZER_DEFAULTS = {
-    "xgboost": {"eta": 0.1},
-    "lightgbm": {"shrinkage_rate": 0.05},
-}
-DEFAULT_RESIDUAL_PARAMS = DEFAULT_RESIDUAL_PARAMS_BY_MODEL["xgboost"].copy()
-RESIDUAL_DEFAULTS = {
-    name: params.copy() for name, params in DEFAULT_RESIDUAL_PARAMS_BY_MODEL.items()
-}
 DEFAULT_TRAINING_PARAMS = {
     "input_size": 64,
     "batch_size": 32,
@@ -146,12 +116,6 @@ ExecutionMode = Literal[
     "learned_fixed",
     "learned_auto_requested",
     "learned_auto",
-]
-ResidualMode = Literal[
-    "residual_disabled",
-    "residual_fixed",
-    "residual_auto_requested",
-    "residual_auto",
 ]
 SearchParamType = Literal["categorical", "int", "float"]
 SearchParamSpec = dict[str, Any]
@@ -397,7 +361,6 @@ def _normalize_model_section(
         _ensure_default_registries()
     from plugin_contracts.stage_registry import all_stage_plugins
     model_fallback = MODEL_PARAM_REGISTRY or None
-    residual_fallback = RESIDUAL_PARAM_REGISTRY or None
     stage_only_registries: dict[str, dict[str, dict[str, Any]]] = {}
     for sp in all_stage_plugins().values():
         key = sp.model_search_space_key()
@@ -412,12 +375,6 @@ def _normalize_model_section(
                     None
                     if model_fallback is None
                     else model_fallback.get(str(model_name))
-                )
-                or (
-                    residual_fallback.get(str(model_name))
-                    if section in stage_only_registries
-                    and residual_fallback is not None
-                    else None
                 )
                 or (
                     stage_only_registries[section].get(str(model_name))
@@ -535,43 +492,26 @@ def _normalize_training_section(
 def normalize_search_space_payload(payload: dict[str, Any]) -> dict[str, Any]:
     if not payload:
         raise ValueError("yaml/HPO/search_space.yaml is empty")
-    required_sections = {"models", "residual"}
+    required_sections = {"models", "training"}
     missing = required_sections.difference(payload)
     if missing:
         raise ValueError(
-            "yaml/HPO/search_space.yaml must contain top-level sections: models and residual"
+            "yaml/HPO/search_space.yaml must contain top-level sections: models and training"
+        )
+    if "residual" in payload:
+        raise ValueError(
+            "search_space.residual is no longer supported; remove the residual section"
         )
     if not _LOADING_DEFAULT_REGISTRIES:
         _ensure_default_registries()
-    residual_fallback = RESIDUAL_PARAM_REGISTRY or None
 
     models = _normalize_model_section(payload.get("models"), section="models")
-
-    residual_payload = payload.get("residual")
-    if not isinstance(residual_payload, dict):
-        raise ValueError("search_space.residual must be a mapping")
-    residual = {
-        str(model_name): _normalize_selector_specs(
-            model_specs,
-            section="residual",
-            owner=str(model_name),
-            fallback_specs=(None if residual_fallback is None else residual_fallback.get(str(model_name))),
-        )
-        for model_name, model_specs in residual_payload.items()
-    }
-    unknown_residual = sorted(set(residual).difference(SUPPORTED_RESIDUAL_MODELS))
-    if unknown_residual:
-        raise ValueError(
-            "search_space.residual contains unsupported residual model(s): "
-            + ", ".join(unknown_residual)
-        )
 
     training = _normalize_training_section(payload.get("training"), section="training")
 
     result: dict[str, Any] = {
         "models": models,
         "training": training,
-        "residual": residual,
     }
     from plugin_contracts.stage_registry import all_stage_plugins
     for sp in all_stage_plugins().values():
@@ -601,13 +541,12 @@ _LOADING_DEFAULT_REGISTRIES = False
 MODEL_PARAM_REGISTRY: dict[str, dict[str, SearchParamSpec]] = {}
 TRAINING_PARAM_REGISTRY: dict[str, SearchParamSpec] = {}
 TRAINING_PARAM_REGISTRY_BY_MODEL: dict[str, dict[str, SearchParamSpec]] = {}
-RESIDUAL_PARAM_REGISTRY: dict[str, dict[str, SearchParamSpec]] = {}
 
 
 def _ensure_default_registries() -> None:
     global _DEFAULT_CONTRACT, _LOADING_DEFAULT_REGISTRIES
     global MODEL_PARAM_REGISTRY, TRAINING_PARAM_REGISTRY
-    global TRAINING_PARAM_REGISTRY_BY_MODEL, RESIDUAL_PARAM_REGISTRY
+    global TRAINING_PARAM_REGISTRY_BY_MODEL
     if _DEFAULT_CONTRACT is not None:
         return
     _LOADING_DEFAULT_REGISTRIES = True
@@ -633,13 +572,6 @@ def _ensure_default_registries() -> None:
                 _DEFAULT_CONTRACT.payload["training"]["per_model"][model_name]
             )
             for model_name in sorted(SUPPORTED_AUTO_MODEL_NAMES)
-        }
-    )
-    RESIDUAL_PARAM_REGISTRY.clear()
-    RESIDUAL_PARAM_REGISTRY.update(
-        {
-            model_name: deepcopy(specs)
-            for model_name, specs in _DEFAULT_CONTRACT.payload["residual"].items()
         }
     )
 
@@ -716,23 +648,6 @@ def suggest_model_params(
         name: _suggest_from_spec(trial, f"{name_prefix}{name}", registry[name])
         for name in selected_names
     }
-
-
-def suggest_residual_params(
-    model_name: str,
-    selected_names: tuple[str, ...],
-    trial: optuna.Trial,
-    *,
-    param_specs: dict[str, SearchParamSpec] | None = None,
-    name_prefix: str = "",
-) -> dict[str, Any]:
-    _ensure_default_registries()
-    registry = RESIDUAL_PARAM_REGISTRY[model_name] if param_specs is None else param_specs
-    suggested = DEFAULT_RESIDUAL_PARAMS_BY_MODEL[model_name].copy()
-    for name in selected_names:
-        suggested[name] = _suggest_from_spec(trial, f"{name_prefix}{name}", registry[name])
-    return suggested
-
 
 def suggest_training_params(
     selected_names: tuple[str, ...],

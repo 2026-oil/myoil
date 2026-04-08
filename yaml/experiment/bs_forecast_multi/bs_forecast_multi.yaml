@@ -16,6 +16,4 @@ dataset:
   - Com_BloombergCommodity_BCOM
   futr_exog_cols: []
   static_exog_cols: []
-residual:
-  enabled: false
 jobs: yaml/jobs/bs_preforcast/bs_preforcast_jobs_multi.yaml

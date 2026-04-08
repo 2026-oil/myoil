@@ -53,3 +53,4 @@ CLAUDE.md
 # local run artifacts
 /runs/
 /runs.zip
+.omx/

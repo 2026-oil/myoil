@@ -7,10 +7,6 @@ dataset:
   static_exog_cols: []
 runtime:
   opt_n_trial: 20
-residual:
-  enabled: false
-  model: xgboost
-  params: {}
 jobs:
 - model: DummyUnivariate
   params: {}

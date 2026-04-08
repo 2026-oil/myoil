@@ -16,20 +16,11 @@ It is intentionally evidence-first so lane integration can compare the merged ru
 - `runtime_support/runner.py:595-714` — `_tune_main_job()` scores Optuna trials directly on raw predictions from `_fit_and_predict_fold()`.
 - `runtime_support/runner.py:841-852` and `runtime_support/adapters.py:71-117` — multivariate input building still forwards raw target and exogenous channels together; target-only differencing is not wired.
 
-### Residual path is currently isolated from transformation logic
-- `runtime_support/runner.py:997-1128` — `_build_fold_eval_panel()` / `_build_fold_backcast_panel()` derive residual panels from raw `y` and `y_hat_base` values.
-- `runtime_support/runner.py:1724-1824` — `_apply_residual_plugin()` persists corrected residual artifacts from those raw-scale panels.
-
 ## Existing review evidence already present
 
 ### Summary artifact coverage exists today
-- `tests/test_residual_config.py:1175-1303` — `test_summary_builder_writes_leaderboard_and_last_fold_plots`
-- `tests/test_residual_config.py:1404-1442` — `test_runtime_smoke_writes_summary_artifacts_for_dummy_model`
 
 ### Residual non-interference coverage exists today
-- `tests/test_residual_config.py:1680-1729` — `test_runtime_generates_per_fold_residual_artifacts_with_dummy_model`
-- `tests/test_residual_config.py:2319-2347` — `test_runtime_skips_residual_artifacts_for_baseline_models`
-- `tests/test_residual_config.py:4784-4853` — `test_apply_residual_plugin_writes_feature_visibility_metadata`
 
 ## Missing integration pieces to check when lane 1/2 land
 1. `RuntimeConfig` / config normalization must accept only `runtime.transformations: diff` and omit the key entirely when unset so legacy `config.resolved.json` and `resolved_hash` stay stable.
@@ -41,31 +32,20 @@ It is intentionally evidence-first so lane integration can compare the merged ru
 ## Integration risks to review during merge
 - **Hash stability risk:** adding a defaulted `transformations` field directly to `RuntimeConfig.to_dict()` will change `config.resolved.json` and `resolved_hash` even when unset.
 - **Baseline fairness risk:** if baseline models continue using raw history while learned jobs use diff history, leaderboard comparisons will mix objective spaces.
-- **Residual leakage risk:** if diff-scale predictions are written into `cv/*.csv` before inverse reconstruction, residual backcast/eval artifacts will inherit the wrong scale.
 - **Multivariate shape risk:** target-only differencing without synchronized timestamp dropping will break rectangular multivariate inputs.
 
 ## Review-ready verification bundle after implementation lands
 Run these checks after lane 1/2/3 changes are merged:
 
 ```bash
-uvx ruff check app_config.py runtime_support/runner.py tests/test_residual_config.py
-uv run pytest tests/test_residual_config.py::test_summary_builder_writes_leaderboard_and_last_fold_plots
-uv run pytest tests/test_residual_config.py::test_runtime_generates_per_fold_residual_artifacts_with_dummy_model
-uv run pytest tests/test_residual_config.py::test_runtime_skips_residual_artifacts_for_baseline_models
 ```
 
 Then add the planned `runtime.transformations`-specific selectors from the ralplan diff and confirm:
 - unset `runtime.transformations` leaves `config/config.resolved.json` unchanged
 - baseline / learned / Optuna forecasts are written on original scale only
-- residual artifacts remain raw-scale only
 - summary outputs (`summary/leaderboard.csv`, `summary/sample.md`, last-fold plots) still build successfully
 
 
 ## Verification snapshot (2026-03-22)
-- `uvx ruff check app_config.py runtime_support/runner.py tests/test_residual_config.py` → PASS
-- `uv run pytest tests/test_residual_config.py::test_summary_builder_writes_leaderboard_and_last_fold_plots` → PASS functionally, but default repo coverage gate fails on single-test invocation (`total 19% < fail-under=80`)
-- `uv run pytest --no-cov tests/test_residual_config.py::test_summary_builder_writes_leaderboard_and_last_fold_plots` → PASS
-- `uv run pytest --no-cov tests/test_residual_config.py::test_runtime_generates_per_fold_residual_artifacts_with_dummy_model` → PASS
-- `uv run pytest --no-cov tests/test_residual_config.py::test_runtime_skips_residual_artifacts_for_baseline_models` → PASS
 
 The coverage failure is a harness issue for targeted single-test invocations, not a functional regression in the reviewed runtime surfaces. The `--no-cov` reruns provide the task-scoped verification evidence requested by the plan.

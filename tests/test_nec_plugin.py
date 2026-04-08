@@ -122,7 +122,6 @@ def test_nec_job_requires_explicit_nec_enablement(tmp_path: Path) -> None:
         },
         "cv": {"horizon": 2, "step_size": 2, "n_windows": 1, "gap": 0, "overlap_eval_policy": "by_cutoff_mean"},
         "scheduler": {"gpu_ids": [0], "max_concurrent_jobs": 1, "worker_devices": 1},
-        "residual": {"enabled": False, "model": "xgboost", "params": {}},
         "jobs": [{"model": "NEC", "params": {"manual_contract": True}}],
     }
     config_path = tmp_path / "config.yaml"

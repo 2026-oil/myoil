@@ -28,16 +28,8 @@ from app_config import (
     load_app_config,  # noqa: F401 - re-exported for bootstrap/tests
     loaded_config_for_jobs_fanout,  # noqa: F401 - compatibility export
 )
-from plugins.residual import build_residual_plugin
-from plugins.residual.base import ResidualContext
-from plugins.residual.features import (
-    build_residual_feature_frame,
-    hist_exog_lag_feature_name,
-)
 from runtime_support.manifest import (
     build_manifest,
-    residual_active_feature_columns,
-    residual_feature_policy_payload,
     write_manifest,
 )
 from runtime_support.forecast_models import (
@@ -48,17 +40,13 @@ from runtime_support.forecast_models import (
     validate_job,
 )
 from tuning import (
-    DEFAULT_RESIDUAL_PARAMS_BY_MODEL,
     DEFAULT_OPTUNA_STUDY_DIRECTION,
-    RESIDUAL_DEFAULTS,
     SUPPORTED_MODEL_AUTO_MODEL_NAMES,
-    SUPPORTED_RESIDUAL_MODELS,
     LEGACY_TRAINING_SELECTOR_TO_CONFIG_FIELD,
     build_optuna_sampler,
     optuna_num_trials,
     optuna_seed,
     suggest_model_params,
-    suggest_residual_params,
     suggest_training_params,
     training_param_registry_for_model,
     training_range_source_for_model,
@@ -97,7 +85,7 @@ from neuralforecast.models.bs_preforcast_direct import (
     predict_univariate_direct,
 )
 
-ENTRYPOINT_VERSION = "neuralforecast-residual-v1"
+ENTRYPOINT_VERSION = "neuralforecast-runtime-v1"
 SUMMARY_REPORT_FILENAME = "sample.md"
 LOSS_CURVE_PLOT_FILENAME = "loss_curve.png"
 LOSS_CURVE_SAMPLE_FILENAME = "loss_curve_every_10_global_steps.csv"
@@ -310,7 +298,6 @@ def _prune_model_run_artifacts(run_root: Path, model_name: str) -> None:
         run_root / "cv" / f"{model_name}_forecasts.csv",
         run_root / "cv" / f"{model_name}_metrics_by_cutoff.csv",
         run_root / "models" / model_name,
-        run_root / "residual" / model_name,
         workers_root / model_name,
     ]
     for target in targets:
@@ -362,17 +349,6 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
     for job in selected_jobs:
         caps = _job_capabilities_for(loaded, job)
         plugin_owned = _plugin_owned_top_level_job(loaded, job.model)
-        if loaded.config.residual.enabled and (
-            is_direct_top_level_model(job.model)
-            or (
-                plugin_owned is not None
-                and getattr(plugin_owned, "config_key", None) != "aa_forecast"
-            )
-        ):
-            raise ValueError(
-                "Top-level direct models and non-AA plugin-managed models do not yet support residual-enabled runs; "
-                "disable residual or use a learned top-level model / bs_preforcast path."
-            )
         caps_by_model[job.model] = caps
         payload[job.model] = {
             **caps.__dict__,
@@ -384,23 +360,6 @@ def _validate_jobs(loaded: LoadedConfig, selected_jobs, capability_path: Path) -
             "unknown_search_params": [],
             "validation_error": None,
         }
-    payload["residual"] = {
-        "model": loaded.config.residual.model,
-        "target": loaded.config.residual.target,
-        "requested_mode": loaded.config.residual.requested_mode,
-        "validated_mode": loaded.config.residual.validated_mode,
-        "supports_auto": loaded.config.residual.model in SUPPORTED_RESIDUAL_MODELS,
-        "search_space_entry_found": bool(loaded.config.residual.selected_search_params),
-        "selected_search_params": list(loaded.config.residual.selected_search_params),
-        "unknown_search_params": [],
-        "validation_error": None,
-        "feature_policy": residual_feature_policy_payload(
-            loaded.config.residual.features
-        ),
-        "active_feature_columns": residual_active_feature_columns(
-            loaded.config.residual.features
-        ),
-    }
     payload["training_search"] = {
         "requested_mode": loaded.config.training_search.requested_mode,
         "validated_mode": loaded.config.training_search.validated_mode,
@@ -464,10 +423,6 @@ def _update_manifest_artifacts(
     training_best_params_path: Path | None = None,
     training_study_summary_path: Path | None = None,
     training_range_source: str | None = None,
-    residual_best_params_path: Path | None = None,
-    residual_study_summary_path: Path | None = None,
-    residual_feature_policy: dict[str, Any] | None = None,
-    residual_active_feature_columns: Sequence[str] | None = None,
 ) -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     for job in manifest.get("jobs", []):
@@ -492,17 +447,7 @@ def _update_manifest_artifacts(
                 )
             if training_range_source is not None:
                 job["training_range_source"] = training_range_source
-            if residual_best_params_path is not None:
-                job["residual_best_params_path"] = str(residual_best_params_path)
-            if residual_study_summary_path is not None:
-                job["residual_optuna_study_summary_path"] = str(
-                    residual_study_summary_path
-                )
             break
-    if residual_best_params_path is not None:
-        manifest.setdefault("residual", {})["best_params_path"] = str(
-            residual_best_params_path
-        )
     if study_catalog_path is not None:
         manifest.setdefault("optuna", {})["study_catalog_path"] = str(
             study_catalog_path
@@ -532,16 +477,6 @@ def _update_manifest_artifacts(
             training_payload["training_range_source"] = training_range_source
         else:
             training_payload.pop("training_range_source", None)
-    if residual_study_summary_path is not None:
-        manifest.setdefault("residual", {})["optuna_study_summary_path"] = str(
-            residual_study_summary_path
-        )
-    if residual_feature_policy is not None:
-        manifest.setdefault("residual", {})["feature_policy"] = residual_feature_policy
-    if residual_active_feature_columns is not None:
-        manifest.setdefault("residual", {})["active_feature_columns"] = list(
-            residual_active_feature_columns
-        )
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
 
@@ -771,6 +706,8 @@ def _fit_and_predict_fold(
             train_df=train_df,
             future_df=future_df,
             run_root=run_root,
+            params_override=params_override,
+            training_override=training_override,
         )
     stage_result = get_active_stage_plugin(loaded.config)
     if stage_result is not None:
@@ -833,6 +770,21 @@ def _fit_and_predict_fold(
         n_series=adapter_inputs.metadata.get("n_series"),
         params_override=params_override,
     )
+    if hasattr(model, "set_star_precompute_context"):
+        model.set_star_precompute_context(
+            enabled=True,
+            fold_key=json.dumps(
+                {
+                    "job": job.model,
+                    "train_rows": len(transformed_train_df),
+                    "train_end": str(train_df[dt_col].iloc[-1]),
+                    "params_override": params_override or {},
+                    "training_override": training_override or {},
+                },
+                sort_keys=True,
+                ensure_ascii=False,
+            ),
+        )
     nf = NeuralForecast(models=[model], freq=freq)
     nf.fit(
         adapter_inputs.fit_df,
@@ -891,699 +843,7 @@ def _mean_fold_metric(values: Sequence[float], *, metric_name: str = "metric") -
 
 
 def _objective_stage_label(loaded: LoadedConfig) -> str:
-    if loaded.config.residual.enabled:
-        return "tuning_pre_replay_corrected_predictions"
     return "tuning_pre_replay_direct_predictions"
-
-
-def _residual_plugin_config(
-    loaded: LoadedConfig, params: dict[str, Any]
-) -> dict[str, Any]:
-    return {
-        "model": loaded.config.residual.model,
-        "params": params,
-        "cpu_threads": loaded.config.residual.cpu_threads,
-    }
-
-
-def _suggest_prefixed_residual_params(
-    loaded: LoadedConfig,
-    trial: optuna.Trial,
-) -> dict[str, Any]:
-    if loaded.search_space_payload is None:
-        raise ValueError("residual auto tuning requires loaded search-space specs")
-    registry = loaded.search_space_payload["residual"][loaded.config.residual.model]
-    suggested = DEFAULT_RESIDUAL_PARAMS_BY_MODEL[loaded.config.residual.model].copy()
-    for name in loaded.config.residual.selected_search_params:
-        suggested[name] = suggest_residual_params(
-            loaded.config.residual.model,
-            (name,),
-            trial,
-            param_specs=registry,
-            name_prefix="residual__",
-        )[name]
-    return suggested
-
-
-def _score_main_trial_with_residual(
-    loaded: LoadedConfig,
-    job: JobConfig,
-    *,
-    train_df: pd.DataFrame,
-    future_df: pd.DataFrame,
-    fold_idx: int,
-    train_end_ds: pd.Timestamp,
-    target_predictions: pd.DataFrame,
-    target_actuals: pd.Series,
-    nf: NeuralForecast,
-    residual_params: dict[str, Any],
-    scratch_root: Path,
-) -> float:
-    backcast_panel = _build_fold_backcast_panel(
-        loaded,
-        job,
-        nf,
-        train_df,
-        loaded.config.dataset.dt_col,
-        loaded.config.dataset.target_col,
-        fold_idx,
-    )
-    if backcast_panel.empty:
-        logging.getLogger(__name__).warning(
-            "backcast panel is empty for fold %d of %s; "
-            "falling back to direct MAPE instead of residual-corrected MAPE",
-            fold_idx,
-            job.model,
-        )
-        return _compute_metrics(target_actuals, target_predictions[job.model])["MAPE"]
-    eval_panel = _build_fold_eval_panel(
-        loaded,
-        job,
-        fold_idx,
-        train_end_ds,
-        target_predictions,
-        target_actuals,
-        future_df,
-        train_df,
-    )
-    with TemporaryDirectory(dir=scratch_root, prefix="residual-main-objective-") as tmpdir:
-        plugin = build_residual_plugin(_residual_plugin_config(loaded, residual_params))
-        plugin.fit(
-            backcast_panel,
-            _build_residual_context(
-                loaded,
-                job,
-                Path(tmpdir),
-                model_name=job.model,
-            ),
-        )
-        predicted = plugin.predict(eval_panel.copy())
-    corrected = eval_panel.reset_index(drop=True).copy()
-    corrected["residual_hat"] = predicted["residual_hat"].astype(float).values
-    corrected["y_hat_corrected"] = reconstruct_corrected_forecast(
-        corrected,
-        loaded.config.residual.target,
-    )
-    return _compute_metrics(corrected["y"], corrected["y_hat_corrected"])["MAPE"]
-
-
-def _selected_optuna_study(args: argparse.Namespace | None) -> int | None:
-    value = getattr(args, "optuna_study", None) if args is not None else None
-    return None if value is None else int(value)
-
-
-def _active_study_selection(
-    loaded: LoadedConfig,
-    args: argparse.Namespace | None = None,
-) -> StudySelection:
-    return resolve_study_selection(
-        loaded,
-        cli_selected_study=_selected_optuna_study(args),
-    )
-
-
-def _study_context(
-    loaded: LoadedConfig,
-    *,
-    run_root: Path,
-    stage: str,
-    job_name: str,
-    worker_index: int = 0,
-) -> StudyContext:
-    selection = _active_study_selection(loaded)
-    selected_index = selection.selected_study_index
-    if selected_index is None:
-        selected_index = selection.canonical_projection_study_index
-    return build_study_context(
-        loaded,
-        selection=selection,
-        run_root=run_root,
-        stage=stage,
-        job_name=job_name,
-        study_index=selected_index,
-        base_seed=optuna_seed(loaded.config.runtime.random_seed),
-        worker_index=worker_index,
-    )
-
-
-def _open_persistent_study(
-    study_context: StudyContext,
-    *,
-    sampler: optuna.samplers.BaseSampler,
-) -> tuple[optuna.Study, dict[str, Any]]:
-    study_context.storage_path.parent.mkdir(parents=True, exist_ok=True)
-    storage = optuna.storages.JournalStorage(
-        optuna.storages.journal.JournalFileBackend(str(study_context.storage_path))
-    )
-    study = optuna.create_study(
-        storage=storage,
-        study_name=study_context.study_name,
-        load_if_exists=True,
-        sampler=sampler,
-        direction=DEFAULT_OPTUNA_STUDY_DIRECTION,
-    )
-    metadata = {
-        "study_index": study_context.study_index,
-        "study_label": study_context.study_label,
-        "study_name": study_context.study_name,
-        "storage_backend": "journal",
-        "storage_path": str(study_context.storage_path.resolve()),
-        "sampler_seed": study_context.sampler_seed,
-        "proposal_flow_id": study_context.proposal_flow_id,
-        "canonical_projection_study_index": (
-            study_context.selection.canonical_projection_study_index
-        ),
-        "selected_study_index": study_context.selection.selected_study_index,
-    }
-    study.set_user_attr("study_index", study_context.study_index)
-    study.set_user_attr("sampler_seed", study_context.sampler_seed)
-    study.set_user_attr("proposal_flow_id", study_context.proposal_flow_id)
-    return study, metadata
-
-
-def _finished_trial_count(study: optuna.Study) -> int:
-    return sum(1 for trial in study.trials if trial.state.is_finished())
-
-
-def _shared_budget_state_path(study_metadata: dict[str, Any]) -> Path:
-    storage_path = Path(str(study_metadata["storage_path"]))
-    return storage_path.with_suffix(f"{storage_path.suffix}.budget.json")
-
-
-def _reserve_shared_optuna_trial_slot(
-    study: optuna.Study,
-    *,
-    target_trial_count: int,
-    study_metadata: dict[str, Any],
-) -> int | None:
-    budget_path = _shared_budget_state_path(study_metadata)
-    budget_path.parent.mkdir(parents=True, exist_ok=True)
-    with budget_path.open("a+", encoding="utf-8") as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        handle.seek(0)
-        raw = handle.read().strip()
-        state = json.loads(raw) if raw else {}
-        finished_trial_count = _finished_trial_count(study)
-        reserved_count = max(int(state.get("reserved_trial_count", 0)), finished_trial_count)
-        if reserved_count >= target_trial_count:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-            return None
-        slot_index = reserved_count
-        state.update(
-            {
-                "reserved_trial_count": reserved_count + 1,
-                "target_trial_count": target_trial_count,
-                "updated_at": _now_iso(),
-            }
-        )
-        handle.seek(0)
-        handle.truncate()
-        handle.write(json.dumps(state, indent=2))
-        handle.flush()
-        os.fsync(handle.fileno())
-        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-        return slot_index
-
-
-def _optimize_study_with_resume(
-    study: optuna.Study,
-    *,
-    objective,
-    target_trial_count: int,
-) -> dict[str, int]:
-    existing_trial_count = len(study.trials)
-    existing_finished_trial_count = _finished_trial_count(study)
-    remaining_trial_count = max(target_trial_count - existing_finished_trial_count, 0)
-    if remaining_trial_count > 0:
-        study.optimize(
-            objective,
-            n_trials=remaining_trial_count,
-            show_progress_bar=False,
-            catch=(_OptunaTrialFailure,),
-        )
-    return {
-        "requested_trial_count": target_trial_count,
-        "existing_trial_count_before_optimize": existing_trial_count,
-        "existing_finished_trial_count_before_optimize": (
-            existing_finished_trial_count
-        ),
-        "remaining_trial_count": remaining_trial_count,
-    }
-
-
-def _parallel_optimize_study_with_shared_budget(
-    study: optuna.Study,
-    *,
-    objective,
-    target_trial_count: int,
-    study_metadata: dict[str, Any],
-) -> dict[str, int]:
-    existing_trial_count = len(study.trials)
-    existing_finished_trial_count = _finished_trial_count(study)
-    reserved_slots = 0
-    while True:
-        slot_index = _reserve_shared_optuna_trial_slot(
-            study,
-            target_trial_count=target_trial_count,
-            study_metadata=study_metadata,
-        )
-        if slot_index is None:
-            break
-        reserved_slots += 1
-        study.optimize(
-            objective,
-            n_trials=1,
-            show_progress_bar=False,
-            catch=(_OptunaTrialFailure,),
-        )
-    return {
-        "requested_trial_count": target_trial_count,
-        "existing_trial_count_before_optimize": existing_trial_count,
-        "existing_finished_trial_count_before_optimize": (
-            existing_finished_trial_count
-        ),
-        "remaining_trial_count": max(target_trial_count - existing_finished_trial_count, 0),
-        "reserved_trial_slots": reserved_slots,
-    }
-
-
-def _require_complete_best_trial(study: optuna.Study, *, label: str) -> optuna.FrozenTrial:
-    if not any(trial.state == TrialState.COMPLETE for trial in study.trials):
-        raise RuntimeError(
-            f"{label} finished without a successful Optuna trial; inspect study summary for failed/pruned states"
-        )
-    return study.best_trial
-
-
-def _trial_dir_from_context(study_context: StudyContext, trial_number: int) -> Path:
-    return study_context.study_root / "trials" / trial_dir_name(trial_number)
-
-
-def _write_trial_result(
-    trial_dir: Path,
-    *,
-    status: str,
-    study_context: StudyContext,
-    payload: dict[str, Any],
-) -> None:
-    trial_dir.mkdir(parents=True, exist_ok=True)
-    output = {
-        "status": status,
-        "study_index": study_context.study_index,
-        "study_name": study_context.study_name,
-        "proposal_flow_id": study_context.proposal_flow_id,
-        **payload,
-    }
-    (trial_dir / "trial_result.json").write_text(
-        json.dumps(output, indent=2), encoding="utf-8"
-    )
-
-
-def _main_job_objective(
-    loaded: LoadedConfig,
-    job: JobConfig,
-    *,
-    study_context: StudyContext,
-    source_df: pd.DataFrame,
-    freq: str,
-    splits: list[tuple[list[int], list[int]]],
-    progress: _ProgressLogger | None = None,
-) -> Any:
-    trial_count = optuna_num_trials(loaded.config.runtime.opt_n_trial)
-
-    def objective(trial: optuna.Trial) -> float:
-        trial_dir = _trial_dir_from_context(study_context, trial.number)
-        trial.set_user_attr("trial_dir", str(trial_dir))
-        trial.set_user_attr("study_index", study_context.study_index)
-        trial.set_user_attr("sampler_seed", study_context.sampler_seed)
-        trial.set_user_attr("proposal_flow_id", study_context.proposal_flow_id)
-        candidate_params = suggest_model_params(
-            job.model,
-            job.selected_search_params,
-            trial,
-            param_specs=(
-                None
-                if loaded.search_space_payload is None
-                else loaded.search_space_payload["models"][job.model]
-            ),
-        )
-        candidate_training_params = suggest_training_params(
-            loaded.config.training_search.selected_search_params,
-            trial,
-            model_name=job.model,
-            param_specs=training_param_registry_for_model(
-                job.model,
-                search_space_payload=loaded.search_space_payload,
-            ),
-        )
-        candidate_residual_params: dict[str, Any] | None = None
-        if loaded.config.residual.enabled:
-            if loaded.config.residual.validated_mode == "residual_auto":
-                candidate_residual_params = _suggest_prefixed_residual_params(
-                    loaded, trial
-                )
-            else:
-                candidate_residual_params = {
-                    **RESIDUAL_DEFAULTS[loaded.config.residual.model],
-                    **loaded.config.residual.params,
-                }
-        trial.set_user_attr("best_params", candidate_params)
-        trial.set_user_attr("best_training_params", candidate_training_params)
-        if candidate_residual_params is not None:
-            trial.set_user_attr("best_residual_params", candidate_residual_params)
-        fold_mape: list[float] = []
-        _write_trial_result(
-            trial_dir,
-            status="running",
-            study_context=study_context,
-            payload={
-                "trial_number": trial.number,
-                "best_params": candidate_params,
-                "best_training_params": candidate_training_params,
-                "best_residual_params": candidate_residual_params,
-                "fold_mape": fold_mape,
-            },
-        )
-        for fold_idx, (train_idx, test_idx) in enumerate(splits):
-            phase = f"tune-trial-{trial.number + 1}/{trial_count}"
-            if progress is not None:
-                progress.fold_started(
-                    fold_idx, total_folds=len(splits), phase=phase
-                )
-            try:
-                fit_kwargs: dict[str, Any] = {
-                    "source_df": source_df,
-                    "freq": freq,
-                    "train_idx": train_idx,
-                    "test_idx": test_idx,
-                    "params_override": candidate_params,
-                    "training_override": candidate_training_params,
-                }
-                if get_active_stage_plugin(loaded.config) is not None:
-                    fit_kwargs["run_root"] = None
-                (
-                    target_predictions,
-                    target_actuals,
-                    train_end_ds,
-                    train_df,
-                    nf,
-                ) = _fit_and_predict_fold(
-                    loaded,
-                    job,
-                    **fit_kwargs,
-                )
-                if candidate_residual_params is None:
-                    metric = _compute_metrics(
-                        target_actuals, target_predictions[job.model]
-                    )["MAPE"]
-                else:
-                    future_df = source_df.iloc[test_idx].reset_index(drop=True)
-                    metric = _score_main_trial_with_residual(
-                        loaded,
-                        job,
-                        train_df=train_df,
-                        future_df=future_df,
-                        fold_idx=fold_idx,
-                        train_end_ds=train_end_ds,
-                        target_predictions=target_predictions,
-                        target_actuals=target_actuals,
-                        nf=nf,
-                        residual_params=candidate_residual_params,
-                        scratch_root=trial_dir,
-                    )
-                fold_mape.append(metric)
-                interim_metric = _mean_fold_metric(fold_mape, metric_name="mape")
-                trial.set_user_attr("fold_mape", fold_mape.copy())
-                _write_trial_result(
-                    trial_dir,
-                    status="running",
-                    study_context=study_context,
-                    payload={
-                        "trial_number": trial.number,
-                        "best_params": candidate_params,
-                        "best_training_params": candidate_training_params,
-                        "best_residual_params": candidate_residual_params,
-                        "fold_mape": fold_mape.copy(),
-                        "last_completed_fold": fold_idx,
-                        "interim_metric": interim_metric,
-                    },
-                )
-                trial.report(interim_metric, step=fold_idx)
-                if trial.should_prune():
-                    trial.set_user_attr("pruned_after_fold", fold_idx)
-                    if progress is not None:
-                        progress.fold_completed(
-                            fold_idx,
-                            total_folds=len(splits),
-                            phase=phase,
-                            detail=f"pruned mean_mape={interim_metric:.4f}",
-                        )
-                    raise optuna.TrialPruned(
-                        f"Pruned after fold {fold_idx} with mean_mape={interim_metric:.4f}"
-                    )
-                if progress is not None:
-                    progress.fold_completed(
-                        fold_idx,
-                        total_folds=len(splits),
-                        phase=phase,
-                        detail=f"mape={metric:.4f}",
-                    )
-            except optuna.TrialPruned:
-                _write_trial_result(
-                    trial_dir,
-                    status="pruned",
-                    study_context=study_context,
-                    payload={
-                        "trial_number": trial.number,
-                        "best_params": candidate_params,
-                        "best_training_params": candidate_training_params,
-                        "best_residual_params": candidate_residual_params,
-                        "fold_mape": fold_mape,
-                    },
-                )
-                raise
-            except Exception as exc:
-                if progress is not None:
-                    progress.error(
-                        fold_idx,
-                        total_folds=len(splits),
-                        phase=phase,
-                        exc=exc,
-                    )
-                trial.set_user_attr(
-                    "failure_reason",
-                    f"fold={fold_idx} {type(exc).__name__}: {exc}",
-                )
-                _write_trial_result(
-                    trial_dir,
-                    status="failed",
-                    study_context=study_context,
-                    payload={
-                        "trial_number": trial.number,
-                        "best_params": candidate_params,
-                        "best_training_params": candidate_training_params,
-                        "best_residual_params": candidate_residual_params,
-                        "fold_mape": fold_mape,
-                        "failure_reason": f"{type(exc).__name__}: {exc}",
-                    },
-                )
-                raise _OptunaTrialFailure(
-                    f"{job.model} tuning failed on fold {fold_idx}: {type(exc).__name__}: {exc}"
-                ) from exc
-        metric = _mean_fold_metric(fold_mape, metric_name="mape")
-        trial.set_user_attr("fold_mape", fold_mape)
-        _write_trial_result(
-            trial_dir,
-            status="complete",
-            study_context=study_context,
-            payload={
-                "trial_number": trial.number,
-                "best_params": candidate_params,
-                "best_training_params": candidate_training_params,
-                "best_residual_params": candidate_residual_params,
-                "fold_mape": fold_mape,
-                "objective_value": metric,
-            },
-        )
-        return metric
-
-    return objective
-
-
-def _collect_main_tuning_result(
-    study: optuna.Study,
-    *,
-    loaded: LoadedConfig,
-    job: JobConfig,
-    study_metadata: dict[str, Any],
-    optimize_metadata: dict[str, Any],
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    best_trial = _require_complete_best_trial(
-        study, label=f"{job.model} main Optuna study"
-    )
-    best_params = dict(best_trial.user_attrs["best_params"])
-    best_training_params = dict(best_trial.user_attrs["best_training_params"])
-    best_residual_params = (
-        dict(best_trial.user_attrs["best_residual_params"])
-        if "best_residual_params" in best_trial.user_attrs
-        else None
-    )
-    summary = {
-        **_trial_metrics_summary(study, objective_metric="mean_fold_mape"),
-        **study_metadata,
-        **optimize_metadata,
-        "requested_mode": job.requested_mode,
-        "validated_mode": job.validated_mode,
-        "selected_search_params": list(job.selected_search_params),
-        "selected_training_search_params": list(
-            loaded.config.training_search.selected_search_params
-        ),
-        "training_range_source": training_range_source_for_model(
-            job.model,
-            search_space_payload=loaded.search_space_payload,
-        ),
-        "best_params": best_params,
-        "best_training_params": best_training_params,
-        "fold_mape": best_trial.user_attrs["fold_mape"],
-        "objective_stage": _objective_stage_label(loaded),
-    }
-    if best_residual_params is not None:
-        summary["best_residual_params"] = best_residual_params
-    return best_params, best_training_params, summary
-
-
-def _tune_main_job(
-    loaded: LoadedConfig,
-    job: JobConfig,
-    models_dir: Path,
-    *,
-    study_context: StudyContext,
-    source_df: pd.DataFrame,
-    freq: str,
-    splits: list[tuple[list[int], list[int]]],
-    progress: _ProgressLogger | None = None,
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    sampler = build_optuna_sampler(study_context.sampler_seed)
-    objective = _main_job_objective(
-        loaded,
-        job,
-        study_context=study_context,
-        source_df=source_df,
-        freq=freq,
-        splits=splits,
-        progress=progress,
-    )
-
-    study, study_metadata = _open_persistent_study(
-        study_context,
-        sampler=sampler,
-    )
-    optimize_metadata = _optimize_study_with_resume(
-        study,
-        objective=objective,
-        target_trial_count=optuna_num_trials(loaded.config.runtime.opt_n_trial),
-    )
-    return _collect_main_tuning_result(
-        study,
-        loaded=loaded,
-        job=job,
-        study_metadata=study_metadata,
-        optimize_metadata=optimize_metadata,
-    )
-
-
-def _parallel_tune_main_job_worker(
-    loaded: LoadedConfig,
-    job: JobConfig,
-    models_dir: Path,
-    *,
-    study_context: StudyContext,
-    source_df: pd.DataFrame,
-    freq: str,
-    splits: list[tuple[list[int], list[int]]],
-    progress: _ProgressLogger | None = None,
-) -> dict[str, Any]:
-    worker_index = int(os.environ.get("NEURALFORECAST_OPTUNA_WORKER_INDEX", "0"))
-    worker_study_context = replace(
-        study_context,
-        sampler_seed=study_context.sampler_seed + worker_index,
-    )
-    sampler = build_optuna_sampler(worker_study_context.sampler_seed)
-    objective = _main_job_objective(
-        loaded,
-        job,
-        study_context=worker_study_context,
-        source_df=source_df,
-        freq=freq,
-        splits=splits,
-        progress=progress,
-    )
-    study, study_metadata = _open_persistent_study(
-        worker_study_context,
-        sampler=sampler,
-    )
-    return _parallel_optimize_study_with_shared_budget(
-        study,
-        objective=objective,
-        target_trial_count=optuna_num_trials(loaded.config.runtime.opt_n_trial),
-        study_metadata=study_metadata,
-    )
-
-
-def _load_main_tuning_result(
-    loaded: LoadedConfig,
-    job: JobConfig,
-    models_dir: Path,
-    *,
-    study_context: StudyContext,
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    sampler = build_optuna_sampler(study_context.sampler_seed)
-    study, study_metadata = _open_persistent_study(
-        study_context,
-        sampler=sampler,
-    )
-    optimize_metadata = {
-        "requested_trial_count": optuna_num_trials(loaded.config.runtime.opt_n_trial),
-        "existing_trial_count_before_optimize": len(study.trials),
-        "existing_finished_trial_count_before_optimize": _finished_trial_count(study),
-        "remaining_trial_count": max(
-            optuna_num_trials(loaded.config.runtime.opt_n_trial)
-            - _finished_trial_count(study),
-            0,
-        ),
-    }
-    return _collect_main_tuning_result(
-        study,
-        loaded=loaded,
-        job=job,
-        study_metadata=study_metadata,
-        optimize_metadata=optimize_metadata,
-    )
-
-
-def _copy_projection_file(source: Path, target: Path) -> None:
-    if not source.exists():
-        return
-    target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, target)
-
-
-def _write_stage_study_catalog(
-    stage_root: Path,
-    selection: StudySelection,
-    *,
-    summary_by_study: Mapping[int, Mapping[str, Any]] | None = None,
-) -> Path:
-    catalog_path = stage_root / "study_catalog.json"
-    write_study_catalog(
-        catalog_path,
-        build_study_catalog_payload(
-            stage_root,
-            selection,
-            study_summaries=summary_by_study,
-        ),
-    )
-    return catalog_path
 
 
 def _initialize_study_catalogs(
@@ -1593,701 +853,11 @@ def _initialize_study_catalogs(
 ) -> None:
     selection = resolve_study_selection(loaded)
     for job in jobs:
-        _write_stage_study_catalog(run_root / "models" / job.model, selection)
-        if loaded.config.residual.enabled:
-            _write_stage_study_catalog(run_root / "residual" / job.model, selection)
-
-
-def _score_residual_params(
-    loaded: LoadedConfig,
-    job: JobConfig,
-    params: dict[str, Any],
-    fold_payloads: list[dict[str, Any]],
-    *,
-    trial: optuna.Trial,
-    study_context: StudyContext,
-) -> float:
-    trial.set_user_attr("study_index", study_context.study_index)
-    trial.set_user_attr("sampler_seed", study_context.sampler_seed)
-    trial.set_user_attr("proposal_flow_id", study_context.proposal_flow_id)
-    mape_scores: list[float] = []
-    for step_idx, payload in enumerate(fold_payloads):
-        fold_idx = int(payload["fold_idx"])
-        try:
-            payload["trial_dir"].mkdir(parents=True, exist_ok=True)
-            plugin = build_residual_plugin(_residual_plugin_config(loaded, params))
-            plugin.fit(
-                payload["backcast_panel"],
-                _build_residual_context(
-                    loaded,
-                    job,
-                    payload["trial_dir"],
-                    model_name=job.model,
-                ),
-            )
-            predicted = plugin.predict(payload["eval_panel"].copy())
-            corrected = payload["eval_panel"].reset_index(drop=True).copy()
-            corrected["residual_hat"] = predicted["residual_hat"].astype(float).values
-            corrected["y_hat_corrected"] = reconstruct_corrected_forecast(
-                corrected,
-                loaded.config.residual.target,
-            )
-            mape_scores.append(
-                _compute_metrics(corrected["y"], corrected["y_hat_corrected"])["MAPE"]
-            )
-            interim_metric = _mean_fold_metric(mape_scores, metric_name="mape")
-            trial.set_user_attr("fold_mape", mape_scores.copy())
-            trial.report(interim_metric, step=step_idx)
-            if trial.should_prune():
-                trial.set_user_attr("pruned_after_fold", fold_idx)
-                raise optuna.TrialPruned(
-                    f"Pruned residual trial after fold {fold_idx} with mean_mape={interim_metric:.4f}"
-                )
-        except optuna.TrialPruned:
-            raise
-        except Exception as exc:
-            trial.set_user_attr(
-                "failure_reason",
-                f"fold={fold_idx} {type(exc).__name__}: {exc}",
-            )
-            raise _OptunaTrialFailure(
-                f"{job.model} residual tuning failed on fold {fold_idx}: {type(exc).__name__}: {exc}"
-            ) from exc
-    return _mean_fold_metric(mape_scores, metric_name="mape")
-
-
-def _residual_trajectory_group_keys() -> list[str]:
-    return ["fold_idx", "cutoff"]
-
-
-def _prepare_ordered_trajectory_frame(panel_df: pd.DataFrame) -> pd.DataFrame:
-    ordered = panel_df.copy()
-    ordered["__orig_order"] = np.arange(len(ordered))
-    return ordered.sort_values(
-        _residual_trajectory_group_keys() + ["horizon_step", "__orig_order"],
-        kind="stable",
-    ).reset_index(drop=True)
-
-
-def build_residual_target(panel_df: pd.DataFrame, mode: str) -> pd.Series:
-    if panel_df.empty:
-        return pd.Series(dtype=float, index=panel_df.index)
-    if mode == "level":
-        return (
-            panel_df["y"].astype(float) - panel_df["y_hat_base"].astype(float)
-        ).rename("residual_target")
-
-    ordered = _prepare_ordered_trajectory_frame(panel_df)
-    group_keys = _residual_trajectory_group_keys()
-    group_index = [ordered[key] for key in group_keys]
-    step_index = ordered.groupby(group_keys, sort=False).cumcount()
-    y = ordered["y"].astype(float)
-    y_hat_base = ordered["y_hat_base"].astype(float)
-    residual_target = (y.groupby(group_index).diff() - y_hat_base.groupby(group_index).diff()).where(
-        step_index > 0,
-        y - y_hat_base,
-    )
-    ordered["residual_target"] = residual_target.astype(float)
-    restored = ordered.sort_values("__orig_order", kind="stable")
-    return pd.Series(
-        restored["residual_target"].to_numpy(),
-        index=panel_df.index,
-        name="residual_target",
-    )
-
-
-def reconstruct_corrected_forecast(panel_df: pd.DataFrame, mode: str) -> pd.Series:
-    if panel_df.empty:
-        return pd.Series(dtype=float, index=panel_df.index)
-    if mode == "level":
-        return (
-            panel_df["y_hat_base"].astype(float)
-            + panel_df["residual_hat"].astype(float)
-        ).rename("y_hat_corrected")
-
-    ordered = _prepare_ordered_trajectory_frame(panel_df)
-    group_keys = _residual_trajectory_group_keys()
-    ordered["y_hat_corrected"] = (
-        ordered["y_hat_base"].astype(float)
-        + ordered.groupby(group_keys, sort=False)["residual_hat"].cumsum().astype(float)
-    )
-    restored = ordered.sort_values("__orig_order", kind="stable")
-    return pd.Series(
-        restored["y_hat_corrected"].to_numpy(),
-        index=panel_df.index,
-        name="y_hat_corrected",
-    )
-
-
-def _prediction_column(predictions: pd.DataFrame, model_name: str) -> str:
-    if model_name in predictions.columns:
-        return model_name
-    raise KeyError(f"Could not find prediction column for {model_name}")
-
-
-def _build_adapter_inputs(
-    loaded: LoadedConfig,
-    train_df: pd.DataFrame,
-    future_df: pd.DataFrame | None,
-    job: JobConfig,
-    dt_col: str,
-):
-    if _should_use_multivariate(loaded, job):
-        return build_multivariate_inputs(
-            train_df,
-            job,
-            dataset=loaded.config.dataset,
-            dt_col=dt_col,
-            future_df=future_df,
+        stage_root = run_root / "models" / job.model
+        write_study_catalog(
+            stage_root / "study_catalog.json",
+            build_study_catalog_payload(stage_root, selection),
         )
-    return build_univariate_inputs(
-        train_df, job, dataset=loaded.config.dataset, dt_col=dt_col, future_df=future_df
-    )
-
-
-def _build_tscv_splits(total_rows: int, cv_config) -> list[tuple[list[int], list[int]]]:
-    if cv_config.step_size < 1:
-        raise ValueError("cv.step_size must be at least 1")
-
-    required_rows = (
-        cv_config.gap
-        + cv_config.horizon
-        + cv_config.step_size * (cv_config.n_windows - 1)
-        + 1
-    )
-    if total_rows < required_rows:
-        raise ValueError(
-            "Dataset is too short for the configured TSCV policy "
-            f"(n_windows={cv_config.n_windows}, horizon={cv_config.horizon}, "
-            f"step_size={cv_config.step_size}, gap={cv_config.gap}, "
-            f"max_train_size={cv_config.max_train_size})"
-        )
-
-    splits: list[tuple[list[int], list[int]]] = []
-    for fold_idx in range(cv_config.n_windows):
-        train_end = (
-            total_rows
-            - cv_config.gap
-            - cv_config.horizon
-            - cv_config.step_size * (cv_config.n_windows - 1 - fold_idx)
-        )
-        if train_end <= 0:
-            raise ValueError(
-                "Dataset is too short for the configured TSCV policy "
-                f"(n_windows={cv_config.n_windows}, horizon={cv_config.horizon}, "
-                f"step_size={cv_config.step_size}, gap={cv_config.gap}, "
-                f"max_train_size={cv_config.max_train_size})"
-            )
-        train_start = 0
-        if cv_config.max_train_size is not None:
-            train_start = max(0, train_end - cv_config.max_train_size)
-        test_start = train_end + cv_config.gap
-        test_end = test_start + cv_config.horizon
-        splits.append(
-            (list(range(train_start, train_end)), list(range(test_start, test_end)))
-        )
-    return splits
-
-
-def _iter_backcast_cutoff_indices(
-    train_length: int,
-    input_size: int,
-    horizon: int,
-    step_size: int,
-) -> list[int]:
-    if train_length < input_size + horizon:
-        return []
-    return list(range(input_size - 1, train_length - horizon, step_size))
-
-
-def _build_residual_context(
-    loaded: LoadedConfig,
-    job: JobConfig,
-    residual_root: Path,
-    *,
-    model_name: str | None = None,
-) -> ResidualContext:
-    return ResidualContext(
-        job_name=job.model,
-        model_name=model_name or job.model,
-        output_dir=residual_root,
-        config=loaded.normalized_payload,
-    )
-
-
-def _predict_with_fitted_model(nf: NeuralForecast, adapter_inputs) -> pd.DataFrame:
-    predict_kwargs = {
-        "df": adapter_inputs.fit_df,
-        "static_df": adapter_inputs.static_df,
-    }
-    if adapter_inputs.futr_df is not None:
-        predict_kwargs["futr_df"] = adapter_inputs.futr_df
-    return nf.predict(**predict_kwargs)
-
-
-def _selected_residual_exog_columns(loaded: LoadedConfig) -> list[str]:
-    columns: list[str] = []
-    for column in loaded.config.residual.features.exog_sources.hist:
-        lagged = hist_exog_lag_feature_name(column)
-        if lagged not in columns:
-            columns.append(lagged)
-    for column in (
-        *loaded.config.residual.features.exog_sources.futr,
-        *loaded.config.residual.features.exog_sources.static,
-    ):
-        if column not in columns:
-            columns.append(column)
-    return columns
-
-
-def _residual_panel_feature_values(
-    loaded: LoadedConfig,
-    row_source: pd.Series,
-    *,
-    static_source_df: pd.DataFrame,
-) -> dict[str, object]:
-    values: dict[str, object] = {}
-    for column in loaded.config.residual.features.exog_sources.hist:
-        values[hist_exog_lag_feature_name(column)] = static_source_df[column].iloc[-1]
-    for column in loaded.config.residual.features.exog_sources.futr:
-        values[column] = row_source[column]
-    for column in loaded.config.residual.features.exog_sources.static:
-        values[column] = static_source_df[column].iloc[-1]
-    return values
-
-
-def _canonical_panel_columns(
-    include_target: bool = True,
-    *,
-    feature_source_columns: Sequence[str] = (),
-) -> list[str]:
-    columns = [
-        "model_name",
-        "fold_idx",
-        "panel_split",
-        "unique_id",
-        "cutoff",
-        "train_end_ds",
-        "ds",
-        "horizon_step",
-        "y_hat_base",
-    ]
-    if include_target:
-        columns.extend(["y", "residual_target"])
-    for column in feature_source_columns:
-        if column not in columns:
-            columns.append(column)
-    return columns
-
-
-def _fold_artifact_dir(residual_root: Path, fold_idx: int) -> Path:
-    return residual_root / "folds" / f"fold_{fold_idx:03d}"
-
-
-def _build_fold_eval_panel(
-    loaded: LoadedConfig,
-    job: JobConfig,
-    fold_idx: int,
-    train_end_ds: object,
-    target_predictions: pd.DataFrame,
-    actuals: pd.Series,
-    future_df: pd.DataFrame,
-    train_df: pd.DataFrame,
-) -> pd.DataFrame:
-    cutoff = pd.to_datetime(train_end_ds)
-    feature_source_columns = _selected_residual_exog_columns(loaded)
-    rows: list[dict[str, object]] = []
-    for row_idx, ds in enumerate(target_predictions["ds"]):
-        y_hat_base = float(target_predictions[job.model].iloc[row_idx])
-        y = float(actuals.iloc[row_idx])
-        row_source = future_df.iloc[row_idx]
-        rows.append(
-            {
-                "model_name": job.model,
-                "fold_idx": fold_idx,
-                "panel_split": "fold_eval",
-                "unique_id": target_predictions["unique_id"].iloc[row_idx],
-                "cutoff": cutoff,
-                "train_end_ds": cutoff,
-                "ds": pd.to_datetime(ds),
-                "horizon_step": row_idx + 1,
-                "y": y,
-                "y_hat_base": y_hat_base,
-                "residual_target": 0.0,
-                **_residual_panel_feature_values(
-                    loaded,
-                    row_source,
-                    static_source_df=train_df,
-                ),
-            }
-        )
-    panel = pd.DataFrame(
-        rows,
-        columns=_canonical_panel_columns(
-            feature_source_columns=feature_source_columns,
-        ),
-    ).reset_index(drop=True)
-    panel["residual_target"] = build_residual_target(
-        panel,
-        loaded.config.residual.target,
-    )
-    return panel
-
-
-def _build_fold_backcast_panel(
-    loaded: LoadedConfig,
-    job: JobConfig,
-    nf: NeuralForecast,
-    train_df: pd.DataFrame,
-    dt_col: str,
-    target_col: str,
-    fold_idx: int,
-) -> pd.DataFrame:
-    cutoff_indices = _iter_backcast_cutoff_indices(
-        train_length=len(train_df),
-        input_size=loaded.config.training.input_size,
-        horizon=loaded.config.cv.horizon,
-        step_size=loaded.config.cv.step_size,
-    )
-    feature_source_columns = _selected_residual_exog_columns(loaded)
-    rows: list[dict[str, object]] = []
-    for cutoff_idx in cutoff_indices:
-        history_df = train_df.iloc[: cutoff_idx + 1].reset_index(drop=True)
-        future_df = train_df.iloc[
-            cutoff_idx + 1 : cutoff_idx + 1 + loaded.config.cv.horizon
-        ].reset_index(drop=True)
-        if _has_any_runtime_diff(loaded) and len(history_df) < 2:
-            continue
-        diff_context = _build_fold_diff_context(
-            loaded,
-            history_df,
-            target_col=target_col,
-        )
-        transformed_history_df = _transform_training_frame(history_df, diff_context)
-        adapter_inputs = _build_adapter_inputs(
-            loaded,
-            transformed_history_df,
-            future_df,
-            job,
-            dt_col,
-        )
-        predictions = _predict_with_fitted_model(nf, adapter_inputs)
-        pred_col = _prediction_column(predictions, job.model)
-        target_predictions = predictions[
-            predictions["unique_id"] == target_col
-        ].reset_index(drop=True)
-        target_predictions = _restore_target_predictions(
-            target_predictions,
-            prediction_col=pred_col,
-            diff_context=diff_context,
-        )
-        actuals = future_df[target_col].reset_index(drop=True)
-        cutoff = pd.to_datetime(train_df[dt_col].iloc[cutoff_idx])
-        for row_idx, ds in enumerate(target_predictions["ds"]):
-            y_hat_base = float(target_predictions[pred_col].iloc[row_idx])
-            y = float(actuals.iloc[row_idx])
-            row_source = future_df.iloc[row_idx]
-            rows.append(
-                {
-                    "model_name": job.model,
-                    "fold_idx": fold_idx,
-                    "panel_split": "backcast_train",
-                    "unique_id": target_col,
-                    "cutoff": cutoff,
-                    "train_end_ds": cutoff,
-                    "ds": pd.to_datetime(ds),
-                    "horizon_step": row_idx + 1,
-                    "y": y,
-                    "y_hat_base": y_hat_base,
-                    "residual_target": 0.0,
-                    **_residual_panel_feature_values(
-                        loaded,
-                        row_source,
-                        static_source_df=history_df,
-                    ),
-                }
-            )
-    panel = pd.DataFrame(
-        rows,
-        columns=_canonical_panel_columns(
-            feature_source_columns=feature_source_columns,
-        ),
-    ).reset_index(drop=True)
-    panel["residual_target"] = build_residual_target(
-        panel,
-        loaded.config.residual.target,
-    )
-    return panel
-
-
-def _resolve_runtime_active_feature_columns(
-    loaded: LoadedConfig,
-    fold_payloads: Sequence[dict[str, Any]],
-) -> list[str]:
-    for payload in fold_payloads:
-        for panel_name in ("backcast_panel", "eval_panel"):
-            panel = payload.get(panel_name)
-            if isinstance(panel, pd.DataFrame):
-                feature_frame = build_residual_feature_frame(
-                    panel,
-                    feature_config=loaded.config.residual.features,
-                )
-                return list(feature_frame.columns)
-    return residual_active_feature_columns(loaded.config.residual.features)
-
-
-def _apply_residual_plugin(
-    loaded: LoadedConfig,
-    job: JobConfig,
-    run_root: Path,
-    fold_payloads: list[dict[str, Any]],
-    *,
-    manifest_path: Path,
-    residual_params_override: dict[str, Any] | None = None,
-    residual_study_summary_override: dict[str, Any] | None = None,
-) -> None:
-    if job.model in BASELINE_MODEL_NAMES:
-        return
-    if not loaded.config.residual.enabled:
-        return
-
-    residual_root = run_root / "residual" / job.model
-    residual_root.mkdir(parents=True, exist_ok=True)
-    feature_policy = residual_feature_policy_payload(loaded.config.residual.features)
-    active_feature_columns = _resolve_runtime_active_feature_columns(
-        loaded, fold_payloads
-    )
-    corrected_groups: list[pd.DataFrame] = []
-    checkpoint_metadata: dict[str, dict[str, object]] = {}
-    total_backcast_rows = 0
-    residual_params = {
-        **RESIDUAL_DEFAULTS[loaded.config.residual.model],
-        **loaded.config.residual.params,
-    }
-    if residual_params_override is not None:
-        residual_params = {
-            **RESIDUAL_DEFAULTS[loaded.config.residual.model],
-            **residual_params_override,
-        }
-        best_params_path = residual_root / "best_params.json"
-        best_params_path.write_text(
-            json.dumps(residual_params, indent=2), encoding="utf-8"
-        )
-        residual_summary_path: Path | None = None
-        if residual_study_summary_override is not None:
-            residual_summary_path = residual_root / "optuna_study_summary.json"
-            residual_summary_path.write_text(
-                json.dumps(residual_study_summary_override, indent=2),
-                encoding="utf-8",
-            )
-        _update_manifest_artifacts(
-            manifest_path,
-            job_name=job.model,
-            residual_best_params_path=best_params_path,
-            residual_study_summary_path=residual_summary_path,
-        )
-    elif loaded.config.residual.validated_mode == "residual_auto":
-        selection = resolve_study_selection(loaded)
-        residual_study_context = build_study_context(
-            loaded,
-            stage_root=residual_root,
-            stage="residual-search",
-            job_name=job.model,
-            study_index=selection.canonical_projection_study_index,
-            base_seed=optuna_seed(loaded.config.runtime.random_seed),
-        )
-        sampler = build_optuna_sampler(residual_study_context.sampler_seed)
-        residual_trial_count = optuna_num_trials(loaded.config.runtime.opt_n_trial)
-
-        def objective(trial: optuna.Trial) -> float:
-            candidate_params = suggest_residual_params(
-                loaded.config.residual.model,
-                loaded.config.residual.selected_search_params,
-                trial,
-                param_specs=(
-                    None
-                    if loaded.search_space_payload is None
-                    else loaded.search_space_payload["residual"][
-                        loaded.config.residual.model
-                    ]
-                ),
-            )
-            trial.set_user_attr("best_params", candidate_params)
-            trial_root = _trial_dir_from_context(residual_study_context, trial.number)
-            prepared_payloads: list[dict[str, Any]] = []
-            for payload in fold_payloads:
-                prepared_payloads.append(
-                    {
-                        **payload,
-                        "trial_dir": trial_root / f"fold-{int(payload['fold_idx']):03d}",
-                    }
-                )
-            return _score_residual_params(
-                loaded,
-                job,
-                candidate_params,
-                prepared_payloads,
-                trial=trial,
-                study_context=residual_study_context,
-            )
-
-        study, study_metadata = _open_persistent_study(
-            residual_study_context,
-            sampler=sampler,
-        )
-        optimize_metadata = _optimize_study_with_resume(
-            study,
-            objective=objective,
-            target_trial_count=residual_trial_count,
-        )
-        best_trial = _require_complete_best_trial(
-            study, label=f"{job.model} residual Optuna study"
-        )
-        residual_params = {
-            **RESIDUAL_DEFAULTS[loaded.config.residual.model],
-            **best_trial.user_attrs["best_params"],
-        }
-        residual_study_context.best_params_path.parent.mkdir(parents=True, exist_ok=True)
-        residual_study_context.best_params_path.write_text(
-            json.dumps(residual_params, indent=2), encoding="utf-8"
-        )
-        residual_summary_payload = {
-            **_trial_metrics_summary(study),
-            **study_metadata,
-            **optimize_metadata,
-            "requested_mode": loaded.config.residual.requested_mode,
-            "validated_mode": loaded.config.residual.validated_mode,
-            "selected_search_params": list(
-                loaded.config.residual.selected_search_params
-            ),
-            "best_params": residual_params,
-            "objective_stage": "tuning_pre_replay_residual_corrected_predictions",
-        }
-        residual_study_context.summary_path.write_text(
-            json.dumps(residual_summary_payload, indent=2),
-            encoding="utf-8",
-        )
-        build_study_visualizations(residual_study_context, residual_summary_payload)
-        _copy_projection_file(
-            residual_study_context.best_params_path,
-            residual_root / "best_params.json",
-        )
-        _copy_projection_file(
-            residual_study_context.summary_path,
-            residual_root / "optuna_study_summary.json",
-        )
-        _write_stage_study_catalog(
-            residual_root,
-            selection,
-            summary_by_study={
-                residual_study_context.study_index: residual_summary_payload,
-            },
-        )
-        _update_manifest_artifacts(
-            manifest_path,
-            job_name=job.model,
-            study_catalog_path=residual_root / "study_catalog.json",
-            selected_study_index=selection.selected_study_index,
-            canonical_projection_study_index=(
-                selection.canonical_projection_study_index
-            ),
-            residual_best_params_path=residual_root / "best_params.json",
-            residual_study_summary_path=residual_root / "optuna_study_summary.json",
-        )
-
-
-    for payload in fold_payloads:
-        fold_idx = int(payload["fold_idx"])
-        backcast_panel: pd.DataFrame = payload["backcast_panel"]
-        eval_panel: pd.DataFrame = payload["eval_panel"]
-        base_summary: dict[str, object] = payload["base_summary"]
-        fold_root = _fold_artifact_dir(residual_root, fold_idx)
-        base_checkpoint_dir = fold_root / "base_checkpoint"
-        residual_checkpoint_dir = fold_root / "residual_checkpoint"
-        base_checkpoint_dir.mkdir(parents=True, exist_ok=True)
-        plugin = build_residual_plugin(_residual_plugin_config(loaded, residual_params))
-
-        backcast_panel.to_csv(fold_root / "backcast_panel.csv", index=False)
-        (base_checkpoint_dir / "fit_summary.json").write_text(
-            json.dumps(base_summary, indent=2),
-            encoding="utf-8",
-        )
-        plugin.fit(
-            backcast_panel,
-            _build_residual_context(
-                loaded,
-                job,
-                residual_checkpoint_dir,
-                model_name=job.model,
-            ),
-        )
-        predicted = plugin.predict(eval_panel.copy())
-        corrected = eval_panel.reset_index(drop=True).copy()
-        corrected["residual_hat"] = predicted["residual_hat"].astype(float).values
-        corrected["y_hat_corrected"] = reconstruct_corrected_forecast(
-            corrected,
-            loaded.config.residual.target,
-        )
-        corrected_groups.append(corrected)
-        corrected.to_csv(fold_root / "corrected_eval.csv", index=False)
-        base_metrics = _compute_metrics(corrected["y"], corrected["y_hat_base"])
-        corrected_metrics = _compute_metrics(
-            corrected["y"], corrected["y_hat_corrected"]
-        )
-        (fold_root / "metrics.json").write_text(
-            json.dumps(
-                {
-                    "fold_idx": fold_idx,
-                    "cutoff": str(corrected["cutoff"].iloc[0]),
-                    "train_end_ds": str(corrected["train_end_ds"].iloc[0]),
-                    "backcast_rows": int(len(backcast_panel)),
-                    "base_metrics": base_metrics,
-                    "corrected_metrics": corrected_metrics,
-                },
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-        checkpoint_metadata[str(fold_idx)] = {
-            **plugin.metadata(),
-            "feature_policy": feature_policy,
-            "active_feature_columns": active_feature_columns,
-        }
-        total_backcast_rows += len(backcast_panel)
-
-    corrected_folds = pd.concat(corrected_groups, ignore_index=True)
-    corrected_folds.to_csv(residual_root / "corrected_folds.csv", index=False)
-    (residual_root / "plugin_metadata.json").write_text(
-        json.dumps(checkpoint_metadata, indent=2), encoding="utf-8"
-    )
-    diagnostics = {
-        "model": job.model,
-        "residual_model": loaded.config.residual.model,
-        "residual.target": loaded.config.residual.target,
-        "residual.feature_policy": feature_policy,
-        "active_feature_columns": active_feature_columns,
-        "fold_count": int(len(fold_payloads)),
-        "backcast_rows_total": int(total_backcast_rows),
-        "corrected_eval_rows": int(len(corrected_folds)),
-        "corrected_eval_mode": "per_fold_backcast_runtime",
-        "tscv_policy": {
-            "n_windows": loaded.config.cv.n_windows,
-            "horizon": loaded.config.cv.horizon,
-            "step_size": loaded.config.cv.step_size,
-            "gap": loaded.config.cv.gap,
-            "max_train_size": loaded.config.cv.max_train_size,
-        },
-        "artifact_layout": "residual/<model>/folds/fold_{i:03d}/(backcast_panel.csv, corrected_eval.csv, base_checkpoint/, residual_checkpoint/model.ubj)",
-    }
-    (residual_root / "diagnostics.json").write_text(
-        json.dumps(diagnostics, indent=2), encoding="utf-8"
-    )
-    _update_manifest_artifacts(
-        manifest_path,
-        job_name=job.model,
-        residual_feature_policy=feature_policy,
-        residual_active_feature_columns=active_feature_columns,
-    )
 
 
 def _baseline_cross_validation(
@@ -2353,35 +923,6 @@ def _artifact_model_name(path: Path, suffix: str) -> str:
     return path.name.removesuffix(suffix)
 
 
-def _residual_summary_model_name(model_name: str) -> str:
-    return f"{model_name}_res"
-
-
-def _load_residual_metrics_for_summary(root: Path) -> list[dict[str, object]]:
-    rows: list[dict[str, object]] = []
-    residual_dir = root / "residual"
-    if not residual_dir.exists():
-        return rows
-    for model_root in sorted(path for path in residual_dir.iterdir() if path.is_dir()):
-        folds_dir = model_root / "folds"
-        if not folds_dir.exists():
-            continue
-        for metrics_path in sorted(folds_dir.glob("fold_*/metrics.json")):
-            payload = json.loads(metrics_path.read_text(encoding="utf-8"))
-            corrected_metrics = payload.get("corrected_metrics")
-            if not corrected_metrics:
-                continue
-            rows.append(
-                {
-                    "model": _residual_summary_model_name(model_root.name),
-                    "fold_idx": payload.get("fold_idx"),
-                    "cutoff": payload.get("cutoff"),
-                    **corrected_metrics,
-                }
-            )
-    return rows
-
-
 def _summary_job_roots(run_root: Path) -> list[Path]:
     roots: list[Path] = []
     if (run_root / "cv").exists():
@@ -2405,7 +946,6 @@ def _load_metrics_for_summary(run_root: Path) -> pd.DataFrame:
             if "model" not in frame.columns:
                 frame["model"] = model_name
             rows.extend(frame.to_dict(orient="records"))
-        rows.extend(_load_residual_metrics_for_summary(root))
     return pd.DataFrame(rows)
 
 
@@ -2711,53 +1251,12 @@ def _load_last_fold_forecasts(run_root: Path) -> pd.DataFrame:
                 frame["model"] = model_name
             frame["fold_idx"] = pd.to_numeric(frame["fold_idx"], errors="coerce")
             frames.append(frame)
-        residual_dir = root / "residual"
-        if not residual_dir.exists():
-            continue
-        for path in sorted(residual_dir.glob("*/corrected_folds.csv")):
-            frame = pd.read_csv(path)
-            if frame.empty or "y_hat_corrected" not in frame.columns:
-                continue
-            model_name = path.parent.name
-            frame = frame.copy()
-            frame["model"] = _residual_summary_model_name(model_name)
-            frame["y_hat"] = pd.to_numeric(
-                frame["y_hat_corrected"], errors="coerce"
-            )
-            frame["fold_idx"] = pd.to_numeric(frame["fold_idx"], errors="coerce")
-            frames.append(frame)
     if not frames:
         return pd.DataFrame()
     forecasts = pd.concat(frames, ignore_index=True)
     forecasts = forecasts.dropna(subset=["fold_idx"]).copy()
     forecasts["fold_idx"] = forecasts["fold_idx"].astype(int)
     return forecasts
-
-
-def _build_residual_comparison_plots(
-    summary_dir: Path, scoped_forecasts: pd.DataFrame
-) -> dict[str, str]:
-    residual_dir = summary_dir / "residual"
-    plot_paths: dict[str, str] = {}
-    available_models = set(scoped_forecasts["model"])
-    residual_models = sorted(
-        model.removesuffix("_res")
-        for model in available_models
-        if model.endswith("_res") and model.removesuffix("_res") in available_models
-    )
-    if not residual_models:
-        return plot_paths
-    residual_dir.mkdir(parents=True, exist_ok=True)
-    for model_name in residual_models:
-        plot_path = residual_dir / f"{model_name}.png"
-        _plot_last_fold_overlay(
-            scoped_forecasts,
-            [model_name, _residual_summary_model_name(model_name)],
-            plot_path,
-            title=f"Last fold predictions ({model_name}: base vs base+residual)",
-        )
-        plot_paths[f"residual_{model_name}"] = str(plot_path)
-    return plot_paths
 
 
 def _build_summary_plot_bundle(
@@ -2782,7 +1281,6 @@ def _build_summary_plot_bundle(
         plot_path = summary_dir / f"last_fold_{slug}.png"
         _plot_last_fold_overlay(scoped_forecasts, models, plot_path, title=title)
         plot_paths[slug] = str(plot_path)
-    plot_paths.update(_build_residual_comparison_plots(summary_dir, scoped_forecasts))
     return plot_paths
 
 
@@ -2931,14 +1429,7 @@ def _plot_last_fold_overlay(
     if selected.empty:
         return
     selected["ds"] = pd.Index([pd.Timestamp(value) for value in selected["ds"]])
-    actual = (
-        selected[["ds", "y"]]
-        .drop_duplicates(subset=["ds"])
-        .sort_values("ds")
-        .reset_index(drop=True)
-    )
     fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(actual["ds"], actual["y"], label="actual", linewidth=2.5, color="black")
     for model_name in selected_models:
         model_frame = (
             selected[selected["model"] == model_name]
@@ -3207,12 +1698,8 @@ def _run_single_job(
 
     cv_rows: list[dict[str, object]] = []
     metrics_rows: list[dict[str, object]] = []
-    fold_payloads: list[dict[str, Any]] = []
     effective_job = job
     effective_training_params: dict[str, Any] = {}
-    effective_residual_params: dict[str, Any] | None = None
-    residual_study_summary: dict[str, Any] | None = None
-    projection_study_context: StudyContext | None = None
     models_dir = run_root / "models" / job.model
     models_dir.mkdir(parents=True, exist_ok=True)
     total_steps = len(splits)
@@ -3367,49 +1854,6 @@ def _run_single_job(
         )
         effective_job = replace(job, params=best_params)
         effective_training_params = best_training_params
-        if loaded.config.residual.enabled:
-            residual_params = study_summary.get("best_residual_params")
-            if isinstance(residual_params, dict) and residual_params:
-                effective_residual_params = dict(residual_params)
-                if loaded.config.residual.validated_mode == "residual_auto":
-                    residual_study_summary = {
-                        "direction": study_summary.get("direction"),
-                        "trial_count": study_summary.get("trial_count"),
-                        "finished_trial_count": study_summary.get(
-                            "finished_trial_count"
-                        ),
-                        "state_counts": study_summary.get("state_counts", {}),
-                        "best_value": study_summary.get("best_value"),
-                        "best_trial_number": study_summary.get("best_trial_number"),
-                        "objective_metric": study_summary.get("objective_metric"),
-                        "storage_backend": study_summary.get("storage_backend"),
-                        "storage_path": study_summary.get("storage_path"),
-                        "study_name": study_summary.get("study_name"),
-                        "requested_trial_count": study_summary.get(
-                            "requested_trial_count"
-                        ),
-                        "existing_trial_count_before_optimize": study_summary.get(
-                            "existing_trial_count_before_optimize"
-                        ),
-                        "existing_finished_trial_count_before_optimize": study_summary.get(
-                            "existing_finished_trial_count_before_optimize"
-                        ),
-                        "remaining_trial_count": study_summary.get(
-                            "remaining_trial_count"
-                        ),
-                        "reserved_trial_slots": study_summary.get(
-                            "reserved_trial_slots"
-                        ),
-                        "requested_mode": loaded.config.residual.requested_mode,
-                        "validated_mode": loaded.config.residual.validated_mode,
-                        "selected_search_params": list(
-                            loaded.config.residual.selected_search_params
-                        ),
-                        "best_params": effective_residual_params,
-                        "objective_stage": "tuning_pre_replay_joint_corrected_predictions",
-                        "source_study_name": study_summary.get("study_name"),
-                        "source_storage_path": study_summary.get("storage_path"),
-                    }
 
     if effective_job.model in BASELINE_MODEL_NAMES:
         train_series = source_df[[dt_col, target_col]].copy()
@@ -3499,54 +1943,7 @@ def _run_single_job(
                         "y_hat": float(target_predictions[effective_job.model].iloc[row_idx]),
                     }
                 )
-            if loaded.config.residual.enabled:
-                backcast_panel = _build_fold_backcast_panel(
-                    loaded,
-                    effective_job,
-                    nf,
-                    train_df,
-                    dt_col,
-                    target_col,
-                    fold_idx,
-                )
-                eval_panel = _build_fold_eval_panel(
-                    loaded,
-                    effective_job,
-                    fold_idx,
-                    train_end_ds,
-                    target_predictions,
-                    target_actuals,
-                    future_df,
-                    train_df,
-                )
-                fold_payloads.append(
-                    {
-                        "fold_idx": fold_idx,
-                        "backcast_panel": backcast_panel,
-                        "eval_panel": eval_panel,
-                        "trial_dir": (
-                            (projection_study_context or build_study_context(
-                                loaded,
-                                stage_root=run_root / "residual" / effective_job.model,
-                                stage="residual-search",
-                                job_name=effective_job.model,
-                                study_index=resolve_study_selection(loaded).canonical_projection_study_index,
-                            )).trials_root
-                            / "replay-selected-study"
-                        ),
-                        "base_summary": {
-                            "model": effective_job.model,
-                            "fold_idx": fold_idx,
-                            "train_rows": int(len(train_df)),
-                            "eval_rows": int(len(future_df)),
-                            "train_end_ds": str(train_end_ds),
-                            "loss": loaded.config.training.loss,
-                            "loss_curve_path": (
-                                str(loss_curve_path) if loss_curve_path is not None else None
-                            ),
-                        },
-                    }
-                )
+
 
     cv_dir = run_root / "cv"
     cv_dir.mkdir(parents=True, exist_ok=True)
@@ -3586,10 +1983,7 @@ def _run_single_job(
                 "loss": loaded.config.training.loss,
                 "evaluation_policy": "tscv_only",
                 "tuning_objective_metric": (
-                    "mean_fold_mape_on_corrected_predictions"
-                    if job.validated_mode == "learned_auto"
-                    and loaded.config.residual.enabled
-                    else "mean_fold_mape_on_direct_predictions"
+                    "mean_fold_mape_on_direct_predictions"
                     if job.validated_mode == "learned_auto"
                     else None
                 ),
@@ -3599,16 +1993,6 @@ def _run_single_job(
         ),
         encoding="utf-8",
     )
-    if effective_job.model not in BASELINE_MODEL_NAMES:
-        _apply_residual_plugin(
-            loaded,
-            effective_job,
-            run_root,
-            fold_payloads,
-            manifest_path=manifest_path,
-            residual_params_override=effective_residual_params,
-            residual_study_summary_override=residual_study_summary,
-        )
     progress.model_finished(detail="run-complete")
 
 
@@ -3667,6 +2051,11 @@ def _run_single_job_with_parallel_tuning(
                     }
                 )
             )
+    _sync_study_roots(
+        scheduler_dir / "models" / job.model,
+        run_root / "models" / job.model,
+        study_indices=selection.execute_study_indices,
+    )
     projection_loaded = loaded_with_study_selection_override(
         loaded,
         selection.canonical_projection_study_index,

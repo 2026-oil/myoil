@@ -22,8 +22,6 @@ dataset:
   - Bonds_CHN_Spread_10Y_5Y
   futr_exog_cols: []
   static_exog_cols: []
-residual:
-  enabled: false
 jobs:
 - yaml/jobs/main/jobs_1.yaml
 - yaml/jobs/main/jobs_2.yaml
