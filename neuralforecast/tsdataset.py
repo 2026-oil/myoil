@@ -7,6 +7,7 @@ __all__ = ['TimeSeriesLoader', 'BaseTimeSeriesDataset', 'TimeSeriesDataset', 'Lo
 
 from collections.abc import Mapping
 from pathlib import Path
+import random
 from typing import List, Optional, Sequence, Union
 
 import numpy as np
@@ -77,6 +78,32 @@ class TimeSeriesLoader(DataLoader):
             )
 
         raise TypeError(f"Unknown {elem_type}")
+
+
+class _RepeatedSingleBatchSampler:
+    def __init__(
+        self,
+        batch_indices: Sequence[int],
+        *,
+        repeats: int,
+        shuffle: bool,
+    ) -> None:
+        if repeats < 1:
+            raise ValueError("repeats must be >= 1")
+        self.batch_indices = tuple(int(index) for index in batch_indices)
+        self.repeats = int(repeats)
+        self.shuffle = bool(shuffle)
+
+    def __iter__(self):
+        batch = list(self.batch_indices)
+        for _ in range(self.repeats):
+            if self.shuffle and len(batch) > 1:
+                yield random.sample(batch, k=len(batch))
+            else:
+                yield list(batch)
+
+    def __len__(self):
+        return self.repeats
 
 
 class BaseTimeSeriesDataset(Dataset):
@@ -627,6 +654,7 @@ class TimeSeriesDataModule(pl.LightningDataModule):
         valid_batch_size=1024,
         drop_last=False,
         shuffle_train=True,
+        train_single_batch_repeats: int | None = None,
         **dataloaders_kwargs
     ):
         super().__init__()
@@ -635,9 +663,32 @@ class TimeSeriesDataModule(pl.LightningDataModule):
         self.valid_batch_size = valid_batch_size
         self.drop_last = drop_last
         self.shuffle_train = shuffle_train
+        self.train_single_batch_repeats = train_single_batch_repeats
         self.dataloaders_kwargs = dataloaders_kwargs
 
+    def set_train_single_batch_repeats(self, repeats: int | None) -> None:
+        self.train_single_batch_repeats = None if repeats is None else int(repeats)
+
     def train_dataloader(self):
+        if self.train_single_batch_repeats is not None:
+            dataset_size = len(self.dataset)
+            effective_batch_size = min(int(self.batch_size), dataset_size)
+            if effective_batch_size < 1:
+                raise ValueError("dataset must contain at least one training series")
+            if dataset_size > effective_batch_size:
+                raise ValueError(
+                    "train_single_batch_repeats only supports datasets that fit in a single batch"
+                )
+            loader = TimeSeriesLoader(
+                self.dataset,
+                batch_sampler=_RepeatedSingleBatchSampler(
+                    range(dataset_size),
+                    repeats=self.train_single_batch_repeats,
+                    shuffle=self.shuffle_train,
+                ),
+                **self.dataloaders_kwargs,
+            )
+            return loader
         loader = TimeSeriesLoader(
             self.dataset,
             batch_size=self.batch_size,
@@ -675,6 +726,7 @@ class _DistributedTimeSeriesDataModule(TimeSeriesDataModule):
         valid_batch_size=1024,
         drop_last=False,
         shuffle_train=True,
+        train_single_batch_repeats: int | None = None,
         **dataloaders_kwargs
     ):
         super(TimeSeriesDataModule, self).__init__()
@@ -683,6 +735,7 @@ class _DistributedTimeSeriesDataModule(TimeSeriesDataModule):
         self.valid_batch_size = valid_batch_size
         self.drop_last = drop_last
         self.shuffle_train = shuffle_train
+        self.train_single_batch_repeats = train_single_batch_repeats
         self.dataloaders_kwargs = dataloaders_kwargs
 
     def setup(self, stage):

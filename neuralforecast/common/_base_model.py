@@ -602,6 +602,7 @@ class BaseModel(pl.LightningModule):
             shuffle_train=shuffle_train,
             **dataloader_kwargs,
         )
+        self._configure_window_based_train_dataloader(datamodule)
 
         if self.val_check_steps > self.max_steps:
             warnings.warn(
@@ -644,6 +645,26 @@ class BaseModel(pl.LightningModule):
                 test_size,
             )
         return model
+
+    def _window_based_train_batches_per_epoch(self, datamodule) -> Union[int, None]:
+        train_loader = datamodule.train_dataloader()
+        if len(train_loader) != 1:
+            return None
+        batch = next(iter(train_loader), None)
+        if batch is None:
+            return None
+        _, _, _, final_condition = self._create_windows(batch, step="train")
+        return max(1, len(final_condition))
+
+    def _configure_window_based_train_dataloader(self, datamodule) -> None:
+        if self._lr_scheduler_cls is not torch.optim.lr_scheduler.ReduceLROnPlateau:
+            return
+        window_based_batches = self._window_based_train_batches_per_epoch(datamodule)
+        if window_based_batches is None or window_based_batches <= 1:
+            return
+        set_repeats = getattr(datamodule, "set_train_single_batch_repeats", None)
+        if callable(set_repeats):
+            set_repeats(window_based_batches)
 
     def on_fit_start(self):
         torch.manual_seed(self.random_seed)
