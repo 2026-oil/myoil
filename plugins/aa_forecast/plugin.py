@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 import pandas as pd
 
 from . import config as _cfg
+from . import search_space as _ss
 
 if TYPE_CHECKING:
     from app_config import AppConfig, LoadedConfig
@@ -104,7 +105,38 @@ class AAForecastStagePlugin:
         )
 
     def apply_stage_to_config(self, config: AppConfig, stage_loaded: Any) -> AppConfig:
-        return replace(config, stage_plugin_config=stage_loaded.config)
+        selected_model_search = _cfg.aa_forecast_selected_model_search_params(stage_loaded)
+        selected_training_search = _cfg.aa_forecast_selected_training_search_params(
+            stage_loaded
+        )
+        jobs = []
+        for job in config.jobs:
+            if job.model != "AAForecast" or job.validated_mode != "learned_auto":
+                jobs.append(job)
+                continue
+            if not selected_model_search:
+                raise ValueError(
+                    "aa_forecast learned_auto requires search_space.aa_forecast_models "
+                    f"for aa_forecast.model={stage_loaded.config.model!r}"
+                )
+            jobs.append(replace(job, selected_search_params=selected_model_search))
+        training_search = config.training_search
+        if training_search.validated_mode == "training_auto":
+            if not selected_training_search:
+                raise ValueError(
+                    "aa_forecast tune_training=true requires search_space.aa_forecast_training "
+                    f"for aa_forecast.model={stage_loaded.config.model!r}"
+                )
+            training_search = replace(
+                training_search,
+                selected_search_params=selected_training_search,
+            )
+        return replace(
+            config,
+            jobs=tuple(jobs),
+            training_search=training_search,
+            stage_plugin_config=stage_loaded.config,
+        )
 
     def stage_normalized_payload(
         self,
@@ -136,7 +168,7 @@ class AAForecastStagePlugin:
         return {"AAForecast"}
 
     def stage_only_param_registry(self) -> dict[str, dict[str, dict[str, Any]]]:
-        return {}
+        return _ss.AA_FORECAST_STAGE_ONLY_PARAM_REGISTRY
 
     def normalize_search_space_sections(
         self,
@@ -145,14 +177,21 @@ class AAForecastStagePlugin:
         normalize_model_section: Any,
         normalize_training_section: Any,
     ) -> dict[str, Any]:
-        del payload, normalize_model_section, normalize_training_section
-        return {}
+        models, training = _ss.normalize_aa_forecast_sections(
+            payload,
+            normalize_model_section=normalize_model_section,
+            normalize_training_section=normalize_training_section,
+        )
+        return {
+            "aa_forecast_models": models,
+            "aa_forecast_training": training,
+        }
 
     def model_search_space_key(self) -> str:
-        return "models"
+        return "aa_forecast_models"
 
     def training_search_space_key(self) -> str:
-        return "training"
+        return "aa_forecast_training"
 
     def validate_model(self, model_name: str) -> None:
         if model_name != "AAForecast":
@@ -177,10 +216,10 @@ class AAForecastStagePlugin:
         }
 
     def model_search_space_fallback_key(self) -> str | None:
-        return None
+        return "models"
 
     def training_search_space_fallback_key(self) -> str | None:
-        return None
+        return "training"
 
     def prepare_fold_inputs(
         self,

@@ -71,6 +71,7 @@ def _aa_params_override(loaded: Any) -> dict[str, Any]:
     if scaler_type == "robust":
         scaler_type = None
     return {
+        "backbone": stage_cfg.model,
         "top_k": stage_cfg.top_k,
         "star_hist_exog_list": list(stage_cfg.star_hist_exog_cols_resolved),
         "non_star_hist_exog_list": list(stage_cfg.non_star_hist_exog_cols_resolved),

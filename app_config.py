@@ -92,6 +92,8 @@ SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
     "runtime.opt_n_trial",
     "runtime.opt_study_count",
     "runtime.opt_selected_study",
+    "runtime.transformations_target",
+    "runtime.transformations_exog",
     "training.input_size",
     "training.batch_size",
     "training.valid_batch_size",
@@ -1951,6 +1953,16 @@ def load_app_config(
     )
     normalized_payload["shared_settings_sha256"] = shared_settings_hash
     resolved_text = json.dumps(normalized_payload, sort_keys=True, ensure_ascii=False)
+    loaded_search_space_payload = (
+        search_space_contract.payload if search_space_contract else None
+    )
+    if (
+        stage_plugin is not None
+        and stage_plugin.config_key == "aa_forecast"
+        and stage_plugin_loaded is not None
+        and stage_plugin_loaded.search_space_payload is not None
+    ):
+        loaded_search_space_payload = stage_plugin_loaded.search_space_payload
     return LoadedConfig(
         config=config,
         source_path=source_path,
@@ -1962,9 +1974,7 @@ def load_app_config(
         search_space_hash=search_space_contract.sha256
         if search_space_contract
         else None,
-        search_space_payload=search_space_contract.payload
-        if search_space_contract
-        else None,
+        search_space_payload=loaded_search_space_payload,
         shared_settings_path=resolved_shared_settings_path,
         shared_settings_hash=shared_settings_hash,
         stage_plugin_loaded=stage_plugin_loaded,

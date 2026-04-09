@@ -23,6 +23,12 @@ AUTO_MODEL_ONLY_CONFIG = Path("tests/fixtures/aa_forecast_runtime_auto_model_onl
 PLUGIN_AUTO_MODEL_ONLY_MAIN_CONFIG = Path(
     "tests/fixtures/aa_forecast_runtime_plugin_auto_model_only_main.yaml"
 )
+PLUGIN_TIMEXER_AUTO_MODEL_ONLY_MAIN_CONFIG = Path(
+    "tests/fixtures/aa_forecast_runtime_plugin_timexer_auto_model_only_main.yaml"
+)
+PLUGIN_TIMEXER_FIXED_MAIN_CONFIG = Path(
+    "tests/fixtures/aa_forecast_runtime_plugin_timexer_fixed_main.yaml"
+)
 PLUGIN_BEST_MAIN_CONFIG = Path(
     "tests/fixtures/aa_forecast_runtime_plugin_best_main.yaml"
 )
@@ -41,6 +47,23 @@ PARITY_SHARED_MODEL_SELECTORS = [
     "encoder_dropout",
     "decoder_hidden_size",
     "decoder_layers",
+]
+TIMEXER_AA_BACKBONE_SELECTORS = [
+    "hidden_size",
+    "n_heads",
+    "e_layers",
+    "dropout",
+    "d_ff",
+    "patch_len",
+    "use_norm",
+    "decoder_hidden_size",
+    "decoder_layers",
+]
+TIMEXER_AA_TRAINING_SELECTORS = [
+    "input_size",
+    "batch_size",
+    "scaler_type",
+    "model_step_size",
 ]
 FEATURE_SET_AAFORECAST_VARIANTS = {
     "all10": {
@@ -145,9 +168,11 @@ def _assert_grouping_payload(
     config_path: str | None,
     star_anomaly_tails: dict[str, list[str]],
     non_star_hist_exog_cols: list[str],
+    model: str = "gru",
 ) -> None:
     assert payload["config_path"] == config_path
-    assert payload["model"] == "gru"
+    assert payload["model"] == model
+    assert payload["backbone"] == model
     assert payload["star_anomaly_tails"] == star_anomaly_tails
     assert payload["non_star_hist_exog_cols_resolved"] == non_star_hist_exog_cols
     assert "mode" not in payload
@@ -236,6 +261,48 @@ def test_runtime_validate_only_accepts_aaforecast_fixed_path(
     assert manifest["jobs"][0]["requested_mode"] == "learned_fixed"
     assert manifest["jobs"][0]["validated_mode"] == "learned_fixed"
     assert manifest["jobs"][0]["selected_search_params"] == []
+
+
+def test_runtime_validate_only_accepts_aaforecast_fixed_path_with_shared_diff_setting(
+    tmp_path: Path,
+    monkeypatch,
+):
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+
+    shared_settings_path = tmp_path / "setting.yaml"
+    shared_settings_path.write_text(
+        yaml.safe_dump(
+            {"runtime": {"transformations_target": "diff"}},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = load_app_config(
+        Path.cwd(),
+        config_path=str(FIXED_CONFIG),
+        shared_settings_path=shared_settings_path,
+    )
+
+    assert loaded.config.runtime.transformations_target == "diff"
+
+    output_root = tmp_path / "validate-only-aa-forecast-fixed-shared-diff"
+    code = runtime.main(
+        [
+            "--config",
+            str(FIXED_CONFIG),
+            "--setting",
+            str(shared_settings_path),
+            "--output-root",
+            str(output_root),
+            "--validate-only",
+        ]
+    )
+
+    assert code == 0
+    manifest = json.loads((output_root / "manifest" / "run_manifest.json").read_text())
+    assert manifest["jobs"][0]["model"] == "AAForecast"
+    assert manifest["shared_settings_path"] == str(shared_settings_path.resolve())
 
 
 def test_runtime_validate_only_accepts_aaforecast_auto_path(
@@ -335,6 +402,7 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_auto_model_only_path(
         (output_root / "aa_forecast" / "config" / "stage_config.json").read_text()
     )
     assert stage_config["model"] == "gru"
+    assert stage_config["backbone"] == "gru"
     assert "mode" not in stage_config
 
 
@@ -378,6 +446,89 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_best_path(
         (output_root / "aa_forecast" / "config" / "stage_config.json").read_text()
     )
     assert stage_config["model"] == "gru"
+    assert stage_config["backbone"] == "gru"
+    assert "mode" not in stage_config
+
+
+def test_runtime_validate_only_accepts_aaforecast_plugin_timexer_auto_model_only_path(
+    tmp_path: Path,
+) -> None:
+    output_root = tmp_path / "validate-only-aa-forecast-plugin-timexer-auto-model-only"
+    code = runtime.main(
+        [
+            "--config",
+            str(PLUGIN_TIMEXER_AUTO_MODEL_ONLY_MAIN_CONFIG),
+            "--output-root",
+            str(output_root),
+            "--validate-only",
+        ]
+    )
+
+    assert code == 0
+    manifest = json.loads((output_root / "manifest" / "run_manifest.json").read_text())
+    assert len(manifest["jobs"]) == 1
+    assert manifest["jobs"][0]["model"] == "AAForecast"
+    assert manifest["jobs"][0]["requested_mode"] == "learned_auto_requested"
+    assert manifest["jobs"][0]["validated_mode"] == "learned_auto"
+    assert manifest["jobs"][0]["selected_search_params"] == TIMEXER_AA_BACKBONE_SELECTORS
+    assert manifest["training_search"] == {
+        "requested_mode": "training_auto_requested",
+        "validated_mode": "training_auto",
+        "selected_search_params": TIMEXER_AA_TRAINING_SELECTORS,
+    }
+    _assert_grouping_payload(
+        manifest["aa_forecast"],
+        config_path="tests/fixtures/aa_forecast_runtime_plugin_timexer_auto_model_only.yaml",
+        star_anomaly_tails={"upward": ["event"], "two_sided": []},
+        non_star_hist_exog_cols=[],
+        model="timexer",
+    )
+    stage_config = json.loads(
+        (output_root / "aa_forecast" / "config" / "stage_config.json").read_text()
+    )
+    assert stage_config["model"] == "timexer"
+    assert stage_config["backbone"] == "timexer"
+    assert "mode" not in stage_config
+
+
+def test_runtime_validate_only_accepts_aaforecast_plugin_timexer_fixed_path(
+    tmp_path: Path,
+) -> None:
+    output_root = tmp_path / "validate-only-aa-forecast-plugin-timexer-fixed"
+    code = runtime.main(
+        [
+            "--config",
+            str(PLUGIN_TIMEXER_FIXED_MAIN_CONFIG),
+            "--output-root",
+            str(output_root),
+            "--validate-only",
+        ]
+    )
+
+    assert code == 0
+    manifest = json.loads((output_root / "manifest" / "run_manifest.json").read_text())
+    assert len(manifest["jobs"]) == 1
+    assert manifest["jobs"][0]["model"] == "AAForecast"
+    assert manifest["jobs"][0]["requested_mode"] == "learned_fixed"
+    assert manifest["jobs"][0]["validated_mode"] == "learned_fixed"
+    assert manifest["jobs"][0]["selected_search_params"] == []
+    assert manifest["training_search"] == {
+        "requested_mode": "training_fixed",
+        "validated_mode": "training_fixed",
+        "selected_search_params": [],
+    }
+    _assert_grouping_payload(
+        manifest["aa_forecast"],
+        config_path="tests/fixtures/aa_forecast_runtime_plugin_timexer_fixed.yaml",
+        star_anomaly_tails={"upward": ["event"], "two_sided": []},
+        non_star_hist_exog_cols=[],
+        model="timexer",
+    )
+    stage_config = json.loads(
+        (output_root / "aa_forecast" / "config" / "stage_config.json").read_text()
+    )
+    assert stage_config["model"] == "timexer"
+    assert stage_config["backbone"] == "timexer"
     assert "mode" not in stage_config
 
 

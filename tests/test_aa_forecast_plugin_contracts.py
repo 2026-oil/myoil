@@ -26,6 +26,50 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_AUTO_MODEL_ONLY_MAIN_CONFIG = Path(
     "tests/fixtures/aa_forecast_runtime_plugin_auto_model_only_main.yaml"
 )
+SUPPORTED_AA_BACKBONES = [
+    "gru",
+    "informer",
+    "patchtst",
+    "timexer",
+    "vanillatransformer",
+]
+FIXED_BACKBONE_PARAMS = {
+    "gru": {"encoder_hidden_size": 8, "encoder_n_layers": 2, "encoder_dropout": 0.1},
+    "vanillatransformer": {
+        "hidden_size": 8,
+        "n_head": 2,
+        "encoder_layers": 1,
+        "dropout": 0.1,
+        "linear_hidden_size": 16,
+    },
+    "informer": {
+        "hidden_size": 8,
+        "n_head": 2,
+        "encoder_layers": 1,
+        "dropout": 0.1,
+        "linear_hidden_size": 16,
+        "factor": 1,
+    },
+    "patchtst": {
+        "hidden_size": 8,
+        "n_heads": 2,
+        "encoder_layers": 1,
+        "dropout": 0.1,
+        "linear_hidden_size": 16,
+        "attn_dropout": 0.0,
+        "patch_len": 2,
+        "stride": 1,
+    },
+    "timexer": {
+        "hidden_size": 8,
+        "n_heads": 2,
+        "e_layers": 1,
+        "dropout": 0.1,
+        "d_ff": 16,
+        "patch_len": 2,
+        "use_norm": True,
+    },
+}
 
 
 def test_aa_forecast_stage_document_type_accepts_yaml_and_toml() -> None:
@@ -80,6 +124,7 @@ def test_aa_forecast_plugin_state_dict_omits_compatibility_metadata() -> None:
         selected_config_path="yaml/plugins/example.yaml",
     )
     assert payload["model"] == "gru"
+    assert payload["backbone"] == "gru"
     assert "mode" not in payload
     assert "compatibility_mode" not in payload
     assert "compatibility_source_path" not in payload
@@ -244,7 +289,102 @@ def test_load_app_config_rejects_unsupported_aa_forecast_model(tmp_path: Path) -
     }
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
-    with pytest.raises(ValueError, match=r"aa_forecast\.model must be one of: gru"):
+    with pytest.raises(
+        ValueError,
+        match=r"aa_forecast\.model must be one of: .*gru.*informer.*patchtst.*timexer.*vanillatransformer",
+    ):
+        load_app_config(tmp_path, config_path=config_path)
+
+
+@pytest.mark.parametrize("backbone", SUPPORTED_AA_BACKBONES)
+def test_load_app_config_accepts_supported_aa_forecast_backbones(
+    tmp_path: Path,
+    backbone: str,
+) -> None:
+    (tmp_path / "data.csv").write_text(
+        "dt,target,event\n2020-01-01,1,0\n2020-01-08,2,1\n",
+        encoding="utf-8",
+    )
+    plugin_path = tmp_path / "aa_plugin.yaml"
+    plugin_path.write_text(
+        yaml.safe_dump(
+            {
+                "aa_forecast": {
+                    "model": backbone,
+                    "tune_training": False,
+                    "star_anomaly_tails": {"upward": ["event"], "two_sided": []},
+                    "model_params": FIXED_BACKBONE_PARAMS[backbone],
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    payload = {
+        "task": {"name": f"accept_supported_aaforecast_model_{backbone}"},
+        "dataset": {
+            "path": "data.csv",
+            "target_col": "target",
+            "dt_col": "dt",
+            "hist_exog_cols": ["event"],
+            "futr_exog_cols": [],
+            "static_exog_cols": [],
+        },
+        "training": {"loss": "mse"},
+        "cv": {"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0},
+        "scheduler": {"gpu_ids": [0], "max_concurrent_jobs": 1, "worker_devices": 1},
+        "aa_forecast": {"enabled": True, "config_path": str(plugin_path)},
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    assert loaded.config.stage_plugin_config.model == backbone
+    assert loaded.config.stage_plugin_config.config_path == str(plugin_path)
+
+
+def test_load_app_config_rejects_backbone_specific_unknown_model_param(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "data.csv").write_text(
+        "dt,target,event\n2020-01-01,1,0\n2020-01-08,2,1\n",
+        encoding="utf-8",
+    )
+    plugin_path = tmp_path / "aa_plugin.yaml"
+    plugin_path.write_text(
+        "aa_forecast:\n"
+        "  model: timexer\n"
+        "  tune_training: false\n"
+        "  star_anomaly_tails:\n"
+        "    upward:\n"
+        "      - event\n"
+        "    two_sided: []\n"
+        "  model_params:\n"
+        "    encoder_hidden_size: 8\n",
+        encoding="utf-8",
+    )
+    payload = {
+        "task": {"name": "reject_timexer_unknown_model_param"},
+        "dataset": {
+            "path": "data.csv",
+            "target_col": "target",
+            "dt_col": "dt",
+            "hist_exog_cols": ["event"],
+            "futr_exog_cols": [],
+            "static_exog_cols": [],
+        },
+        "training": {"loss": "mse"},
+        "cv": {"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0},
+        "scheduler": {"gpu_ids": [0], "max_concurrent_jobs": 1, "worker_devices": 1},
+        "aa_forecast": {"enabled": True, "config_path": str(plugin_path)},
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    with pytest.raises(
+        ValueError,
+        match=r"unsupported key\(s\) for aa_forecast\.model='timexer': encoder_hidden_size",
+    ):
         load_app_config(tmp_path, config_path=config_path)
 
 

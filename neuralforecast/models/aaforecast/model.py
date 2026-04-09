@@ -13,15 +13,16 @@ from plugins.aa_forecast import CriticalSparseAttention, STARFeatureExtractor
 from ...common._base_model import BaseModel
 from ...common._modules import MLP
 from ...losses.pytorch import MAE
-from .gru import _align_horizon, _apply_stochastic_dropout, _build_encoder
+from .backbones import AA_SUPPORTED_BACKBONES, build_aaforecast_backbone
+from .gru import _align_horizon, _apply_stochastic_dropout
 
 
 class AAForecast(BaseModel):
     """AAForecast
 
     PyTorch/neuralforecast adaptation of the AA-Forecast architecture:
-    STAR decomposition + anomaly/event-aware sparse attention over a GRU encoder
-    + stochastic-dropout uncertainty inference at prediction time.
+    STAR decomposition + anomaly/event-aware sparse attention over a selectable
+    sequence backbone + stochastic-dropout uncertainty inference at prediction time.
     """
 
     EXOGENOUS_FUTR = False
@@ -38,6 +39,20 @@ class AAForecast(BaseModel):
         encoder_n_layers: int = 2,
         encoder_hidden_size: int = 128,
         encoder_dropout: float = 0.1,
+        backbone: str = "gru",
+        hidden_size: int = 128,
+        n_head: int = 4,
+        n_heads: int = 4,
+        encoder_layers: int = 2,
+        dropout: float = 0.1,
+        linear_hidden_size: Optional[int] = None,
+        factor: int = 3,
+        attn_dropout: float = 0.0,
+        patch_len: int = 4,
+        stride: int = 2,
+        e_layers: int = 2,
+        d_ff: int = 256,
+        use_norm: bool = True,
         decoder_hidden_size: int = 128,
         decoder_layers: int = 2,
         attention_hidden_size: Optional[int] = None,
@@ -107,9 +122,30 @@ class AAForecast(BaseModel):
             **trainer_kwargs,
         )
 
-        self.encoder_hidden_size = encoder_hidden_size
+        self.backbone = str(backbone).strip().lower()
+        if self.backbone not in AA_SUPPORTED_BACKBONES:
+            supported = ", ".join(sorted(AA_SUPPORTED_BACKBONES))
+            raise ValueError(f"AAForecast backbone must be one of: {supported}")
+        self.encoder_hidden_size = (
+            encoder_hidden_size if self.backbone == "gru" else hidden_size
+        )
         self.encoder_n_layers = encoder_n_layers
-        self.encoder_dropout = encoder_dropout
+        self.encoder_dropout = (
+            encoder_dropout if self.backbone == "gru" else dropout
+        )
+        self.hidden_size = hidden_size
+        self.n_head = n_head
+        self.n_heads = n_heads
+        self.encoder_layers = encoder_layers
+        self.dropout = dropout
+        self.linear_hidden_size = linear_hidden_size
+        self.factor = factor
+        self.attn_dropout = attn_dropout
+        self.patch_len = patch_len
+        self.stride = stride
+        self.e_layers = e_layers
+        self.d_ff = d_ff
+        self.use_norm = use_norm
         self.decoder_hidden_size = decoder_hidden_size
         self.decoder_layers = decoder_layers
         self.season_length = season_length
@@ -124,7 +160,7 @@ class AAForecast(BaseModel):
         )
         self.uncertainty_sample_count = int(uncertainty_sample_count)
         self._stochastic_inference_enabled = False
-        self._stochastic_dropout_p = float(encoder_dropout)
+        self._stochastic_dropout_p = float(self.encoder_dropout)
         self._star_precompute_enabled = True
         self._star_precompute_fold_key: str | None = None
         self._star_phase_cache: dict[str, dict[str, object]] = {}
@@ -139,8 +175,9 @@ class AAForecast(BaseModel):
 
         feature_size = (
             (0 if exclude_insample_y else 1)
-            + self.hist_exog_size
-            + 4 * (1 + len(self.star_hist_exog_list))
+            + len(self.non_star_hist_exog_list)
+            + 4
+            + 2 * len(self.star_hist_exog_list)
         )
         self.star = STARFeatureExtractor(
             season_length=season_length,
@@ -148,26 +185,41 @@ class AAForecast(BaseModel):
             lowess_delta=lowess_delta,
             top_k=top_k,
         )
-        self.encoder = _build_encoder(
+        self.encoder = build_aaforecast_backbone(
+            self.backbone,
             feature_size=feature_size,
-            hidden_size=encoder_hidden_size,
-            num_layers=encoder_n_layers,
-            dropout=encoder_dropout,
+            input_size=self.input_size,
+            hidden_size=self.hidden_size,
+            encoder_hidden_size=encoder_hidden_size,
+            encoder_n_layers=encoder_n_layers,
+            encoder_dropout=encoder_dropout,
+            n_head=n_head,
+            n_heads=n_heads,
+            encoder_layers=encoder_layers,
+            dropout=dropout,
+            linear_hidden_size=linear_hidden_size,
+            factor=factor,
+            attn_dropout=attn_dropout,
+            patch_len=patch_len,
+            stride=stride,
+            e_layers=e_layers,
+            d_ff=d_ff,
+            use_norm=use_norm,
         )
         self.attention = CriticalSparseAttention(
-            hidden_size=encoder_hidden_size,
+            hidden_size=self.encoder_hidden_size,
             attention_hidden_size=attention_hidden_size,
         )
         self.sequence_adapter = (
             nn.Linear(self.input_size, self.h) if self.h > self.input_size else None
         )
         self.decoder = MLP(
-            in_features=2 * encoder_hidden_size,
+            in_features=2 * self.encoder_hidden_size,
             out_features=self.loss.outputsize_multiplier,
             hidden_size=decoder_hidden_size,
             num_layers=decoder_layers,
             activation="ReLU",
-            dropout=encoder_dropout,
+            dropout=self.encoder_dropout,
         )
 
     def configure_stochastic_inference(
@@ -447,8 +499,11 @@ class AAForecast(BaseModel):
         encoder_parts = []
         if not self.exclude_insample_y:
             encoder_parts.append(insample_y)
-        if self.hist_exog_size > 0:
-            encoder_parts.append(hist_exog)
+        non_star_hist_exog = self._select_hist_exog(
+            hist_exog, self.non_star_hist_exog_indices
+        )
+        if non_star_hist_exog is not None:
+            encoder_parts.append(non_star_hist_exog)
         encoder_parts.extend(
             [
                 star_payload["target_trend"],
@@ -457,18 +512,16 @@ class AAForecast(BaseModel):
                 star_payload["target_residual"],
             ]
         )
-        if star_payload["star_hist_trend"].size(-1) > 0:
+        if star_payload["star_hist_anomalies"].size(-1) > 0:
             encoder_parts.extend(
                 [
-                    star_payload["star_hist_trend"],
-                    star_payload["star_hist_seasonal"],
                     star_payload["star_hist_anomalies"],
                     star_payload["star_hist_residual"],
                 ]
             )
         encoder_input = torch.cat(encoder_parts, dim=2)
 
-        hidden_states, _ = self.encoder(encoder_input)
+        hidden_states = self.encoder(encoder_input)
         critical_mask = star_payload["critical_mask"].bool()
         attended_states, _ = self.attention(hidden_states, critical_mask)
 

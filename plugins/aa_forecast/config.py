@@ -9,6 +9,13 @@ from typing import TYPE_CHECKING, Any, Literal
 if TYPE_CHECKING:
     from tuning.search_space import SearchSpaceContract
 
+from .search_space import (
+    AA_FORECAST_STAGE_ONLY_PARAM_REGISTRY,
+    SUPPORTED_AA_FORECAST_BACKBONES,
+    rewrite_search_space_error,
+    stage_search_space_payload,
+)
+
 
 AA_FORECAST_MAIN_KEYS = {
     "enabled",
@@ -111,6 +118,7 @@ def aa_forecast_uncertainty_public_dict(
 def aa_forecast_plugin_tuning_public_dict(cfg: AAForecastPluginConfig) -> dict[str, Any]:
     return {
         "model": cfg.model,
+        "backbone": cfg.model,
         "top_k": cfg.top_k,
         "star_hist_exog_cols_resolved": list(cfg.star_hist_exog_cols_resolved),
         "non_star_hist_exog_cols_resolved": list(cfg.non_star_hist_exog_cols_resolved),
@@ -180,9 +188,69 @@ def _normalize_model_name(value: Any, *, field_name: str) -> str:
     model = value.strip().lower()
     if not model:
         raise ValueError(f"{field_name} must not be empty")
-    if model != "gru":
-        raise ValueError(f"{field_name} must be one of: gru")
+    if model not in SUPPORTED_AA_FORECAST_BACKBONES:
+        supported = ", ".join(sorted(SUPPORTED_AA_FORECAST_BACKBONES))
+        raise ValueError(f"{field_name} must be one of: {supported}")
     return model
+
+
+def _validate_param_value_against_spec(
+    value: Any,
+    *,
+    field_name: str,
+    spec: dict[str, Any],
+) -> None:
+    spec_type = spec["type"]
+    if spec_type == "categorical":
+        if value not in spec["choices"]:
+            raise ValueError(
+                f"{field_name} must be one of: {', '.join(repr(choice) for choice in spec['choices'])}"
+            )
+        return
+    if spec_type == "int":
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"{field_name} must be an integer")
+        low = int(spec["low"])
+        high = int(spec["high"])
+        step = int(spec.get("step", 1))
+        if value < low or value > high:
+            raise ValueError(f"{field_name} must satisfy {low} <= value <= {high}")
+        if step > 1 and (value - low) % step != 0:
+            raise ValueError(f"{field_name} must increase in steps of {step}")
+        return
+    if spec_type == "float":
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"{field_name} must be numeric")
+        parsed = float(value)
+        low = float(spec["low"])
+        high = float(spec["high"])
+        if parsed < low or parsed > high:
+            raise ValueError(f"{field_name} must satisfy {low} <= value <= {high}")
+        return
+    raise ValueError(f"{field_name} uses unsupported schema type: {spec_type}")
+
+
+def _validate_model_params_for_backbone(
+    backbone: str,
+    model_params: dict[str, Any],
+    *,
+    field_name: str,
+) -> dict[str, Any]:
+    registry = AA_FORECAST_STAGE_ONLY_PARAM_REGISTRY[backbone]
+    unknown = sorted(set(model_params).difference(registry))
+    if unknown:
+        raise ValueError(
+            f"{field_name} contains unsupported key(s) for aa_forecast.model={backbone!r}: "
+            + ", ".join(unknown)
+        )
+    normalized = dict(model_params)
+    for key, value in normalized.items():
+        _validate_param_value_against_spec(
+            value,
+            field_name=f"{field_name}.{key}",
+            spec=registry[key],
+        )
+    return normalized
 
 
 def _coerce_name_tuple(value: Any, *, field_name: str) -> tuple[str, ...]:
@@ -338,6 +406,11 @@ def _normalize_canonical_fields(
         raise ValueError(
             f"{section}.top_k cannot be set both top-level and inside {section}.model_params"
         )
+    model_params = _validate_model_params_for_backbone(
+        model,
+        model_params,
+        field_name=f"{section}.model_params",
+    )
     tune_training = coerce_bool(
         payload.get("tune_training"),
         field_name=f"{section}.tune_training",
@@ -469,6 +542,7 @@ def normalize_linked_aa_forecast_config(
 
 def aa_forecast_to_dict(config: AAForecastPluginConfig) -> dict[str, Any]:
     payload = asdict(config)
+    payload["backbone"] = config.model
     payload["model_params"] = dict(config.model_params)
     payload["uncertainty"]["dropout_candidates"] = list(
         config.uncertainty.dropout_candidates
@@ -556,6 +630,22 @@ def aa_forecast_training_search_payload(
     return {"enabled": bool(config.tune_training)}
 
 
+def aa_forecast_selected_model_search_params(
+    stage_loaded: AAForecastStageLoadedConfig | None,
+) -> tuple[str, ...]:
+    if stage_loaded is None or stage_loaded.search_space_payload is None:
+        return ()
+    return tuple(stage_loaded.search_space_payload["models"]["AAForecast"])
+
+
+def aa_forecast_selected_training_search_params(
+    stage_loaded: AAForecastStageLoadedConfig | None,
+) -> tuple[str, ...]:
+    if stage_loaded is None or stage_loaded.search_space_payload is None:
+        return ()
+    return tuple(stage_loaded.search_space_payload["training"]["per_model"]["AAForecast"])
+
+
 def load_aa_forecast_stage1(
     repo_root: Path,
     *,
@@ -604,6 +694,15 @@ def load_aa_forecast_stage1(
             "selected_config_path": str(stage_source_path),
         }
     }
+    scoped_search_space = None
+    if search_space_contract is not None:
+        try:
+            scoped_search_space = stage_search_space_payload(
+                search_space_contract.payload,
+                backbone=config.model,
+            )
+        except ValueError as exc:
+            raise ValueError(rewrite_search_space_error(str(exc))) from exc
     return AAForecastStageLoadedConfig(
         config=config,
         source_path=stage_source_path,
@@ -613,5 +712,5 @@ def load_aa_forecast_stage1(
         resolved_hash=_hash_text(json.dumps(normalized_payload, sort_keys=True)),
         search_space_path=search_space_contract.path if search_space_contract else None,
         search_space_hash=search_space_contract.sha256 if search_space_contract else None,
-        search_space_payload=search_space_contract.payload if search_space_contract else None,
+        search_space_payload=scoped_search_space,
     )

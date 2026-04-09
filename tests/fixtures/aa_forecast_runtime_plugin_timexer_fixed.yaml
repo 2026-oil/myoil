@@ -1,0 +1,18 @@
+aa_forecast:
+  model: timexer
+  tune_training: false
+  lowess_frac: 0.6
+  lowess_delta: 0.01
+  uncertainty:
+    enabled: false
+    sample_count: 3
+  model_params:
+    hidden_size: 64
+    n_heads: 4
+    e_layers: 1
+    d_ff: 128
+    patch_len: 4
+  star_anomaly_tails:
+    upward:
+    - event
+    two_sided: []

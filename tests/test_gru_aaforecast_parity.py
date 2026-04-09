@@ -39,7 +39,11 @@ BRENT_CASE1_PARITY_PARAMS = {
     "decoder_layers": 2,
 }
 BRENT_CASE1_PARITY_AA_PARAMS = {
-    **BRENT_CASE1_PARITY_PARAMS,
+    "encoder_hidden_size": 128,
+    "encoder_n_layers": 4,
+    "encoder_dropout": 0.1,
+    "decoder_hidden_size": 128,
+    "decoder_layers": 4,
     "season_length": 52,
 }
 BRENT_CASE1_PARITY_HIST_EXOG = [
@@ -53,6 +57,18 @@ BRENT_CASE1_PARITY_HIST_EXOG = [
     "GPRD_THREAT",
     "GPRD",
     "GPRD_ACT",
+]
+BRENT_CASE1_PARITY_AA_HIST_EXOG = [
+    "GPRD_THREAT",
+    "BS_Core_Index_A",
+    "GPRD",
+    "GPRD_ACT",
+    "BS_Core_Index_B",
+    "BS_Core_Index_C",
+    "Idx_OVX",
+    "Com_Oil_Spread",
+    "Com_LMEX",
+    "Com_BloombergCommodity_BCOM",
 ]
 
 
@@ -127,6 +143,30 @@ def test_gru_parity_horizon_context_varies_across_steps() -> None:
     context = gru._build_horizon_context(batch_size=2, device=torch.device("cpu"))
     assert context.shape == (2, 4, gru.encoder_hidden_size)
     assert not torch.allclose(context[:, 0, :], context[:, 1, :])
+
+
+def test_aaforecast_encoder_uses_only_non_star_raw_hist_exog() -> None:
+    model = AAForecast(
+        h=2,
+        input_size=4,
+        encoder_hidden_size=8,
+        encoder_n_layers=2,
+        encoder_dropout=0.1,
+        decoder_hidden_size=8,
+        decoder_layers=2,
+        hist_exog_list=["event", "macro"],
+        star_hist_exog_list=["event"],
+        non_star_hist_exog_list=["macro"],
+        star_hist_exog_tail_modes=["upward"],
+        scaler_type="identity",
+        max_steps=1,
+        val_check_steps=1,
+        batch_size=1,
+        windows_batch_size=1,
+        inference_windows_batch_size=1,
+    )
+
+    assert model.encoder.input_size == 1 + 1 + 4 + 2 * 1
 
 
 @pytest.mark.parametrize(
@@ -245,10 +285,12 @@ def test_brent_case1_parity_experiment_configs_share_dataset_contract() -> None:
         assert payload["dataset"]["path"] == "data/df.csv"
         assert payload["dataset"]["target_col"] == "Com_BrentCrudeOil"
         assert payload["dataset"]["dt_col"] == "dt"
-        assert payload["dataset"]["hist_exog_cols"] == BRENT_CASE1_PARITY_HIST_EXOG
         assert payload["dataset"]["futr_exog_cols"] == []
         assert payload["dataset"]["static_exog_cols"] == []
         assert payload["training_search"] == {"enabled": False}
+
+    assert gru_payload["dataset"]["hist_exog_cols"] == BRENT_CASE1_PARITY_HIST_EXOG
+    assert aa_payload["dataset"]["hist_exog_cols"] == BRENT_CASE1_PARITY_AA_HIST_EXOG
 
     assert gru_payload["jobs"] == [{"model": "GRU", "params": BRENT_CASE1_PARITY_PARAMS}]
     assert aa_payload["aa_forecast"]["enabled"] is True
@@ -260,7 +302,7 @@ def test_brent_case1_parity_experiment_configs_share_dataset_contract() -> None:
         "enabled": True,
         "sample_count": 50,
     }
-    assert aa_plugin_payload["aa_forecast"]["top_k"] == 0.15
+    assert aa_plugin_payload["aa_forecast"]["top_k"] == 0.1
 
 
 def test_runtime_validate_only_accepts_brent_case1_fixed_parity_experiments(
