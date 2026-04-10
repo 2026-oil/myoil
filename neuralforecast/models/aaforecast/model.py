@@ -260,13 +260,23 @@ class AAForecast(BaseModel):
             if star_hist_exog is not None
             else None
         )
-        target_mask = self._reduce_critical_mask(
+        target_count = self._count_active_channels(
             target_star["critical_mask"],
             template=insample_y,
         )
-        star_hist_mask = self._reduce_critical_mask(
+        star_hist_count = self._count_active_channels(
             None if star_hist_outputs is None else star_hist_outputs["critical_mask"],
             template=insample_y,
+        )
+        combined_count = target_count + star_hist_count
+        target_activity = target_star["ranking_score"] * target_star["critical_mask"].to(
+            dtype=insample_y.dtype
+        )
+        star_hist_activity = (
+            star_hist_outputs["ranking_score"]
+            * star_hist_outputs["critical_mask"].to(dtype=insample_y.dtype)
+            if star_hist_outputs is not None
+            else insample_y.new_empty((insample_y.size(0), insample_y.size(1), 0))
         )
         return {
             "target_trend": target_star["trend"],
@@ -301,7 +311,9 @@ class AAForecast(BaseModel):
                     (insample_y.size(0), insample_y.size(1), 0)
                 )
             ),
-            "critical_mask": target_mask | star_hist_mask,
+            "critical_mask": combined_count > 0,
+            "count_active_channels": combined_count,
+            "channel_activity": torch.cat([target_activity, star_hist_activity], dim=2),
         }
 
     def _build_star_phase_cache(
@@ -481,14 +493,20 @@ class AAForecast(BaseModel):
         return torch.index_select(hist_exog, dim=2, index=index_tensor)
 
     @staticmethod
-    def _reduce_critical_mask(mask: torch.Tensor | None, *, template: torch.Tensor) -> torch.Tensor:
+    def _count_active_channels(
+        mask: torch.Tensor | None,
+        *,
+        template: torch.Tensor,
+    ) -> torch.Tensor:
         if mask is None:
-            return torch.zeros_like(template, dtype=torch.bool)
+            return torch.zeros_like(template)
         if mask.ndim != 3:
             raise ValueError("AAForecast critical mask must be rank-3")
-        if mask.size(-1) == 1:
-            return mask.bool()
-        return mask.any(dim=2, keepdim=True)
+        return mask.bool().to(dtype=template.dtype).sum(dim=2, keepdim=True)
+
+    @staticmethod
+    def _reduce_critical_mask(mask: torch.Tensor | None, *, template: torch.Tensor) -> torch.Tensor:
+        return AAForecast._count_active_channels(mask, template=template) > 0
 
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]
@@ -525,7 +543,20 @@ class AAForecast(BaseModel):
 
         hidden_states = self.encoder(encoder_input)
         critical_mask = star_payload["critical_mask"].bool()
-        attended_states, _ = self.attention(hidden_states, critical_mask)
+        count_active_channels = star_payload["count_active_channels"].to(
+            device=hidden_states.device,
+            dtype=hidden_states.dtype,
+        )
+        channel_activity = star_payload["channel_activity"].to(
+            device=hidden_states.device,
+            dtype=hidden_states.dtype,
+        )
+        attended_states, _ = self.attention(
+            hidden_states,
+            critical_mask,
+            count_active_channels,
+            channel_activity,
+        )
 
         hidden_aligned = _align_horizon(
             hidden_states,

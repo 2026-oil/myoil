@@ -201,17 +201,44 @@ class CriticalSparseAttention(nn.Module):
         self,
         hidden_states: torch.Tensor,
         critical_mask: torch.Tensor,
+        count_active_channels: torch.Tensor,
+        channel_activity: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         mask = critical_mask.squeeze(-1).bool()
+        if count_active_channels.ndim != 3:
+            raise ValueError("CriticalSparseAttention count_active_channels must be rank-3")
+        if channel_activity.ndim != 3:
+            raise ValueError("CriticalSparseAttention channel_activity must be rank-3")
+        count_signal = count_active_channels.squeeze(-1).to(dtype=hidden_states.dtype)
+        activity = channel_activity.to(dtype=hidden_states.dtype).clamp_min(0.0)
         logits = self.score(torch.tanh(self.proj(hidden_states))).squeeze(-1)
-        masked_logits = logits.masked_fill(~mask, -1e9)
-        has_any = mask.any(dim=1, keepdim=True)
-        weights = torch.softmax(masked_logits, dim=1)
-        weights = torch.where(has_any, weights, torch.zeros_like(weights))
+        logits = logits + torch.log1p(count_signal.clamp_min(0.0))
+        channel_mask = activity > 0
+        channel_logits = logits.unsqueeze(1) + torch.log1p(activity.transpose(1, 2))
+        channel_logits = channel_logits.masked_fill(~channel_mask.transpose(1, 2), -1e9)
+        has_channel_any = channel_mask.any(dim=1)
+        weights = torch.softmax(channel_logits, dim=-1)
+        weights = torch.where(
+            has_channel_any.unsqueeze(-1),
+            weights,
+            torch.zeros_like(weights),
+        )
 
-        context = torch.einsum("bl,blh->bh", weights, hidden_states)
-        fallback = hidden_states[:, -1, :]
-        context = torch.where(has_any, context, fallback)
-        expanded_context = context.unsqueeze(1).expand(-1, hidden_states.size(1), -1)
-        attended = torch.where(mask.unsqueeze(-1), expanded_context, hidden_states)
+        channel_contexts = torch.einsum("bcl,blh->bch", weights, hidden_states)
+        fallback = hidden_states[:, -1, :].unsqueeze(1).expand_as(channel_contexts)
+        channel_contexts = torch.where(
+            has_channel_any.unsqueeze(-1),
+            channel_contexts,
+            fallback,
+        )
+        mix_denom = activity.sum(dim=2, keepdim=True).clamp_min(1.0)
+        mix = activity / mix_denom
+        expanded_context = torch.einsum("blc,bch->blh", mix, channel_contexts)
+        max_count = count_signal.amax(dim=1, keepdim=True).clamp_min(1.0)
+        density_gate = 1.0 + (count_signal / max_count)
+        attended = torch.where(
+            mask.unsqueeze(-1),
+            expanded_context * density_gate.unsqueeze(-1),
+            hidden_states,
+        )
         return attended, weights

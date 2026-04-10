@@ -5,6 +5,7 @@ import pytest
 import torch
 
 from neuralforecast.models import AAForecast
+from plugins.aa_forecast import CriticalSparseAttention
 
 
 def _build_model() -> AAForecast:
@@ -138,6 +139,8 @@ def test_star_precompute_validation_cache_reuses_phase_payload() -> None:
         "target_anomalies",
         "target_residual",
         "critical_mask",
+        "count_active_channels",
+        "channel_activity",
     ):
         assert key in payload1
         assert torch.equal(payload1[key], payload2[key])
@@ -207,6 +210,112 @@ def test_star_precompute_supports_zero_anomaly_windows() -> None:
 
     assert payload is not None
     assert torch.count_nonzero(payload["critical_mask"]) == 0
+    assert torch.count_nonzero(payload["count_active_channels"]) == 0
+    assert torch.count_nonzero(payload["channel_activity"]) == 0
+
+
+def test_count_active_channels_preserves_multi_channel_density() -> None:
+    template = torch.zeros((1, 4, 1), dtype=torch.float32)
+    mask = torch.tensor(
+        [
+            [
+                [False, False, False],
+                [True, False, True],
+                [True, True, True],
+                [False, True, False],
+            ]
+        ],
+        dtype=torch.bool,
+    )
+
+    counts = AAForecast._count_active_channels(mask, template=template)
+    reduced_mask = AAForecast._reduce_critical_mask(mask, template=template)
+
+    assert torch.equal(
+        counts,
+        torch.tensor([[[0.0], [2.0], [3.0], [1.0]]], dtype=torch.float32),
+    )
+    assert torch.equal(reduced_mask, counts > 0)
+
+
+def test_critical_sparse_attention_uses_count_signal() -> None:
+    attention = CriticalSparseAttention(hidden_size=2, attention_hidden_size=2)
+    with torch.no_grad():
+        attention.proj.weight.zero_()
+        attention.proj.bias.zero_()
+        attention.score.weight.zero_()
+        attention.score.bias.zero_()
+
+    hidden_states = torch.tensor(
+        [[[1.0, 0.0], [0.0, 2.0], [1.0, 1.0]]],
+        dtype=torch.float32,
+    )
+    critical_mask = torch.ones((1, 3, 1), dtype=torch.bool)
+    low_counts = torch.ones((1, 3, 1), dtype=torch.float32)
+    high_counts = torch.tensor(
+        [[[1.0], [3.0], [1.0]]],
+        dtype=torch.float32,
+    )
+    channel_activity = torch.tensor(
+        [[[1.0, 1.0], [1.0, 1.0], [1.0, 1.0]]],
+        dtype=torch.float32,
+    )
+
+    attended_low, weights_low = attention(
+        hidden_states,
+        critical_mask,
+        low_counts,
+        channel_activity,
+    )
+    attended_high, weights_high = attention(
+        hidden_states,
+        critical_mask,
+        high_counts,
+        channel_activity,
+    )
+
+    assert weights_high[0, 0, 1] > weights_low[0, 0, 1]
+    assert not torch.allclose(attended_high, attended_low)
+
+
+def test_critical_sparse_attention_uses_channel_activity_bank() -> None:
+    attention = CriticalSparseAttention(hidden_size=2, attention_hidden_size=2)
+    with torch.no_grad():
+        attention.proj.weight.zero_()
+        attention.proj.bias.zero_()
+        attention.score.weight.zero_()
+        attention.score.bias.zero_()
+
+    hidden_states = torch.tensor(
+        [[[2.0, 0.0], [0.0, 3.0], [1.0, 1.0]]],
+        dtype=torch.float32,
+    )
+    critical_mask = torch.ones((1, 3, 1), dtype=torch.bool)
+    count_active_channels = torch.ones((1, 3, 1), dtype=torch.float32)
+    first_identity = torch.tensor(
+        [[[1.0, 0.0], [1.0, 0.0], [0.0, 1.0]]],
+        dtype=torch.float32,
+    )
+    swapped_identity = torch.tensor(
+        [[[1.0, 0.0], [0.0, 1.0], [0.0, 1.0]]],
+        dtype=torch.float32,
+    )
+
+    attended_first, weights_first = attention(
+        hidden_states,
+        critical_mask,
+        count_active_channels,
+        first_identity,
+    )
+    attended_swapped, weights_swapped = attention(
+        hidden_states,
+        critical_mask,
+        count_active_channels,
+        swapped_identity,
+    )
+
+    assert not torch.allclose(attended_first, attended_swapped)
+    assert not torch.allclose(weights_first, weights_swapped)
 
 
 def test_star_precompute_preserves_active_scaler_state() -> None:
@@ -281,6 +390,8 @@ def test_forward_uses_precomputed_payload_without_calling_star(
         "star_hist_anomalies": torch.full((batch_size, seq_len, 1), 7.0),
         "star_hist_residual": torch.full((batch_size, seq_len, 1), 8.0),
         "critical_mask": torch.ones(batch_size, seq_len, 1, dtype=torch.bool),
+        "count_active_channels": torch.ones(batch_size, seq_len, 1),
+        "channel_activity": torch.ones(batch_size, seq_len, 2),
     }
     captured: dict[str, torch.Tensor] = {}
 
