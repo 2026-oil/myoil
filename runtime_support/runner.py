@@ -2128,6 +2128,7 @@ def _build_summary_plot_bundle(
     scoped_forecasts: pd.DataFrame,
     *,
     title_prefix: str,
+    include_future_only_predictions: bool = False,
 ) -> dict[str, str]:
     plot_paths: dict[str, str] = {}
     if leaderboard.empty:
@@ -2158,6 +2159,7 @@ def _build_summary_plot_bundle(
             title=title,
             run_root=run_root,
             history_steps_override=history_steps_override,
+            include_future_only_predictions=include_future_only_predictions,
         )
         plot_paths[slug] = str(plot_path)
     return plot_paths
@@ -2171,6 +2173,7 @@ def _write_summary_bundle(
     scoped_forecasts: pd.DataFrame | None = None,
     title_prefix: str,
     report_context_lines: Sequence[str] | None = None,
+    include_future_only_predictions: bool = False,
 ) -> tuple[pd.DataFrame, dict[str, str]]:
     leaderboard = _build_leaderboard(metrics_frame)
     workbook_path = summary_dir / "leaderboard.csv"
@@ -2193,6 +2196,7 @@ def _write_summary_bundle(
                 leaderboard,
                 scoped_forecasts,
                 title_prefix=title_prefix,
+                include_future_only_predictions=include_future_only_predictions,
             )
         )
     return leaderboard, artifact_paths
@@ -2658,6 +2662,7 @@ def _write_per_window_summary_bundles(
             report_context_lines=_rolling_origin_context_lines(
                 window, horizon=loaded.config.cv.horizon
             ),
+            include_future_only_predictions=True,
         )
         _write_rolling_origin_manifest(
             summary_dir,
@@ -2674,6 +2679,7 @@ def _plot_last_fold_overlay(
     title: str,
     run_root: Path,
     history_steps_override: int | None = None,
+    include_future_only_predictions: bool = False,
 ) -> None:
     import matplotlib
 
@@ -2843,7 +2849,7 @@ def _plot_last_fold_overlay(
         )
         if model_frame.empty:
             continue
-        if "y" in model_frame.columns:
+        if "y" in model_frame.columns and not include_future_only_predictions:
             model_frame = model_frame[model_frame["y"].notna()].reset_index(drop=True)
         if model_frame.empty:
             continue

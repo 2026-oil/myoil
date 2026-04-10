@@ -589,6 +589,67 @@ def test_plot_last_fold_overlay_skips_future_only_prediction_segment(
     assert pred_y.tolist() == [11.0, 12.5]
 
 
+def test_plot_last_fold_overlay_includes_future_only_prediction_segment_when_enabled(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    price_axis = _FakeAxis()
+
+    def fake_subplots(*args, **kwargs):
+        return _FakeFigure(), price_axis
+
+    monkeypatch.setattr(matplotlib, "use", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(plt, "subplots", fake_subplots)
+    monkeypatch.setattr(plt, "close", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        runtime,
+        "_summary_overlay_actual_frames",
+        lambda *_args, **_kwargs: (
+            pd.DataFrame(
+                {
+                    "ds": pd.to_datetime(["2024-02-11", "2024-02-18"]),
+                    "y": [10.0, 11.0],
+                }
+            ),
+            pd.DataFrame(
+                {
+                    "ds": pd.to_datetime(["2024-02-25"]),
+                    "y": [12.0],
+                }
+            ),
+        ),
+    )
+
+    forecasts = pd.DataFrame(
+        {
+            "model": ["Naive", "Naive"],
+            "ds": ["2024-02-25", "2024-03-03"],
+            "y": [12.0, None],
+            "y_hat": [12.5, 13.5],
+            "fold_idx": [0, 0],
+            "cutoff": ["2024-02-18", "2024-02-18"],
+        }
+    )
+
+    runtime._plot_last_fold_overlay(
+        forecasts,
+        ["Naive"],
+        tmp_path / "future-included.png",
+        title="future-included",
+        run_root=tmp_path,
+        include_future_only_predictions=True,
+    )
+
+    assert len(price_axis.plot_calls) == 3
+    pred_x, pred_y = price_axis.plot_calls[2]
+    assert [str(value.date()) for value in pred_x.tolist()] == [
+        "2024-02-18",
+        "2024-02-25",
+        "2024-03-03",
+    ]
+    assert pred_y.tolist() == [11.0, 12.5, 13.5]
+
+
 def test_plot_last_fold_overlay_adds_lower_context_subplot_for_aaforecast(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -763,12 +824,14 @@ def test_build_summary_plot_bundle_writes_window_16_variant(
         title,
         run_root,
         history_steps_override=None,
+        include_future_only_predictions=False,
     ):
         del forecasts, selected_models, title, run_root
         calls.append(
             {
                 "path": Path(plot_path).name,
                 "history_steps_override": history_steps_override,
+                "include_future_only_predictions": include_future_only_predictions,
             }
         )
         Path(plot_path).parent.mkdir(parents=True, exist_ok=True)
@@ -794,9 +857,67 @@ def test_build_summary_plot_bundle_writes_window_16_variant(
         {
             "path": "last_fold_all_models.png",
             "history_steps_override": None,
+            "include_future_only_predictions": False,
         },
         {
             "path": "last_fold_all_models_window_16.png",
             "history_steps_override": 16,
+            "include_future_only_predictions": False,
         },
     ]
+
+
+def test_write_summary_bundle_enables_future_tail_only_for_requested_scope(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[bool] = []
+
+    def fake_build_summary_plot_bundle(
+        run_root,
+        summary_dir,
+        leaderboard,
+        scoped_forecasts,
+        *,
+        title_prefix,
+        include_future_only_predictions=False,
+    ):
+        del run_root, summary_dir, leaderboard, scoped_forecasts, title_prefix
+        calls.append(include_future_only_predictions)
+        return {"all_models": "fake.png"}
+
+    monkeypatch.setattr(runtime, "_build_summary_plot_bundle", fake_build_summary_plot_bundle)
+
+    metrics = pd.DataFrame(
+        [
+            {
+                "model": "Naive",
+                "fold_idx": 0,
+                "MAE": 1.0,
+                "MSE": 1.0,
+                "RMSE": 1.0,
+                "MAPE": 0.1,
+                "NRMSE": 0.1,
+                "R2": 0.9,
+            }
+        ]
+    )
+    scoped_forecasts = pd.DataFrame([{"model": "Naive", "fold_idx": 0}])
+
+    runtime._write_summary_bundle(
+        tmp_path,
+        tmp_path / "summary-default",
+        metrics,
+        scoped_forecasts=scoped_forecasts,
+        title_prefix="default",
+    )
+    runtime._write_summary_bundle(
+        tmp_path,
+        tmp_path / "summary-test",
+        metrics,
+        scoped_forecasts=scoped_forecasts,
+        title_prefix="test",
+        include_future_only_predictions=True,
+    )
+
+    assert calls == [False, True]

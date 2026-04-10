@@ -339,6 +339,7 @@ def test_load_app_config_shared_settings_round_trip_preserves_optuna_study_selec
                 'opt_n_trial': 7,
                 'opt_study_count': 3,
                 'opt_selected_study': 2,
+                'transformations_target': 'diff',
             }
         },
     )
@@ -353,18 +354,43 @@ def test_load_app_config_shared_settings_round_trip_preserves_optuna_study_selec
     assert loaded.config.runtime.opt_n_trial == 7
     assert loaded.config.runtime.opt_study_count == 3
     assert loaded.config.runtime.opt_selected_study == 2
+    assert loaded.config.runtime.transformations_target == 'diff'
     assert loaded.config.to_dict()['runtime'] == {
         'random_seed': 11,
         'opt_n_trial': 7,
         'opt_study_count': 3,
         'opt_selected_study': 2,
+        'transformations_target': 'diff',
     }
     assert loaded.normalized_payload['runtime'] == {
         'random_seed': 11,
         'opt_n_trial': 7,
         'opt_study_count': 3,
         'opt_selected_study': 2,
+        'transformations_target': 'diff',
     }
+
+
+def test_load_app_config_rejects_duplicate_shared_runtime_transformation(
+    tmp_path: Path,
+) -> None:
+    payload = _minimal_app_config_payload()
+    payload['runtime'] = {'transformations_target': 'diff'}
+    config_path = _write_yaml(tmp_path / 'config.yaml', payload)
+    shared_settings_path = _write_yaml(
+        tmp_path / 'setting.yaml',
+        {'runtime': {'transformations_target': 'diff'}},
+    )
+
+    with pytest.raises(
+        ValueError,
+        match='config repeats shared setting path\\(s\\): runtime.transformations_target',
+    ):
+        load_app_config(
+            tmp_path,
+            config_path=config_path,
+            shared_settings_path=shared_settings_path.name,
+        )
 
 
 def test_load_app_config_defaults_opt_study_count_and_omits_unset_selected_study(

@@ -2,6 +2,8 @@ runtime:
   random_seed: 1
   opt_study_count: 2
   opt_n_trial: 2
+  transformations_target: diff
+  transformations_exog: diff
 training:
   input_size: 24
   batch_size: 32

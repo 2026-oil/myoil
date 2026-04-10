@@ -1,5 +1,5 @@
 task:
-  name: brentoil_case1_parity_aaforecast
+  name: brentoil_case1_parity_aaforecast_gru
 dataset:
   path: data/df.csv
   target_col: Com_BrentCrudeOil
