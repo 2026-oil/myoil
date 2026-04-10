@@ -177,7 +177,7 @@ class AAForecast(BaseModel):
             (0 if exclude_insample_y else 1)
             + len(self.non_star_hist_exog_list)
             + 4
-            + 2 * len(self.star_hist_exog_list)
+            + 4 * len(self.star_hist_exog_list)
         )
         self.star = STARFeatureExtractor(
             season_length=season_length,
@@ -515,6 +515,8 @@ class AAForecast(BaseModel):
         if star_payload["star_hist_anomalies"].size(-1) > 0:
             encoder_parts.extend(
                 [
+                    star_payload["star_hist_trend"],
+                    star_payload["star_hist_seasonal"],
                     star_payload["star_hist_anomalies"],
                     star_payload["star_hist_residual"],
                 ]

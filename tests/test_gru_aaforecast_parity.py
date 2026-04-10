@@ -145,7 +145,7 @@ def test_gru_parity_horizon_context_varies_across_steps() -> None:
     assert not torch.allclose(context[:, 0, :], context[:, 1, :])
 
 
-def test_aaforecast_encoder_uses_only_non_star_raw_hist_exog() -> None:
+def test_aaforecast_encoder_uses_non_star_raw_and_full_star_hist_exog() -> None:
     model = AAForecast(
         h=2,
         input_size=4,
@@ -166,7 +166,7 @@ def test_aaforecast_encoder_uses_only_non_star_raw_hist_exog() -> None:
         inference_windows_batch_size=1,
     )
 
-    assert model.encoder.input_size == 1 + 1 + 4 + 2 * 1
+    assert model.encoder.input_size == 1 + 1 + 4 + 4 * 1
 
 
 @pytest.mark.parametrize(

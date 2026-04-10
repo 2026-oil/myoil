@@ -246,25 +246,39 @@ def test_forward_uses_precomputed_payload_without_calling_star(
     batch_size = 2
     seq_len = model.input_size
     insample_y = torch.ones(batch_size, seq_len, 1)
-    hist_exog = torch.ones(batch_size, seq_len, 2)
+    hist_exog = torch.cat(
+        [
+            torch.full((batch_size, seq_len, 1), 9.0),
+            torch.full((batch_size, seq_len, 1), 8.0),
+        ],
+        dim=2,
+    )
     star_precomputed = {
-        "target_trend": torch.ones(batch_size, seq_len, 1),
-        "target_seasonal": torch.ones(batch_size, seq_len, 1),
-        "target_anomalies": torch.ones(batch_size, seq_len, 1),
-        "target_residual": torch.ones(batch_size, seq_len, 1),
-        "star_hist_trend": torch.ones(batch_size, seq_len, 1),
-        "star_hist_seasonal": torch.ones(batch_size, seq_len, 1),
-        "star_hist_anomalies": torch.ones(batch_size, seq_len, 1),
-        "star_hist_residual": torch.ones(batch_size, seq_len, 1),
+        "target_trend": torch.full((batch_size, seq_len, 1), 1.0),
+        "target_seasonal": torch.full((batch_size, seq_len, 1), 2.0),
+        "target_anomalies": torch.full((batch_size, seq_len, 1), 3.0),
+        "target_residual": torch.full((batch_size, seq_len, 1), 4.0),
+        "star_hist_trend": torch.full((batch_size, seq_len, 1), 5.0),
+        "star_hist_seasonal": torch.full((batch_size, seq_len, 1), 6.0),
+        "star_hist_anomalies": torch.full((batch_size, seq_len, 1), 7.0),
+        "star_hist_residual": torch.full((batch_size, seq_len, 1), 8.0),
         "critical_mask": torch.ones(batch_size, seq_len, 1, dtype=torch.bool),
     }
+    captured: dict[str, torch.Tensor] = {}
 
     def _raise(*args, **kwargs):
         raise AssertionError(
             "STAR should not be called when star_precomputed is provided"
         )
 
+    original_encoder_forward = model.encoder.forward
+
+    def _capture_encoder_input(x: torch.Tensor) -> torch.Tensor:
+        captured["encoder_input"] = x.detach().clone()
+        return original_encoder_forward(x)
+
     monkeypatch.setattr(model.star, "forward", _raise)
+    monkeypatch.setattr(model.encoder, "forward", _capture_encoder_input)
     output = model(
         {
             "insample_y": insample_y,
@@ -278,3 +292,11 @@ def test_forward_uses_precomputed_payload_without_calling_star(
 
     assert output.shape[0] == batch_size
     assert output.shape[1] == model.h
+    encoder_input = captured["encoder_input"]
+    assert encoder_input.shape == (batch_size, seq_len, 10)
+    expected_channels = (1.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0)
+    for index, expected in enumerate(expected_channels):
+        assert torch.allclose(
+            encoder_input[:, :, index],
+            torch.full((batch_size, seq_len), expected),
+        )
