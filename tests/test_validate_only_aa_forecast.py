@@ -684,6 +684,41 @@ def test_validate_only_aaforecast_legacy_plugin_anomaly_threshold_fails_fast(
         )
 
 
+def test_validate_only_aaforecast_legacy_plugin_top_k_fails_fast(
+    tmp_path: Path,
+) -> None:
+    payload = yaml.safe_load(PLUGIN_BEST_MAIN_CONFIG.read_text(encoding="utf-8"))
+    payload["dataset"]["path"] = str(
+        (PLUGIN_BEST_MAIN_CONFIG.parent / payload["dataset"]["path"]).resolve()
+    )
+    plugin_payload = yaml.safe_load(
+        (PLUGIN_BEST_MAIN_CONFIG.parent / "aa_forecast_runtime_plugin_best.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    plugin_payload["aa_forecast"]["top_k"] = 0.1
+    plugin_payload["aa_forecast"].pop("thresh", None)
+    plugin_path = tmp_path / "legacy-top-k-plugin.yaml"
+    plugin_path.write_text(yaml.safe_dump(plugin_payload, sort_keys=False), encoding="utf-8")
+    payload["aa_forecast"] = {
+        "enabled": True,
+        "config_path": str(plugin_path),
+    }
+    config_path = tmp_path / "legacy-top-k-main.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"top_k.*thresh"):
+        runtime.main(
+            [
+                "--config",
+                str(config_path),
+                "--output-root",
+                str(tmp_path / "legacy-top-k-out"),
+                "--validate-only",
+            ]
+        )
+
+
 def test_validate_only_aaforecast_grouped_tail_missing_dataset_var_fails_fast(
     tmp_path: Path,
 ) -> None:

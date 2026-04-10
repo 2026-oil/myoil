@@ -19,4 +19,4 @@ aa_forecast:
     upward:
     - event
     two_sided: []
-  top_k: 0.01
+  thresh: 3.5

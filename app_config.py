@@ -1094,12 +1094,12 @@ def _normalize_job(
     params = dict(job.get("params", {}))
     if model_name == "AAForecast" and "anomaly_threshold" in params:
         raise ValueError(
-            "AAForecast.anomaly_threshold has been removed; migrate to aa_forecast.top_k and aa_forecast.star_anomaly_tails"
+            "AAForecast.anomaly_threshold has been removed; migrate to aa_forecast.thresh and aa_forecast.star_anomaly_tails"
         )
     params_for_mode = params
     if stage_scope == "aa_forecast" and model_name == "AAForecast":
         structural_keys = {
-            "top_k",
+            "thresh",
             "lowess_frac",
             "lowess_delta",
             "uncertainty_enabled",

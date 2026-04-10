@@ -426,6 +426,45 @@ def test_load_app_config_rejects_legacy_aa_forecast_mode_key(tmp_path: Path) -> 
         load_app_config(tmp_path, config_path=config_path)
 
 
+def test_load_app_config_rejects_legacy_top_k_key(tmp_path: Path) -> None:
+    (tmp_path / "data.csv").write_text(
+        "dt,target,event\n2020-01-01,1,0\n2020-01-08,2,1\n",
+        encoding="utf-8",
+    )
+    plugin_path = tmp_path / "aa_plugin.yaml"
+    plugin_path.write_text(
+        "aa_forecast:\n"
+        "  model: gru\n"
+        "  tune_training: false\n"
+        "  star_anomaly_tails:\n"
+        "    upward:\n"
+        "      - event\n"
+        "    two_sided: []\n"
+        "  top_k: 0.1\n"
+        "  model_params: {}\n",
+        encoding="utf-8",
+    )
+    payload = {
+        "task": {"name": "reject_legacy_aaforecast_top_k"},
+        "dataset": {
+            "path": "data.csv",
+            "target_col": "target",
+            "dt_col": "dt",
+            "hist_exog_cols": ["event"],
+            "futr_exog_cols": [],
+            "static_exog_cols": [],
+        },
+        "training": {"loss": "mse"},
+        "cv": {"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0},
+        "scheduler": {"gpu_ids": [0], "max_concurrent_jobs": 1, "worker_devices": 1},
+        "aa_forecast": {"enabled": True, "config_path": str(plugin_path)},
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    with pytest.raises(ValueError, match=r"aa_forecast\.top_k.*aa_forecast\.thresh"):
+        load_app_config(tmp_path, config_path=config_path)
+
+
 def test_fit_and_predict_fold_passes_trial_overrides_to_aa_plugin(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -487,13 +526,13 @@ def test_fit_and_predict_fold_passes_trial_overrides_to_aa_plugin(
         freq="W",
         train_idx=[0],
         test_idx=[1],
-        params_override={"season_length": 4, "top_k": 0.01},
+        params_override={"season_length": 4, "thresh": 3.5},
         training_override={"model_step_size": 4, "scaler_type": "standard"},
     )
 
     assert captured["train_rows"] == 1
     assert captured["future_rows"] == 1
-    assert captured["params_override"] == {"season_length": 4, "top_k": 0.01}
+    assert captured["params_override"] == {"season_length": 4, "thresh": 3.5}
     assert captured["training_override"] == {
         "model_step_size": 4,
         "scaler_type": "standard",
@@ -591,7 +630,7 @@ def test_predict_aa_forecast_fold_uses_trial_specific_overrides(
             train_df=train_df,
             future_df=future_df,
             run_root=None,
-            params_override={"season_length": 4, "top_k": 0.01},
+            params_override={"season_length": 4, "thresh": 3.5},
             training_override={"model_step_size": 4, "scaler_type": "standard"},
         )
     )
@@ -599,7 +638,7 @@ def test_predict_aa_forecast_fold_uses_trial_specific_overrides(
     assert captured["training_model_step_size"] == 4
     assert captured["training_scaler_type"] == "standard"
     assert captured["params_override"]["season_length"] == 4
-    assert captured["params_override"]["top_k"] == pytest.approx(0.01)
+    assert captured["params_override"]["thresh"] == pytest.approx(3.5)
     assert captured["params_override"]["star_hist_exog_list"] == list(
         loaded.config.stage_plugin_config.star_hist_exog_cols_resolved
     )

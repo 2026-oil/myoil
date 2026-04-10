@@ -20,7 +20,7 @@ def _build_model() -> AAForecast:
         season_length=2,
         lowess_frac=0.6,
         lowess_delta=0.01,
-        top_k=0.25,
+        thresh=3.5,
         hist_exog_list=["event", "macro"],
         star_hist_exog_list=["event"],
         non_star_hist_exog_list=["macro"],
@@ -189,6 +189,24 @@ def test_predict_phase_star_precompute_is_disabled() -> None:
         dtype=torch.float32,
     )
     assert payload is None
+
+
+def test_star_precompute_supports_zero_anomaly_windows() -> None:
+    model = _build_model()
+    model.star.thresh = 1_000.0
+    batch = _build_batch()
+    batch["temporal"] = torch.ones_like(batch["temporal"])
+
+    payload = model.get_star_precomputed(
+        batch=batch,
+        phase="val",
+        window_ids=torch.tensor([0], dtype=torch.long),
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+    )
+
+    assert payload is not None
+    assert torch.count_nonzero(payload["critical_mask"]) == 0
 
 
 def test_star_precompute_preserves_active_scaler_state() -> None:

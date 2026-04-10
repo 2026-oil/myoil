@@ -19,10 +19,10 @@ BRENT_CASE1_PARITY_GRU_CONFIG = Path(
     "yaml/experiment/feature_set_aaforecast/brentoil-case1-parity-gru.yaml"
 )
 BRENT_CASE1_PARITY_AA_CONFIG = Path(
-    "yaml/experiment/feature_set_aaforecast/brentoil-case1-parity-aaforecast.yaml"
+    "yaml/experiment/feature_set_aaforecast/brentoil-case1-parity-aaforecast-gru.yaml"
 )
 BRENT_CASE1_PARITY_AA_PLUGIN = Path(
-    "yaml/plugins/aa_forecast_brentoil_case1_parity.yaml"
+    "yaml/plugins/aa_forecast_brentoil_case1_parity_gru.yaml"
 )
 PARITY_SHARED_MODEL_SELECTORS = [
     "encoder_hidden_size",
@@ -44,7 +44,7 @@ BRENT_CASE1_PARITY_AA_PARAMS = {
     "encoder_dropout": 0.1,
     "decoder_hidden_size": 128,
     "decoder_layers": 4,
-    "season_length": 52,
+    "season_length": 4,
 }
 BRENT_CASE1_PARITY_HIST_EXOG = [
     "Idx_OVX",
@@ -302,7 +302,7 @@ def test_brent_case1_parity_experiment_configs_share_dataset_contract() -> None:
         "enabled": True,
         "sample_count": 50,
     }
-    assert aa_plugin_payload["aa_forecast"]["top_k"] == 0.1
+    assert aa_plugin_payload["aa_forecast"]["thresh"] == 3.5
 
 
 def test_runtime_validate_only_accepts_brent_case1_fixed_parity_experiments(

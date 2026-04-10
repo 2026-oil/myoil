@@ -140,7 +140,7 @@ class AutoAAForecast(BaseAuto):
         "decoder_layers": tune.choice([1, 2, 3]),
         "season_length": tune.choice([4, 8, 12]),
         "trend_kernel_size": tune.choice([3, 5, 7]),
-        "top_k": tune.choice([0.005, 0.01, 0.02, 0.05]),
+        "thresh": tune.choice([2.5, 3.0, 3.5, 4.0, 4.5]),
         "batch_size": tune.choice([16, 32, 64]),
         "max_steps": tune.choice([500, 1000]),
         "loss": None,

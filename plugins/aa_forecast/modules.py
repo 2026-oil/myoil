@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -34,15 +32,15 @@ class STARFeatureExtractor(nn.Module):
         season_length: int = 12,
         lowess_frac: float = 0.6,
         lowess_delta: float = 0.01,
-        top_k: float = 0.05,
+        thresh: float = 3.5,
     ):
         super().__init__()
         self.season_length = max(2, int(season_length))
         self.lowess_frac = float(lowess_frac)
         self.lowess_delta = float(lowess_delta)
-        self.top_k = float(top_k)
-        if self.top_k <= 0 or self.top_k >= 1:
-            raise ValueError("STARFeatureExtractor top_k must satisfy 0 < value < 1")
+        self.thresh = float(thresh)
+        if self.thresh < 0:
+            raise ValueError("STARFeatureExtractor thresh must satisfy value >= 0")
         self._trend_cache: dict[bytes, np.ndarray] = {}
         self._trend_cache_order: list[bytes] = []
         self._trend_cache_limit = 4096
@@ -126,41 +124,20 @@ class STARFeatureExtractor(nn.Module):
         abs_score = signed_score.abs()
         return signed_score, abs_score
 
-    def _ranking_score(
-        self,
-        signed_score: torch.Tensor,
-        *,
-        tail_modes: tuple[str, ...],
-    ) -> torch.Tensor:
-        score_parts: list[torch.Tensor] = []
-        for channel_idx, mode in enumerate(tail_modes):
-            channel_score = signed_score[:, :, channel_idx : channel_idx + 1]
-            if mode == "upward":
-                score_parts.append(channel_score.clamp_min(0.0))
-            else:
-                score_parts.append(channel_score.abs())
-        return torch.cat(score_parts, dim=2)
-
     def _anomaly_mask(
         self,
         signed_score: torch.Tensor,
-        ranking_score: torch.Tensor,
         *,
         tail_modes: tuple[str, ...],
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        batch, seq_len, channels = ranking_score.shape
-        selected_count = max(1, math.ceil(self.top_k * seq_len))
-        if selected_count >= seq_len:
-            cutoff = ranking_score.min(dim=1, keepdim=True).values
-        else:
-            topk = torch.topk(ranking_score, k=selected_count, dim=1).values
-            cutoff = topk[:, -1:, :]
-
-        anomaly_mask = ranking_score >= cutoff
+        threshold = torch.full_like(signed_score[:, :1, :], self.thresh)
+        anomaly_mask = signed_score.abs() > threshold
         for channel_idx, mode in enumerate(tail_modes):
             if mode == "upward":
-                anomaly_mask[:, :, channel_idx] &= signed_score[:, :, channel_idx] > 0
-        return anomaly_mask, cutoff
+                anomaly_mask[:, :, channel_idx] = (
+                    signed_score[:, :, channel_idx] > self.thresh
+                )
+        return anomaly_mask, threshold
 
     def forward(
         self,
@@ -177,13 +154,8 @@ class STARFeatureExtractor(nn.Module):
             channels=residual.size(2),
         )
         signed_score, abs_score = self._robust_scores(residual)
-        ranking_score = self._ranking_score(
-            signed_score,
-            tail_modes=normalized_tail_modes,
-        )
         anomaly_mask, cutoff = self._anomaly_mask(
             signed_score,
-            ranking_score,
             tail_modes=normalized_tail_modes,
         )
 
@@ -201,7 +173,15 @@ class STARFeatureExtractor(nn.Module):
             "critical_mask": anomaly_mask,
             "robust_score_signed": signed_score,
             "robust_score_abs": abs_score,
-            "ranking_score": ranking_score,
+            "ranking_score": torch.where(
+                torch.tensor(
+                    [mode == "upward" for mode in normalized_tail_modes],
+                    device=signed_score.device,
+                    dtype=torch.bool,
+                ).view(1, 1, -1),
+                signed_score.clamp_min(0.0),
+                signed_score.abs(),
+            ),
             "ranking_cutoff": cutoff,
         }
 

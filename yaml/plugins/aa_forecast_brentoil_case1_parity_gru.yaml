@@ -12,10 +12,10 @@ aa_forecast:
     encoder_dropout: 0.1
     decoder_hidden_size: 128
     decoder_layers: 4
-    season_length: 52
+    season_length: 4
   star_anomaly_tails:
     upward:
     - GPRD_THREAT
     - BS_Core_Index_A
     two_sided: []
-  top_k: 0.1
+  thresh: 3.5

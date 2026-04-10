@@ -60,7 +60,7 @@ class AAForecast(BaseModel):
         trend_kernel_size: int | None = None,
         lowess_frac: float = 0.6,
         lowess_delta: float = 0.01,
-        top_k: float = 0.05,
+        thresh: float = 3.5,
         star_hist_exog_list=None,
         non_star_hist_exog_list=None,
         star_hist_exog_tail_modes=None,
@@ -152,7 +152,7 @@ class AAForecast(BaseModel):
         self.trend_kernel_size = trend_kernel_size
         self.lowess_frac = lowess_frac
         self.lowess_delta = lowess_delta
-        self.top_k = float(top_k)
+        self.thresh = float(thresh)
         self.exclude_insample_y = exclude_insample_y
         self.uncertainty_enabled = bool(uncertainty_enabled)
         self.uncertainty_dropout_candidates = tuple(
@@ -183,7 +183,7 @@ class AAForecast(BaseModel):
             season_length=season_length,
             lowess_frac=lowess_frac,
             lowess_delta=lowess_delta,
-            top_k=top_k,
+            thresh=thresh,
         )
         self.encoder = build_aaforecast_backbone(
             self.backbone,

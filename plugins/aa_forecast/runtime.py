@@ -72,7 +72,7 @@ def _aa_params_override(loaded: Any) -> dict[str, Any]:
         scaler_type = None
     return {
         "backbone": stage_cfg.model,
-        "top_k": stage_cfg.top_k,
+        "thresh": stage_cfg.thresh,
         "star_hist_exog_list": list(stage_cfg.star_hist_exog_cols_resolved),
         "non_star_hist_exog_list": list(stage_cfg.non_star_hist_exog_cols_resolved),
         "star_hist_exog_tail_modes": list(stage_cfg.star_anomaly_tail_modes_resolved),
@@ -310,7 +310,7 @@ def _write_uncertainty_artifacts(
         summary_path,
         {
             "train_end_ds": str(pd.Timestamp(train_end_ds)),
-            "top_k": stage_cfg.top_k,
+            "thresh": stage_cfg.thresh,
             "star_hist_exog_cols_resolved": list(stage_cfg.star_hist_exog_cols_resolved),
             "non_star_hist_exog_cols_resolved": list(
                 stage_cfg.non_star_hist_exog_cols_resolved

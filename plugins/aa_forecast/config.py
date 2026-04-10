@@ -23,7 +23,7 @@ AA_FORECAST_MAIN_KEYS = {
     "model",
     "tune_training",
     "model_params",
-    "top_k",
+    "thresh",
     "star_anomaly_tails",
     "lowess_frac",
     "lowess_delta",
@@ -33,7 +33,7 @@ AA_FORECAST_LINKED_KEYS = {
     "model",
     "tune_training",
     "model_params",
-    "top_k",
+    "thresh",
     "star_anomaly_tails",
     "lowess_frac",
     "lowess_delta",
@@ -71,7 +71,7 @@ class AAForecastPluginConfig:
     model: str = "gru"
     tune_training: bool = False
     model_params: dict[str, Any] = field(default_factory=dict)
-    top_k: float = 0.05
+    thresh: float = 3.5
     star_hist_exog_cols_resolved: tuple[str, ...] = field(default_factory=tuple)
     non_star_hist_exog_cols_resolved: tuple[str, ...] = field(default_factory=tuple)
     star_anomaly_tails: dict[str, tuple[str, ...]] = field(
@@ -119,7 +119,7 @@ def aa_forecast_plugin_tuning_public_dict(cfg: AAForecastPluginConfig) -> dict[s
     return {
         "model": cfg.model,
         "backbone": cfg.model,
-        "top_k": cfg.top_k,
+        "thresh": cfg.thresh,
         "star_hist_exog_cols_resolved": list(cfg.star_hist_exog_cols_resolved),
         "non_star_hist_exog_cols_resolved": list(cfg.non_star_hist_exog_cols_resolved),
         "star_anomaly_tails": {
@@ -383,7 +383,7 @@ def _normalize_canonical_fields(
 ) -> AAForecastPluginConfig:
     if "p_value" in payload:
         raise ValueError(
-            f"{section}.p_value has been removed; use {section}.top_k"
+            f"{section}.p_value has been removed; use {section}.thresh"
         )
     model = _normalize_model_name(
         payload.get("model"),
@@ -395,16 +395,20 @@ def _normalize_canonical_fields(
     )
     if "anomaly_threshold" in model_params:
         raise ValueError(
-            f"{section}.model_params.anomaly_threshold has been removed; use {section}.top_k and {section}.star_anomaly_tails"
+            f"{section}.model_params.anomaly_threshold has been removed; use {section}.thresh and {section}.star_anomaly_tails"
         )
     if "p_value" in model_params:
         raise ValueError(
-            f"{section}.model_params.p_value has been removed; use {section}.top_k"
+            f"{section}.model_params.p_value has been removed; use {section}.thresh"
         )
-    top_k_in_params = model_params.pop("top_k", None)
-    if top_k_in_params is not None and "top_k" in payload:
+    if "top_k" in model_params:
         raise ValueError(
-            f"{section}.top_k cannot be set both top-level and inside {section}.model_params"
+            f"{section}.model_params.top_k has been removed; use {section}.thresh"
+        )
+    thresh_in_params = model_params.pop("thresh", None)
+    if thresh_in_params is not None and "thresh" in payload:
+        raise ValueError(
+            f"{section}.thresh cannot be set both top-level and inside {section}.model_params"
         )
     model_params = _validate_model_params_for_backbone(
         model,
@@ -416,9 +420,11 @@ def _normalize_canonical_fields(
         field_name=f"{section}.tune_training",
         default=False,
     )
-    top_k = _coerce_probability(
-        payload.get("top_k", top_k_in_params if top_k_in_params is not None else 0.05),
-        field_name=f"{section}.top_k",
+    if "top_k" in payload:
+        raise ValueError(f"{section}.top_k has been removed; use {section}.thresh")
+    thresh = _coerce_non_negative_float(
+        payload.get("thresh", thresh_in_params if thresh_in_params is not None else 3.5),
+        field_name=f"{section}.thresh",
     )
     star_anomaly_tails = _normalize_star_anomaly_tails(
         payload.get("star_anomaly_tails"),
@@ -444,7 +450,7 @@ def _normalize_canonical_fields(
         model=model,
         tune_training=tune_training,
         model_params=model_params,
-        top_k=top_k,
+        thresh=thresh,
         star_anomaly_tails=star_anomaly_tails,
         lowess_frac=lowess_frac,
         lowess_delta=lowess_delta,
@@ -465,7 +471,9 @@ def normalize_aa_forecast_config(
         raise ValueError("aa_forecast must be a mapping")
     payload = dict(value)
     if "p_value" in payload:
-        raise ValueError("aa_forecast.p_value has been removed; use aa_forecast.top_k")
+        raise ValueError("aa_forecast.p_value has been removed; use aa_forecast.thresh")
+    if "top_k" in payload:
+        raise ValueError("aa_forecast.top_k has been removed; use aa_forecast.thresh")
     unknown_keys(payload, allowed=AA_FORECAST_MAIN_KEYS, section="aa_forecast")
     enabled = coerce_bool(
         payload.get("enabled"),
@@ -486,7 +494,7 @@ def normalize_aa_forecast_config(
             "model",
             "tune_training",
             "model_params",
-            "top_k",
+            "thresh",
             "star_anomaly_tails",
             "lowess_frac",
             "lowess_delta",
@@ -503,7 +511,7 @@ def normalize_aa_forecast_config(
             "model",
             "tune_training",
             "model_params",
-            "top_k",
+            "thresh",
             "star_anomaly_tails",
             "lowess_frac",
             "lowess_delta",
@@ -530,7 +538,9 @@ def normalize_linked_aa_forecast_config(
         raise ValueError("aa_forecast routed YAML block must be a mapping")
     payload = dict(value)
     if "p_value" in payload:
-        raise ValueError("aa_forecast.p_value has been removed; use aa_forecast.top_k")
+        raise ValueError("aa_forecast.p_value has been removed; use aa_forecast.thresh")
+    if "top_k" in payload:
+        raise ValueError("aa_forecast.top_k has been removed; use aa_forecast.thresh")
     unknown_keys(payload, allowed=AA_FORECAST_LINKED_KEYS, section="aa_forecast")
     return _normalize_canonical_fields(
         payload,

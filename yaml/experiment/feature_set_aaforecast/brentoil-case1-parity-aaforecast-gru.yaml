@@ -21,4 +21,4 @@ training_search:
   enabled: false
 aa_forecast:
   enabled: true
-  config_path: yaml/plugins/aa_forecast_brentoil_case1_parity.yaml
+  config_path: yaml/plugins/aa_forecast_brentoil_case1_parity_gru.yaml

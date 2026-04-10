@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import os
 import sys
 from datetime import UTC, datetime
@@ -41,7 +40,9 @@ TARGET_TAILS = {
 DEFAULT_LOWESS_FRAC = 0.6
 DEFAULT_LOWESS_DELTA = 0.01
 DEFAULT_SEASON_LENGTH = 4
-DEFAULT_TOP_K = 0.05
+DEFAULT_THRESH = 3.5
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot AA-Forecast STAR decomposition for WTI and Brent from data/df.csv."
@@ -75,10 +76,10 @@ def parse_args() -> argparse.Namespace:
         help=f"STAR seasonal period (default: {DEFAULT_SEASON_LENGTH}).",
     )
     parser.add_argument(
-        "--top-k",
+        "--thresh",
         type=float,
-        default=DEFAULT_TOP_K,
-        help=f"Shared STAR anomaly top-k (default: {DEFAULT_TOP_K}).",
+        default=DEFAULT_THRESH,
+        help=f"Shared STAR anomaly threshold (default: {DEFAULT_THRESH}).",
     )
     parser.add_argument(
         "--targets",
@@ -150,39 +151,31 @@ def compute_signed_robustness_score(raw_residual: np.ndarray) -> np.ndarray:
     return 0.6745 * (raw_residual - residual_center) / mad
 
 
-def compute_selected_count(sequence_length: int, top_k: float) -> int:
-    if sequence_length <= 0:
-        raise ValueError("sequence_length must be positive")
-    if not 0 < top_k < 1:
-        raise ValueError("top_k must satisfy 0 < top_k < 1")
-    return max(1, math.ceil(top_k * sequence_length))
-
-
-def compute_tail_priority(raw_residual: np.ndarray, *, tail: str) -> np.ndarray:
+def compute_tail_score(raw_residual: np.ndarray, *, tail: str) -> np.ndarray:
     signed_score = compute_signed_robustness_score(raw_residual)
     if tail == "two_sided":
         return np.abs(signed_score)
     if tail == "upward":
-        return np.maximum(signed_score, 0.0)
+        return signed_score
     raise ValueError(f"Unsupported tail: {tail}")
 
 
 def select_tail_anomaly_mask(
     raw_residual: np.ndarray,
     *,
-    top_k: float,
+    thresh: float,
     tail: str,
-) -> tuple[np.ndarray, np.ndarray, int]:
-    selected_count = compute_selected_count(len(raw_residual), top_k)
-    priority = compute_tail_priority(raw_residual, tail=tail)
-    candidate_order = np.argsort(priority, kind="stable")
-    selected_idx = candidate_order[-selected_count:]
-    mask = np.zeros(len(raw_residual), dtype=bool)
-    mask[selected_idx] = True
-    if tail == "upward":
-        signed_score = compute_signed_robustness_score(raw_residual)
-        mask &= signed_score > 0
-    return mask, priority, selected_count
+) -> tuple[np.ndarray, np.ndarray]:
+    if thresh < 0:
+        raise ValueError("thresh must be non-negative")
+    tail_score = compute_tail_score(raw_residual, tail=tail)
+    if tail == "two_sided":
+        mask = tail_score > thresh
+    elif tail == "upward":
+        mask = tail_score > thresh
+    else:
+        raise ValueError(f"Unsupported tail: {tail}")
+    return mask, tail_score
 
 
 def render_target_plot(
@@ -192,18 +185,17 @@ def render_target_plot(
     target_frame: pd.DataFrame,
     components: dict[str, np.ndarray],
     output_path: Path,
-    top_k: float,
+    thresh: float,
     tail: str,
 ) -> None:
     dt = target_frame["dt"]
     observed = target_frame[column].to_numpy(dtype=float)
     trend = components["trend"]
     seasonal = components["seasonal"]
-    legacy_mask = components["critical_mask"].astype(bool)
-    raw_residual = np.where(legacy_mask, components["anomalies"], components["residual"])
-    anomaly_mask, tail_priority, selected_count = select_tail_anomaly_mask(
+    raw_residual = components["anomalies"] * components["residual"]
+    anomaly_mask, tail_score = select_tail_anomaly_mask(
         raw_residual,
-        top_k=top_k,
+        thresh=thresh,
         tail=tail,
     )
     anomalies = np.where(anomaly_mask, raw_residual, 1.0)
@@ -214,7 +206,7 @@ def render_target_plot(
     fig.suptitle(
         (
             f"{label.upper()} STAR decomposition ({column}) | "
-            f"tail={tail} | top_k={top_k} | selected_count={selected_count}"
+            f"tail={tail} | thresh={thresh}"
         ),
         fontsize=16,
     )
@@ -239,7 +231,7 @@ def render_target_plot(
         raw_residual[anomaly_mask],
         color="#d62728",
         s=18,
-        label="selected anomaly residual",
+        label="threshold anomaly residual",
         zorder=3,
     )
     axes[3].set_title("Raw residual multiplier")
@@ -252,17 +244,37 @@ def render_target_plot(
     axes[4].set_title("Anomalies only (normal points forced to 1)")
     axes[4].set_ylabel("anomalies")
 
-    axes[5].plot(dt, robustness_score, color="#17becf", linewidth=1.4, label="robustness score")
-    axes[5].plot(dt, tail_priority, color="#111111", linewidth=1.0, linestyle=":", label=f"{tail} priority")
+    axes[5].plot(
+        dt,
+        robustness_score,
+        color="#17becf",
+        linewidth=1.4,
+        label="robustness score",
+    )
+    axes[5].plot(
+        dt,
+        tail_score,
+        color="#111111",
+        linewidth=1.0,
+        linestyle=":",
+        label=f"{tail} score",
+    )
+    axes[5].axhline(
+        thresh,
+        color="#d62728",
+        linewidth=0.9,
+        linestyle="--",
+        label=f"thresh={thresh}",
+    )
     axes[5].scatter(
         dt[anomaly_mask],
         robustness_score[anomaly_mask],
         color="#d62728",
         s=20,
-        label="selected anomalies",
+        label="threshold anomalies",
         zorder=3,
     )
-    axes[5].set_title("Robustness score and tail-priority ranking")
+    axes[5].set_title("Robustness score and tail score")
     axes[5].set_ylabel("score")
     axes[5].legend(loc="upper left")
 
@@ -283,12 +295,12 @@ def render_target_plot(
         where="mid",
         color="#111111",
         linewidth=1.2,
-        label="selected anomaly mask",
+        label="threshold anomaly mask",
     )
     mask_axis.set_ylim(-0.05, 1.05)
     mask_axis.set_yticks([0, 1])
     mask_axis.set_ylabel("mask")
-    axes[6].set_title("Cleaned residual (selected anomalies forced to 1) + mask")
+    axes[6].set_title("Cleaned residual (threshold anomalies forced to 1) + mask")
     axes[6].set_ylabel("cleaned residual")
     axes[6].set_xlabel("dt")
 
@@ -313,7 +325,6 @@ def run(args: argparse.Namespace) -> dict[str, str]:
         season_length=args.season_length,
         lowess_frac=args.lowess_frac,
         lowess_delta=args.lowess_delta,
-        top_k=args.top_k,
     )
 
     output_paths: dict[str, str] = {}
@@ -329,7 +340,7 @@ def run(args: argparse.Namespace) -> dict[str, str]:
             target_frame=target_frame,
             components=components,
             output_path=output_path,
-            top_k=args.top_k,
+            thresh=args.thresh,
             tail=TARGET_TAILS[label],
         )
         output_paths[label] = str(output_path)
