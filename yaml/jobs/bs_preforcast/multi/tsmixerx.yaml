@@ -1,6 +1,0 @@
-- model: TSMixerx
-  params:
-    n_block: 3
-    ff_dim: 64
-    dropout: 0.05
-    revin: true

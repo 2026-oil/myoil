@@ -1,0 +1,22 @@
+task:
+  name: brentoil_baseline
+dataset:
+  path: data/df.csv
+  target_col: Com_BrentCrudeOil
+  dt_col: dt
+  hist_exog_cols:
+    - GPRD_THREAT
+    - BS_Core_Index_A
+    - GPRD
+    - GPRD_ACT
+    - BS_Core_Index_B
+    - BS_Core_Index_C
+    - Idx_OVX
+    - Com_Oil_Spread
+    - Com_LMEX
+    - Com_BloombergCommodity_BCOM
+  futr_exog_cols: []
+  static_exog_cols: []
+jobs:
+- yaml/jobs/main/gru_informer.yaml
+  

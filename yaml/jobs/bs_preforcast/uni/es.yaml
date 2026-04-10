@@ -1,4 +1,0 @@
-- model: ES
-  params:
-    trend: add
-    damped_trend: false

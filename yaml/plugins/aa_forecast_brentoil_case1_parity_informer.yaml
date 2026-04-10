@@ -6,7 +6,7 @@ aa_forecast:
   uncertainty:
     enabled: true
     sample_count: 50
-  model_params:
+  model_params: 
     hidden_size: 128
     n_head: 8
     encoder_layers: 2

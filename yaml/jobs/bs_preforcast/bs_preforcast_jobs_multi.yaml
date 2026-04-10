@@ -1,8 +1,0 @@
-- model: iTransformer
-  params: {}
-- model: LSTM
-  params: {}
-- model: TimeXer
-  params: {}
-- model: TSMixerx
-  params: {}

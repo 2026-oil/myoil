@@ -1,6 +1,0 @@
-- model: PatchTST
-  params:
-    hidden_size: 16
-    n_heads: 4
-    encoder_layers: 2
-    patch_len: 4

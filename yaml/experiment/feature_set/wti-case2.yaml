@@ -25,6 +25,3 @@ dataset:
   static_exog_cols: []
 jobs:
 - yaml/jobs/main/jobs_1.yaml
-- yaml/jobs/main/jobs_2.yaml
-- yaml/jobs/main/jobs_3.yaml
-- yaml/jobs/main/jobs_4.yaml
