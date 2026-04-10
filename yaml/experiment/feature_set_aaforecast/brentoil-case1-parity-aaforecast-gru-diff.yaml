@@ -1,0 +1,22 @@
+task:
+  name: brentoil_case1_parity_aaforecast_gru_diff
+dataset:
+  path: data/df.csv
+  target_col: Com_BrentCrudeOil
+  dt_col: dt
+  hist_exog_cols:
+    - GPRD_THREAT
+    - BS_Core_Index_A
+    - GPRD_ACT
+    - Idx_OVX
+    - GPRD
+    - BS_Core_Index_C
+    - Com_BloombergCommodity_BCOM
+    - Com_LMEX
+  futr_exog_cols: []
+  static_exog_cols: []
+training_search:
+  enabled: false
+aa_forecast:
+  enabled: true
+  config_path: yaml/plugins/aa_forecast_brentoil_case1_parity_gru.yaml

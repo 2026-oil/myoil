@@ -155,6 +155,7 @@ FEATURE_SET_AAFORECAST_VARIANTS = {
         ],
     },
 }
+EXPECTED_AA_DROPOUT_CANDIDATES = [round(step * 0.05, 2) for step in range(1, 20)]
 DIRECT_TARGET_CONFIG = Path("yaml/experiment/feature_set_aaforecast/brentoil-case1.yaml")
 
 
@@ -852,7 +853,7 @@ def test_runtime_smoke_emits_aaforecast_uncertainty_artifacts(
     assert png_files
     summary = json.loads(json_files[0].read_text())
     assert summary["sample_count"] == 3
-    assert summary["dropout_candidates"] == [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    assert summary["dropout_candidates"] == EXPECTED_AA_DROPOUT_CANDIDATES
     assert summary["star_anomaly_tails"] == {"upward": ["event"], "two_sided": []}
     assert summary["non_star_hist_exog_cols_resolved"] == []
     _assert_no_event_column(summary)
@@ -966,7 +967,7 @@ def test_runtime_aaforecast_plugin_uncertainty_smoke(
     assert distribution_files
     assert png_files
     payload = json.loads(distribution_files[0].read_text())
-    assert payload["dropout_candidates"] == [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    assert payload["dropout_candidates"] == EXPECTED_AA_DROPOUT_CANDIDATES
     assert payload["star_anomaly_tails"] == {"upward": ["event"], "two_sided": []}
     assert payload["non_star_hist_exog_cols_resolved"] == []
     _assert_no_event_column(payload)

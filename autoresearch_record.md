@@ -207,3 +207,67 @@
 - 15% band PASS/FAIL: FAIL (h3=25.22%, h4=35.14%)
 - runtime PASS/FAIL: PASS (~90.5s core run; summary rebuild succeeded)
 - leakage concern 여부: none observed; gain used only horizon embeddings and in-sample-trained parameters
+
+## Iteration 0 Plain Informer Control
+- timestamp: 2026-04-10T20:43:40+09:00
+- git branch: exp/aaforecast-brentoil-case1-plain-informer-20260410
+- experiment title: Plain Informer diff control to complete the control-vs-AAForecast comparison
+- main config path: yaml/experiment/feature_set_aaforecast/brentoil-case1-parity-informer.yaml
+- plugin config path: n/a (plain Informer control)
+- encoder family: Informer
+- 바꾼 조작변인: plain control backbone switched to Informer; shared diff setting active; no AAForecast plugin
+- 고정한 통제변인: target=Com_BrentCrudeOil; diff transforms active; allowed Brent hist exog subset [GPRD_THREAT, BS_Core_Index_A, GPRD_ACT, Idx_OVX, GPRD, BS_Core_Index_C, Com_BloombergCommodity_BCOM, Com_LMEX]; h=4 one-shot forecast contract; no future/static exog; no deliberate drift/uplift; runtime budget < 1200s
+- 실행 명령: .venv/bin/python main.py --config yaml/experiment/feature_set_aaforecast/brentoil-case1-parity-informer.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_plain_informer_diff
+- 상승추세 PASS/FAIL: PASS (68.9944, 69.3880, 69.6867, 69.6203)
+- 15% band PASS/FAIL: PASS (fallback h1=1.88%, h2=4.59%; h3=19.57%, h4=29.60% outside 15%)
+- runtime PASS/FAIL: PASS (~42.65s by artifact elapsed)
+- leakage concern 여부: none observed; diff path is train-only and replay-restored
+
+## Iteration 1 AAForecast GRU Diff Control
+- timestamp: 2026-04-10T20:46:00+09:00
+- git branch: exp/aaforecast-brentoil-case1-plain-informer-20260410
+- experiment title: AAForecast GRU diff control on the same constrained Brent subset
+- main config path: yaml/experiment/feature_set_aaforecast/brentoil-case1-parity-aaforecast-gru-diff.yaml
+- plugin config path: yaml/plugins/aa_forecast_brentoil_case1_parity_gru.yaml
+- encoder family: GRU
+- 바꾼 조작변인: AAForecast GRU backbone with the same diff-active control subset as plain Informer control
+- 고정한 통제변인: target=Com_BrentCrudeOil; diff transforms active; allowed Brent hist exog subset [GPRD_THREAT, BS_Core_Index_A, GPRD_ACT, Idx_OVX, GPRD, BS_Core_Index_C, Com_BloombergCommodity_BCOM, Com_LMEX]; h=4 one-shot forecast contract; no future/static exog; no deliberate drift/uplift; runtime budget < 1200s
+- 실행 명령: .venv/bin/python main.py --config yaml/experiment/feature_set_aaforecast/brentoil-case1-parity-aaforecast-gru-diff.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_gru_diff
+- 상승추세 PASS/FAIL: PASS (fallback h1=1.81%, h2=4.32%; h3=19.25%, h4=29.32% outside 15%)
+- 15% band PASS/FAIL: FAIL (h3=19.25%, h4=29.32%)
+- runtime PASS/FAIL: PASS (~146.01s by artifact elapsed)
+- leakage concern 여부: none observed; diff path is train-only and replay-restored
+
+## Iteration 2 AAForecast Informer Diff Control
+- timestamp: 2026-04-10T20:52:00+09:00
+- git branch: exp/aaforecast-brentoil-case1-plain-informer-20260410
+- experiment title: AAForecast Informer diff control on the same constrained Brent subset
+- main config path: yaml/experiment/feature_set_aaforecast/brentoil-case1-parity-aaforecast-informer-diff.yaml
+- plugin config path: yaml/plugins/aa_forecast_brentoil_case1_parity_informer.yaml
+- encoder family: Informer
+- 바꾼 조작변인: AAForecast Informer backbone with the same diff-active control subset as plain Informer control
+- 고정한 통제변인: target=Com_BrentCrudeOil; diff transforms active; allowed Brent hist exog subset [GPRD_THREAT, BS_Core_Index_A, GPRD_ACT, Idx_OVX, GPRD, BS_Core_Index_C, Com_BloombergCommodity_BCOM, Com_LMEX]; h=4 one-shot forecast contract; no future/static exog; no deliberate drift/uplift; runtime budget < 1200s
+- 실행 명령: .venv/bin/python main.py --config yaml/experiment/feature_set_aaforecast/brentoil-case1-parity-aaforecast-informer-diff.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_subset8_diff
+- 상승추세 PASS/FAIL: PASS (fallback h1=2.23%, h2=4.31%; h3=19.05%, h4=28.64% outside 15%)
+- 15% band PASS/FAIL: FAIL (h3=19.05%, h4=28.64%)
+- runtime PASS/FAIL: PASS (~173.59s by artifact elapsed)
+- leakage concern 여부: none observed; diff path is train-only and replay-restored
+
+## Iteration 3 GRU Diff Control
+- timestamp: 2026-04-10T20:55:00+09:00
+- git branch: exp/aaforecast-brentoil-case1-plain-informer-20260410
+- experiment title: GRU diff control on the same constrained Brent subset
+- main config path: yaml/experiment/feature_set_aaforecast/brentoil-case1-parity-gru-diff.yaml
+- plugin config path: n/a (plain GRU control)
+- encoder family: GRU
+- 바꾼 조작변인: plain GRU backbone with the same diff-active control subset as the other comparison runs
+- 고정한 통제변인: target=Com_BrentCrudeOil; diff transforms active; allowed Brent hist exog subset [GPRD_THREAT, BS_Core_Index_A, GPRD_ACT, Idx_OVX, GPRD, BS_Core_Index_C, Com_BloombergCommodity_BCOM, Com_LMEX]; h=4 one-shot forecast contract; no future/static exog; no deliberate drift/uplift; runtime budget < 1200s
+- 실행 명령: .venv/bin/python main.py --config yaml/experiment/feature_set_aaforecast/brentoil-case1-parity-gru-diff.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_gru_diff
+- 상승추세 PASS/FAIL: PASS (fallback h1=2.57%, h2=6.22%; h3=22.36%, h4=33.39% outside 15%)
+- 15% band PASS/FAIL: FAIL (h3=22.36%, h4=33.39%)
+- runtime PASS/FAIL: PASS (~23.93s by artifact elapsed)
+- leakage concern 여부: none observed; diff path is train-only and replay-restored

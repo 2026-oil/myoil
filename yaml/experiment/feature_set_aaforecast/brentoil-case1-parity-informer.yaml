@@ -1,0 +1,31 @@
+task:
+  name: brentoil_case1_plain_informer_diff
+dataset:
+  path: data/df.csv
+  target_col: Com_BrentCrudeOil
+  dt_col: dt
+  hist_exog_cols:
+    - GPRD_THREAT
+    - BS_Core_Index_A
+    - GPRD_ACT
+    - Idx_OVX
+    - GPRD
+    - BS_Core_Index_C
+    - Com_BloombergCommodity_BCOM
+    - Com_LMEX
+  futr_exog_cols: []
+  static_exog_cols: []
+training_search:
+  enabled: false
+jobs:
+  - model: Informer
+    params:
+      decoder_input_size_multiplier: 0.5
+      hidden_size: 128
+      dropout: 0.05
+      factor: 3
+      n_head: 8
+      conv_hidden_size: 32
+      encoder_layers: 2
+      decoder_layers: 1
+      distil: true

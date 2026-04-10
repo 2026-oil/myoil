@@ -70,6 +70,7 @@ BRENT_CASE1_PARITY_AA_HIST_EXOG = [
     "Com_LMEX",
     "Com_BloombergCommodity_BCOM",
 ]
+EXPECTED_AA_DROPOUT_CANDIDATES = [round(step * 0.05, 2) for step in range(1, 20)]
 
 
 def _windows_batch(batch_size: int = 2, input_size: int = 4) -> dict[str, torch.Tensor]:
@@ -389,14 +390,6 @@ def test_runtime_validate_only_accepts_brent_case1_fixed_parity_experiments(
     assert aa_stage_config["model_params"] == BRENT_CASE1_PARITY_AA_PARAMS
     assert aa_stage_config["uncertainty"]["enabled"] is True
     assert aa_stage_config["uncertainty"]["sample_count"] == 50
-    assert aa_stage_config["uncertainty"]["dropout_candidates"] == [
-        0.1,
-        0.2,
-        0.3,
-        0.4,
-        0.5,
-        0.6,
-        0.7,
-        0.8,
-        0.9,
-    ]
+    assert aa_stage_config["uncertainty"]["dropout_candidates"] == (
+        EXPECTED_AA_DROPOUT_CANDIDATES
+    )
