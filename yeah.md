@@ -30,6 +30,7 @@ main.py 결과가 전체적으로 상승 추세를 예측하는 방향으로 나
 이상치임을 감지하고, 향후 급등하는 구간을 잘 포착한다는 것이 증명이 되어야하고,
 이게 증명이 되면, aa-forecast에서 gru 보다 transformer 계열이 향후 급등하는 구간을 잘 포착한다는 것을 보여주는 식으로 실험이 진행되어야함
 
+- AA-GRU 는 상관 없고, transformer family만 15% 위로 올리면 성공한 것으로 판단
 
 
 - 모든 실험은 
@@ -42,9 +43,6 @@ aaforecast 된 transformer family 와 gru 실험
 
 yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml
 yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml
-yaml/experiment/feature_set_aaforecast/aaforecast-itransformer.yaml
-yaml/experiment/feature_set_aaforecast/aaforecast-patchtst.yaml
-yaml/experiment/feature_set_aaforecast/aaforecast-timexer.yaml
 yaml/experiment/feature_set_aaforecast/aaforecast-vanillatransformer
 
 

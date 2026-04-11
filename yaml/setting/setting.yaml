@@ -5,7 +5,7 @@ runtime:
   transformations_target: diff
   transformations_exog: diff
 training:
-  input_size: 24
+  input_size: 48
   batch_size: 32
   valid_batch_size: 8
   windows_batch_size: 64
