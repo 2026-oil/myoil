@@ -92,33 +92,32 @@ def rolling_origin_loaded() -> SimpleNamespace:
     )
 
 
-def test_build_rolling_origin_windows_uses_post_anchor_observed_origins(
+def test_build_configured_summary_windows_follow_cv_splits(
     rolling_origin_source_df: pd.DataFrame,
     rolling_origin_loaded: SimpleNamespace,
 ) -> None:
-    windows = runtime._build_rolling_origin_windows(
+    windows = runtime._build_configured_summary_windows(
         rolling_origin_source_df,
         rolling_origin_loaded,
-        freq="W-SUN",
     )
 
-    assert [str(window.anchor_train_end_ds.date()) for window in windows] == [
-        "2024-02-11",
+    assert [window.test_index for window in windows] == [1, 2]
+    assert [window.fold_idx for window in windows] == [0, 1]
+    assert [str(window.cutoff.date()) for window in windows] == [
+        "2024-02-04",
         "2024-02-11",
     ]
-    assert [str(window.origin_ds.date()) for window in windows] == [
+    assert [str(window.forecast_start_ds.date()) for window in windows] == [
+        "2024-02-11",
+        "2024-02-18",
+    ]
+    assert [str(window.forecast_end_ds.date()) for window in windows] == [
         "2024-02-18",
         "2024-02-25",
     ]
-    assert [str(window.forecast_start_ds.date()) for window in windows] == [
-        "2024-02-25",
-        "2024-03-03",
-    ]
-    assert [window.observed_steps for window in windows] == [1, 0]
-    assert [window.forecast_only for window in windows] == [False, True]
 
 
-def test_write_per_window_summary_bundles_replays_best_params_and_writes_manifests(
+def test_write_per_window_summary_bundles_uses_existing_cv_windows_and_writes_manifests(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     rolling_origin_source_df: pd.DataFrame,
@@ -127,7 +126,7 @@ def test_write_per_window_summary_bundles_replays_best_params_and_writes_manifes
     rolling_origin_source_df.to_csv(dataset_path, index=False)
 
     config_payload = {
-        "task": {"name": "rolling_origin_summary_test"},
+        "task": {"name": "cv_summary_test"},
         "dataset": {
             "path": str(dataset_path),
             "target_col": "target",
@@ -158,21 +157,15 @@ def test_write_per_window_summary_bundles_replays_best_params_and_writes_manifes
             "overlap_eval_policy": "by_cutoff_mean",
         },
         "scheduler": {"gpu_ids": [0], "max_concurrent_jobs": 1, "worker_devices": 1},
-        "aa_forecast": {
-            "enabled": True,
-            "config_path": str(
-                Path("tests/fixtures/aa_forecast_runtime_plugin_auto_model_only.yaml").resolve()
-            ),
-        },
+        "jobs": [{"model": "Naive", "params": {}}],
     }
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.safe_dump(config_payload, sort_keys=False), encoding="utf-8")
 
     run_root = tmp_path / "run"
     (run_root / "manifest").mkdir(parents=True)
-    (run_root / "models" / "AAForecast").mkdir(parents=True)
     (run_root / "summary").mkdir(parents=True)
-    (run_root / "config").mkdir(parents=True)
+    (run_root / "cv").mkdir(parents=True)
 
     (run_root / "manifest" / "run_manifest.json").write_text(
         json.dumps(
@@ -184,107 +177,255 @@ def test_write_per_window_summary_bundles_replays_best_params_and_writes_manifes
         ),
         encoding="utf-8",
     )
-    (run_root / "models" / "AAForecast" / "best_params.json").write_text(
-        json.dumps({"best": "param"}, indent=2),
-        encoding="utf-8",
-    )
-    (run_root / "models" / "AAForecast" / "training_best_params.json").write_text(
-        json.dumps({"lr": 0.01}, indent=2),
-        encoding="utf-8",
-    )
 
-    calls: list[dict[str, object]] = []
-
-    def fake_fit_and_predict_fold(
-        loaded,
-        job,
-        *,
-        source_df,
-        freq,
-        train_idx,
-        test_idx,
-        params_override=None,
-        training_override=None,
-        run_root=None,
-    ):
-        del loaded, freq, params_override
-        train_df = source_df.iloc[train_idx].reset_index(drop=True)
-        future_df = source_df.iloc[test_idx].reset_index(drop=True)
-        calls.append(
-            {
-                "job_params": dict(job.params),
-                "training_override": dict(training_override or {}),
-                "train_end_ds": str(pd.Timestamp(train_df["dt"].iloc[-1]).date()),
-                "run_root": str(run_root) if run_root is not None else None,
-            }
-        )
-        predictions = pd.DataFrame(
-            {
-                "unique_id": ["target"] * len(future_df),
-                "ds": pd.to_datetime(future_df["dt"]),
-                job.model: [100.0 + idx for idx in range(len(future_df))],
-                "aaforecast_context_artifact": ["aa_forecast/context/test.csv"]
-                * len(future_df),
-            }
-        )
-        actuals = future_df["target"].reset_index(drop=True)
-        train_end_ds = pd.to_datetime(train_df["dt"].iloc[-1])
-        return predictions, actuals, train_end_ds, train_df, None
-
-    monkeypatch.setattr(runtime, "_fit_and_predict_fold", fake_fit_and_predict_fold)
     monkeypatch.setattr(runtime, "_build_summary_plot_bundle", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        runtime,
+        "_load_summary_loaded_config",
+        lambda _run_root: SimpleNamespace(
+            config=SimpleNamespace(
+                dataset=SimpleNamespace(
+                    path=str(dataset_path),
+                    dt_col="dt",
+                    target_col="target",
+                ),
+                cv=SimpleNamespace(
+                    horizon=2,
+                    step_size=1,
+                    n_windows=2,
+                    gap=0,
+                    max_train_size=None,
+                    overlap_eval_policy="by_cutoff_mean",
+                ),
+            )
+        ),
+    )
+    monkeypatch.setattr(runtime, "_build_summary_plot_bundle", lambda *args, **kwargs: {})
+
+    metrics_frame = pd.DataFrame(
+        [
+            {
+                "model": "AAForecast",
+                "fold_idx": 0,
+                "cutoff": "2024-02-04",
+                "MAE": 1.0,
+                "RMSE": 1.1,
+                "MAPE": 1.2,
+                "SMAPE": 1.3,
+                "MSE": 1.4,
+            },
+            {
+                "model": "AAForecast",
+                "fold_idx": 1,
+                "cutoff": "2024-02-11",
+                "MAE": 2.0,
+                "RMSE": 2.1,
+                "MAPE": 2.2,
+                "SMAPE": 2.3,
+                "MSE": 2.4,
+            },
+        ]
+    )
+    forecasts_frame = pd.DataFrame(
+        [
+            {
+                "model": "AAForecast",
+                "fold_idx": 0,
+                "cutoff": "2024-02-04",
+                "train_end_ds": "2024-02-04",
+                "unique_id": "target",
+                "ds": "2024-02-11",
+                "horizon_step": 1,
+                "y": 15.0,
+                "y_hat": 14.5,
+                "aaforecast_context_artifact": "aa_forecast/context/test.csv",
+            },
+            {
+                "model": "AAForecast",
+                "fold_idx": 0,
+                "cutoff": "2024-02-04",
+                "train_end_ds": "2024-02-04",
+                "unique_id": "target",
+                "ds": "2024-02-18",
+                "horizon_step": 2,
+                "y": 16.0,
+                "y_hat": 15.5,
+                "aaforecast_context_artifact": "aa_forecast/context/test.csv",
+            },
+            {
+                "model": "AAForecast",
+                "fold_idx": 1,
+                "cutoff": "2024-02-11",
+                "train_end_ds": "2024-02-11",
+                "unique_id": "target",
+                "ds": "2024-02-18",
+                "horizon_step": 1,
+                "y": 16.0,
+                "y_hat": 15.8,
+                "aaforecast_context_artifact": "aa_forecast/context/test.csv",
+            },
+            {
+                "model": "AAForecast",
+                "fold_idx": 1,
+                "cutoff": "2024-02-11",
+                "train_end_ds": "2024-02-11",
+                "unique_id": "target",
+                "ds": "2024-02-25",
+                "horizon_step": 2,
+                "y": 17.0,
+                "y_hat": 16.8,
+                "aaforecast_context_artifact": "aa_forecast/context/test.csv",
+            },
+        ]
+    )
 
     runtime._write_per_window_summary_bundles(
         run_root,
-        pd.DataFrame([{"model": "AAForecast"}]),
-        pd.DataFrame([{"model": "AAForecast"}]),
+        metrics_frame,
+        forecasts_frame,
     )
-
-    assert calls == [
-        {
-            "job_params": {"best": "param"},
-            "training_override": {"lr": 0.01},
-            "train_end_ds": "2024-02-18",
-            "run_root": str(run_root),
-        },
-        {
-            "job_params": {"best": "param"},
-            "training_override": {"lr": 0.01},
-            "train_end_ds": "2024-02-25",
-            "run_root": str(run_root),
-        },
-    ]
 
     manifest_1 = json.loads((run_root / "summary" / "test_1" / "window_manifest.json").read_text())
     manifest_2 = json.loads((run_root / "summary" / "test_2" / "window_manifest.json").read_text())
-    assert manifest_1["anchor_train_end_ds"].startswith("2024-02-11")
-    assert manifest_1["origin_ds"].startswith("2024-02-18")
+    assert manifest_1["test_index"] == 1
+    assert manifest_1["fold_idx"] == 0
+    assert manifest_1["cutoff"].startswith("2024-02-04")
+    assert manifest_1["forecast_start_ds"].startswith("2024-02-11")
+    assert manifest_1["forecast_end_ds"].startswith("2024-02-18")
     assert manifest_1["forecast_only"] is False
-    assert manifest_1["observed_steps"] == 1
-    assert manifest_2["origin_ds"].startswith("2024-02-25")
-    assert manifest_2["forecast_only"] is True
-    assert manifest_2["observed_steps"] == 0
-
-    rolling_metrics = pd.read_csv(run_root / "cv" / "AAForecast_rolling_origin_metrics.csv")
-    rolling_forecasts = pd.read_csv(run_root / "cv" / "AAForecast_rolling_origin_forecasts.csv")
-    assert rolling_metrics["test_index"].tolist() == [1]
-    assert rolling_metrics["used_best_params"].tolist() == [True]
-    assert rolling_forecasts["test_index"].tolist() == [1, 1, 2, 2]
-    assert rolling_forecasts["used_best_params"].tolist() == [True, True, True, True]
-    assert rolling_forecasts["aaforecast_context_artifact"].tolist() == [
-        "aa_forecast/context/test.csv",
-        "aa_forecast/context/test.csv",
-        "aa_forecast/context/test.csv",
-        "aa_forecast/context/test.csv",
-    ]
-    if "aaforecast_context_active" in rolling_forecasts.columns:
-        assert rolling_forecasts["aaforecast_context_active"].isna().all()
-    if "aaforecast_context_label" in rolling_forecasts.columns:
-        assert rolling_forecasts["aaforecast_context_label"].isna().all()
+    assert manifest_1["observed_steps"] == 2
+    assert manifest_2["test_index"] == 2
+    assert manifest_2["fold_idx"] == 1
+    assert manifest_2["cutoff"].startswith("2024-02-11")
+    assert manifest_2["forecast_start_ds"].startswith("2024-02-18")
+    assert manifest_2["forecast_end_ds"].startswith("2024-02-25")
+    assert manifest_2["forecast_only"] is False
+    assert manifest_2["observed_steps"] == 2
 
     sample_md = (run_root / "summary" / "test_2" / "sample.md").read_text(encoding="utf-8")
-    assert "rolling-origin forecast" in sample_md
-    assert "forecast-only" in sample_md
+    assert "설정된 CV fold 결과" in sample_md
+    assert "cutoff(train_end_ds): 2024-02-11" in sample_md
+
+
+def test_write_per_window_summary_bundles_fails_when_configured_window_slice_is_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    rolling_origin_source_df: pd.DataFrame,
+) -> None:
+    dataset_path = tmp_path / "rolling_origin.csv"
+    rolling_origin_source_df.to_csv(dataset_path, index=False)
+
+    config_payload = {
+        "task": {"name": "cv_summary_missing_window"},
+        "dataset": {
+            "path": str(dataset_path),
+            "target_col": "target",
+            "dt_col": "dt",
+            "hist_exog_cols": ["event"],
+            "futr_exog_cols": [],
+            "static_exog_cols": [],
+        },
+        "runtime": {"random_seed": 7},
+        "training": {
+            "input_size": 4,
+            "batch_size": 1,
+            "valid_batch_size": 1,
+            "windows_batch_size": 8,
+            "inference_windows_batch_size": 8,
+            "max_steps": 1,
+            "val_size": 2,
+            "val_check_steps": 1,
+            "early_stop_patience_steps": -1,
+            "loss": "mse",
+            "accelerator": "cpu",
+        },
+        "cv": {
+            "horizon": 2,
+            "step_size": 1,
+            "n_windows": 2,
+            "gap": 0,
+            "overlap_eval_policy": "by_cutoff_mean",
+        },
+        "scheduler": {"gpu_ids": [0], "max_concurrent_jobs": 1, "worker_devices": 1},
+        "jobs": [{"model": "Naive", "params": {}}],
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config_payload, sort_keys=False), encoding="utf-8")
+
+    run_root = tmp_path / "run"
+    (run_root / "manifest").mkdir(parents=True)
+    (run_root / "summary").mkdir(parents=True)
+    (run_root / "manifest" / "run_manifest.json").write_text(
+        json.dumps(
+            {
+                "config_source_type": "yaml",
+                "config_source_path": str(config_path),
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_load_summary_loaded_config",
+        lambda _run_root: SimpleNamespace(
+            config=SimpleNamespace(
+                dataset=SimpleNamespace(
+                    path=str(dataset_path),
+                    dt_col="dt",
+                    target_col="target",
+                ),
+                cv=SimpleNamespace(
+                    horizon=2,
+                    step_size=1,
+                    n_windows=2,
+                    gap=0,
+                    max_train_size=None,
+                    overlap_eval_policy="by_cutoff_mean",
+                ),
+            )
+        ),
+    )
+
+    metrics_frame = pd.DataFrame(
+        [
+            {
+                "model": "Naive",
+                "fold_idx": 0,
+                "cutoff": "2024-02-04",
+                "MAE": 1.0,
+                "RMSE": 1.1,
+                "MAPE": 1.2,
+                "SMAPE": 1.3,
+                "MSE": 1.4,
+            }
+        ]
+    )
+    forecasts_frame = pd.DataFrame(
+        [
+            {
+                "model": "Naive",
+                "fold_idx": 0,
+                "cutoff": "2024-02-04",
+                "train_end_ds": "2024-02-04",
+                "unique_id": "target",
+                "ds": "2024-02-11",
+                "horizon_step": 1,
+                "y": 15.0,
+                "y_hat": 14.5,
+            }
+        ]
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="summary/test_k could not find summary metrics rows for test_2",
+    ):
+        runtime._write_per_window_summary_bundles(
+            run_root,
+            metrics_frame,
+            forecasts_frame,
+        )
 
 
 def test_plot_last_fold_overlay_uses_single_panel_without_aaforecast_context(

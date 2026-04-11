@@ -117,15 +117,12 @@ class _CurveFrameCarrier:
 
 
 @dataclass(frozen=True)
-class _RollingOriginWindow:
+class _SummaryBundleWindow:
     test_index: int
-    anchor_train_end_ds: pd.Timestamp
-    origin_ds: pd.Timestamp
+    fold_idx: int
+    cutoff: pd.Timestamp
     forecast_start_ds: pd.Timestamp
     forecast_end_ds: pd.Timestamp
-    observed_steps: int
-    forecast_only: bool
-    future_df: pd.DataFrame
 
 
 def _now_iso() -> str:
@@ -2294,221 +2291,124 @@ def _summary_overlay_actual_frames(
     return history_frame.reset_index(drop=True), output_frame
 
 
-def _summary_available_model_names(
-    metrics_frame: pd.DataFrame, forecasts_frame: pd.DataFrame
-) -> set[str]:
-    models: set[str] = set()
-    if not metrics_frame.empty and "model" in metrics_frame.columns:
-        models.update(str(model) for model in metrics_frame["model"].dropna().tolist())
-    if not forecasts_frame.empty and "model" in forecasts_frame.columns:
-        models.update(
-            str(model) for model in forecasts_frame["model"].dropna().tolist()
-        )
-    return models
-
-
-def _last_holdout_anchor(source_df: pd.DataFrame, loaded: LoadedConfig) -> tuple[pd.Timestamp, int]:
+def _build_configured_summary_windows(
+    source_df: pd.DataFrame, loaded: LoadedConfig
+) -> list[_SummaryBundleWindow]:
     dt_col = loaded.config.dataset.dt_col
-    splits = _build_tscv_splits(len(source_df), loaded.config.cv)
-    if not splits:
-        raise ValueError("summary rolling-origin forecast requires at least one split")
-    anchor_idx = splits[-1][0][-1]
-    anchor_ds = _normalize_summary_timestamp(source_df[dt_col].iloc[anchor_idx])
-    return anchor_ds, int(anchor_idx)
-
-
-def _build_rolling_origin_windows(
-    source_df: pd.DataFrame,
-    loaded: LoadedConfig,
-    *,
-    freq: str,
-) -> list[_RollingOriginWindow]:
-    dt_col = loaded.config.dataset.dt_col
-    target_col = loaded.config.dataset.target_col
     normalized_ds = pd.Index(
         pd.to_datetime(source_df[dt_col]).map(_normalize_summary_timestamp)
     )
     if normalized_ds.has_duplicates:
         raise ValueError(
-            "summary rolling-origin forecast requires unique dataset.dt_col timestamps"
+            "summary/test_k requires unique dataset.dt_col timestamps"
         )
-    anchor_ds, anchor_idx = _last_holdout_anchor(source_df, loaded)
-    available_future_origins = len(source_df) - anchor_idx - 1
-    required_origins = loaded.config.cv.n_windows
-    if available_future_origins < required_origins:
-        raise ValueError(
-            "summary rolling-origin forecast requires at least "
-            f"{required_origins} observed timestamps after anchor {anchor_ds}, "
-            f"but only found {available_future_origins}"
-        )
-    row_lookup = {
-        normalized_ds[idx]: source_df.iloc[idx].to_dict() for idx in range(len(source_df))
-    }
-    windows: list[_RollingOriginWindow] = []
-    future_dates_per_window = loaded.config.cv.horizon + 1
-    for test_index in range(1, required_origins + 1):
-        origin_idx = anchor_idx + test_index
-        origin_ds = normalized_ds[origin_idx]
-        forecast_dates = pd.date_range(
-            start=origin_ds,
-            periods=future_dates_per_window,
-            freq=freq,
-        )[1:]
-        rows: list[dict[str, Any]] = []
-        observed_steps = 0
-        for forecast_ds in forecast_dates:
-            normalized_forecast_ds = _normalize_summary_timestamp(forecast_ds)
-            row = dict(row_lookup.get(normalized_forecast_ds, {}))
-            if not row:
-                row = {column: np.nan for column in source_df.columns}
-                row[target_col] = np.nan
-            row[dt_col] = normalized_forecast_ds
-            if pd.notna(row.get(target_col)):
-                observed_steps += 1
-            rows.append(row)
-        future_df = pd.DataFrame(rows, columns=source_df.columns)
+    splits = _build_tscv_splits(len(source_df), loaded.config.cv)
+    if not splits:
+        raise ValueError("summary/test_k requires at least one configured CV split")
+    windows: list[_SummaryBundleWindow] = []
+    for test_index, (train_idx, test_idx) in enumerate(splits, start=1):
+        if not train_idx or not test_idx:
+            raise ValueError(
+                "summary/test_k requires non-empty train/test indices for every CV split"
+            )
         windows.append(
-            _RollingOriginWindow(
+            _SummaryBundleWindow(
                 test_index=test_index,
-                anchor_train_end_ds=anchor_ds,
-                origin_ds=origin_ds,
-                forecast_start_ds=_normalize_summary_timestamp(forecast_dates[0]),
-                forecast_end_ds=_normalize_summary_timestamp(forecast_dates[-1]),
-                observed_steps=observed_steps,
-                forecast_only=observed_steps == 0,
-                future_df=future_df,
+                fold_idx=test_index - 1,
+                cutoff=normalized_ds[train_idx[-1]],
+                forecast_start_ds=normalized_ds[test_idx[0]],
+                forecast_end_ds=normalized_ds[test_idx[-1]],
             )
         )
     return windows
 
 
-def _resolve_summary_replay_job(
-    run_root: Path, job: JobConfig
-) -> tuple[JobConfig, dict[str, Any], bool]:
-    if job.validated_mode != "learned_auto":
-        return job, {}, False
-    models_dir = run_root / "models" / job.model
-    best_params_path = models_dir / "best_params.json"
-    training_best_params_path = models_dir / "training_best_params.json"
-    if not best_params_path.exists() or not training_best_params_path.exists():
-        raise FileNotFoundError(
-            "summary rolling-origin forecast requires resolved Optuna artifacts for "
-            f"{job.model}: {best_params_path} and {training_best_params_path}"
-        )
-    best_params = json.loads(best_params_path.read_text(encoding="utf-8"))
-    training_best_params = json.loads(
-        training_best_params_path.read_text(encoding="utf-8")
-    )
-    return replace(job, params=best_params), training_best_params, True
-
-
-def _validate_rolling_origin_future_requirements(
-    loaded: LoadedConfig,
-    job: JobConfig,
-    window: _RollingOriginWindow,
-) -> None:
-    missing_future_steps = loaded.config.cv.horizon - window.observed_steps
-    if missing_future_steps <= 0:
-        return
-    if loaded.config.dataset.futr_exog_cols:
-        raise ValueError(
-            "summary rolling-origin forecast cannot extend beyond observed data when "
-            f"dataset.futr_exog_cols are configured for {job.model}; "
-            "provide explicit future exogenous values first"
-        )
-    if (
-        job.model in {"xgboost", "lightgbm"}
-        and loaded.config.dataset.hist_exog_cols
-    ):
-        raise ValueError(
-            "summary rolling-origin forecast cannot extend beyond observed data for "
-            f"{job.model} when dataset.hist_exog_cols are configured; "
-            "future historic-exogenous rows are unavailable"
-        )
-
-
-def _baseline_predict_window(
-    loaded: LoadedConfig,
-    model_name: str,
+def _scoped_summary_window_frame(
+    frame: pd.DataFrame,
+    window: _SummaryBundleWindow,
     *,
-    train_df: pd.DataFrame,
-    future_df: pd.DataFrame,
-) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, None]:
-    dt_col = loaded.config.dataset.dt_col
-    target_col = loaded.config.dataset.target_col
-    history = train_df[target_col].astype(float).reset_index(drop=True)
-    future_actual = future_df[target_col].reset_index(drop=True)
-    future_dates = pd.to_datetime(future_df[dt_col]).reset_index(drop=True)
-    train_end_ds = pd.to_datetime(train_df[dt_col].iloc[-1])
-    diff_context = _build_fold_diff_context(loaded, train_df, target_col=target_col)
-    working_history = _transform_training_series(history, diff_context)
-    if model_name == "Naive":
-        pred_values = pd.Series([float(working_history.iloc[-1])] * len(future_df))
-    elif model_name == "SeasonalNaive":
-        season = min(len(working_history), len(future_df))
-        tail = working_history.iloc[-season:].reset_index(drop=True)
-        pred_values = pd.Series(
-            (list(tail) * ((len(future_df) // len(tail)) + 1))[: len(future_df)]
+    frame_name: str,
+) -> pd.DataFrame:
+    if frame.empty:
+        raise ValueError(
+            f"summary/test_k requires {frame_name} rows for test_{window.test_index}, "
+            f"but {frame_name} is empty"
         )
-    else:
-        pred_values = pd.Series([float(working_history.mean())] * len(future_df))
-    pred_values = _restore_prediction_series(pred_values, diff_context)
-    target_predictions = pd.DataFrame(
-        {
-            "unique_id": [target_col] * len(future_df),
-            "ds": future_dates,
-            model_name: pred_values,
-        }
+    normalized_frame = _normalize_summary_window_frame(frame, frame_name=frame_name)
+    scoped = normalized_frame[
+        _summary_window_mask(
+            normalized_frame,
+            normalized_cutoff=window.cutoff,
+            fold_idx=window.fold_idx,
+        )
+    ].copy()
+    if scoped.empty:
+        raise ValueError(
+            "summary/test_k could not find "
+            f"{frame_name} rows for test_{window.test_index} "
+            f"(fold_idx={window.fold_idx}, cutoff={window.cutoff})"
+        )
+    return scoped.drop(columns=["normalized_cutoff"])
+
+
+def _summary_window_observed_steps(forecasts_window: pd.DataFrame) -> int:
+    if forecasts_window.empty:
+        return 0
+    if "ds" not in forecasts_window.columns or "y" not in forecasts_window.columns:
+        raise ValueError("summary/test_k forecasts must contain ds and y columns")
+    actuals = forecasts_window[["ds", "y"]].copy()
+    actuals["normalized_ds"] = pd.to_datetime(actuals["ds"]).map(
+        _normalize_summary_timestamp
     )
-    return target_predictions, future_actual, train_end_ds, train_df, None
-
-
-def _compute_observed_metrics(
-    actual: pd.Series, predicted: pd.Series
-) -> tuple[dict[str, float] | None, int]:
-    observed_mask = actual.notna()
-    observed_steps = int(observed_mask.sum())
-    if observed_steps == 0:
-        return None, 0
-    metrics = _compute_metrics(
-        actual[observed_mask].reset_index(drop=True),
-        predicted[observed_mask].reset_index(drop=True),
+    actuals["y"] = pd.to_numeric(actuals["y"], errors="coerce")
+    actuals = (
+        actuals.groupby("normalized_ds", dropna=True)["y"]
+        .agg(lambda series: bool(series.notna().any()))
+        .reset_index(name="observed")
     )
-    return metrics, observed_steps
+    return int(actuals["observed"].sum())
 
 
-def _rolling_origin_context_lines(
-    window: _RollingOriginWindow, *, horizon: int
+def _summary_window_context_lines(
+    window: _SummaryBundleWindow,
+    *,
+    horizon: int,
+    observed_steps: int,
+    forecast_only: bool,
 ) -> list[str]:
     lines = [
-        "- summary/test_k는 마지막 holdout anchor 이후 rolling-origin forecast 결과다.",
-        f"- anchor train_end_ds: {window.anchor_train_end_ds.date()}",
-        f"- origin ds: {window.origin_ds.date()}",
+        "- summary/test_k는 설정된 CV fold 결과를 window별로 다시 묶은 번들이다.",
+        f"- fold_idx: {window.fold_idx}",
+        f"- cutoff(train_end_ds): {window.cutoff.date()}",
         (
             f"- 예측 구간: {window.forecast_start_ds.date()} ~ "
             f"{window.forecast_end_ds.date()}"
         ),
-        f"- 관측 가능한 horizon step: {window.observed_steps}/{horizon}",
+        f"- 관측 가능한 horizon step: {observed_steps}/{horizon}",
         "- metric은 실제값이 존재하는 step만 사용한다.",
     ]
-    if window.forecast_only:
+    if forecast_only:
         lines.append("- 이 test window는 forecast-only 구간이다.")
     return lines
 
 
-def _write_rolling_origin_manifest(
+def _write_summary_window_manifest(
     summary_dir: Path,
-    window: _RollingOriginWindow,
+    window: _SummaryBundleWindow,
     *,
     horizon: int,
+    observed_steps: int,
+    forecast_only: bool,
 ) -> None:
     payload = {
-        "anchor_train_end_ds": str(window.anchor_train_end_ds),
-        "origin_ds": str(window.origin_ds),
+        "test_index": int(window.test_index),
+        "fold_idx": int(window.fold_idx),
+        "cutoff": str(window.cutoff),
+        "train_end_ds": str(window.cutoff),
         "forecast_start_ds": str(window.forecast_start_ds),
         "forecast_end_ds": str(window.forecast_end_ds),
-        "observed_steps": int(window.observed_steps),
-        "forecast_only": bool(window.forecast_only),
+        "observed_steps": int(observed_steps),
+        "forecast_only": bool(forecast_only),
         "horizon": int(horizon),
     }
     (summary_dir / "window_manifest.json").write_text(
@@ -2523,151 +2423,44 @@ def _write_per_window_summary_bundles(
     loaded = _load_summary_loaded_config(run_root)
     source_df = pd.read_csv(loaded.config.dataset.path)
     source_df = source_df.sort_values(loaded.config.dataset.dt_col).reset_index(drop=True)
-    freq = _resolve_freq(loaded, source_df)
-    windows = _build_rolling_origin_windows(source_df, loaded, freq=freq)
-    available_models = _summary_available_model_names(metrics_frame, forecasts_frame)
-    jobs = [
-        job
-        for job in loaded.config.jobs
-        if not available_models or job.model in available_models
-    ]
+    windows = _build_configured_summary_windows(source_df, loaded)
 
-    rolling_metrics_rows: list[dict[str, object]] = []
-    rolling_forecast_rows: list[dict[str, object]] = []
-    cv_dir = run_root / "cv"
-    cv_dir.mkdir(parents=True, exist_ok=True)
-
-    for job in jobs:
-        effective_job, training_override, used_best_params = _resolve_summary_replay_job(
-            run_root, job
-        )
-        job_metric_rows: list[dict[str, object]] = []
-        job_forecast_rows: list[dict[str, object]] = []
-        for window in windows:
-            _validate_rolling_origin_future_requirements(loaded, effective_job, window)
-            origin_mask = pd.to_datetime(source_df[loaded.config.dataset.dt_col]).map(
-                _normalize_summary_timestamp
-            ) <= window.origin_ds
-            train_df = source_df.loc[origin_mask].reset_index(drop=True)
-            future_df = window.future_df.copy()
-            if effective_job.model in BASELINE_MODEL_NAMES:
-                (
-                    target_predictions,
-                    target_actuals,
-                    train_end_ds,
-                    _train_df,
-                    _,
-                ) = _baseline_predict_window(
-                    loaded,
-                    effective_job.model,
-                    train_df=train_df,
-                    future_df=future_df,
-                )
-            else:
-                combined_df = pd.concat([train_df, future_df], ignore_index=True)
-                train_idx = list(range(len(train_df)))
-                test_idx = list(range(len(train_df), len(combined_df)))
-                (
-                    target_predictions,
-                    target_actuals,
-                    train_end_ds,
-                    _train_df,
-                    _,
-                ) = _fit_and_predict_fold(
-                    loaded,
-                    effective_job,
-                    run_root=run_root,
-                    source_df=combined_df,
-                    freq=freq,
-                    train_idx=train_idx,
-                    test_idx=test_idx,
-                    training_override=training_override,
-                )
-            pred_col = _prediction_column(target_predictions, effective_job.model)
-            metrics, observed_steps = _compute_observed_metrics(
-                target_actuals,
-                target_predictions[pred_col],
-            )
-            if metrics is not None:
-                metric_row = {
-                    "model": effective_job.model,
-                    "requested_mode": job.requested_mode,
-                    "validated_mode": job.validated_mode,
-                    "test_index": window.test_index,
-                    "fold_idx": window.test_index - 1,
-                    "cutoff": str(window.origin_ds),
-                    "train_end_ds": str(train_end_ds),
-                    "anchor_train_end_ds": str(window.anchor_train_end_ds),
-                    "origin_ds": str(window.origin_ds),
-                    "observed_steps": observed_steps,
-                    "used_best_params": used_best_params,
-                    **metrics,
-                }
-                job_metric_rows.append(metric_row)
-                rolling_metrics_rows.append(metric_row)
-            for row_idx, ds in enumerate(target_predictions["ds"]):
-                actual_value = target_actuals.iloc[row_idx]
-                forecast_row = {
-                    "model": effective_job.model,
-                    "requested_mode": job.requested_mode,
-                    "validated_mode": job.validated_mode,
-                    "test_index": window.test_index,
-                    "fold_idx": window.test_index - 1,
-                    "cutoff": str(window.origin_ds),
-                    "train_end_ds": str(train_end_ds),
-                    "anchor_train_end_ds": str(window.anchor_train_end_ds),
-                    "origin_ds": str(window.origin_ds),
-                    "unique_id": loaded.config.dataset.target_col,
-                    "ds": str(pd.Timestamp(ds)),
-                    "horizon_step": row_idx + 1,
-                    "y": None if pd.isna(actual_value) else float(actual_value),
-                    "y_hat": float(target_predictions[pred_col].iloc[row_idx]),
-                    "observed": bool(pd.notna(actual_value)),
-                    "used_best_params": used_best_params,
-                    **_prediction_additive_fields(target_predictions, row_idx),
-                }
-                job_forecast_rows.append(forecast_row)
-                rolling_forecast_rows.append(forecast_row)
-        pd.DataFrame(job_forecast_rows).to_csv(
-            cv_dir / f"{effective_job.model}_rolling_origin_forecasts.csv",
-            index=False,
-        )
-        pd.DataFrame(job_metric_rows).to_csv(
-            cv_dir / f"{effective_job.model}_rolling_origin_metrics.csv",
-            index=False,
-        )
-
-    rolling_metrics = pd.DataFrame(rolling_metrics_rows)
-    rolling_forecasts = pd.DataFrame(rolling_forecast_rows)
     summary_root = run_root / "summary"
     for window in windows:
         summary_dir = summary_root / f"test_{window.test_index}"
         summary_dir.mkdir(parents=True, exist_ok=True)
-        metrics_window = (
-            rolling_metrics[rolling_metrics["test_index"] == window.test_index].copy()
-            if not rolling_metrics.empty
-            else pd.DataFrame()
+        metrics_window = _scoped_summary_window_frame(
+            metrics_frame,
+            window,
+            frame_name="summary metrics",
         )
-        forecasts_window = (
-            rolling_forecasts[rolling_forecasts["test_index"] == window.test_index].copy()
-            if not rolling_forecasts.empty
-            else pd.DataFrame()
+        forecasts_window = _scoped_summary_window_frame(
+            forecasts_frame,
+            window,
+            frame_name="summary forecasts",
         )
+        observed_steps = _summary_window_observed_steps(forecasts_window)
+        forecast_only = observed_steps == 0
         _write_summary_bundle(
             run_root,
             summary_dir,
             metrics_window,
             scoped_forecasts=forecasts_window,
-            title_prefix=f"Rolling-origin test {window.test_index} predictions",
-            report_context_lines=_rolling_origin_context_lines(
-                window, horizon=loaded.config.cv.horizon
+            title_prefix=f"CV test {window.test_index} predictions",
+            report_context_lines=_summary_window_context_lines(
+                window,
+                horizon=loaded.config.cv.horizon,
+                observed_steps=observed_steps,
+                forecast_only=forecast_only,
             ),
             include_future_only_predictions=True,
         )
-        _write_rolling_origin_manifest(
+        _write_summary_window_manifest(
             summary_dir,
             window,
             horizon=loaded.config.cv.horizon,
+            observed_steps=observed_steps,
+            forecast_only=forecast_only,
         )
 
 
