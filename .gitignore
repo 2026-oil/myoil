@@ -47,6 +47,8 @@ nbs/_extensions
 /.omx/
 **/.omx/
 .venv/
+*.Zone.Identifier
+*Zone.Identifier
 
 CLAUDE.md
 
