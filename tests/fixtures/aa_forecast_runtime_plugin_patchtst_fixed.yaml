@@ -1,0 +1,20 @@
+aa_forecast:
+  model: patchtst
+  tune_training: false
+  lowess_frac: 0.6
+  lowess_delta: 0.01
+  uncertainty:
+    enabled: false
+    sample_count: 3
+  model_params:
+    hidden_size: 64
+    n_heads: 4
+    encoder_layers: 1
+    linear_hidden_size: 128
+    attn_dropout: 0.0
+    patch_len: 4
+    stride: 2
+  star_anomaly_tails:
+    upward:
+    - event
+    two_sided: []

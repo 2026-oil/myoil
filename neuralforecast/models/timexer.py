@@ -420,3 +420,69 @@ class TimeXer(BaseModel):
         y_pred = self.forecast(insample_y, ex_embed)
         y_pred = y_pred.reshape(B, self.h, -1)
         return y_pred
+
+# === AAForecast seam: encoder-only TimeXer helper ===
+class TimeXerEncoderOnly(nn.Module):
+    def __init__(
+        self,
+        *,
+        input_size: int,
+        n_series: int,
+        patch_len: int,
+        hidden_size: int,
+        n_heads: int,
+        e_layers: int,
+        d_ff: int,
+        factor: int,
+        dropout: float,
+        use_norm: bool,
+    ) -> None:
+        super().__init__()
+        TimeXer._validate_patch_geometry(input_size=input_size, patch_len=patch_len)
+        self.use_norm = use_norm
+        self.en_embedding = EnEmbedding(n_series, hidden_size, patch_len, dropout)
+        self.ex_embedding = DataEmbedding_inverted(input_size, hidden_size, dropout)
+        self.encoder = Encoder(
+            [
+                EncoderLayer(
+                    AttentionLayer(
+                        FullAttention(
+                            False,
+                            factor,
+                            attention_dropout=dropout,
+                            output_attention=False,
+                        ),
+                        hidden_size,
+                        n_heads,
+                    ),
+                    AttentionLayer(
+                        FullAttention(
+                            False,
+                            factor,
+                            attention_dropout=dropout,
+                            output_attention=False,
+                        ),
+                        hidden_size,
+                        n_heads,
+                    ),
+                    hidden_size,
+                    d_ff,
+                    dropout=dropout,
+                    activation="relu",
+                )
+                for _ in range(e_layers)
+            ],
+            norm_layer=torch.nn.LayerNorm(hidden_size),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.use_norm:
+            means = x.mean(1, keepdim=True).detach()
+            centered = x - means
+            variance = torch.var(centered, dim=1, keepdim=True, unbiased=False)
+            scale = torch.where(variance < 1e-5, torch.ones_like(variance), variance.sqrt())
+            x = centered / scale
+        en_embed, n_vars = self.en_embedding(x.permute(0, 2, 1))
+        cross_embed = self.ex_embedding(x, None)
+        enc_out = self.encoder(en_embed, cross_embed)
+        return enc_out.reshape(-1, n_vars, enc_out.shape[-2], enc_out.shape[-1]).permute(0, 1, 3, 2)

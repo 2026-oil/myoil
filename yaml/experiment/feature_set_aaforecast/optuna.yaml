@@ -19,4 +19,4 @@ dataset:
   static_exog_cols: []
 aa_forecast:
   enabled: true
-  config_path: yaml/plugins/aa_forecsat/aa_forecast_optuna_model_only.yaml
+  config_path: yaml/plugins/aa_forecast/aa_forecast_optuna_model_only.yaml

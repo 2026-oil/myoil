@@ -1048,3 +1048,58 @@ class PatchTST(BaseModel):
         forecast = x.permute(0, 2, 1)  # x: [Batch, h, c_out]
 
         return forecast
+
+# === AAForecast seam: encoder-only PatchTST helper ===
+class PatchTSTEncoderOnly(nn.Module):
+    def __init__(
+        self,
+        c_in: int,
+        input_size: int,
+        patch_len: int,
+        stride: int,
+        n_layers: int,
+        hidden_size: int,
+        n_heads: int,
+        linear_hidden_size: int,
+        attn_dropout: float,
+        dropout: float,
+        *,
+        padding_patch: str = "end",
+        revin: bool = False,
+    ):
+        super().__init__()
+        self.patch_len = patch_len
+        self.stride = stride
+        self.padding_patch = padding_patch
+        self.revin = revin
+        self.patch_num = _patchtst_patch_num(
+            input_size=input_size,
+            patch_len=patch_len,
+            stride=stride,
+            padding_patch=padding_patch,
+        )
+        self.encoder = TSTiEncoder(
+            c_in=c_in,
+            patch_num=self.patch_num,
+            patch_len=patch_len,
+            n_layers=n_layers,
+            hidden_size=hidden_size,
+            n_heads=n_heads,
+            linear_hidden_size=linear_hidden_size,
+            attn_dropout=attn_dropout,
+            dropout=dropout,
+        )
+        self.revin_layer = RevIN(c_in) if revin else None
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        feature_major = x.transpose(1, 2)
+        if self.revin_layer is not None:
+            normalized = self.revin_layer(x, "norm")
+            feature_major = normalized.transpose(1, 2)
+        patches = _patchtst_create_patches(
+            feature_major,
+            patch_len=self.patch_len,
+            stride=self.stride,
+            padding_patch=self.padding_patch,
+        )
+        return self.encoder(patches)

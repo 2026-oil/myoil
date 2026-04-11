@@ -136,11 +136,9 @@ def test_runtime_validate_only_accepts_itransformer_future_exog(
     assert resolved["dataset"]["futr_exog_cols"] == ["futr_a"]
 
     manifest = json.loads((output_root / "manifest" / "run_manifest.json").read_text())
-    assert manifest["jobs"] == [
-        {
-            "model": "iTransformer",
-            "requested_mode": "learned_fixed",
-            "validated_mode": "learned_fixed",
-            "selected_search_params": [],
-        }
-    ]
+    assert len(manifest["jobs"]) == 1
+    job = manifest["jobs"][0]
+    assert job["model"] == "iTransformer"
+    assert job["requested_mode"] == "learned_fixed"
+    assert job["validated_mode"] == "learned_fixed"
+    assert job["selected_search_params"] == []

@@ -262,3 +262,54 @@ class VanillaTransformer(BaseModel):
 
         forecast = dec_out[:, -self.h :]
         return forecast
+
+# === AAForecast seam: encoder-only VanillaTransformer helper ===
+class VanillaTransformerEncoderOnly(nn.Module):
+    def __init__(
+        self,
+        *,
+        c_in: int,
+        exog_input_size: int,
+        hidden_size: int,
+        n_head: int,
+        conv_hidden_size: int,
+        activation: str,
+        encoder_layers: int,
+        dropout: float,
+    ) -> None:
+        super().__init__()
+        self.enc_embedding = DataEmbedding(
+            c_in=c_in,
+            exog_input_size=exog_input_size,
+            hidden_size=hidden_size,
+            pos_embedding=True,
+            dropout=dropout,
+        )
+        self.encoder = TransEncoder(
+            [
+                TransEncoderLayer(
+                    AttentionLayer(
+                        FullAttention(
+                            mask_flag=False,
+                            attention_dropout=dropout,
+                            output_attention=False,
+                        ),
+                        hidden_size,
+                        n_head,
+                    ),
+                    hidden_size,
+                    conv_hidden_size,
+                    dropout=dropout,
+                    activation=activation,
+                )
+                for _ in range(encoder_layers)
+            ],
+            norm_layer=torch.nn.LayerNorm(hidden_size),
+        )
+
+    def forward(
+        self, x: torch.Tensor, x_mark: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        enc_out = self.enc_embedding(x, x_mark)
+        enc_out, _ = self.encoder(enc_out, attn_mask=None)
+        return enc_out

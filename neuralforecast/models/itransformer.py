@@ -304,3 +304,49 @@ class iTransformer(BaseModel):
         y_pred = y_pred.reshape(insample_y.shape[0], self.h, -1)
 
         return y_pred
+
+# === AAForecast seam: encoder-only iTransformer helper ===
+class ITransformerTokenEncoderOnly(nn.Module):
+    def __init__(
+        self,
+        *,
+        input_size: int,
+        hidden_size: int,
+        n_heads: int,
+        e_layers: int,
+        d_ff: int,
+        factor: int,
+        dropout: float,
+        use_norm: bool,
+    ) -> None:
+        super().__init__()
+        self.use_norm = use_norm
+        self.enc_embedding = DataEmbedding_inverted(input_size, hidden_size, dropout)
+        self.encoder = TransEncoder(
+            [
+                TransEncoderLayer(
+                    AttentionLayer(
+                        FullAttention(False, factor, attention_dropout=dropout),
+                        hidden_size,
+                        n_heads,
+                    ),
+                    hidden_size,
+                    d_ff,
+                    dropout=dropout,
+                    activation=F.gelu,
+                )
+                for _ in range(e_layers)
+            ],
+            norm_layer=torch.nn.LayerNorm(hidden_size),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.use_norm:
+            means = x.mean(1, keepdim=True).detach()
+            centered = x - means
+            variance = torch.var(centered, dim=1, keepdim=True, unbiased=False)
+            scale = torch.where(variance < 1e-5, torch.ones_like(variance), variance.sqrt())
+            x = centered / scale
+        enc_out = self.enc_embedding(x, None)
+        enc_out, _ = self.encoder(enc_out, attn_mask=None)
+        return enc_out

@@ -1486,3 +1486,60 @@ def test_runtime_validate_only_plugin_target_preserves_grouped_tails(
             star_anomaly_tails=expected_tails,
             non_star_hist_exog_cols=expected_non_star,
         )
+
+PLUGIN_PATCHTST_FIXED_MAIN_CONFIG = Path(
+    "tests/fixtures/aa_forecast_runtime_plugin_patchtst_fixed_main.yaml"
+)
+PATCHTST_AA_BACKBONE_SELECTORS = [
+    "hidden_size",
+    "n_heads",
+    "encoder_layers",
+    "dropout",
+    "linear_hidden_size",
+    "attn_dropout",
+    "patch_len",
+    "stride",
+    "decoder_hidden_size",
+    "decoder_layers",
+]
+
+
+def test_runtime_validate_only_accepts_aaforecast_plugin_patchtst_fixed_path(
+    tmp_path: Path,
+) -> None:
+    output_root = tmp_path / "validate-only-aa-forecast-plugin-patchtst-fixed"
+    code = runtime.main(
+        [
+            "--config",
+            str(PLUGIN_PATCHTST_FIXED_MAIN_CONFIG),
+            "--output-root",
+            str(output_root),
+            "--validate-only",
+        ]
+    )
+
+    assert code == 0
+    manifest = json.loads((output_root / "manifest" / "run_manifest.json").read_text())
+    assert len(manifest["jobs"]) == 1
+    assert manifest["jobs"][0]["model"] == "AAForecast"
+    assert manifest["jobs"][0]["requested_mode"] == "learned_fixed"
+    assert manifest["jobs"][0]["validated_mode"] == "learned_fixed"
+    assert manifest["jobs"][0]["selected_search_params"] == []
+    assert manifest["training_search"] == {
+        "requested_mode": "training_fixed",
+        "validated_mode": "training_fixed",
+        "selected_search_params": [],
+    }
+    _assert_grouping_payload(
+        manifest["aa_forecast"],
+        config_path="tests/fixtures/aa_forecast_runtime_plugin_patchtst_fixed.yaml",
+        star_anomaly_tails={"upward": ["event"], "two_sided": []},
+        non_star_hist_exog_cols=[],
+        model="patchtst",
+    )
+    stage_config = json.loads(
+        (output_root / "aa_forecast" / "config" / "stage_config.json").read_text()
+    )
+    assert stage_config["model"] == "patchtst"
+    assert stage_config["backbone"] == "patchtst"
+    assert "mode" not in stage_config
