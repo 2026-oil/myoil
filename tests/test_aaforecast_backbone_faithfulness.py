@@ -96,7 +96,7 @@ BACKBONE_CASES = [
             "use_norm": True,
         },
         ITransformerTokenEncoderOnly,
-        "late projection",
+        "token space",
     ),
 ]
 
@@ -173,8 +173,8 @@ def _build_standalone_helper(model: AAForecast, *, feature_size: int) -> torch.n
         ).eval()
     if model.backbone == "informer":
         return InformerEncoderOnly(
-            c_in=encoder.encoder_only.enc_embedding.value_embedding.tokenConv.in_channels,
-            exog_input_size=0,
+            c_in=1,
+            exog_input_size=feature_size - 1,
             hidden_size=model.hidden_size,
             factor=model.factor,
             n_head=model.n_head,
@@ -244,9 +244,15 @@ def test_aaforecast_non_gru_backbones_match_standalone_encoder_only_pre_bridge(
     standalone.load_state_dict(model.encoder.encoder_only.state_dict())
 
     torch.manual_seed(11)
-    adapter_raw = model.encoder.encoder_only(inputs)
-    torch.manual_seed(11)
-    standalone_raw = standalone(inputs)
+    if model.backbone == "informer":
+        signal, exog = model.encoder._split_inputs(inputs)
+        adapter_raw = model.encoder(inputs)
+        torch.manual_seed(11)
+        standalone_raw = standalone(signal, exog)
+    else:
+        adapter_raw = model.encoder.encoder_only(inputs)
+        torch.manual_seed(11)
+        standalone_raw = standalone(inputs)
 
     assert adapter_raw.shape == standalone_raw.shape
     assert torch.allclose(adapter_raw, standalone_raw, atol=1e-6, rtol=1e-5)
@@ -437,7 +443,7 @@ def test_informer_distillation_changes_sequence_length_while_aa_path_preserves_t
     assert distilled_out.shape[1] < aligned_out.shape[1]
 
 
-def test_itransformer_adapter_preserves_raw_tokens_until_late_projection() -> None:
+def test_itransformer_adapter_keeps_sparse_attention_and_decode_in_token_space() -> None:
     model = _make_model(
         "itransformer",
         hidden_size=8,
@@ -452,15 +458,47 @@ def test_itransformer_adapter_preserves_raw_tokens_until_late_projection() -> No
 
     raw_tokens = model.encoder.encoder_only(inputs)
     adapter_tokens = model.encoder(inputs)
-    late_projected = model.encoder.project_to_time_states(adapter_tokens)
-    manual_projection = model.encoder.late_token_projection(
-        raw_tokens.transpose(1, 2)
-    ).transpose(1, 2)
+    signals = model._aggregate_itransformer_attention_signals(
+        star_payload={
+            "target_activity": torch.tensor(
+                [[
+                    [2.0],
+                    [0.0],
+                    [1.0],
+                    [0.0],
+                ]],
+                dtype=inputs.dtype,
+            ),
+            "star_hist_activity": torch.tensor(
+                [[
+                    [0.0],
+                    [0.0],
+                    [3.0],
+                    [0.0],
+                ]],
+                dtype=inputs.dtype,
+            ),
+        },
+        template=inputs[:1],
+    )
+    attended_tokens, _ = model.attention(
+        adapter_tokens[:1],
+        signals["token_mask"],
+        signals["token_count"].to(dtype=adapter_tokens.dtype),
+        signals["token_activity"].to(dtype=adapter_tokens.dtype),
+    )
+    decoded = model._decode_itransformer_forecast(
+        raw_tokens=adapter_tokens[:1],
+        attended_tokens=attended_tokens,
+    )
 
     assert raw_tokens.shape == (2, inputs.shape[-1], model.hidden_size)
     assert adapter_tokens.shape == raw_tokens.shape
     assert torch.allclose(adapter_tokens, raw_tokens, atol=1e-6, rtol=1e-5)
-    assert late_projected.shape == (2, model.input_size, model.hidden_size)
-    assert torch.allclose(late_projected, manual_projection, atol=1e-6, rtol=1e-5)
-    assert not hasattr(model.encoder, "input_projection")
-    assert not hasattr(model.encoder, "output_norm")
+    assert signals["token_mask"].shape == (1, inputs.shape[-1], 1)
+    assert signals["token_count"].shape == (1, inputs.shape[-1], 1)
+    assert signals["token_activity"].shape == (1, inputs.shape[-1], 1)
+    assert attended_tokens.shape == (1, inputs.shape[-1], model.hidden_size)
+    assert decoded.shape == (1, model.h, 1)
+    assert model.target_token_indices == (0, 1, 2, 3, 4)
+    assert model.itransformer_decoder.in_features == 2 * model.hidden_size

@@ -17,11 +17,11 @@ class ITransformerBackboneAdapter(AABackboneAdapter):
         ),
         aa_bridge_steps=(
             "preserve raw token states through the iTransformer encoder path",
-            "late-project token states back to time states immediately before AA sparse attention",
+            "keep AA sparse attention in token space instead of forcing a time-axis bridge",
         ),
         unavoidable_divergences=(
             "standalone projector/head remains outside the AA adapter",
-            "token-to-time late projection is still required because current AA sparse attention consumes timestep states",
+            "AA decode pools target-centric token forecasts instead of reusing the standalone all-token forecast projector verbatim",
         ),
         required_output="[B, token, hidden]",
     )
@@ -54,13 +54,11 @@ class ITransformerBackboneAdapter(AABackboneAdapter):
         )
         self.embedding = self.encoder_only.enc_embedding
         self.encoder = self.encoder_only.encoder
-        self.late_token_projection = nn.Linear(feature_size, input_size)
+        self.feature_size = feature_size
+        self.input_size = input_size
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         return self.encoder_only(inputs)
-
-    def project_to_time_states(self, states: torch.Tensor) -> torch.Tensor:
-        return self.late_token_projection(states.transpose(1, 2)).transpose(1, 2)
 
 
 def build_itransformer_backbone(

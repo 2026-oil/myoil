@@ -244,6 +244,59 @@ class CriticalSparseAttention(nn.Module):
         return attended, weights
 
 
+class ITransformerTokenSparseAttention(nn.Module):
+    """Sparse attention over iTransformer token states."""
+
+    def __init__(self, hidden_size: int, attention_hidden_size: int | None = None):
+        super().__init__()
+        attention_hidden_size = (
+            hidden_size if attention_hidden_size is None else int(attention_hidden_size)
+        )
+        self.proj = nn.Linear(hidden_size, attention_hidden_size)
+        self.score = nn.Linear(attention_hidden_size, 1)
+
+    def forward(
+        self,
+        token_states: torch.Tensor,
+        token_mask: torch.Tensor,
+        token_count: torch.Tensor,
+        token_activity: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        if token_states.ndim != 3:
+            raise ValueError("ITransformerTokenSparseAttention token_states must be rank-3")
+        if token_mask.ndim != 3:
+            raise ValueError("ITransformerTokenSparseAttention token_mask must be rank-3")
+        if token_count.ndim != 3:
+            raise ValueError("ITransformerTokenSparseAttention token_count must be rank-3")
+        if token_activity.ndim != 3:
+            raise ValueError("ITransformerTokenSparseAttention token_activity must be rank-3")
+
+        token_mask = token_mask.squeeze(-1).bool()
+        token_count = token_count.squeeze(-1).to(dtype=token_states.dtype)
+        token_activity = token_activity.squeeze(-1).to(dtype=token_states.dtype).clamp_min(0.0)
+
+        logits = self.score(torch.tanh(self.proj(token_states))).squeeze(-1)
+        logits = logits + torch.log1p(token_count) + torch.log1p(token_activity)
+        logits = logits.masked_fill(~token_mask, -1e9)
+
+        has_any = token_mask.any(dim=1, keepdim=True)
+        weights = torch.softmax(logits, dim=-1)
+        weights = torch.where(has_any, weights, torch.zeros_like(weights))
+
+        token_context = torch.einsum("bt,bth->bh", weights, token_states)
+        fallback = token_states[:, 0, :]
+        token_context = torch.where(has_any, token_context, fallback)
+
+        max_count = token_count.amax(dim=1, keepdim=True).clamp_min(1.0)
+        density_gate = 1.0 + (token_count / max_count)
+        attended = torch.where(
+            token_mask.unsqueeze(-1),
+            token_context.unsqueeze(1) * density_gate.unsqueeze(-1),
+            token_states,
+        )
+        return attended, weights
+
+
 class TimeXerTokenSparseAttention(nn.Module):
     """Sparse attention over per-series TimeXer patch/global tokens."""
 

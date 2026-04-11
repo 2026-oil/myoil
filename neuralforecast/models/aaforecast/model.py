@@ -10,6 +10,7 @@ import torch.nn as nn
 
 from plugins.aa_forecast import (
     CriticalSparseAttention,
+    ITransformerTokenSparseAttention,
     STARFeatureExtractor,
     TimeXerTokenSparseAttention,
 )
@@ -178,6 +179,7 @@ class AAForecast(BaseModel):
             self._resolve_hist_exog_groups()
         )
         self.star_hist_exog_tail_modes = self._resolve_star_hist_exog_tail_modes()
+        self.target_token_indices = self._resolve_target_token_indices()
 
         feature_size = (
             (0 if exclude_insample_y else 1)
@@ -217,6 +219,11 @@ class AAForecast(BaseModel):
                 hidden_size=self.encoder_hidden_size,
                 attention_hidden_size=attention_hidden_size,
             )
+        elif self.backbone == "itransformer":
+            self.attention = ITransformerTokenSparseAttention(
+                hidden_size=self.encoder_hidden_size,
+                attention_hidden_size=attention_hidden_size,
+            )
         else:
             self.attention = CriticalSparseAttention(
                 hidden_size=self.encoder_hidden_size,
@@ -233,6 +240,14 @@ class AAForecast(BaseModel):
                 head_dropout=self.encoder_dropout,
             )
             self.decoder = None
+            self.itransformer_decoder = None
+        elif self.backbone == "itransformer":
+            self.itransformer_decoder = nn.Linear(
+                2 * self.encoder_hidden_size,
+                self.h * self.loss.outputsize_multiplier,
+            )
+            self.decoder = None
+            self.timexer_decoder = None
         else:
             self.decoder = MLP(
                 in_features=2 * self.encoder_hidden_size,
@@ -243,6 +258,7 @@ class AAForecast(BaseModel):
                 dropout=self.encoder_dropout,
             )
             self.timexer_decoder = None
+            self.itransformer_decoder = None
 
     def configure_stochastic_inference(
         self,
@@ -305,6 +321,7 @@ class AAForecast(BaseModel):
             "target_seasonal": target_star["seasonal"],
             "target_anomalies": target_star["anomalies"],
             "target_residual": target_star["residual"],
+            "target_activity": target_activity,
             "star_hist_trend": (
                 star_hist_outputs["trend"]
                 if star_hist_outputs is not None
@@ -335,6 +352,7 @@ class AAForecast(BaseModel):
             ),
             "critical_mask": combined_count > 0,
             "count_active_channels": combined_count,
+            "star_hist_activity": star_hist_activity,
             "channel_activity": torch.cat([target_activity, star_hist_activity], dim=2),
         }
 
@@ -507,6 +525,16 @@ class AAForecast(BaseModel):
             )
         return self.star_hist_exog_tail_modes
 
+    def _resolve_target_token_indices(self) -> tuple[int, ...]:
+        target_indices: list[int] = []
+        if not self.exclude_insample_y:
+            target_indices.append(0)
+        target_star_offset = (0 if self.exclude_insample_y else 1) + len(
+            self.non_star_hist_exog_list
+        )
+        target_indices.extend(range(target_star_offset, target_star_offset + 4))
+        return tuple(target_indices)
+
     @staticmethod
     def _select_hist_exog(hist_exog: torch.Tensor, indices: tuple[int, ...]) -> torch.Tensor | None:
         if not indices:
@@ -589,6 +617,36 @@ class AAForecast(BaseModel):
             "global_activity": global_activity,
         }
 
+    def _aggregate_itransformer_attention_signals(
+        self,
+        *,
+        star_payload: dict[str, torch.Tensor],
+        template: torch.Tensor,
+    ) -> dict[str, torch.Tensor]:
+        zero_non_star = template.new_zeros(
+            template.shape[0],
+            template.shape[1],
+            len(self.non_star_hist_exog_list),
+        )
+        activity_parts = []
+        if not self.exclude_insample_y:
+            activity_parts.append(star_payload["target_activity"])
+        if zero_non_star.size(-1) > 0:
+            activity_parts.append(zero_non_star)
+        activity_parts.extend([star_payload["target_activity"]] * 4)
+        if star_payload["star_hist_activity"].size(-1) > 0:
+            activity_parts.extend([star_payload["star_hist_activity"]] * 4)
+        full_token_activity = torch.cat(activity_parts, dim=2)
+        token_activity = full_token_activity.clamp_min(0.0).sum(dim=1, keepdim=False)
+        token_count = (full_token_activity > 0).sum(dim=1, keepdim=False).to(
+            dtype=full_token_activity.dtype
+        )
+        return {
+            "token_mask": token_count.unsqueeze(-1) > 0,
+            "token_count": token_count.unsqueeze(-1),
+            "token_activity": token_activity.unsqueeze(-1),
+        }
+
     def _decode_timexer_forecast(
         self,
         *,
@@ -624,6 +682,46 @@ class AAForecast(BaseModel):
         decoded = self.timexer_decoder(decoder_input)
         target_forecast = decoded[:, :1, :]
         return target_forecast.transpose(1, 2).reshape(raw_tokens.shape[0], self.h, -1)
+
+    def _decode_itransformer_forecast(
+        self,
+        *,
+        raw_tokens: torch.Tensor,
+        attended_tokens: torch.Tensor,
+    ) -> torch.Tensor:
+        if self.itransformer_decoder is None:
+            raise ValueError("iTransformer decoder is not initialized")
+        raw_tokens = _apply_stochastic_dropout(
+            raw_tokens,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
+        attended_tokens = _apply_stochastic_dropout(
+            attended_tokens,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
+        decoder_input = torch.cat([raw_tokens, attended_tokens], dim=-1)
+        decoder_input = _apply_stochastic_dropout(
+            decoder_input,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
+        decoded = self.itransformer_decoder(decoder_input)
+        target_tokens = decoded[:, self.target_token_indices, :]
+        pooled = target_tokens.reshape(
+            decoded.shape[0],
+            len(self.target_token_indices),
+            self.h,
+            self.loss.outputsize_multiplier,
+        ).mean(dim=1)
+        return pooled.reshape(decoded.shape[0], self.h, -1)
 
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]
@@ -684,6 +782,36 @@ class AAForecast(BaseModel):
             return self._decode_timexer_forecast(
                 raw_states=backbone_states,
                 attended_states=attended_states,
+            )
+        if self.backbone == "itransformer":
+            token_signals = self._aggregate_itransformer_attention_signals(
+                star_payload={
+                    "target_activity": star_payload["target_activity"].to(
+                        device=encoder_input.device,
+                        dtype=encoder_input.dtype,
+                    ),
+                    "star_hist_activity": star_payload["star_hist_activity"].to(
+                        device=encoder_input.device,
+                        dtype=encoder_input.dtype,
+                    ),
+                },
+                template=encoder_input,
+            )
+            attended_tokens, _ = self.attention(
+                backbone_states,
+                token_signals["token_mask"],
+                token_signals["token_count"].to(
+                    device=backbone_states.device,
+                    dtype=backbone_states.dtype,
+                ),
+                token_signals["token_activity"].to(
+                    device=backbone_states.device,
+                    dtype=backbone_states.dtype,
+                ),
+            )
+            return self._decode_itransformer_forecast(
+                raw_tokens=backbone_states,
+                attended_tokens=attended_tokens,
             )
 
         hidden_states = self.encoder.project_to_time_states(backbone_states)

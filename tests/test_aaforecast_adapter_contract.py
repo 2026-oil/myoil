@@ -7,7 +7,10 @@ from neuralforecast.models.aaforecast.backbones import (
     build_aaforecast_backbone,
 )
 from neuralforecast.models.aaforecast.models.base import AATimeXerTokenStates
-from plugins.aa_forecast.modules import TimeXerTokenSparseAttention
+from plugins.aa_forecast.modules import (
+    ITransformerTokenSparseAttention,
+    TimeXerTokenSparseAttention,
+)
 
 
 def test_adapter_contract_requires_b_time_hidden_output() -> None:
@@ -90,7 +93,6 @@ def test_itransformer_adapter_exposes_token_space_internal_contract() -> None:
     )
     token_states = backbone(torch.randn(2, 4, 5))
     assert token_states.shape == (2, 5, 8)
-    assert backbone.project_to_time_states(token_states).shape == (2, 4, 8)
     assert backbone.faithfulness_evidence().required_output == "[B, token, hidden]"
 
 
@@ -164,6 +166,34 @@ def test_timexer_token_sparse_attention_preserves_hidden_states_when_no_token_is
     assert torch.allclose(weights, torch.zeros_like(weights))
     assert torch.allclose(attended_patch, patch_states)
     assert torch.allclose(attended_global, global_states)
+
+
+def test_itransformer_token_sparse_attention_preserves_hidden_states_when_no_token_is_active() -> None:
+    attention = ITransformerTokenSparseAttention(hidden_size=4)
+    token_states = torch.tensor(
+        [
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [2.0, 0.0, 0.0, 0.0],
+                [3.0, 0.0, 0.0, 0.0],
+            ]
+        ]
+    )
+    token_mask = torch.zeros(1, 3, 1, dtype=torch.bool)
+    token_count = torch.zeros(1, 3, 1)
+    token_activity = torch.zeros(1, 3, 1)
+
+    attended_tokens, weights = attention(
+        token_states,
+        token_mask,
+        token_count,
+        token_activity,
+    )
+
+    assert attended_tokens.shape == token_states.shape
+    assert weights.shape == (1, 3)
+    assert torch.allclose(weights, torch.zeros_like(weights))
+    assert torch.allclose(attended_tokens, token_states)
 
 
 def test_supported_backbones_registry_remains_stable_after_router_split() -> None:

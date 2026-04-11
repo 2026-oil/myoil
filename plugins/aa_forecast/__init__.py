@@ -6,12 +6,14 @@ surface is ``neuralforecast.models.AAForecast``.
 
 from .modules import (
     CriticalSparseAttention,
+    ITransformerTokenSparseAttention,
     STARFeatureExtractor,
     TimeXerTokenSparseAttention,
 )
 
 __all__ = [
     "CriticalSparseAttention",
+    "ITransformerTokenSparseAttention",
     "STARFeatureExtractor",
     "TimeXerTokenSparseAttention",
 ]

@@ -17,7 +17,7 @@ class InformerBackboneAdapter(AABackboneAdapter):
             "neuralforecast.common._modules.TransEncoder",
         ),
         aa_bridge_steps=(
-            "treat AA encoder input as the autoregressive channel set consumed by the encoder-only Informer path",
+            "route the first AA channel through Informer c_in and preserve the remaining AA channels as Informer exogenous marks",
         ),
         unavoidable_divergences=(
             "Informer distillation is disabled to preserve per-timestep alignment required by AA attention",
@@ -39,9 +39,11 @@ class InformerBackboneAdapter(AABackboneAdapter):
         super().__init__()
         validate_attention_heads(hidden_size, n_head, field_name="n_head")
         self.hidden_size = hidden_size
+        self.feature_size = feature_size
+        self.exog_input_size = max(feature_size - 1, 0)
         self.encoder_only = InformerEncoderOnly(
-            c_in=feature_size,
-            exog_input_size=0,
+            c_in=1,
+            exog_input_size=self.exog_input_size,
             hidden_size=hidden_size,
             factor=factor,
             n_head=n_head,
@@ -54,8 +56,17 @@ class InformerBackboneAdapter(AABackboneAdapter):
         self.encoder = self.encoder_only.encoder
         self.enc_embedding = self.encoder_only.enc_embedding
 
+    def _split_inputs(
+        self,
+        inputs: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        signal = inputs[..., :1]
+        exog = inputs[..., 1:] if self.exog_input_size > 0 else None
+        return signal, exog
+
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        return self.encoder_only(inputs, None)
+        signal, exog = self._split_inputs(inputs)
+        return self.encoder_only(signal, exog)
 
 
 def build_informer_backbone(
