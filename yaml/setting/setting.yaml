@@ -34,7 +34,7 @@ training:
     eps: 0.000001
 cv:
   gap: 0
-  horizon: 4
+  horizon: 2
   step_size: 4
   n_windows: 4
   max_train_size: null
