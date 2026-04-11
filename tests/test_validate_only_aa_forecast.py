@@ -29,6 +29,12 @@ PLUGIN_TIMEXER_AUTO_MODEL_ONLY_MAIN_CONFIG = Path(
 PLUGIN_TIMEXER_FIXED_MAIN_CONFIG = Path(
     "tests/fixtures/aa_forecast_runtime_plugin_timexer_fixed_main.yaml"
 )
+PLUGIN_ITRANSFORMER_AUTO_MODEL_ONLY_MAIN_CONFIG = Path(
+    "tests/fixtures/aa_forecast_runtime_plugin_itransformer_auto_model_only_main.yaml"
+)
+PLUGIN_ITRANSFORMER_FIXED_MAIN_CONFIG = Path(
+    "tests/fixtures/aa_forecast_runtime_plugin_itransformer_fixed_main.yaml"
+)
 PLUGIN_BEST_MAIN_CONFIG = Path(
     "tests/fixtures/aa_forecast_runtime_plugin_best_main.yaml"
 )
@@ -59,7 +65,24 @@ TIMEXER_AA_BACKBONE_SELECTORS = [
     "decoder_hidden_size",
     "decoder_layers",
 ]
+ITRANSFORMER_AA_BACKBONE_SELECTORS = [
+    "hidden_size",
+    "n_heads",
+    "e_layers",
+    "dropout",
+    "d_ff",
+    "factor",
+    "use_norm",
+    "decoder_hidden_size",
+    "decoder_layers",
+]
 TIMEXER_AA_TRAINING_SELECTORS = [
+    "input_size",
+    "batch_size",
+    "scaler_type",
+    "model_step_size",
+]
+ITRANSFORMER_AA_TRAINING_SELECTORS = [
     "input_size",
     "batch_size",
     "scaler_type",
@@ -180,6 +203,38 @@ def _assert_grouping_payload(
     assert "compatibility_mode" not in payload
     assert "compatibility_source_path" not in payload
     _assert_no_event_column(payload)
+
+
+def _assert_retrieval_payload(
+    payload: dict[str, object],
+    *,
+    enabled: bool,
+    top_k: int,
+    recency_gap_steps: int,
+    event_score_threshold: float,
+    min_similarity: float,
+    blend_max: float,
+    use_uncertainty_gate: bool,
+) -> None:
+    assert payload["enabled"] is enabled
+    assert payload["top_k"] == top_k
+    assert payload["recency_gap_steps"] == recency_gap_steps
+    assert payload["event_score_threshold"] == pytest.approx(event_score_threshold)
+    assert payload["min_similarity"] == pytest.approx(min_similarity)
+    assert payload["blend_max"] == pytest.approx(blend_max)
+    assert payload["use_uncertainty_gate"] is use_uncertainty_gate
+    assert payload["mode"] == "posthoc_blend"
+    assert payload["similarity"] == "cosine"
+    assert payload["temperature"] == pytest.approx(0.1)
+    assert payload["use_shape_key"] is True
+    assert payload["use_event_key"] is True
+
+
+def _read_optional_csv(path: Path) -> pd.DataFrame:
+    try:
+        return pd.read_csv(path)
+    except pd.errors.EmptyDataError:
+        return pd.DataFrame()
 
 
 def _build_aaforecast_plugin_model(*, training_scaler_type: str | None):
@@ -451,6 +506,55 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_best_path(
     assert "mode" not in stage_config
 
 
+def test_runtime_validate_only_accepts_aaforecast_plugin_uncertainty_retrieval_path(
+    tmp_path: Path,
+) -> None:
+    output_root = tmp_path / "validate-only-aa-forecast-plugin-uncertainty-retrieval"
+    code = runtime.main(
+        [
+            "--config",
+            str(PLUGIN_UNCERTAINTY_MAIN_CONFIG),
+            "--output-root",
+            str(output_root),
+            "--validate-only",
+        ]
+    )
+
+    assert code == 0
+    manifest = json.loads((output_root / "manifest" / "run_manifest.json").read_text())
+    _assert_grouping_payload(
+        manifest["aa_forecast"],
+        config_path="tests/fixtures/aa_forecast_runtime_plugin_uncertainty.yaml",
+        star_anomaly_tails={"upward": ["event"], "two_sided": []},
+        non_star_hist_exog_cols=[],
+    )
+    assert manifest["aa_forecast"]["uncertainty"]["enabled"] is True
+    _assert_retrieval_payload(
+        manifest["aa_forecast"]["retrieval"],
+        enabled=True,
+        top_k=2,
+        recency_gap_steps=1,
+        event_score_threshold=100.0,
+        min_similarity=0.55,
+        blend_max=0.2,
+        use_uncertainty_gate=True,
+    )
+
+    stage_config = json.loads(
+        (output_root / "aa_forecast" / "config" / "stage_config.json").read_text()
+    )
+    _assert_retrieval_payload(
+        stage_config["retrieval"],
+        enabled=True,
+        top_k=2,
+        recency_gap_steps=1,
+        event_score_threshold=100.0,
+        min_similarity=0.55,
+        blend_max=0.2,
+        use_uncertainty_gate=True,
+    )
+
+
 def test_runtime_validate_only_accepts_aaforecast_plugin_timexer_auto_model_only_path(
     tmp_path: Path,
 ) -> None:
@@ -530,6 +634,88 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_timexer_fixed_path(
     )
     assert stage_config["model"] == "timexer"
     assert stage_config["backbone"] == "timexer"
+    assert "mode" not in stage_config
+
+
+def test_runtime_validate_only_accepts_aaforecast_plugin_itransformer_auto_model_only_path(
+    tmp_path: Path,
+) -> None:
+    output_root = tmp_path / "validate-only-aa-forecast-plugin-itransformer-auto-model-only"
+    code = runtime.main(
+        [
+            "--config",
+            str(PLUGIN_ITRANSFORMER_AUTO_MODEL_ONLY_MAIN_CONFIG),
+            "--output-root",
+            str(output_root),
+            "--validate-only",
+        ]
+    )
+
+    assert code == 0
+    manifest = json.loads((output_root / "manifest" / "run_manifest.json").read_text())
+    assert len(manifest["jobs"]) == 1
+    assert manifest["jobs"][0]["model"] == "AAForecast"
+    assert manifest["jobs"][0]["requested_mode"] == "learned_auto_requested"
+    assert manifest["jobs"][0]["validated_mode"] == "learned_auto"
+    assert manifest["jobs"][0]["selected_search_params"] == ITRANSFORMER_AA_BACKBONE_SELECTORS
+    assert manifest["training_search"] == {
+        "requested_mode": "training_auto_requested",
+        "validated_mode": "training_auto",
+        "selected_search_params": ITRANSFORMER_AA_TRAINING_SELECTORS,
+    }
+    _assert_grouping_payload(
+        manifest["aa_forecast"],
+        config_path="tests/fixtures/aa_forecast_runtime_plugin_itransformer_auto_model_only.yaml",
+        star_anomaly_tails={"upward": ["event"], "two_sided": []},
+        non_star_hist_exog_cols=[],
+        model="itransformer",
+    )
+    stage_config = json.loads(
+        (output_root / "aa_forecast" / "config" / "stage_config.json").read_text()
+    )
+    assert stage_config["model"] == "itransformer"
+    assert stage_config["backbone"] == "itransformer"
+    assert "mode" not in stage_config
+
+
+def test_runtime_validate_only_accepts_aaforecast_plugin_itransformer_fixed_path(
+    tmp_path: Path,
+) -> None:
+    output_root = tmp_path / "validate-only-aa-forecast-plugin-itransformer-fixed"
+    code = runtime.main(
+        [
+            "--config",
+            str(PLUGIN_ITRANSFORMER_FIXED_MAIN_CONFIG),
+            "--output-root",
+            str(output_root),
+            "--validate-only",
+        ]
+    )
+
+    assert code == 0
+    manifest = json.loads((output_root / "manifest" / "run_manifest.json").read_text())
+    assert len(manifest["jobs"]) == 1
+    assert manifest["jobs"][0]["model"] == "AAForecast"
+    assert manifest["jobs"][0]["requested_mode"] == "learned_fixed"
+    assert manifest["jobs"][0]["validated_mode"] == "learned_fixed"
+    assert manifest["jobs"][0]["selected_search_params"] == []
+    assert manifest["training_search"] == {
+        "requested_mode": "training_fixed",
+        "validated_mode": "training_fixed",
+        "selected_search_params": [],
+    }
+    _assert_grouping_payload(
+        manifest["aa_forecast"],
+        config_path="tests/fixtures/aa_forecast_runtime_plugin_itransformer_fixed.yaml",
+        star_anomaly_tails={"upward": ["event"], "two_sided": []},
+        non_star_hist_exog_cols=[],
+        model="itransformer",
+    )
+    stage_config = json.loads(
+        (output_root / "aa_forecast" / "config" / "stage_config.json").read_text()
+    )
+    assert stage_config["model"] == "itransformer"
+    assert stage_config["backbone"] == "itransformer"
     assert "mode" not in stage_config
 
 
@@ -963,16 +1149,44 @@ def test_runtime_aaforecast_plugin_uncertainty_smoke(
     assert code == 0
     uncertainty_dir = output_root / "aa_forecast" / "uncertainty"
     distribution_files = sorted(uncertainty_dir.glob("*.json"))
+    uncertainty_csv_files = sorted(
+        path
+        for path in uncertainty_dir.glob("*.csv")
+        if ".candidate_" not in path.name
+    )
     png_files = sorted(uncertainty_dir.glob("*.dropout_mae_sd.png"))
+    retrieval_dir = output_root / "aa_forecast" / "retrieval"
+    retrieval_summary_files = sorted(retrieval_dir.glob("*.json"))
+    retrieval_neighbor_files = sorted(retrieval_dir.glob("*.neighbors.csv"))
     assert distribution_files
+    assert uncertainty_csv_files
     assert png_files
+    assert retrieval_summary_files
+    assert retrieval_neighbor_files
     payload = json.loads(distribution_files[0].read_text())
+    uncertainty_frame = pd.read_csv(uncertainty_csv_files[0])
+    retrieval_payload = json.loads(retrieval_summary_files[0].read_text())
+    retrieval_neighbors = _read_optional_csv(retrieval_neighbor_files[0])
     assert payload["dropout_candidates"] == EXPECTED_AA_DROPOUT_CANDIDATES
     assert payload["star_anomaly_tails"] == {"upward": ["event"], "two_sided": []}
     assert payload["non_star_hist_exog_cols_resolved"] == []
     _assert_no_event_column(payload)
     assert len(payload["selected_dropout_by_horizon"]) == 1
     assert len(payload["selected_std_by_horizon"]) == 1
+    assert retrieval_payload["retrieval_enabled"] is True
+    assert retrieval_payload["retrieval_attempted"] is True
+    assert retrieval_payload["retrieval_applied"] is False
+    assert retrieval_payload["skip_reason"] == "below_event_threshold"
+    assert retrieval_payload["top_k_requested"] == 2
+    assert retrieval_payload["top_k_used"] == 0
+    assert retrieval_payload["blend_max"] == pytest.approx(0.2)
+    assert retrieval_payload["base_prediction"] == pytest.approx(
+        uncertainty_frame["prediction_mean"].tolist()
+    )
+    assert retrieval_payload["final_prediction"] == pytest.approx(
+        uncertainty_frame["prediction_mean"].tolist()
+    )
+    assert retrieval_neighbors.empty
 
 
 def test_runtime_aaforecast_writes_context_annotation_and_sidecar(
@@ -1091,9 +1305,12 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     prediction_frame = pd.read_csv(trial_root / "predictions.csv")
     common_fold_root = trial_root / "folds" / "fold_000"
     fold_root = trial_root / "folds" / "fold_000" / "aa_forecast" / "uncertainty"
+    retrieval_fold_root = trial_root / "folds" / "fold_000" / "aa_forecast" / "retrieval"
     candidate_stats_files = sorted(fold_root.glob("*.candidate_stats.csv"))
     candidate_sample_files = sorted(fold_root.glob("*.candidate_samples.csv"))
     candidate_plot_files = sorted(fold_root.glob("*.dropout_mae_sd.png"))
+    retrieval_summary_files = sorted(retrieval_fold_root.glob("*.json"))
+    retrieval_neighbor_files = sorted(retrieval_fold_root.glob("*.neighbors.csv"))
     metrics_payload = json.loads((common_fold_root / "metrics.json").read_text(encoding="utf-8"))
 
     assert code == 0
@@ -1107,9 +1324,13 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     assert candidate_stats_files
     assert candidate_sample_files
     assert candidate_plot_files
+    assert retrieval_summary_files
+    assert retrieval_neighbor_files
 
     candidate_stats = pd.read_csv(candidate_stats_files[0])
     candidate_samples = pd.read_csv(candidate_sample_files[0])
+    retrieval_summary = json.loads(retrieval_summary_files[0].read_text())
+    retrieval_neighbors = _read_optional_csv(retrieval_neighbor_files[0])
     assert {
         "horizon_step",
         "dropout_p",
@@ -1124,6 +1345,11 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     }.issubset(candidate_samples.columns)
     assert candidate_stats["prediction_std"].gt(0).any()
     assert candidate_samples["prediction"].nunique() > 1
+    assert retrieval_summary["retrieval_enabled"] is True
+    assert retrieval_summary["retrieval_attempted"] is True
+    assert retrieval_summary["retrieval_applied"] is False
+    assert retrieval_summary["skip_reason"] == "below_event_threshold"
+    assert retrieval_neighbors.empty
 
 
 def test_build_uncertainty_error_summary_aggregates_dropout_mae_and_sd() -> None:

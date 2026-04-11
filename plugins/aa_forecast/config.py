@@ -28,6 +28,7 @@ AA_FORECAST_MAIN_KEYS = {
     "lowess_frac",
     "lowess_delta",
     "uncertainty",
+    "retrieval",
 }
 AA_FORECAST_LINKED_KEYS = {
     "model",
@@ -38,9 +39,19 @@ AA_FORECAST_LINKED_KEYS = {
     "lowess_frac",
     "lowess_delta",
     "uncertainty",
+    "retrieval",
 }
 AA_FORECAST_UNCERTAINTY_KEYS = {"enabled", "sample_count"}
 AA_FORECAST_STAR_ANOMALY_TAIL_KEYS = {"upward", "two_sided"}
+AA_FORECAST_RETRIEVAL_KEYS = {
+    "enabled",
+    "top_k",
+    "recency_gap_steps",
+    "event_score_threshold",
+    "min_similarity",
+    "blend_max",
+    "use_uncertainty_gate",
+}
 
 
 @dataclass(frozen=True)
@@ -70,6 +81,23 @@ class AAForecastUncertaintyConfig:
     sample_count: int = 5
 
 
+@dataclass(frozen=True)
+class AAForecastRetrievalConfig:
+    enabled: bool = False
+    top_k: int = 5
+    recency_gap_steps: int = 8
+    event_score_threshold: float = 1.0
+    min_similarity: float = 0.55
+    blend_max: float = 0.25
+    use_uncertainty_gate: bool = True
+    mode: str = "posthoc_blend"
+    similarity: str = "cosine"
+    temperature: float = 0.10
+    use_shape_key: bool = True
+    use_event_key: bool = True
+    blend_floor: float = 0.0
+
+
 def _default_star_anomaly_tails() -> dict[str, tuple[str, ...]]:
     return {"upward": (), "two_sided": ()}
 
@@ -95,6 +123,9 @@ class AAForecastPluginConfig:
     lowess_delta: float = 0.01
     uncertainty: AAForecastUncertaintyConfig = field(
         default_factory=AAForecastUncertaintyConfig
+    )
+    retrieval: AAForecastRetrievalConfig = field(
+        default_factory=AAForecastRetrievalConfig
     )
 
 
@@ -125,6 +156,26 @@ def aa_forecast_uncertainty_public_dict(
     }
 
 
+def aa_forecast_retrieval_public_dict(
+    retrieval: AAForecastRetrievalConfig,
+) -> dict[str, Any]:
+    return {
+        "enabled": retrieval.enabled,
+        "top_k": retrieval.top_k,
+        "recency_gap_steps": retrieval.recency_gap_steps,
+        "event_score_threshold": retrieval.event_score_threshold,
+        "min_similarity": retrieval.min_similarity,
+        "blend_max": retrieval.blend_max,
+        "use_uncertainty_gate": retrieval.use_uncertainty_gate,
+        "mode": retrieval.mode,
+        "similarity": retrieval.similarity,
+        "temperature": retrieval.temperature,
+        "use_shape_key": retrieval.use_shape_key,
+        "use_event_key": retrieval.use_event_key,
+        "blend_floor": retrieval.blend_floor,
+    }
+
+
 def aa_forecast_plugin_tuning_public_dict(cfg: AAForecastPluginConfig) -> dict[str, Any]:
     return {
         "model": cfg.model,
@@ -144,6 +195,7 @@ def aa_forecast_plugin_tuning_public_dict(cfg: AAForecastPluginConfig) -> dict[s
         "lowess_frac": cfg.lowess_frac,
         "lowess_delta": cfg.lowess_delta,
         "uncertainty": aa_forecast_uncertainty_public_dict(cfg.uncertainty),
+        "retrieval": aa_forecast_retrieval_public_dict(cfg.retrieval),
     }
 
 
@@ -347,6 +399,80 @@ def _normalize_uncertainty_config(
     )
 
 
+def _normalize_retrieval_config(
+    value: Any,
+    *,
+    section: str,
+    unknown_keys: Any,
+    coerce_bool: Any,
+    uncertainty: AAForecastUncertaintyConfig,
+) -> AAForecastRetrievalConfig:
+    if value is None:
+        return AAForecastRetrievalConfig()
+    if not isinstance(value, dict):
+        raise ValueError(f"{section} must be a mapping")
+    payload = dict(value)
+    unknown_keys(payload, allowed=AA_FORECAST_RETRIEVAL_KEYS, section=section)
+    enabled = coerce_bool(
+        payload.get("enabled"),
+        field_name=f"{section}.enabled",
+        default=False,
+    )
+    top_k = _coerce_positive_int(
+        payload.get("top_k", AAForecastRetrievalConfig().top_k),
+        field_name=f"{section}.top_k",
+    )
+    recency_gap_steps = _coerce_non_negative_float(
+        payload.get(
+            "recency_gap_steps", AAForecastRetrievalConfig().recency_gap_steps
+        ),
+        field_name=f"{section}.recency_gap_steps",
+    )
+    recency_gap_steps_int = int(recency_gap_steps)
+    if recency_gap_steps != recency_gap_steps_int:
+        raise ValueError(f"{section}.recency_gap_steps must be an integer")
+    event_score_threshold = _coerce_non_negative_float(
+        payload.get(
+            "event_score_threshold",
+            AAForecastRetrievalConfig().event_score_threshold,
+        ),
+        field_name=f"{section}.event_score_threshold",
+    )
+    min_similarity = _coerce_non_negative_float(
+        payload.get("min_similarity", AAForecastRetrievalConfig().min_similarity),
+        field_name=f"{section}.min_similarity",
+    )
+    if min_similarity > 1:
+        raise ValueError(f"{section}.min_similarity must satisfy 0 <= value <= 1")
+    blend_max = _coerce_non_negative_float(
+        payload.get("blend_max", AAForecastRetrievalConfig().blend_max),
+        field_name=f"{section}.blend_max",
+    )
+    if blend_max > 1:
+        raise ValueError(f"{section}.blend_max must satisfy 0 <= value <= 1")
+    use_uncertainty_gate = coerce_bool(
+        payload.get(
+            "use_uncertainty_gate",
+            AAForecastRetrievalConfig().use_uncertainty_gate,
+        ),
+        field_name=f"{section}.use_uncertainty_gate",
+        default=AAForecastRetrievalConfig().use_uncertainty_gate,
+    )
+    if enabled and not uncertainty.enabled:
+        raise ValueError(
+            f"{section}.enabled=true requires aa_forecast.uncertainty.enabled=true"
+        )
+    return AAForecastRetrievalConfig(
+        enabled=enabled,
+        top_k=top_k,
+        recency_gap_steps=recency_gap_steps_int,
+        event_score_threshold=event_score_threshold,
+        min_similarity=min_similarity,
+        blend_max=blend_max,
+        use_uncertainty_gate=use_uncertainty_gate,
+    )
+
+
 def _normalize_star_anomaly_tails(
     value: Any,
     *,
@@ -455,6 +581,13 @@ def _normalize_canonical_fields(
         unknown_keys=unknown_keys,
         coerce_bool=coerce_bool,
     )
+    retrieval = _normalize_retrieval_config(
+        payload.get("retrieval"),
+        section=f"{section}.retrieval",
+        unknown_keys=unknown_keys,
+        coerce_bool=coerce_bool,
+        uncertainty=uncertainty,
+    )
     return AAForecastPluginConfig(
         enabled=True,
         model=model,
@@ -465,6 +598,7 @@ def _normalize_canonical_fields(
         lowess_frac=lowess_frac,
         lowess_delta=lowess_delta,
         uncertainty=uncertainty,
+        retrieval=retrieval,
     )
 
 
@@ -509,6 +643,7 @@ def normalize_aa_forecast_config(
             "lowess_frac",
             "lowess_delta",
             "uncertainty",
+            "retrieval",
         }
         if any(key in payload for key in inline_keys):
             raise ValueError(
@@ -526,6 +661,7 @@ def normalize_aa_forecast_config(
             "lowess_frac",
             "lowess_delta",
             "uncertainty",
+            "retrieval",
         }
     ):
         raise ValueError(

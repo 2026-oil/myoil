@@ -18,6 +18,7 @@ def _stage_root(run_root: Path) -> Path:
     (root / "manifest").mkdir(parents=True, exist_ok=True)
     (root / "uncertainty").mkdir(parents=True, exist_ok=True)
     (root / "context").mkdir(parents=True, exist_ok=True)
+    (root / "retrieval").mkdir(parents=True, exist_ok=True)
     return root
 
 
@@ -435,6 +436,323 @@ def _write_uncertainty_error_plot(
     plt.close(figure)
 
 
+def _normalize_signature(values: np.ndarray) -> np.ndarray:
+    vector = np.asarray(values, dtype=float).reshape(-1)
+    if vector.size == 0:
+        raise ValueError("retrieval signature must not be empty")
+    norm = np.linalg.norm(vector)
+    if norm <= 1e-12:
+        return np.zeros_like(vector)
+    return vector / norm
+
+
+def _require_star_payload(payload: dict[str, Any]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    required = ("critical_mask", "count_active_channels", "channel_activity")
+    missing = [key for key in required if key not in payload]
+    if missing:
+        raise ValueError(
+            "aa_forecast retrieval requires STAR payload keys: "
+            + ", ".join(required)
+            + f"; missing: {', '.join(missing)}"
+        )
+    critical_mask = (
+        payload["critical_mask"].detach().cpu().numpy().astype(float).reshape(-1)
+    )
+    count_active_channels = (
+        payload["count_active_channels"].detach().cpu().numpy().astype(float).reshape(-1)
+    )
+    channel_activity = (
+        payload["channel_activity"].detach().cpu().numpy().astype(float)
+    )
+    if channel_activity.ndim != 3:
+        raise ValueError("aa_forecast retrieval requires 3D channel_activity payload")
+    return critical_mask, count_active_channels, channel_activity.reshape(
+        channel_activity.shape[1], channel_activity.shape[2]
+    )
+
+
+def _build_retrieval_signature(
+    *,
+    model: Any,
+    transformed_window_df: pd.DataFrame,
+    target_col: str,
+) -> dict[str, Any]:
+    if not hasattr(model, "_compute_star_outputs"):
+        raise ValueError(
+            "aa_forecast retrieval requires model._compute_star_outputs for V0"
+        )
+    insample_y = torch.as_tensor(
+        transformed_window_df[target_col].to_numpy(dtype=np.float32),
+        dtype=torch.float32,
+    ).reshape(1, -1, 1)
+    hist_exog = None
+    if getattr(model, "hist_exog_list", ()):
+        hist_exog = torch.as_tensor(
+            transformed_window_df[list(model.hist_exog_list)].to_numpy(dtype=np.float32),
+            dtype=torch.float32,
+        ).reshape(1, len(transformed_window_df), -1)
+    with torch.no_grad():
+        payload = model._compute_star_outputs(insample_y, hist_exog)
+    critical_mask, count_active_channels, channel_activity = _require_star_payload(
+        payload
+    )
+    activity_sums = channel_activity.sum(axis=0)
+    activity_max = channel_activity.max(axis=0)
+    event_vector = np.concatenate(
+        [
+            critical_mask,
+            count_active_channels,
+            channel_activity.reshape(-1),
+            activity_sums,
+            activity_max,
+        ]
+    )
+    shape_vector = transformed_window_df[target_col].to_numpy(dtype=float)
+    event_score = float(
+        count_active_channels.sum() + np.abs(channel_activity).sum()
+    )
+    return {
+        "shape_vector": _normalize_signature(shape_vector),
+        "event_vector": _normalize_signature(event_vector),
+        "event_score": event_score,
+    }
+
+
+def _cosine_similarity(left: np.ndarray, right: np.ndarray) -> float:
+    if left.shape != right.shape:
+        raise ValueError("retrieval cosine similarity requires matching vector shapes")
+    left_norm = np.linalg.norm(left)
+    right_norm = np.linalg.norm(right)
+    if left_norm <= 1e-12 or right_norm <= 1e-12:
+        return 0.0
+    return float(np.dot(left, right) / (left_norm * right_norm))
+
+
+def _build_event_memory_bank(
+    *,
+    model: Any,
+    transformed_train_df: pd.DataFrame,
+    raw_train_df: pd.DataFrame,
+    dt_col: str,
+    target_col: str,
+    retrieval_cfg: _cfg.AAForecastRetrievalConfig,
+    input_size: int,
+    horizon: int,
+) -> tuple[list[dict[str, Any]], int]:
+    last_idx = len(raw_train_df) - 1
+    max_end_idx = last_idx - horizon - retrieval_cfg.recency_gap_steps
+    if max_end_idx < input_size - 1:
+        return [], 0
+    candidate_count = max_end_idx - (input_size - 1) + 1
+    bank: list[dict[str, Any]] = []
+    for end_idx in range(input_size - 1, max_end_idx + 1):
+        start_idx = end_idx - input_size + 1
+        transformed_window = transformed_train_df.iloc[start_idx : end_idx + 1].reset_index(
+            drop=True
+        )
+        signature = _build_retrieval_signature(
+            model=model,
+            transformed_window_df=transformed_window,
+            target_col=target_col,
+        )
+        if signature["event_score"] < retrieval_cfg.event_score_threshold:
+            continue
+        anchor_value = float(raw_train_df[target_col].iloc[end_idx])
+        future_values = raw_train_df[target_col].iloc[end_idx + 1 : end_idx + 1 + horizon]
+        if len(future_values) != horizon:
+            continue
+        scale = max(abs(anchor_value), 1e-8)
+        future_returns = (
+            future_values.to_numpy(dtype=float) - anchor_value
+        ) / scale
+        bank.append(
+            {
+                "candidate_end_ds": str(pd.Timestamp(raw_train_df[dt_col].iloc[end_idx])),
+                "candidate_future_end_ds": str(
+                    pd.Timestamp(raw_train_df[dt_col].iloc[end_idx + horizon])
+                ),
+                "shape_vector": signature["shape_vector"],
+                "event_vector": signature["event_vector"],
+                "event_score": signature["event_score"],
+                "anchor_target_value": anchor_value,
+                "future_returns": future_returns,
+            }
+        )
+    return bank, candidate_count
+
+
+def _build_event_query(
+    *,
+    model: Any,
+    transformed_train_df: pd.DataFrame,
+    target_col: str,
+    input_size: int,
+) -> dict[str, Any]:
+    transformed_window = transformed_train_df.iloc[-input_size:].reset_index(drop=True)
+    return _build_retrieval_signature(
+        model=model,
+        transformed_window_df=transformed_window,
+        target_col=target_col,
+    )
+
+
+def _retrieve_event_neighbors(
+    *,
+    query: dict[str, Any],
+    bank: list[dict[str, Any]],
+    retrieval_cfg: _cfg.AAForecastRetrievalConfig,
+) -> dict[str, Any]:
+    if query["event_score"] < retrieval_cfg.event_score_threshold:
+        return {
+            "retrieval_attempted": True,
+            "retrieval_applied": False,
+            "skip_reason": "below_event_threshold",
+            "top_neighbors": [],
+            "mean_similarity": 0.0,
+            "max_similarity": 0.0,
+        }
+    if not bank:
+        return {
+            "retrieval_attempted": True,
+            "retrieval_applied": False,
+            "skip_reason": "empty_bank",
+            "top_neighbors": [],
+            "mean_similarity": 0.0,
+            "max_similarity": 0.0,
+        }
+    scored_neighbors: list[dict[str, Any]] = []
+    for entry in bank:
+        shape_similarity = _cosine_similarity(
+            query["shape_vector"], entry["shape_vector"]
+        )
+        event_similarity = _cosine_similarity(
+            query["event_vector"], entry["event_vector"]
+        )
+        similarity = 0.4 * shape_similarity + 0.6 * event_similarity
+        if similarity < retrieval_cfg.min_similarity:
+            continue
+        scored_neighbors.append(
+            {
+                **entry,
+                "shape_similarity": shape_similarity,
+                "event_similarity": event_similarity,
+                "similarity": similarity,
+            }
+        )
+    if not scored_neighbors:
+        return {
+            "retrieval_attempted": True,
+            "retrieval_applied": False,
+            "skip_reason": "min_similarity",
+            "top_neighbors": [],
+            "mean_similarity": 0.0,
+            "max_similarity": 0.0,
+        }
+    scored_neighbors.sort(key=lambda item: item["similarity"], reverse=True)
+    top_neighbors = scored_neighbors[: retrieval_cfg.top_k]
+    logits = np.asarray(
+        [neighbor["similarity"] for neighbor in top_neighbors],
+        dtype=float,
+    ) / retrieval_cfg.temperature
+    logits = logits - logits.max()
+    weights = np.exp(logits)
+    weights = weights / weights.sum()
+    for neighbor, weight in zip(top_neighbors, weights, strict=True):
+        neighbor["softmax_weight"] = float(weight)
+    similarities = np.asarray(
+        [neighbor["similarity"] for neighbor in top_neighbors],
+        dtype=float,
+    )
+    return {
+        "retrieval_attempted": True,
+        "retrieval_applied": True,
+        "skip_reason": None,
+        "top_neighbors": top_neighbors,
+        "mean_similarity": float(similarities.mean()),
+        "max_similarity": float(similarities.max()),
+    }
+
+
+def _blend_event_memory_prediction(
+    *,
+    base_prediction: np.ndarray,
+    memory_prediction: np.ndarray,
+    uncertainty_std: np.ndarray | None,
+    retrieval_cfg: _cfg.AAForecastRetrievalConfig,
+    mean_similarity: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    similarity_scale = float(np.clip(mean_similarity, 0.0, 1.0))
+    if retrieval_cfg.use_uncertainty_gate and uncertainty_std is not None:
+        std_values = np.asarray(uncertainty_std, dtype=float)
+        max_std = float(np.max(std_values))
+        if max_std > 1e-12:
+            uncertainty_scale = std_values / max_std
+        else:
+            uncertainty_scale = np.ones_like(std_values)
+    else:
+        uncertainty_scale = np.ones_like(base_prediction, dtype=float)
+    blend_weight = retrieval_cfg.blend_floor + (
+        retrieval_cfg.blend_max - retrieval_cfg.blend_floor
+    ) * similarity_scale * uncertainty_scale
+    blend_weight = np.clip(blend_weight, retrieval_cfg.blend_floor, retrieval_cfg.blend_max)
+    final_prediction = (
+        (1.0 - blend_weight) * np.asarray(base_prediction, dtype=float)
+        + blend_weight * np.asarray(memory_prediction, dtype=float)
+    )
+    return final_prediction, np.asarray(blend_weight, dtype=float)
+
+
+def _write_retrieval_artifacts(
+    *,
+    run_root: Path,
+    train_end_ds: pd.Timestamp,
+    retrieval_summary: dict[str, Any],
+) -> str:
+    _stage_root(run_root)
+    slug = pd.Timestamp(train_end_ds).strftime("%Y%m%dT%H%M%S")
+    relative_json_path = Path("aa_forecast") / "retrieval" / f"{slug}.json"
+    relative_neighbors_path = Path("aa_forecast") / "retrieval" / f"{slug}.neighbors.csv"
+    json_payload = dict(retrieval_summary)
+    json_payload["neighbors"] = [
+        {
+            "candidate_end_ds": neighbor["candidate_end_ds"],
+            "candidate_future_end_ds": neighbor["candidate_future_end_ds"],
+            "similarity": neighbor["similarity"],
+            "shape_similarity": neighbor["shape_similarity"],
+            "event_similarity": neighbor["event_similarity"],
+            "softmax_weight": neighbor["softmax_weight"],
+            "event_score": neighbor["event_score"],
+            "anchor_target_value": neighbor["anchor_target_value"],
+            "future_returns": np.asarray(neighbor["future_returns"], dtype=float).tolist(),
+        }
+        for neighbor in retrieval_summary["neighbors"]
+    ]
+    _write_json(run_root / relative_json_path, json_payload)
+    neighbor_rows: list[dict[str, Any]] = []
+    horizon = len(retrieval_summary["base_prediction"])
+    for rank, neighbor in enumerate(retrieval_summary["neighbors"], start=1):
+        row = {
+            "rank": rank,
+            "candidate_end_ds": neighbor["candidate_end_ds"],
+            "candidate_future_end_ds": neighbor["candidate_future_end_ds"],
+            "similarity": neighbor["similarity"],
+            "shape_similarity": neighbor["shape_similarity"],
+            "event_similarity": neighbor["event_similarity"],
+            "softmax_weight": neighbor["softmax_weight"],
+            "event_score": neighbor["event_score"],
+            "anchor_target_value": neighbor["anchor_target_value"],
+        }
+        for horizon_idx in range(horizon):
+            row[f"future_return_step_{horizon_idx + 1}"] = neighbor["future_returns"][
+                horizon_idx
+            ]
+        neighbor_rows.append(row)
+    pd.DataFrame(neighbor_rows).to_csv(
+        run_root / relative_neighbors_path, index=False
+    )
+    return str(relative_json_path)
+
+
 def predict_aa_forecast_fold(
     loaded: Any,
     job: Any,
@@ -533,8 +851,9 @@ def predict_aa_forecast_fold(
     )
     if context_artifact is not None:
         target_predictions["aaforecast_context_artifact"] = context_artifact
+    uncertainty_summary: dict[str, Any] | None = None
     if stage_cfg.uncertainty.enabled:
-        summary = _select_uncertainty_predictions(
+        uncertainty_summary = _select_uncertainty_predictions(
             nf=nf,
             adapter_inputs=adapter_inputs,
             model=nf.models[0],
@@ -546,9 +865,9 @@ def predict_aa_forecast_fold(
             dropout_candidates=stage_cfg.uncertainty.dropout_candidates,
             sample_count=stage_cfg.uncertainty.sample_count,
         )
-        target_predictions[job.model] = summary["mean"]
-        target_predictions[f"{job.model}__uncertainty_std"] = summary["std"]
-        target_predictions[f"{job.model}__selected_dropout"] = summary[
+        target_predictions[job.model] = uncertainty_summary["mean"]
+        target_predictions[f"{job.model}__uncertainty_std"] = uncertainty_summary["std"]
+        target_predictions[f"{job.model}__selected_dropout"] = uncertainty_summary[
             "selected_dropout"
         ]
         if run_root is not None:
@@ -556,9 +875,114 @@ def predict_aa_forecast_fold(
                 run_root=run_root,
                 stage_cfg=stage_cfg,
                 train_end_ds=pd.to_datetime(train_df[dt_col].iloc[-1]),
-                summary=summary,
+                summary=uncertainty_summary,
                 target_actuals=future_df[target_col].reset_index(drop=True),
             )
+    retrieval_artifact = None
+    retrieval_cfg = stage_cfg.retrieval
+    if retrieval_cfg.enabled:
+        if uncertainty_summary is None:
+            raise ValueError(
+                "aa_forecast retrieval requires uncertainty summary in predict_aa_forecast_fold"
+            )
+        input_size = int(getattr(nf.models[0], "input_size", len(transformed_train_df)))
+        horizon = int(getattr(nf.models[0], "h", len(future_df)))
+        if input_size <= 0:
+            raise ValueError("aa_forecast retrieval requires positive input_size")
+        if len(transformed_train_df) < input_size:
+            raise ValueError(
+                "aa_forecast retrieval requires transformed_train_df rows >= input_size"
+            )
+        bank, candidate_count = _build_event_memory_bank(
+            model=nf.models[0],
+            transformed_train_df=transformed_train_df,
+            raw_train_df=train_df.reset_index(drop=True),
+            dt_col=dt_col,
+            target_col=target_col,
+            retrieval_cfg=retrieval_cfg,
+            input_size=input_size,
+            horizon=horizon,
+        )
+        query = _build_event_query(
+            model=nf.models[0],
+            transformed_train_df=transformed_train_df,
+            target_col=target_col,
+            input_size=input_size,
+        )
+        retrieval_result = _retrieve_event_neighbors(
+            query=query,
+            bank=bank,
+            retrieval_cfg=retrieval_cfg,
+        )
+        base_prediction = np.asarray(target_predictions[job.model], dtype=float)
+        current_last_y = float(train_df[target_col].iloc[-1])
+        retrieval_summary = {
+            "cutoff": str(pd.Timestamp(train_df[dt_col].iloc[-1])),
+            "train_end_ds": str(pd.Timestamp(train_df[dt_col].iloc[-1])),
+            "retrieval_enabled": True,
+            "retrieval_attempted": retrieval_result["retrieval_attempted"],
+            "retrieval_applied": False,
+            "skip_reason": retrieval_result["skip_reason"],
+            "top_k_requested": retrieval_cfg.top_k,
+            "top_k_used": len(retrieval_result["top_neighbors"]),
+            "candidate_count": candidate_count,
+            "eligible_candidate_count": len(bank),
+            "event_score_threshold": retrieval_cfg.event_score_threshold,
+            "recency_gap_steps": retrieval_cfg.recency_gap_steps,
+            "min_similarity": retrieval_cfg.min_similarity,
+            "mean_similarity": retrieval_result["mean_similarity"],
+            "max_similarity": retrieval_result["max_similarity"],
+            "query_event_score": query["event_score"],
+            "blend_max": retrieval_cfg.blend_max,
+            "blend_weight_by_horizon": [0.0] * len(base_prediction),
+            "used_uncertainty_gate": retrieval_cfg.use_uncertainty_gate,
+            "base_prediction": base_prediction.tolist(),
+            "memory_prediction": base_prediction.tolist(),
+            "final_prediction": base_prediction.tolist(),
+            "neighbors": retrieval_result["top_neighbors"],
+        }
+        if retrieval_result["retrieval_applied"]:
+            weighted_returns = np.zeros_like(base_prediction, dtype=float)
+            for neighbor in retrieval_result["top_neighbors"]:
+                weighted_returns = weighted_returns + (
+                    float(neighbor["softmax_weight"])
+                    * np.asarray(neighbor["future_returns"], dtype=float)
+                )
+            scale = max(abs(current_last_y), 1e-8)
+            memory_prediction = current_last_y + scale * weighted_returns
+            final_prediction, blend_weight = _blend_event_memory_prediction(
+                base_prediction=base_prediction,
+                memory_prediction=memory_prediction,
+                uncertainty_std=np.asarray(uncertainty_summary["std"], dtype=float),
+                retrieval_cfg=retrieval_cfg,
+                mean_similarity=retrieval_result["mean_similarity"],
+            )
+            target_predictions[job.model] = final_prediction
+            retrieval_summary["retrieval_applied"] = True
+            retrieval_summary["skip_reason"] = None
+            retrieval_summary["blend_weight_by_horizon"] = blend_weight.tolist()
+            retrieval_summary["memory_prediction"] = memory_prediction.tolist()
+            retrieval_summary["final_prediction"] = final_prediction.tolist()
+        if run_root is not None:
+            retrieval_artifact = _write_retrieval_artifacts(
+                run_root=run_root,
+                train_end_ds=pd.to_datetime(train_df[dt_col].iloc[-1]),
+                retrieval_summary=retrieval_summary,
+            )
+        target_predictions["aaforecast_retrieval_enabled"] = pd.Series(
+            [True] * len(target_predictions),
+            dtype="boolean",
+        )
+        target_predictions["aaforecast_retrieval_applied"] = pd.Series(
+            [retrieval_summary["retrieval_applied"]] * len(target_predictions),
+            dtype="boolean",
+        )
+        target_predictions["aaforecast_retrieval_skip_reason"] = pd.Series(
+            [retrieval_summary["skip_reason"]] * len(target_predictions),
+            dtype="object",
+        )
+        if retrieval_artifact is not None:
+            target_predictions["aaforecast_retrieval_artifact"] = retrieval_artifact
     target_actuals = future_df[target_col].reset_index(drop=True)
     train_end_ds = pd.to_datetime(train_df[dt_col].iloc[-1])
     return target_predictions, target_actuals, train_end_ds, train_df, nf

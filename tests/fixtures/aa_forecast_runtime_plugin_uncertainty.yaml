@@ -6,6 +6,14 @@ aa_forecast:
   uncertainty:
     enabled: true
     sample_count: 2
+  retrieval:
+    enabled: true
+    top_k: 2
+    recency_gap_steps: 1
+    event_score_threshold: 100.0
+    min_similarity: 0.55
+    blend_max: 0.2
+    use_uncertainty_gate: true
   model_params:
     encoder_hidden_size: 16
     encoder_n_layers: 1

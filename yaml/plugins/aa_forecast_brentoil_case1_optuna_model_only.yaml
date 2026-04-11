@@ -6,6 +6,7 @@ aa_forecast:
   uncertainty:
     enabled: true
     sample_count: 5
+
   model_params: {}
   star_anomaly_tails:
     upward:
