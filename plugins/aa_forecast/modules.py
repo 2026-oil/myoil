@@ -242,3 +242,76 @@ class CriticalSparseAttention(nn.Module):
             hidden_states,
         )
         return attended, weights
+
+
+class TimeXerTokenSparseAttention(nn.Module):
+    """Sparse attention over per-series TimeXer patch/global tokens."""
+
+    def __init__(self, hidden_size: int, attention_hidden_size: int | None = None):
+        super().__init__()
+        attention_hidden_size = (
+            hidden_size if attention_hidden_size is None else int(attention_hidden_size)
+        )
+        self.proj = nn.Linear(hidden_size, attention_hidden_size)
+        self.score = nn.Linear(attention_hidden_size, 1)
+
+    def forward(
+        self,
+        patch_states: torch.Tensor,
+        global_states: torch.Tensor,
+        patch_mask: torch.Tensor,
+        patch_count: torch.Tensor,
+        patch_activity: torch.Tensor,
+        global_mask: torch.Tensor,
+        global_count: torch.Tensor,
+        global_activity: torch.Tensor,
+    ) -> tuple[tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
+        if patch_states.ndim != 4:
+            raise ValueError("TimeXerTokenSparseAttention patch_states must be rank-4")
+        if global_states.ndim != 4:
+            raise ValueError("TimeXerTokenSparseAttention global_states must be rank-4")
+        if patch_mask.ndim != 3 or global_mask.ndim != 3:
+            raise ValueError("TimeXerTokenSparseAttention masks must be rank-3")
+        if patch_count.ndim != 3 or global_count.ndim != 3:
+            raise ValueError("TimeXerTokenSparseAttention counts must be rank-3")
+        if patch_activity.ndim != 3 or global_activity.ndim != 3:
+            raise ValueError("TimeXerTokenSparseAttention activity tensors must be rank-3")
+
+        token_states = torch.cat([patch_states, global_states], dim=2)
+        token_mask = torch.cat([patch_mask, global_mask], dim=1).squeeze(-1).bool()
+        token_count = torch.cat([patch_count, global_count], dim=1).squeeze(-1)
+        token_activity = torch.cat([patch_activity, global_activity], dim=1).squeeze(-1)
+
+        token_count = token_count.to(dtype=token_states.dtype)
+        token_activity = token_activity.to(dtype=token_states.dtype).clamp_min(0.0)
+
+        logits = self.score(torch.tanh(self.proj(token_states))).squeeze(-1)
+        logits = logits + torch.log1p(token_count).unsqueeze(1)
+        logits = logits + torch.log1p(token_activity).unsqueeze(1)
+
+        token_mask = token_mask.unsqueeze(1).expand(-1, token_states.shape[1], -1)
+        logits = logits.masked_fill(~token_mask, -1e9)
+
+        has_any = token_mask.any(dim=2, keepdim=True)
+        weights = torch.softmax(logits, dim=-1)
+        weights = torch.where(has_any, weights, torch.zeros_like(weights))
+
+        token_context = torch.einsum("bct,bcth->bch", weights, token_states)
+        fallback = global_states.squeeze(2)
+        token_context = torch.where(
+            has_any.expand_as(token_context),
+            token_context,
+            fallback,
+        )
+
+        max_count = token_count.amax(dim=1, keepdim=True).clamp_min(1.0)
+        density_gate = 1.0 + (token_count / max_count)
+        expanded_context = token_context.unsqueeze(2).expand_as(token_states)
+        attended = torch.where(
+            token_mask.unsqueeze(-1),
+            expanded_context * density_gate.unsqueeze(1).unsqueeze(-1),
+            token_states,
+        )
+
+        patch_num = patch_states.shape[2]
+        return (attended[:, :, :patch_num, :], attended[:, :, patch_num:, :]), weights

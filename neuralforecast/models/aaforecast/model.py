@@ -8,13 +8,19 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from plugins.aa_forecast import CriticalSparseAttention, STARFeatureExtractor
+from plugins.aa_forecast import (
+    CriticalSparseAttention,
+    STARFeatureExtractor,
+    TimeXerTokenSparseAttention,
+)
 
 from ...common._base_model import BaseModel
 from ...common._modules import MLP
 from ...losses.pytorch import MAE
 from .backbones import AA_SUPPORTED_BACKBONES, build_aaforecast_backbone
 from .gru import _align_horizon, _apply_stochastic_dropout
+from .models.base import AATimeXerTokenStates
+from ..timexer import FlattenHead
 
 
 class AAForecast(BaseModel):
@@ -206,21 +212,37 @@ class AAForecast(BaseModel):
             d_ff=d_ff,
             use_norm=use_norm,
         )
-        self.attention = CriticalSparseAttention(
-            hidden_size=self.encoder_hidden_size,
-            attention_hidden_size=attention_hidden_size,
-        )
+        if self.backbone == "timexer":
+            self.attention = TimeXerTokenSparseAttention(
+                hidden_size=self.encoder_hidden_size,
+                attention_hidden_size=attention_hidden_size,
+            )
+        else:
+            self.attention = CriticalSparseAttention(
+                hidden_size=self.encoder_hidden_size,
+                attention_hidden_size=attention_hidden_size,
+            )
         self.sequence_adapter = (
             nn.Linear(self.input_size, self.h) if self.h > self.input_size else None
         )
-        self.decoder = MLP(
-            in_features=2 * self.encoder_hidden_size,
-            out_features=self.loss.outputsize_multiplier,
-            hidden_size=decoder_hidden_size,
-            num_layers=decoder_layers,
-            activation="ReLU",
-            dropout=self.encoder_dropout,
-        )
+        if self.backbone == "timexer":
+            self.timexer_decoder = FlattenHead(
+                feature_size,
+                (self.encoder.patch_num + 1) * (2 * self.encoder_hidden_size),
+                self.h * self.loss.outputsize_multiplier,
+                head_dropout=self.encoder_dropout,
+            )
+            self.decoder = None
+        else:
+            self.decoder = MLP(
+                in_features=2 * self.encoder_hidden_size,
+                out_features=self.loss.outputsize_multiplier,
+                hidden_size=decoder_hidden_size,
+                num_layers=decoder_layers,
+                activation="ReLU",
+                dropout=self.encoder_dropout,
+            )
+            self.timexer_decoder = None
 
     def configure_stochastic_inference(
         self,
@@ -508,6 +530,101 @@ class AAForecast(BaseModel):
     def _reduce_critical_mask(mask: torch.Tensor | None, *, template: torch.Tensor) -> torch.Tensor:
         return AAForecast._count_active_channels(mask, template=template) > 0
 
+    def _reduce_time_signal_to_timexer_patches(
+        self,
+        signal: torch.Tensor,
+        *,
+        reduce: str,
+    ) -> torch.Tensor:
+        if self.backbone != "timexer":
+            raise ValueError("TimeXer patch reduction is only available for the timexer backbone")
+        if signal.ndim != 3:
+            raise ValueError("TimeXer patch reduction expects rank-3 [B, time, channel]")
+        if signal.shape[1] != self.input_size:
+            raise ValueError(
+                "TimeXer patch reduction requires signal length to match input_size; "
+                f"got signal_len={signal.shape[1]}, input_size={self.input_size}"
+            )
+        reshaped = signal.reshape(
+            signal.shape[0],
+            self.encoder.patch_num,
+            self.patch_len,
+            signal.shape[2],
+        )
+        if reduce == "any":
+            return reshaped.bool().any(dim=2)
+        if reduce == "sum":
+            return reshaped.sum(dim=2)
+        raise ValueError(f"Unsupported TimeXer patch reduction mode: {reduce}")
+
+    def _aggregate_timexer_attention_signals(
+        self,
+        *,
+        critical_mask: torch.Tensor,
+        count_active_channels: torch.Tensor,
+        channel_activity: torch.Tensor,
+    ) -> dict[str, torch.Tensor]:
+        time_activity = channel_activity.sum(dim=2, keepdim=True)
+        patch_mask = self._reduce_time_signal_to_timexer_patches(
+            critical_mask.to(dtype=torch.bool),
+            reduce="any",
+        ).to(dtype=torch.bool)
+        patch_count = self._reduce_time_signal_to_timexer_patches(
+            count_active_channels,
+            reduce="sum",
+        )
+        patch_activity = self._reduce_time_signal_to_timexer_patches(
+            time_activity,
+            reduce="sum",
+        )
+        global_mask = critical_mask.bool().any(dim=1, keepdim=True)
+        global_count = count_active_channels.sum(dim=1, keepdim=True)
+        global_activity = time_activity.sum(dim=1, keepdim=True)
+        return {
+            "patch_mask": patch_mask,
+            "patch_count": patch_count,
+            "patch_activity": patch_activity,
+            "global_mask": global_mask,
+            "global_count": global_count,
+            "global_activity": global_activity,
+        }
+
+    def _decode_timexer_forecast(
+        self,
+        *,
+        raw_states: AATimeXerTokenStates,
+        attended_states: AATimeXerTokenStates,
+    ) -> torch.Tensor:
+        if self.timexer_decoder is None:
+            raise ValueError("TimeXer decoder is not initialized")
+        raw_tokens = raw_states.combined()
+        attended_tokens = attended_states.combined()
+        raw_tokens = _apply_stochastic_dropout(
+            raw_tokens,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
+        attended_tokens = _apply_stochastic_dropout(
+            attended_tokens,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
+        decoder_input = torch.cat([raw_tokens, attended_tokens], dim=-1).permute(0, 1, 3, 2)
+        decoder_input = _apply_stochastic_dropout(
+            decoder_input,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
+        decoded = self.timexer_decoder(decoder_input)
+        target_forecast = decoded[:, :1, :]
+        return target_forecast.transpose(1, 2).reshape(raw_tokens.shape[0], self.h, -1)
+
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]
         hist_exog = windows_batch["hist_exog"]
@@ -542,6 +659,33 @@ class AAForecast(BaseModel):
         encoder_input = torch.cat(encoder_parts, dim=2)
 
         backbone_states = self.encoder(encoder_input)
+        if self.backbone == "timexer":
+            if not isinstance(backbone_states, AATimeXerTokenStates):
+                raise ValueError("AAForecast timexer backbone must return AATimeXerTokenStates")
+            timexer_signals = self._aggregate_timexer_attention_signals(
+                critical_mask=star_payload["critical_mask"],
+                count_active_channels=star_payload["count_active_channels"],
+                channel_activity=star_payload["channel_activity"],
+            )
+            (attended_patch, attended_global), _ = self.attention(
+                backbone_states.patch_states,
+                backbone_states.global_states,
+                timexer_signals["patch_mask"],
+                timexer_signals["patch_count"],
+                timexer_signals["patch_activity"],
+                timexer_signals["global_mask"],
+                timexer_signals["global_count"],
+                timexer_signals["global_activity"],
+            )
+            attended_states = AATimeXerTokenStates(
+                patch_states=attended_patch,
+                global_states=attended_global,
+            )
+            return self._decode_timexer_forecast(
+                raw_states=backbone_states,
+                attended_states=attended_states,
+            )
+
         hidden_states = self.encoder.project_to_time_states(backbone_states)
         critical_mask = star_payload["critical_mask"].bool()
         count_active_channels = star_payload["count_active_channels"].to(

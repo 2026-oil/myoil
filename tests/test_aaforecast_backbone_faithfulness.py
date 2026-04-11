@@ -5,6 +5,7 @@ import torch
 
 from neuralforecast.models import AAForecast
 from neuralforecast.models.aaforecast.gru import _build_encoder
+from neuralforecast.models.aaforecast.models.base import AATimeXerTokenStates
 from neuralforecast.models.informer import InformerEncoderOnly
 from neuralforecast.models.itransformer import ITransformerTokenEncoderOnly
 from neuralforecast.models.patchtst import PatchTSTEncoderOnly
@@ -303,7 +304,7 @@ def test_patchtst_bridge_discards_channel_identity_after_reusing_encoder_core() 
     assert torch.allclose(bridged, bridged_swapped, atol=1e-6, rtol=1e-5)
 
 
-def test_timexer_bridge_reduces_series_order_sensitivity_relative_to_raw_encoder() -> None:
+def test_timexer_adapter_preserves_patch_and_global_token_structure() -> None:
     model = _make_model(
         "timexer",
         hidden_size=8,
@@ -316,15 +317,90 @@ def test_timexer_bridge_reduces_series_order_sensitivity_relative_to_raw_encoder
         use_norm=True,
     )
     inputs = _encoder_input(model)
-    swapped = inputs.clone()
-    swapped[:, :, [0, 1]] = swapped[:, :, [1, 0]]
+    raw_tokens = model.encoder.encoder_only(inputs)
+    adapter_states = model.encoder(inputs)
 
-    raw_diff = (model.encoder.encoder_only(inputs) - model.encoder.encoder_only(swapped)).abs().max()
-    bridged_diff = (model.encoder(inputs) - model.encoder(swapped)).abs().max()
+    assert isinstance(adapter_states, AATimeXerTokenStates)
+    expected_patch = raw_tokens[..., :-1].permute(0, 1, 3, 2)
+    expected_global = raw_tokens[..., -1:].permute(0, 1, 3, 2)
+    assert adapter_states.patch_states.shape == (
+        inputs.shape[0],
+        inputs.shape[-1],
+        model.encoder.patch_num,
+        model.hidden_size,
+    )
+    assert adapter_states.global_states.shape == (
+        inputs.shape[0],
+        inputs.shape[-1],
+        1,
+        model.hidden_size,
+    )
+    assert torch.allclose(adapter_states.patch_states, expected_patch, atol=1e-6, rtol=1e-5)
+    assert torch.allclose(adapter_states.global_states, expected_global, atol=1e-6, rtol=1e-5)
 
-    assert raw_diff.item() > 1.0
-    assert bridged_diff.item() < 0.1
-    assert raw_diff.item() > bridged_diff.item()
+
+def test_timexer_time_signals_are_aggregated_to_patch_and_global_tokens() -> None:
+    model = _make_model(
+        "timexer",
+        hidden_size=8,
+        n_heads=2,
+        e_layers=1,
+        dropout=0.1,
+        d_ff=16,
+        factor=1,
+        patch_len=2,
+        use_norm=True,
+    )
+    critical_mask = torch.tensor(
+        [[
+            [True],
+            [False],
+            [False],
+            [True],
+        ]],
+        dtype=torch.bool,
+    )
+    count_active_channels = torch.tensor(
+        [[
+            [2.0],
+            [0.0],
+            [0.0],
+            [3.0],
+        ]]
+    )
+    channel_activity = torch.tensor(
+        [[
+            [1.0, 0.5],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [2.0, 1.0],
+        ]]
+    )
+
+    aggregated = model._aggregate_timexer_attention_signals(
+        critical_mask=critical_mask,
+        count_active_channels=count_active_channels,
+        channel_activity=channel_activity,
+    )
+
+    assert torch.equal(
+        aggregated["patch_mask"],
+        torch.tensor([[[True], [True]]], dtype=torch.bool),
+    )
+    assert torch.allclose(
+        aggregated["patch_count"],
+        torch.tensor([[[2.0], [3.0]]]),
+    )
+    assert torch.allclose(
+        aggregated["patch_activity"],
+        torch.tensor([[[1.5], [3.0]]]),
+    )
+    assert torch.equal(
+        aggregated["global_mask"],
+        torch.tensor([[[True]]], dtype=torch.bool),
+    )
+    assert torch.allclose(aggregated["global_count"], torch.tensor([[[5.0]]]))
+    assert torch.allclose(aggregated["global_activity"], torch.tensor([[[4.5]]]))
 
 
 def test_informer_distillation_changes_sequence_length_while_aa_path_preserves_time_alignment() -> None:

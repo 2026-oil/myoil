@@ -15,6 +15,15 @@ class AABackboneEvidence:
     required_output: str = "[B, time, hidden]"
 
 
+@dataclass(frozen=True)
+class AATimeXerTokenStates:
+    patch_states: torch.Tensor
+    global_states: torch.Tensor
+
+    def combined(self) -> torch.Tensor:
+        return torch.cat([self.patch_states, self.global_states], dim=2)
+
+
 class AABackboneAdapter(nn.Module):
     evidence: AABackboneEvidence
 

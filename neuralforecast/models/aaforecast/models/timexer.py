@@ -7,7 +7,7 @@ from ...timexer import TimeXerEncoderOnly
 from .base import (
     AABackboneAdapter,
     AABackboneEvidence,
-    scatter_patch_tokens_to_time_states,
+    AATimeXerTokenStates,
     validate_attention_heads,
 )
 
@@ -22,14 +22,14 @@ class TimeXerBackboneAdapter(AABackboneAdapter):
             "neuralforecast.common._modules.DataEmbedding_inverted",
         ),
         aa_bridge_steps=(
-            "split TimeXer patch tokens from the global token",
-            "scatter patch tokens back to time positions",
-            "broadcast averaged global token context across time states",
+            "preserve per-series patch tokens and per-series global tokens from the TimeXer encoder",
+            "run AA sparse attention directly over the patch/global token structure",
         ),
         unavoidable_divergences=(
             "standalone forecast head remains outside the AA adapter",
-            "the AA bridge reconstructs per-timestep hidden states from patch/global token outputs",
+            "AA still injects STAR-driven anomaly priors that are aggregated from timesteps to tokens",
         ),
+        required_output="{patch:[B, channel, patch, hidden], global:[B, channel, 1, hidden]}",
     )
 
     def __init__(
@@ -50,6 +50,7 @@ class TimeXerBackboneAdapter(AABackboneAdapter):
         validate_attention_heads(hidden_size, n_heads, field_name="n_heads")
         self.hidden_size = hidden_size
         self.patch_len = patch_len
+        self.patch_num = input_size // patch_len
         self.encoder_only = TimeXerEncoderOnly(
             input_size=input_size,
             n_series=feature_size,
@@ -65,21 +66,15 @@ class TimeXerBackboneAdapter(AABackboneAdapter):
         self.en_embedding = self.encoder_only.en_embedding
         self.ex_embedding = self.encoder_only.ex_embedding
         self.encoder = self.encoder_only.encoder
-        self.output_norm = nn.LayerNorm(hidden_size) if use_norm else nn.Identity()
 
-    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+    def forward(self, inputs: torch.Tensor) -> AATimeXerTokenStates:
         encoded = self.encoder_only(inputs)
-        patch_tokens = encoded[..., :-1].mean(dim=1).permute(0, 2, 1)
-        global_context = encoded[..., -1].mean(dim=1)
-        hidden = scatter_patch_tokens_to_time_states(
-            patch_tokens,
-            seq_len=inputs.shape[1],
-            patch_len=self.patch_len,
-            stride=self.patch_len,
-            template=inputs,
-            global_context=global_context,
+        patch_states = encoded[..., :-1].permute(0, 1, 3, 2)
+        global_states = encoded[..., -1:].permute(0, 1, 3, 2)
+        return AATimeXerTokenStates(
+            patch_states=patch_states,
+            global_states=global_states,
         )
-        return self.output_norm(hidden)
 
 
 def build_timexer_backbone(
