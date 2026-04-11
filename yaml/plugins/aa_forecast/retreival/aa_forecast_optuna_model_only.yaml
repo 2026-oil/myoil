@@ -1,0 +1,22 @@
+aa_forecast:
+  model: gru
+  tune_training: false
+  lowess_frac: 0.6
+  lowess_delta: 0.01
+  uncertainty:
+    enabled: true
+    sample_count: 5
+  model_params: {}
+  star_anomaly_tails:
+    upward:
+    - GPRD_THREAT
+    two_sided: []
+  thresh: 3.5
+  retrieval:
+    enabled: true
+    top_k: 5
+    recency_gap_steps: 8
+    event_score_threshold: 1.0
+    min_similarity: 0.55
+    blend_max: 0.25
+    use_uncertainty_gate: true
