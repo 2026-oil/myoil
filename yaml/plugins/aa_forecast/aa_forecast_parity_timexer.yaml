@@ -1,0 +1,25 @@
+aa_forecast:
+  model: timexer
+  tune_training: false
+  lowess_frac: 0.35
+  lowess_delta: 0.01
+  uncertainty:
+    enabled: true
+    sample_count: 50
+  model_params:
+    hidden_size: 128
+    n_heads: 8
+    e_layers: 2
+    dropout: 0.1
+    d_ff: 256
+    patch_len: 8
+    use_norm: true
+    decoder_hidden_size: 128
+    decoder_layers: 4
+    season_length: 4
+  star_anomaly_tails:
+    upward:
+    - GPRD_THREAT
+    - BS_Core_Index_A
+    two_sided: []
+  thresh: 3.5

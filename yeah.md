@@ -122,6 +122,14 @@ reference\aaforecast 에 있는 aaforecast 논문 이미지가 아키텍쳐임
 
 - 단일 모델 학습시 20분 이상 걸리면 안됨.
 - 절대 leaking이 발생해서는 안 됨.
-- 기존의 input 만큼 데이터를 넣어서 한 번에 향후 2개 호라이즌을 예측하는 형태 자체는 흐트러지면 안됨
+
+- setting.yaml 에서
+ horizon: 2 , n_windows: 1 유지 
+
+ - 변경가능
+  transformations_target: diff
+  transformations_exog: diff
+  input_size: 24
+  
 
 - 모든 조건 PASS 전까지 리서치 멈추지 말 것.

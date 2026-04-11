@@ -15,6 +15,7 @@ SUPPORTED_AA_FORECAST_BACKBONES = {
     "gru",
     "vanillatransformer",
     "informer",
+    "itransformer",
     "patchtst",
     "timexer",
 }
@@ -60,6 +61,16 @@ AA_FORECAST_STAGE_ONLY_PARAM_REGISTRY = {
         "dropout": _probability(),
         "linear_hidden_size": _positive_int(low=1, high=8192),
         "factor": _positive_int(low=1, high=64),
+    },
+    "itransformer": {
+        **_AA_COMMON_PARAM_REGISTRY,
+        "hidden_size": _positive_int(low=1, high=4096),
+        "n_heads": _positive_int(low=1, high=128),
+        "e_layers": _positive_int(low=1, high=16),
+        "dropout": _probability(),
+        "d_ff": _positive_int(low=1, high=8192),
+        "factor": _positive_int(low=1, high=64),
+        "use_norm": {"type": "categorical", "choices": [True, False]},
     },
     "patchtst": {
         **_AA_COMMON_PARAM_REGISTRY,

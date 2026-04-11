@@ -93,7 +93,7 @@ FEATURE_SET_AAFORECAST_VARIANTS = {
         "config_path": Path(
             "yaml/experiment/feature_set_aaforecast/brentoil-case1-best-all10.yaml"
         ),
-        "plugin_path": "yaml/plugins/aa_forecast_brentoil_case1_best_all10.yaml",
+        "plugin_path": "yaml/plugins/aa_forecsat/aa_forecast_best_all10.yaml",
         "task_name": "brentoil_case1_aaforecast_best_all10",
         "hist_exog_cols": [
             "Idx_OVX",
@@ -125,7 +125,7 @@ FEATURE_SET_AAFORECAST_VARIANTS = {
         "config_path": Path(
             "yaml/experiment/feature_set_aaforecast/brentoil-case1-best-no_bs_core.yaml"
         ),
-        "plugin_path": "yaml/plugins/aa_forecast_brentoil_case1_best_no_bs_core.yaml",
+        "plugin_path": "yaml/plugins/aa_forecsat/aa_forecast_best_no_bs_core.yaml",
         "task_name": "brentoil_case1_aaforecast_best_no_bs_core",
         "hist_exog_cols": [
             "Idx_OVX",
@@ -151,7 +151,7 @@ FEATURE_SET_AAFORECAST_VARIANTS = {
         "config_path": Path(
             "yaml/experiment/feature_set_aaforecast/brentoil-case1-best-no_gprd.yaml"
         ),
-        "plugin_path": "yaml/plugins/aa_forecast_brentoil_case1_best_no_gprd.yaml",
+        "plugin_path": "yaml/plugins/aa_forecsat/aa_forecast_best_no_gprd.yaml",
         "task_name": "brentoil_case1_aaforecast_best_no_gprd",
         "hist_exog_cols": [
             "Idx_OVX",
@@ -788,7 +788,7 @@ def test_feature_set_aaforecast_best_validate_only(
     for payload in (resolved["aa_forecast"], manifest["aa_forecast"]):
         _assert_grouping_payload(
             payload,
-            config_path="yaml/plugins/aa_forecast_brentoil_case1_best.yaml",
+            config_path="yaml/plugins/aa_forecsat/aa_forecast_best.yaml",
             star_anomaly_tails={
                 "upward": [],
                 "two_sided": [
@@ -806,7 +806,7 @@ def test_feature_set_aaforecast_best_validate_only(
         )
 
 
-def test_validate_only_brentoil_case1_accepts_plugin_grouped_tails(
+def test_validate_only_accepts_plugin_grouped_tails(
     tmp_path: Path,
 ) -> None:
     output_root = tmp_path / "validate-only-aa-forecast-direct-brentoil-case1"
@@ -839,7 +839,7 @@ def test_validate_only_brentoil_case1_accepts_plugin_grouped_tails(
     for payload in (resolved["aa_forecast"], manifest["aa_forecast"]):
         _assert_grouping_payload(
             payload,
-            config_path="yaml/plugins/aa_forecast_brentoil_case1.yaml",
+            config_path="yaml/plugins/aa_forecast.yaml",
             star_anomaly_tails=expected_tails,
             non_star_hist_exog_cols=expected_non_star,
         )
@@ -1482,7 +1482,7 @@ def test_runtime_validate_only_plugin_target_preserves_grouped_tails(
     for payload in (resolved["aa_forecast"], manifest["aa_forecast"], capability["aa_forecast"]):
         _assert_grouping_payload(
             payload,
-            config_path="yaml/plugins/aa_forecast_brentoil_case1.yaml",
+            config_path="yaml/plugins/aa_forecast.yaml",
             star_anomaly_tails=expected_tails,
             non_star_hist_exog_cols=expected_non_star,
         )

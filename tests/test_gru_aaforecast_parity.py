@@ -22,7 +22,7 @@ BRENT_CASE1_PARITY_AA_CONFIG = Path(
     "yaml/experiment/feature_set_aaforecast/brentoil-case1-parity-aaforecast-gru.yaml"
 )
 BRENT_CASE1_PARITY_AA_PLUGIN = Path(
-    "yaml/plugins/aa_forecast_brentoil_case1_parity_gru.yaml"
+    "yaml/plugins/aa_forecsat/aa_forecast_parity_gru.yaml"
 )
 PARITY_SHARED_MODEL_SELECTORS = [
     "encoder_hidden_size",
@@ -262,7 +262,7 @@ def test_runtime_validate_only_gru_and_aaforecast_share_parity_selectors(
 
 
 def test_gru_real_run_forecasts_are_not_flat_within_cutoff() -> None:
-    forecast_path = REPO_ROOT / "runs/feature_set_aaforecast_brentoil_case1_parity_gru/cv/GRU_forecasts.csv"
+    forecast_path = REPO_ROOT / "runs/feature_set_aaforecast_parity_gru/cv/GRU_forecasts.csv"
     if not forecast_path.exists():
         pytest.skip("real-run artifact not present")
 

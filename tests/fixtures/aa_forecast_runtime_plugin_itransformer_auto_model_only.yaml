@@ -1,0 +1,13 @@
+aa_forecast:
+  model: itransformer
+  tune_training: true
+  lowess_frac: 0.6
+  lowess_delta: 0.01
+  uncertainty:
+    enabled: false
+    sample_count: 3
+  model_params: {}
+  star_anomaly_tails:
+    upward:
+    - event
+    two_sided: []

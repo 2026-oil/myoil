@@ -4,6 +4,7 @@ import torch
 import pytest
 
 from neuralforecast.models import AAForecast
+from neuralforecast.models.patchtst import TSTiEncoder, _patchtst_create_patches
 
 
 def _windows_batch(batch_size: int = 2, input_size: int = 4) -> dict[str, torch.Tensor]:
@@ -51,6 +52,18 @@ def _windows_batch(batch_size: int = 2, input_size: int = 4) -> dict[str, torch.
                 "dropout": 0.1,
                 "linear_hidden_size": 16,
                 "factor": 1,
+            },
+        ),
+        (
+            "itransformer",
+            {
+                "hidden_size": 8,
+                "n_heads": 2,
+                "e_layers": 1,
+                "dropout": 0.1,
+                "d_ff": 16,
+                "factor": 1,
+                "use_norm": True,
             },
         ),
         (
@@ -105,3 +118,67 @@ def test_aaforecast_supported_backbones_match_forward_contract(
     outputs = model(_windows_batch())
 
     assert outputs.shape == (2, 2, 1)
+
+
+def test_aaforecast_patchtst_backbone_reuses_tsti_encoder() -> None:
+    model = AAForecast(
+        h=2,
+        input_size=4,
+        backbone="patchtst",
+        hist_exog_list=["event"],
+        star_hist_exog_list=["event"],
+        non_star_hist_exog_list=[],
+        star_hist_exog_tail_modes=["upward"],
+        scaler_type="identity",
+        max_steps=1,
+        val_check_steps=1,
+        batch_size=1,
+        windows_batch_size=1,
+        inference_windows_batch_size=1,
+        hidden_size=8,
+        n_heads=2,
+        encoder_layers=1,
+        linear_hidden_size=16,
+        dropout=0.1,
+        attn_dropout=0.0,
+        patch_len=2,
+        stride=1,
+    )
+
+    assert isinstance(model.encoder.encoder, TSTiEncoder)
+
+
+def test_aaforecast_patchtst_backbone_uses_shared_patch_prep() -> None:
+    model = AAForecast(
+        h=2,
+        input_size=4,
+        backbone="patchtst",
+        hist_exog_list=["event"],
+        star_hist_exog_list=["event"],
+        non_star_hist_exog_list=[],
+        star_hist_exog_tail_modes=["upward"],
+        scaler_type="identity",
+        max_steps=1,
+        val_check_steps=1,
+        batch_size=1,
+        windows_batch_size=1,
+        inference_windows_batch_size=1,
+        hidden_size=8,
+        n_heads=2,
+        encoder_layers=1,
+        linear_hidden_size=16,
+        dropout=0.1,
+        attn_dropout=0.0,
+        patch_len=2,
+        stride=1,
+    )
+    inputs = torch.randn(2, 4, 3)
+
+    shared_patches = _patchtst_create_patches(
+        inputs.transpose(1, 2),
+        patch_len=2,
+        stride=1,
+        padding_patch="end",
+    )
+
+    assert shared_patches.shape[2:] == (2, model.encoder.patch_num)
