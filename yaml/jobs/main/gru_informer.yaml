@@ -1,4 +1,4 @@
-- model: gru
+- model: GRU
   params:
     encoder_hidden_size: 128
     encoder_n_layers: 4
@@ -6,7 +6,7 @@
     decoder_hidden_size: 128
     decoder_layers: 4
 
-- model: informer
+- model: Informer
   params:
     hidden_size: 128
     n_head: 8
