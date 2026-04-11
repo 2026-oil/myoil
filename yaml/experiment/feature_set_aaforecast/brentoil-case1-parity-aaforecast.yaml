@@ -1,5 +1,5 @@
 task:
-  name: brentoil_case1_parity_informer
+  name: brentoil_case1_parity_aaforecast
 dataset:
   path: data/df.csv
   target_col: Com_BrentCrudeOil
@@ -19,14 +19,6 @@ dataset:
   static_exog_cols: []
 training_search:
   enabled: false
-jobs:
-  - model: Informer
-    params:
-      hidden_size: 128
-      n_head: 8
-      encoder_layers: 2
-      dropout: 0.1
-      linear_hidden_size: 256
-      factor: 3
-      decoder_hidden_size: 128
-      decoder_layers: 4
+aa_forecast:
+  enabled: true
+  config_path: yaml/plugins/aa_forecast_brentoil_case1_parity.yaml

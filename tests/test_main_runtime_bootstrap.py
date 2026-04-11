@@ -339,6 +339,7 @@ def test_load_app_config_shared_settings_round_trip_preserves_optuna_study_selec
                 'opt_n_trial': 7,
                 'opt_study_count': 3,
                 'opt_selected_study': 2,
+                'tuning_objective_metric': 'mean_fold_mse_on_direct_predictions',
                 'transformations_target': 'diff',
             }
         },
@@ -354,12 +355,17 @@ def test_load_app_config_shared_settings_round_trip_preserves_optuna_study_selec
     assert loaded.config.runtime.opt_n_trial == 7
     assert loaded.config.runtime.opt_study_count == 3
     assert loaded.config.runtime.opt_selected_study == 2
+    assert (
+        loaded.config.runtime.tuning_objective_metric
+        == 'mean_fold_mse_on_direct_predictions'
+    )
     assert loaded.config.runtime.transformations_target == 'diff'
     assert loaded.config.to_dict()['runtime'] == {
         'random_seed': 11,
         'opt_n_trial': 7,
         'opt_study_count': 3,
         'opt_selected_study': 2,
+        'tuning_objective_metric': 'mean_fold_mse_on_direct_predictions',
         'transformations_target': 'diff',
     }
     assert loaded.normalized_payload['runtime'] == {
@@ -367,6 +373,7 @@ def test_load_app_config_shared_settings_round_trip_preserves_optuna_study_selec
         'opt_n_trial': 7,
         'opt_study_count': 3,
         'opt_selected_study': 2,
+        'tuning_objective_metric': 'mean_fold_mse_on_direct_predictions',
         'transformations_target': 'diff',
     }
 
@@ -421,6 +428,18 @@ def test_load_app_config_rejects_opt_selected_study_above_count(tmp_path: Path) 
 
     with pytest.raises(
         ValueError, match='runtime.opt_selected_study cannot exceed runtime.opt_study_count'
+    ):
+        load_app_config(tmp_path, config_path=config_path)
+
+
+def test_load_app_config_rejects_unknown_tuning_objective_metric(tmp_path: Path) -> None:
+    payload = _minimal_app_config_payload()
+    payload['runtime'] = {'tuning_objective_metric': 'mean_fold_rmse_on_direct_predictions'}
+    config_path = _write_yaml(tmp_path / 'config.yaml', payload)
+
+    with pytest.raises(
+        ValueError,
+        match='runtime.tuning_objective_metric must be one of:',
     ):
         load_app_config(tmp_path, config_path=config_path)
 

@@ -1,0 +1,17 @@
+aa_forecast:
+  model: informer
+  tune_training: true
+  # lowess_frac: 0.6
+  lowess_frac: 0.35
+  lowess_delta: 0.01
+  uncertainty:
+    enabled: true
+    sample_count: 50
+  model_params: {}
+  star_anomaly_tails:
+    upward:
+    - GPRD_THREAT
+    - BS_Core_Index_A
+    two_sided: []
+  # top_k: 0.05
+  thresh: 3.0

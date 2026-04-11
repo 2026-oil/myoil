@@ -92,6 +92,7 @@ SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
     "runtime.opt_n_trial",
     "runtime.opt_study_count",
     "runtime.opt_selected_study",
+    "runtime.tuning_objective_metric",
     "runtime.transformations_target",
     "runtime.transformations_exog",
     "training.input_size",
@@ -131,6 +132,16 @@ SUPPORTED_DATALOADER_KWARGS = {
     "prefetch_factor",
 }
 RuntimeTransformationMode = Literal["diff"]
+TuningObjectiveMetric = Literal[
+    "mean_fold_mape_on_direct_predictions",
+    "mean_fold_mse_on_direct_predictions",
+]
+SUPPORTED_TUNING_OBJECTIVE_METRICS = frozenset(
+    {
+        "mean_fold_mape_on_direct_predictions",
+        "mean_fold_mse_on_direct_predictions",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -150,6 +161,7 @@ class RuntimeConfig:
     opt_n_trial: int | None = None
     opt_study_count: int = 1
     opt_selected_study: int | None = None
+    tuning_objective_metric: TuningObjectiveMetric | None = None
     transformations_target: RuntimeTransformationMode | None = None
     transformations_exog: RuntimeTransformationMode | None = None
 
@@ -363,6 +375,8 @@ class AppConfig:
         payload["training"]["lr_scheduler"] = self.training.lr_scheduler.to_dict()
         if payload["runtime"].get("opt_selected_study") is None:
             payload["runtime"].pop("opt_selected_study", None)
+        if payload["runtime"].get("tuning_objective_metric") is None:
+            payload["runtime"].pop("tuning_objective_metric", None)
         for key in ("transformations_target", "transformations_exog"):
             if payload["runtime"].get(key) is None:
                 payload["runtime"].pop(key, None)
@@ -1258,6 +1272,18 @@ def _normalize_payload(
             raise ValueError(
                 "runtime.opt_selected_study must be a positive integer"
             )
+    if runtime.get("tuning_objective_metric") is not None:
+        raw_objective_metric = runtime["tuning_objective_metric"]
+        if not isinstance(raw_objective_metric, str):
+            raise ValueError("runtime.tuning_objective_metric must be a string")
+        normalized_objective_metric = raw_objective_metric.strip().lower()
+        if normalized_objective_metric not in SUPPORTED_TUNING_OBJECTIVE_METRICS:
+            supported_metrics = ", ".join(sorted(SUPPORTED_TUNING_OBJECTIVE_METRICS))
+            raise ValueError(
+                "runtime.tuning_objective_metric must be one of: "
+                f"{supported_metrics}"
+            )
+        runtime["tuning_objective_metric"] = normalized_objective_metric
     if (
         runtime.get("opt_selected_study") is not None
         and runtime["opt_selected_study"]

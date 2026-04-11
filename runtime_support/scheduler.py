@@ -136,6 +136,8 @@ def _worker_command(
         command.extend(["--config-toml", str(loaded.source_path)])
     else:
         command.extend(["--config", str(loaded.source_path)])
+    if loaded.shared_settings_path is not None:
+        command.extend(["--setting", str(loaded.shared_settings_path)])
     return command
 
 

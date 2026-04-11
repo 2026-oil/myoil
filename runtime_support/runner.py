@@ -901,6 +901,23 @@ def _mean_fold_metric(values: Sequence[float], *, metric_name: str = "metric") -
     return float(finite.mean())
 
 
+def _resolved_tuning_objective_metric(loaded: LoadedConfig) -> str:
+    runtime_config = getattr(loaded.config, "runtime", None)
+    metric = getattr(runtime_config, "tuning_objective_metric", None)
+    return metric or "mean_fold_mape_on_direct_predictions"
+
+
+def _tuning_objective_metric_key(loaded: LoadedConfig) -> str:
+    metric = _resolved_tuning_objective_metric(loaded)
+    if metric == "mean_fold_mse_on_direct_predictions":
+        return "MSE"
+    return "MAPE"
+
+
+def _tuning_objective_metric_label(loaded: LoadedConfig) -> str:
+    return _tuning_objective_metric_key(loaded).lower()
+
+
 def _objective_stage_label(loaded: LoadedConfig) -> str:
     return "tuning_pre_replay_direct_predictions"
 
@@ -1134,6 +1151,9 @@ def _main_job_objective(
     progress: _ProgressLogger | None = None,
 ) -> Any:
     trial_count = optuna_num_trials(loaded.config.runtime.opt_n_trial)
+    objective_metric_key = _tuning_objective_metric_key(loaded)
+    objective_metric_label = objective_metric_key.lower()
+    objective_metric_name = _resolved_tuning_objective_metric(loaded)
 
     def objective(trial: optuna.Trial) -> float:
         trial_dir = _trial_dir_from_context(study_context, trial.number)
@@ -1163,6 +1183,7 @@ def _main_job_objective(
         trial.set_user_attr("best_params", candidate_params)
         trial.set_user_attr("best_training_params", candidate_training_params)
         fold_mape: list[float] = []
+        fold_mse: list[float] = []
         trial_prediction_frames: list[pd.DataFrame] = []
         _write_trial_result(
             trial_dir,
@@ -1173,6 +1194,8 @@ def _main_job_objective(
                 "best_params": candidate_params,
                 "best_training_params": candidate_training_params,
                 "fold_mape": fold_mape,
+                "fold_mse": fold_mse,
+                "objective_metric": objective_metric_name,
             },
         )
         for fold_idx, (train_idx, test_idx) in enumerate(splits):
@@ -1205,10 +1228,14 @@ def _main_job_objective(
                 )
                 pred_col = _prediction_column(target_predictions, job.model)
                 metrics = _compute_metrics(target_actuals, target_predictions[pred_col])
-                metric = metrics["MAPE"]
-                completed_fold_mape = fold_mape + [metric]
+                metric = float(metrics[objective_metric_key])
+                completed_fold_metrics = (
+                    fold_mse + [metric]
+                    if objective_metric_key == "MSE"
+                    else fold_mape + [metric]
+                )
                 interim_metric = _mean_fold_metric(
-                    completed_fold_mape, metric_name="mape"
+                    completed_fold_metrics, metric_name=objective_metric_label
                 )
                 fold_prediction_frame = _write_trial_fold_artifacts(
                     trial_dir=trial_dir,
@@ -1226,8 +1253,10 @@ def _main_job_objective(
                     trial_dir / TRIAL_PREDICTIONS_FILENAME,
                     index=False,
                 )
-                fold_mape.append(metric)
+                fold_mape.append(float(metrics["MAPE"]))
+                fold_mse.append(float(metrics["MSE"]))
                 trial.set_user_attr("fold_mape", fold_mape.copy())
+                trial.set_user_attr("fold_mse", fold_mse.copy())
                 _write_trial_result(
                     trial_dir,
                     status="running",
@@ -1237,8 +1266,10 @@ def _main_job_objective(
                         "best_params": candidate_params,
                         "best_training_params": candidate_training_params,
                         "fold_mape": fold_mape.copy(),
+                        "fold_mse": fold_mse.copy(),
                         "last_completed_fold": fold_idx,
                         "interim_metric": interim_metric,
+                        "objective_metric": objective_metric_name,
                     },
                 )
                 trial.report(interim_metric, step=fold_idx)
@@ -1249,17 +1280,22 @@ def _main_job_objective(
                             fold_idx,
                             total_folds=len(splits),
                             phase=phase,
-                            detail=f"pruned mean_mape={interim_metric:.4f}",
+                            detail=(
+                                f"pruned mean_{objective_metric_label}="
+                                f"{interim_metric:.4f}"
+                            ),
                         )
                     raise optuna.TrialPruned(
-                        f"Pruned after fold {fold_idx} with mean_mape={interim_metric:.4f}"
+                        "Pruned after fold "
+                        f"{fold_idx} with mean_{objective_metric_label}="
+                        f"{interim_metric:.4f}"
                     )
                 if progress is not None:
                     progress.fold_completed(
                         fold_idx,
                         total_folds=len(splits),
                         phase=phase,
-                        detail=f"mape={metric:.4f}",
+                        detail=f"{objective_metric_label}={metric:.4f}",
                     )
             except optuna.TrialPruned:
                 _write_trial_result(
@@ -1271,6 +1307,8 @@ def _main_job_objective(
                         "best_params": candidate_params,
                         "best_training_params": candidate_training_params,
                         "fold_mape": fold_mape,
+                        "fold_mse": fold_mse,
+                        "objective_metric": objective_metric_name,
                     },
                 )
                 raise
@@ -1295,14 +1333,20 @@ def _main_job_objective(
                         "best_params": candidate_params,
                         "best_training_params": candidate_training_params,
                         "fold_mape": fold_mape,
+                        "fold_mse": fold_mse,
                         "failure_reason": f"{type(exc).__name__}: {exc}",
+                        "objective_metric": objective_metric_name,
                     },
                 )
                 raise _OptunaTrialFailure(
                     f"{job.model} tuning failed on fold {fold_idx}: {type(exc).__name__}: {exc}"
                 ) from exc
-        metric = _mean_fold_metric(fold_mape, metric_name="mape")
+        metric = _mean_fold_metric(
+            fold_mse if objective_metric_key == "MSE" else fold_mape,
+            metric_name=objective_metric_label,
+        )
         trial.set_user_attr("fold_mape", fold_mape)
+        trial.set_user_attr("fold_mse", fold_mse)
         _write_trial_result(
             trial_dir,
             status="complete",
@@ -1312,6 +1356,8 @@ def _main_job_objective(
                 "best_params": candidate_params,
                 "best_training_params": candidate_training_params,
                 "fold_mape": fold_mape,
+                "fold_mse": fold_mse,
+                "objective_metric": objective_metric_name,
                 "objective_value": metric,
             },
         )
@@ -1333,8 +1379,9 @@ def _collect_main_tuning_result(
     )
     best_params = dict(best_trial.user_attrs["best_params"])
     best_training_params = dict(best_trial.user_attrs["best_training_params"])
+    objective_metric_name = _resolved_tuning_objective_metric(loaded)
     summary = {
-        **_trial_metrics_summary(study, objective_metric="mean_fold_mape"),
+        **_trial_metrics_summary(study, objective_metric=objective_metric_name),
         **study_metadata,
         **optimize_metadata,
         "requested_mode": job.requested_mode,
@@ -1350,6 +1397,7 @@ def _collect_main_tuning_result(
         "best_params": best_params,
         "best_training_params": best_training_params,
         "fold_mape": best_trial.user_attrs["fold_mape"],
+        "fold_mse": best_trial.user_attrs.get("fold_mse", []),
         "objective_stage": _objective_stage_label(loaded),
     }
     return best_params, best_training_params, summary
@@ -3489,7 +3537,7 @@ def _run_single_job(
                 "loss": loaded.config.training.loss,
                 "evaluation_policy": "tscv_only",
                 "tuning_objective_metric": (
-                    "mean_fold_mape_on_direct_predictions"
+                    _resolved_tuning_objective_metric(loaded)
                     if job.validated_mode == "learned_auto"
                     else None
                 ),

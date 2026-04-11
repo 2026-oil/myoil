@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -9,6 +10,7 @@ import pandas as pd
 import pytest
 
 import runtime_support.runner as runtime
+from runtime_support.scheduler import WorkerLaunch, _worker_command
 
 
 def test_sync_study_roots_replaces_stale_projection_inputs(tmp_path: Path) -> None:
@@ -134,6 +136,45 @@ def test_parallel_tuning_syncs_scheduler_studies_before_replay(
 
     assert worker_results == [{"returncode": 0}, {"returncode": 0}]
     assert replay_calls == ['{"source":"study-01"}']
+
+
+def test_worker_command_preserves_explicit_shared_settings(tmp_path: Path) -> None:
+    loaded = SimpleNamespace(
+        source_type="yaml",
+        source_path=tmp_path / "experiment.yaml",
+        shared_settings_path=tmp_path / "setting.yaml",
+        active_jobs_route_slug=None,
+    )
+    launch = WorkerLaunch(
+        job_name="AAForecast",
+        phase="tune-main-only",
+        worker_index=0,
+        selected_study=2,
+    )
+
+    command = _worker_command(
+        tmp_path / "main.py",
+        loaded,
+        launch,
+        tmp_path / "scheduler" / "study-02" / "workers" / "AAForecast#0",
+    )
+
+    assert command == [
+        sys.executable,
+        str(tmp_path / "main.py"),
+        "--jobs",
+        "AAForecast",
+        "--output-root",
+        str(tmp_path / "scheduler"),
+        "--internal-stage",
+        "tune-main-only",
+        "--optuna-study",
+        "2",
+        "--config",
+        str(tmp_path / "experiment.yaml"),
+        "--setting",
+        str(tmp_path / "setting.yaml"),
+    ]
 
 
 class _FakeSaveableModel:

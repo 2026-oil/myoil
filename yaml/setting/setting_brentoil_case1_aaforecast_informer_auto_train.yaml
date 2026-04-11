@@ -1,8 +1,9 @@
 runtime:
   random_seed: 1
   opt_study_count: 2
-  opt_n_trial: 2
-  transformations_target: diff
+  # opt_n_trial: 4
+  opt_n_trial: 12
+  transformations_target: null
   transformations_exog: diff
 training:
   input_size: 24
@@ -10,20 +11,21 @@ training:
   valid_batch_size: 4
   windows_batch_size: 64
   inference_windows_batch_size: 64
-  max_steps: 1200
-  val_size: 8
+  max_steps: 800
+  val_size: 16
   scaler_type: null
   val_check_steps: 4
-  min_steps_before_early_stop: 300
+  min_steps_before_early_stop: 200
   model_step_size: 1
-  early_stop_patience_steps: 16
-  loss: exloss
+  early_stop_patience_steps: 8
+  #새로추가 기존 loss는 mse였음
+  loss: latehorizonweightedmape
   loss_params:
-      up_th: 0.85
-      down_th: 0.10
-      lamda_underestimate: 4.0
-      lamda_overestimate: 1.0
-      lamda: 1.0
+    horizon: 4
+    late_start: 3
+    late_multiplier: 5.0
+    ramp_power: 2.0
+    base_weight: 1.0
   optimizer:
     name: adamw
     kwargs: {}
