@@ -21,3 +21,5 @@ aa_forecast:
     - BS_Core_Index_A
     two_sided: []
   thresh: 3.5
+  retrieval:
+    enabled: false

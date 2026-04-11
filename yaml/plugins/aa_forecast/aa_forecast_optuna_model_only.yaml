@@ -12,3 +12,5 @@ aa_forecast:
     - GPRD_THREAT
     two_sided: []
   thresh: 3.5
+  retrieval:
+    enabled: false
