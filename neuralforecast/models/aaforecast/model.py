@@ -541,7 +541,8 @@ class AAForecast(BaseModel):
             )
         encoder_input = torch.cat(encoder_parts, dim=2)
 
-        hidden_states = self.encoder(encoder_input)
+        backbone_states = self.encoder(encoder_input)
+        hidden_states = self.encoder.project_to_time_states(backbone_states)
         critical_mask = star_payload["critical_mask"].bool()
         count_active_channels = star_payload["count_active_channels"].to(
             device=hidden_states.device,

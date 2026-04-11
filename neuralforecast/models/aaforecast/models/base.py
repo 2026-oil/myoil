@@ -21,6 +21,9 @@ class AABackboneAdapter(nn.Module):
     def faithfulness_evidence(self) -> AABackboneEvidence:
         return self.evidence
 
+    def project_to_time_states(self, states: torch.Tensor) -> torch.Tensor:
+        return states
+
 
 def validate_attention_heads(
     hidden_size: int,

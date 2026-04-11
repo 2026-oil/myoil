@@ -16,13 +16,14 @@ class ITransformerBackboneAdapter(AABackboneAdapter):
             "neuralforecast.common._modules.TransEncoder",
         ),
         aa_bridge_steps=(
-            "project token states back to time states",
-            "add a residual input projection for AA hidden-state stability",
+            "preserve raw token states through the iTransformer encoder path",
+            "late-project token states back to time states immediately before AA sparse attention",
         ),
         unavoidable_divergences=(
             "standalone projector/head remains outside the AA adapter",
-            "token-to-time projection is the AA-specific bridge needed to recover per-timestep hidden states",
+            "token-to-time late projection is still required because current AA sparse attention consumes timestep states",
         ),
+        required_output="[B, token, hidden]",
     )
 
     def __init__(
@@ -53,15 +54,13 @@ class ITransformerBackboneAdapter(AABackboneAdapter):
         )
         self.embedding = self.encoder_only.enc_embedding
         self.encoder = self.encoder_only.encoder
-        self.token_to_time = nn.Linear(feature_size, input_size)
-        self.input_projection = nn.Linear(feature_size, hidden_size)
-        self.output_norm = nn.LayerNorm(hidden_size) if use_norm else nn.Identity()
+        self.late_token_projection = nn.Linear(feature_size, input_size)
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        encoded_tokens = self.encoder_only(inputs)
-        time_states = self.token_to_time(encoded_tokens.transpose(1, 2)).transpose(1, 2)
-        residual = self.input_projection(inputs)
-        return self.output_norm(time_states + residual)
+        return self.encoder_only(inputs)
+
+    def project_to_time_states(self, states: torch.Tensor) -> torch.Tensor:
+        return self.late_token_projection(states.transpose(1, 2)).transpose(1, 2)
 
 
 def build_itransformer_backbone(
