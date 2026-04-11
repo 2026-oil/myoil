@@ -1022,11 +1022,14 @@ def test_runtime_aaforecast_writes_context_annotation_and_sidecar(
     context_path = output_root / artifact_relpath
     assert context_path.exists()
     context_frame = pd.read_csv(context_path)
+    result_frame = pd.read_csv(output_root / "summary" / "result.csv")
     assert {"ds", "context_active", "context_label"}.issubset(context_frame.columns)
     assert (output_root / "summary" / "last_fold_all_models.png").exists()
     assert (output_root / "summary" / "last_fold_all_models_window_16.png").exists()
+    assert (output_root / "summary" / "result.csv").exists()
     assert not (output_root / "summary" / "sample.md").exists()
     assert not any((output_root / "summary").glob("test_*"))
+    assert {"model", "fold_idx", "ds", "y", "y_hat"}.issubset(result_frame.columns)
 
 
 def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(

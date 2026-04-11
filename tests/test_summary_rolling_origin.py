@@ -266,12 +266,59 @@ def test_build_summary_artifacts_do_not_write_per_window_bundles(
     (stale_window_dir / "leaderboard.csv").write_text("stale", encoding="utf-8")
 
     artifact_paths = runtime._build_summary_artifacts(run_root)
+    result_frame = pd.read_csv(run_root / "summary" / "result.csv")
 
     assert (run_root / "summary" / "leaderboard.csv").exists()
+    assert (run_root / "summary" / "result.csv").exists()
     assert not stale_summary_markdown.exists()
     assert artifact_paths["leaderboard"].endswith("summary/leaderboard.csv")
+    assert artifact_paths["result"].endswith("summary/result.csv")
     assert not stale_window_dir.exists()
     assert not any((run_root / "summary").glob("test_*"))
+    assert result_frame.columns.tolist() == [
+        "model",
+        "fold_idx",
+        "cutoff",
+        "train_end_ds",
+        "unique_id",
+        "ds",
+        "horizon_step",
+        "y",
+        "y_hat",
+        "aaforecast_context_artifact",
+    ]
+    assert result_frame[["model", "fold_idx", "ds", "y", "y_hat"]].to_dict(
+        orient="records"
+    ) == [
+        {
+            "model": "AAForecast",
+            "fold_idx": 0,
+            "ds": "2024-02-11",
+            "y": 15.0,
+            "y_hat": 14.5,
+        },
+        {
+            "model": "AAForecast",
+            "fold_idx": 0,
+            "ds": "2024-02-18",
+            "y": 16.0,
+            "y_hat": 15.5,
+        },
+        {
+            "model": "AAForecast",
+            "fold_idx": 1,
+            "ds": "2024-02-18",
+            "y": 16.0,
+            "y_hat": 15.8,
+        },
+        {
+            "model": "AAForecast",
+            "fold_idx": 1,
+            "ds": "2024-02-25",
+            "y": 17.0,
+            "y_hat": 16.8,
+        },
+    ]
 
 
 def test_plot_last_fold_overlay_uses_single_panel_without_aaforecast_context(

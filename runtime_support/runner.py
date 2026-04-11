@@ -87,11 +87,14 @@ ENTRYPOINT_VERSION = "neuralforecast-runtime-v1"
 LOSS_CURVE_PLOT_FILENAME = "loss_curve.png"
 LOSS_CURVE_SAMPLE_FILENAME = "loss_curve_every_10_global_steps.csv"
 SUMMARY_LOSS_ARTIFACTS_FILENAME = "loss_curve_artifacts.csv"
+SUMMARY_RESULTS_FILENAME = "result.csv"
 TRIAL_PREDICTIONS_FILENAME = "predictions.csv"
 TRIAL_FOLD_PLOT_FILENAME = "plot.png"
 TRIAL_FOLD_METRICS_FILENAME = "metrics.json"
 TRIAL_FOLD_CHECKPOINT_FILENAME = "checkpoint.pt"
 LOSS_CURVE_SAMPLE_EVERY_N_STEPS = 10
+
+
 class _OptunaTrialFailure(RuntimeError):
     """Recoverable per-trial failure that should not abort the whole study."""
 
@@ -1866,6 +1869,42 @@ def _load_last_fold_forecasts(run_root: Path) -> pd.DataFrame:
     return forecasts
 
 
+def _write_summary_results_csv(forecasts: pd.DataFrame, output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    ordered_columns = [
+        "model",
+        "requested_mode",
+        "validated_mode",
+        "fold_idx",
+        "cutoff",
+        "train_end_ds",
+        "unique_id",
+        "ds",
+        "horizon_step",
+        "y",
+        "y_hat",
+    ]
+    result_frame = forecasts.copy()
+    if "_summary_source_root" in result_frame.columns:
+        result_frame = result_frame.drop(columns=["_summary_source_root"])
+    sort_columns = [
+        column
+        for column in ("model", "fold_idx", "cutoff", "ds", "horizon_step")
+        if column in result_frame.columns
+    ]
+    if sort_columns:
+        result_frame = result_frame.sort_values(sort_columns, kind="stable").reset_index(
+            drop=True
+        )
+    front_columns = [column for column in ordered_columns if column in result_frame.columns]
+    remaining_columns = [
+        column for column in result_frame.columns if column not in front_columns
+    ]
+    result_frame = result_frame[front_columns + remaining_columns]
+    result_frame.to_csv(output_path, index=False)
+    return output_path
+
+
 def _build_summary_plot_bundle(
     run_root: Path,
     summary_dir: Path,
@@ -2432,6 +2471,11 @@ def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
         plot_paths["loss_artifacts"] = str(loss_artifact_summary_path)
     if forecasts.empty:
         return plot_paths
+    result_path = _write_summary_results_csv(
+        forecasts,
+        summary_dir / SUMMARY_RESULTS_FILENAME,
+    )
+    plot_paths["result"] = str(result_path)
     normalized_forecasts = _normalize_summary_window_frame(
         forecasts, frame_name="summary forecasts"
     )
