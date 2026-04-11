@@ -1025,9 +1025,8 @@ def test_runtime_aaforecast_writes_context_annotation_and_sidecar(
     assert {"ds", "context_active", "context_label"}.issubset(context_frame.columns)
     assert (output_root / "summary" / "last_fold_all_models.png").exists()
     assert (output_root / "summary" / "last_fold_all_models_window_16.png").exists()
-    assert (
-        output_root / "summary" / "test_1" / "last_fold_all_models_window_16.png"
-    ).exists()
+    assert not (output_root / "summary" / "sample.md").exists()
+    assert not any((output_root / "summary").glob("test_*"))
 
 
 def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(

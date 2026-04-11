@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass, replace
-from decimal import Decimal, ROUND_HALF_UP
 import fcntl
 import json
 import os
@@ -85,7 +84,6 @@ from neuralforecast.models.bs_preforcast_direct import (
 )
 
 ENTRYPOINT_VERSION = "neuralforecast-runtime-v1"
-SUMMARY_REPORT_FILENAME = "sample.md"
 LOSS_CURVE_PLOT_FILENAME = "loss_curve.png"
 LOSS_CURVE_SAMPLE_FILENAME = "loss_curve_every_10_global_steps.csv"
 SUMMARY_LOSS_ARTIFACTS_FILENAME = "loss_curve_artifacts.csv"
@@ -94,19 +92,6 @@ TRIAL_FOLD_PLOT_FILENAME = "plot.png"
 TRIAL_FOLD_METRICS_FILENAME = "metrics.json"
 TRIAL_FOLD_CHECKPOINT_FILENAME = "checkpoint.pt"
 LOSS_CURVE_SAMPLE_EVERY_N_STEPS = 10
-TARGET_DISPLAY_NAMES = {
-    "Com_BrentCrudeOil": "BrentCrude",
-    "Com_CrudeOil": "WTI",
-}
-DEFAULT_SAMPLE_STRUCTURE = {
-    "section_setup": "# 02. 데이터 및 모델 세팅",
-    "setup_intro": "- 아래는 case별 hist_exog_cols만 남기고, 공통 training/jobs 상세는 Appendix 첨부 하였음.",
-    "section_design": "# 03. 실험 설계 및 적용",
-    "section_results": "# 04. 실험(모델링) 결과",
-    "section_results_detail": "### 04-01. 세부 결과",
-    "results_intro": "- 각 run의 leaderboard.csv 기준 결과를 아래에 정리했다.",
-    "section_model_tables": "### 각 모형별 Table",
-}
 class _OptunaTrialFailure(RuntimeError):
     """Recoverable per-trial failure that should not abort the whole study."""
 
@@ -114,16 +99,6 @@ class _OptunaTrialFailure(RuntimeError):
 @dataclass(frozen=True)
 class _CurveFrameCarrier:
     curve_frame: pd.DataFrame
-
-
-@dataclass(frozen=True)
-class _SummaryBundleWindow:
-    test_index: int
-    fold_idx: int
-    cutoff: pd.Timestamp
-    forecast_start_ds: pd.Timestamp
-    forecast_end_ds: pd.Timestamp
-
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -1815,35 +1790,6 @@ def _normalize_summary_window_frame(
     return normalized
 
 
-def _ordered_summary_windows(metrics_frame: pd.DataFrame) -> pd.DataFrame:
-    if metrics_frame.empty:
-        return pd.DataFrame(columns=["normalized_cutoff", "fold_idx"])
-    normalized_metrics = _normalize_summary_window_frame(
-        metrics_frame, frame_name="summary metrics"
-    )
-    return (
-        normalized_metrics[["normalized_cutoff", "fold_idx"]]
-        .drop_duplicates()
-        .sort_values(["normalized_cutoff", "fold_idx"], kind="stable")
-        .reset_index(drop=True)
-    )
-
-
-def _summary_window_mask(
-    frame: pd.DataFrame, *, normalized_cutoff: pd.Timestamp, fold_idx: int
-) -> pd.Series:
-    return (frame["normalized_cutoff"] == normalized_cutoff) & (
-        frame["fold_idx"] == fold_idx
-    )
-
-
-def _window_label(normalized_cutoff: pd.Timestamp, fold_idx: int) -> str:
-    return (
-        f"cutoff={normalized_cutoff.isoformat(sep=' ')}"
-        f", fold_idx={fold_idx}"
-    )
-
-
 def _build_leaderboard(metrics_frame: pd.DataFrame) -> pd.DataFrame:
     if metrics_frame.empty or "model" not in metrics_frame.columns:
         columns = [
@@ -1895,204 +1841,6 @@ def _build_leaderboard(metrics_frame: pd.DataFrame) -> pd.DataFrame:
 def _write_leaderboard_workbook(leaderboard: pd.DataFrame, workbook_path: Path) -> None:
     workbook_path.parent.mkdir(parents=True, exist_ok=True)
     leaderboard.to_csv(workbook_path, index=False)
-
-
-def _load_summary_config(run_root: Path) -> dict[str, Any]:
-    config_path = run_root / "config" / "config.resolved.json"
-    if not config_path.exists():
-        return {}
-    return json.loads(config_path.read_text(encoding="utf-8"))
-
-
-def _load_sample_structure() -> dict[str, str]:
-    return dict(DEFAULT_SAMPLE_STRUCTURE)
-
-
-def _display_target_name(target_col: str | None) -> str:
-    if not target_col:
-        return ""
-    if target_col in TARGET_DISPLAY_NAMES:
-        return TARGET_DISPLAY_NAMES[target_col]
-    target = target_col.removeprefix("Com_").replace("_", " ").strip()
-    return target
-
-
-def _case_title(task_name: str | None, target_col: str | None, run_root: Path) -> str:
-    raw_name = (task_name or run_root.name).strip()
-    lowered = raw_name.lower()
-    variant = ""
-    if lowered.endswith("_hpt"):
-        raw_name = raw_name[:-4]
-        variant = " HPT"
-    parts = [part for part in raw_name.split("_") if part]
-    case_number = ""
-    for part in parts:
-        if part.lower().startswith("case") and part[4:].isdigit():
-            case_number = part[4:]
-            break
-    target_name = _display_target_name(target_col) or raw_name
-    if case_number:
-        return f"Case {case_number}{variant} | {target_name}"
-    return f"{raw_name}{variant} | {target_name}".strip(" |")
-
-
-def _yaml_hist_exog_block(hist_exog_cols: Sequence[str] | None) -> str:
-    lines = ["...", "hist_exog_cols:"]
-    for col in hist_exog_cols or ():
-        lines.append(f"  - {col}")
-    lines.append("...")
-    return "\n".join(lines)
-
-
-def _round_half_up(value: float | int | None) -> str:
-    if value is None:
-        return ""
-    numeric = float(value)
-    if not np.isfinite(numeric):
-        return ""
-    quantized = Decimal(str(numeric)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    return format(quantized, "f")
-
-
-def _format_report_metric(value: float | int | None, *, percentage: bool = False) -> str:
-    if value is None:
-        return ""
-    numeric = float(value)
-    if not np.isfinite(numeric):
-        return ""
-    if percentage:
-        return f"{_round_half_up(numeric * 100)}%"
-    return _round_half_up(numeric)
-
-
-def _markdown_table_cell(value: object) -> str:
-    text = "" if value is None else str(value)
-    return " ".join(text.splitlines()).replace("|", "\\|")
-
-
-def _build_summary_markdown(
-    run_root: Path,
-    leaderboard: pd.DataFrame,
-    *,
-    summary_dir: Path | None = None,
-    report_context_lines: Sequence[str] | None = None,
-) -> Path:
-    summary_dir = summary_dir or (run_root / "summary")
-    summary_dir.mkdir(parents=True, exist_ok=True)
-    report_path = summary_dir / SUMMARY_REPORT_FILENAME
-
-    resolved = _load_summary_config(run_root)
-    dataset = resolved.get("dataset", {})
-    cv = resolved.get("cv", {})
-    task = resolved.get("task", {})
-    sample_structure = _load_sample_structure()
-
-    case_title = _case_title(task.get("name"), dataset.get("target_col"), run_root)
-    hist_exog_yaml = _yaml_hist_exog_block(dataset.get("hist_exog_cols"))
-    target_name = _display_target_name(dataset.get("target_col"))
-    horizon = cv.get("horizon")
-    step_size = cv.get("step_size")
-    n_windows = cv.get("n_windows")
-    gap = cv.get("gap")
-    overlap_eval_policy = cv.get("overlap_eval_policy")
-
-    leaderboard_lines = [
-        "| Rank (nRMSE) | Model | MAPE | nRMSE | MAE | R2 |",
-        "| --- | --- | --- | --- | --- | --- |",
-    ]
-    if leaderboard.empty:
-        leaderboard_lines.append("|  |  |  |  |  |  |")
-    else:
-        for row in leaderboard.to_dict(orient="records"):
-            leaderboard_lines.append(
-                "| "
-                + " | ".join(
-                    [
-                        _markdown_table_cell(row.get("rank", "")) if row.get("rank") is not None else "",
-                        _markdown_table_cell(row.get("model", "") or ""),
-                        _markdown_table_cell(_format_report_metric(row.get("mean_fold_mape"), percentage=True)),
-                        _markdown_table_cell(_format_report_metric(row.get("mean_fold_nrmse"))),
-                        _markdown_table_cell(_format_report_metric(row.get("mean_fold_mae"))),
-                        _markdown_table_cell(_format_report_metric(row.get("mean_fold_r2"))),
-                    ]
-                )
-                + " |"
-            )
-
-    model_sections: list[str] = []
-    if leaderboard.empty:
-        model_sections.append("- \n\n    | Case | MAPE | nRMSE | MAE | R2 |\n    | --- | --- | --- | --- | --- |\n    |  |  |  |  |  |")
-    else:
-        for row in leaderboard.to_dict(orient="records"):
-            model_sections.append(
-                "\n".join(
-                    [
-                        f"- {row.get('model', '')}",
-                        "",
-                        "    | Case | MAPE | nRMSE | MAE | R2 |",
-                        "    | --- | --- | --- | --- | --- |",
-                        "    | "
-                        + " | ".join(
-                            [
-                                _markdown_table_cell(case_title),
-                                _markdown_table_cell(_format_report_metric(row.get("mean_fold_mape"), percentage=True)),
-                                _markdown_table_cell(_format_report_metric(row.get("mean_fold_nrmse"))),
-                                _markdown_table_cell(_format_report_metric(row.get("mean_fold_mae"))),
-                                _markdown_table_cell(_format_report_metric(row.get("mean_fold_r2"))),
-                            ]
-                        )
-                        + " |",
-                    ]
-                )
-            )
-
-    report = "\n".join(
-        [
-            sample_structure["section_setup"],
-            "",
-            "---",
-            "",
-            f"## **{case_title}**",
-            "",
-            sample_structure["setup_intro"],
-            "",
-            "```yaml",
-            hist_exog_yaml,
-            "```",
-            "",
-            sample_structure["section_design"],
-            "",
-            "---",
-            "",
-            f"- 타깃: {target_name}",
-            "- 각 타깃을 독립적인 forecasting 문제로 학습/평가",
-            (
-                f"- 평가는 {n_windows if n_windows is not None else ''}개 rolling TSCV"
-                f"(h={horizon if horizon is not None else ''}, step={step_size if step_size is not None else ''}, gap={gap if gap is not None else ''}) 구조로 설계했다."
-            ),
-            f"- overlap_eval_policy: {overlap_eval_policy or ''}",
-            *(report_context_lines or ()),
-            "",
-            sample_structure["section_results"],
-            "",
-            sample_structure["section_results_detail"],
-            "",
-            "---",
-            "",
-            sample_structure["results_intro"],
-            "",
-            f"## **{case_title}**",
-            "",
-            *leaderboard_lines,
-            "",
-            sample_structure["section_model_tables"],
-            "",
-            *model_sections,
-            "",
-        ]
-    )
-    report_path.write_text(report, encoding="utf-8")
-    return report_path
 
 
 def _load_last_fold_forecasts(run_root: Path) -> pd.DataFrame:
@@ -2169,21 +1917,13 @@ def _write_summary_bundle(
     *,
     scoped_forecasts: pd.DataFrame | None = None,
     title_prefix: str,
-    report_context_lines: Sequence[str] | None = None,
     include_future_only_predictions: bool = False,
 ) -> tuple[pd.DataFrame, dict[str, str]]:
     leaderboard = _build_leaderboard(metrics_frame)
     workbook_path = summary_dir / "leaderboard.csv"
     _write_leaderboard_workbook(leaderboard, workbook_path)
-    markdown_path = _build_summary_markdown(
-        run_root,
-        leaderboard,
-        summary_dir=summary_dir,
-        report_context_lines=report_context_lines,
-    )
     artifact_paths: dict[str, str] = {
         "leaderboard": str(workbook_path),
-        "markdown": str(markdown_path),
     }
     if scoped_forecasts is not None and not scoped_forecasts.empty:
         artifact_paths.update(
@@ -2289,179 +2029,6 @@ def _summary_overlay_actual_frames(
         .reset_index(drop=True)
     )
     return history_frame.reset_index(drop=True), output_frame
-
-
-def _build_configured_summary_windows(
-    source_df: pd.DataFrame, loaded: LoadedConfig
-) -> list[_SummaryBundleWindow]:
-    dt_col = loaded.config.dataset.dt_col
-    normalized_ds = pd.Index(
-        pd.to_datetime(source_df[dt_col]).map(_normalize_summary_timestamp)
-    )
-    if normalized_ds.has_duplicates:
-        raise ValueError(
-            "summary/test_k requires unique dataset.dt_col timestamps"
-        )
-    splits = _build_tscv_splits(len(source_df), loaded.config.cv)
-    if not splits:
-        raise ValueError("summary/test_k requires at least one configured CV split")
-    windows: list[_SummaryBundleWindow] = []
-    for test_index, (train_idx, test_idx) in enumerate(splits, start=1):
-        if not train_idx or not test_idx:
-            raise ValueError(
-                "summary/test_k requires non-empty train/test indices for every CV split"
-            )
-        windows.append(
-            _SummaryBundleWindow(
-                test_index=test_index,
-                fold_idx=test_index - 1,
-                cutoff=normalized_ds[train_idx[-1]],
-                forecast_start_ds=normalized_ds[test_idx[0]],
-                forecast_end_ds=normalized_ds[test_idx[-1]],
-            )
-        )
-    return windows
-
-
-def _scoped_summary_window_frame(
-    frame: pd.DataFrame,
-    window: _SummaryBundleWindow,
-    *,
-    frame_name: str,
-) -> pd.DataFrame:
-    if frame.empty:
-        raise ValueError(
-            f"summary/test_k requires {frame_name} rows for test_{window.test_index}, "
-            f"but {frame_name} is empty"
-        )
-    normalized_frame = _normalize_summary_window_frame(frame, frame_name=frame_name)
-    scoped = normalized_frame[
-        _summary_window_mask(
-            normalized_frame,
-            normalized_cutoff=window.cutoff,
-            fold_idx=window.fold_idx,
-        )
-    ].copy()
-    if scoped.empty:
-        raise ValueError(
-            "summary/test_k could not find "
-            f"{frame_name} rows for test_{window.test_index} "
-            f"(fold_idx={window.fold_idx}, cutoff={window.cutoff})"
-        )
-    return scoped.drop(columns=["normalized_cutoff"])
-
-
-def _summary_window_observed_steps(forecasts_window: pd.DataFrame) -> int:
-    if forecasts_window.empty:
-        return 0
-    if "ds" not in forecasts_window.columns or "y" not in forecasts_window.columns:
-        raise ValueError("summary/test_k forecasts must contain ds and y columns")
-    actuals = forecasts_window[["ds", "y"]].copy()
-    actuals["normalized_ds"] = pd.to_datetime(actuals["ds"]).map(
-        _normalize_summary_timestamp
-    )
-    actuals["y"] = pd.to_numeric(actuals["y"], errors="coerce")
-    actuals = (
-        actuals.groupby("normalized_ds", dropna=True)["y"]
-        .agg(lambda series: bool(series.notna().any()))
-        .reset_index(name="observed")
-    )
-    return int(actuals["observed"].sum())
-
-
-def _summary_window_context_lines(
-    window: _SummaryBundleWindow,
-    *,
-    horizon: int,
-    observed_steps: int,
-    forecast_only: bool,
-) -> list[str]:
-    lines = [
-        "- summary/test_k는 설정된 CV fold 결과를 window별로 다시 묶은 번들이다.",
-        f"- fold_idx: {window.fold_idx}",
-        f"- cutoff(train_end_ds): {window.cutoff.date()}",
-        (
-            f"- 예측 구간: {window.forecast_start_ds.date()} ~ "
-            f"{window.forecast_end_ds.date()}"
-        ),
-        f"- 관측 가능한 horizon step: {observed_steps}/{horizon}",
-        "- metric은 실제값이 존재하는 step만 사용한다.",
-    ]
-    if forecast_only:
-        lines.append("- 이 test window는 forecast-only 구간이다.")
-    return lines
-
-
-def _write_summary_window_manifest(
-    summary_dir: Path,
-    window: _SummaryBundleWindow,
-    *,
-    horizon: int,
-    observed_steps: int,
-    forecast_only: bool,
-) -> None:
-    payload = {
-        "test_index": int(window.test_index),
-        "fold_idx": int(window.fold_idx),
-        "cutoff": str(window.cutoff),
-        "train_end_ds": str(window.cutoff),
-        "forecast_start_ds": str(window.forecast_start_ds),
-        "forecast_end_ds": str(window.forecast_end_ds),
-        "observed_steps": int(observed_steps),
-        "forecast_only": bool(forecast_only),
-        "horizon": int(horizon),
-    }
-    (summary_dir / "window_manifest.json").write_text(
-        json.dumps(payload, indent=2),
-        encoding="utf-8",
-    )
-
-
-def _write_per_window_summary_bundles(
-    run_root: Path, metrics_frame: pd.DataFrame, forecasts_frame: pd.DataFrame
-) -> None:
-    loaded = _load_summary_loaded_config(run_root)
-    source_df = pd.read_csv(loaded.config.dataset.path)
-    source_df = source_df.sort_values(loaded.config.dataset.dt_col).reset_index(drop=True)
-    windows = _build_configured_summary_windows(source_df, loaded)
-
-    summary_root = run_root / "summary"
-    for window in windows:
-        summary_dir = summary_root / f"test_{window.test_index}"
-        summary_dir.mkdir(parents=True, exist_ok=True)
-        metrics_window = _scoped_summary_window_frame(
-            metrics_frame,
-            window,
-            frame_name="summary metrics",
-        )
-        forecasts_window = _scoped_summary_window_frame(
-            forecasts_frame,
-            window,
-            frame_name="summary forecasts",
-        )
-        observed_steps = _summary_window_observed_steps(forecasts_window)
-        forecast_only = observed_steps == 0
-        _write_summary_bundle(
-            run_root,
-            summary_dir,
-            metrics_window,
-            scoped_forecasts=forecasts_window,
-            title_prefix=f"CV test {window.test_index} predictions",
-            report_context_lines=_summary_window_context_lines(
-                window,
-                horizon=loaded.config.cv.horizon,
-                observed_steps=observed_steps,
-                forecast_only=forecast_only,
-            ),
-            include_future_only_predictions=True,
-        )
-        _write_summary_window_manifest(
-            summary_dir,
-            window,
-            horizon=loaded.config.cv.horizon,
-            observed_steps=observed_steps,
-            forecast_only=forecast_only,
-        )
 
 
 def _plot_last_fold_overlay(
@@ -2837,8 +2404,19 @@ def _should_build_summary_artifacts() -> bool:
     return os.environ.get("NEURALFORECAST_SKIP_SUMMARY_ARTIFACTS") != "1"
 
 
+def _prune_legacy_per_window_summary_artifacts(summary_dir: Path) -> None:
+    for path in summary_dir.glob("test_*"):
+        _remove_existing_artifact(path)
+
+
+def _prune_legacy_summary_markdown(summary_dir: Path) -> None:
+    _remove_existing_artifact(summary_dir / "sample.md")
+
+
 def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
     summary_dir = run_root / "summary"
+    _prune_legacy_per_window_summary_artifacts(summary_dir)
+    _prune_legacy_summary_markdown(summary_dir)
     metrics = _load_metrics_for_summary(run_root)
     if metrics.empty:
         return {}
@@ -2870,7 +2448,6 @@ def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
             title_prefix="Last fold predictions",
         )
     )
-    _write_per_window_summary_bundles(run_root, metrics, forecasts)
     return plot_paths
 
 
