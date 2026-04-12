@@ -15,6 +15,7 @@ dataset:
   - Com_Oil_Spread
   - Com_LMEX
   - Com_BloombergCommodity_BCOM
+  - Idx_DxyUSD
   futr_exog_cols: []
   static_exog_cols: []
 training_search:
