@@ -346,6 +346,40 @@ def test_load_app_config_rejects_direct_top_level_aaforecast_jobs(tmp_path: Path
         load_app_config(tmp_path, config_path=config_path)
 
 
+def test_load_app_config_rejects_linked_aa_forecast_yaml_as_top_level_config(
+    tmp_path: Path,
+) -> None:
+    plugin_path = tmp_path / "yaml/plugins/aa_forecast/aa_forecast_parity_informer.yaml"
+    plugin_path.parent.mkdir(parents=True, exist_ok=True)
+    plugin_path.write_text(
+        yaml.safe_dump(
+            {
+                "aa_forecast": {
+                    "model": "informer",
+                    "tune_training": False,
+                    "star_anomaly_tails": {"upward": ["event"], "two_sided": []},
+                    "model_params": {
+                        "hidden_size": 8,
+                        "n_head": 2,
+                        "encoder_layers": 1,
+                        "dropout": 0.1,
+                        "linear_hidden_size": 16,
+                        "factor": 1,
+                    },
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=r"is an aa_forecast plugin YAML, not a runnable app config",
+    ):
+        load_app_config(tmp_path, config_path=plugin_path)
+
+
 def test_load_app_config_rejects_mixed_top_level_jobs_when_aa_forecast_route_enabled(
     tmp_path: Path,
 ) -> None:

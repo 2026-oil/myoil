@@ -616,6 +616,32 @@ def _reject_legacy_or_mixed_aaforecast_jobs(payload: dict[str, Any]) -> None:
         )
 
 
+def _reject_direct_linked_aa_forecast_config(
+    payload: Any,
+    *,
+    repo_root: Path,
+    source_path: Path,
+) -> None:
+    if not isinstance(payload, dict) or set(payload) != {"aa_forecast"}:
+        return
+    from plugins.aa_forecast.config import normalize_linked_aa_forecast_config
+
+    try:
+        normalize_linked_aa_forecast_config(
+            payload.get("aa_forecast"),
+            unknown_keys=_unknown_keys,
+            coerce_bool=_coerce_bool,
+        )
+    except ValueError:
+        return
+    relative_path = _repo_relative_path(repo_root, source_path)
+    raise ValueError(
+        f"{relative_path} is an aa_forecast plugin YAML, not a runnable app config; "
+        "use an experiment YAML with aa_forecast.enabled=true and "
+        f"aa_forecast.config_path={relative_path!r}"
+    )
+
+
 def _as_tuple(value: Any) -> tuple[str, ...]:
     if value is None:
         return ()
@@ -1714,6 +1740,11 @@ def load_app_config(
     )
     raw_text = source_path.read_text(encoding="utf-8")
     payload = _load_document(source_path, source_type)
+    _reject_direct_linked_aa_forecast_config(
+        payload,
+        repo_root=repo_root,
+        source_path=source_path,
+    )
     shared_settings_payload: dict[str, Any] | None = None
     resolved_shared_settings_path: Path | None = None
     shared_settings_hash: str | None = None
