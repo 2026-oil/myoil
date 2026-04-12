@@ -125,6 +125,7 @@ retreival의 하이퍼파라미터를 수정해보는것도 가능
 
 [Restriction]
 
+- h2 블렌딩에 추가적인 continuation 보너스를 주어서 반드시 오를 것이다라는 것을 인지하고 결과를 보정하는 것은 금지
 - 우상향을 목표로 의도적으로 +방향 드리프트시키는 건 leaking 성격이라 올바르지 않음.
 - 최근 타깃 상승분을 이용해 미래 horizon uplift하는 것은 금지
 
@@ -137,7 +138,7 @@ retreival의 하이퍼파라미터를 수정해보는것도 가능
  - 변경가능
   transformations_target: diff
   transformations_exog: diff
-  input_size: 24
+  input_size: 64
   
 
 - 모든 조건 PASS 전까지 리서치 멈추지 말 것.
