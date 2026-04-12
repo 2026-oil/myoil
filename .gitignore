@@ -32,6 +32,12 @@ nbs/_extensions/mintlify
 *.env
 .coverage*
 
+# allow tracking the two operator-owned weekly datasets only
+!/data/
+/data/*
+!/data/df.csv
+!/data/df_new.csv
+
 # ignore files created in the docs folder
 docs/**/*.mdx
 
