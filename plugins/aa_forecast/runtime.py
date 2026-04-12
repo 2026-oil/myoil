@@ -307,6 +307,17 @@ def _write_uncertainty_artifacts(
     candidate_stats_path = stage_root / "uncertainty" / f"{slug}.candidate_stats.csv"
     candidate_samples_path = stage_root / "uncertainty" / f"{slug}.candidate_samples.csv"
     candidate_plot_path = stage_root / "uncertainty" / f"{slug}.dropout_mae_sd.png"
+    distribution_summary_path = (
+        stage_root / "uncertainty" / f"{slug}.prediction_distribution_by_dropout.csv"
+    )
+    distribution_combined_path = (
+        stage_root
+        / "uncertainty"
+        / f"{slug}.prediction_distribution_by_dropout.combined.csv"
+    )
+    distribution_plot_path = (
+        stage_root / "uncertainty" / f"{slug}.prediction_distribution_by_dropout.png"
+    )
     _write_json(
         summary_path,
         {
@@ -365,7 +376,17 @@ def _write_uncertainty_artifacts(
                         "prediction": float(prediction),
                     }
                 )
-    pd.DataFrame(candidate_sample_rows).to_csv(candidate_samples_path, index=False)
+    candidate_sample_frame = pd.DataFrame(candidate_sample_rows)
+    candidate_sample_frame.to_csv(candidate_samples_path, index=False)
+    distribution_summary = _build_uncertainty_prediction_distribution_summary(
+        candidate_sample_frame=candidate_sample_frame
+    )
+    distribution_summary.to_csv(distribution_summary_path, index=False)
+    distribution_combined = _build_uncertainty_prediction_distribution_summary(
+        candidate_sample_frame=candidate_sample_frame,
+        combine_horizons=True,
+    )
+    distribution_combined.to_csv(distribution_combined_path, index=False)
     error_summary = _build_uncertainty_error_summary(
         candidate_samples=summary["candidate_samples"],
         target_actuals=target_actuals,
@@ -374,6 +395,53 @@ def _write_uncertainty_artifacts(
         error_summary=error_summary,
         plot_path=candidate_plot_path,
     )
+    _write_uncertainty_prediction_distribution_plot(
+        candidate_sample_frame=candidate_sample_frame,
+        plot_path=distribution_plot_path,
+    )
+
+
+def _build_uncertainty_prediction_distribution_summary(
+    *,
+    candidate_sample_frame: pd.DataFrame,
+    combine_horizons: bool = False,
+) -> pd.DataFrame:
+    if candidate_sample_frame.empty:
+        raise ValueError("uncertainty candidate sample frame must not be empty")
+
+    required_columns = {"dropout_p", "prediction"}
+    if not combine_horizons:
+        required_columns.add("horizon_step")
+    missing_columns = required_columns.difference(candidate_sample_frame.columns)
+    if missing_columns:
+        missing_text = ", ".join(sorted(missing_columns))
+        raise ValueError(
+            "uncertainty candidate sample frame missing required columns: "
+            f"{missing_text}"
+        )
+
+    group_columns = ["dropout_p"]
+    if not combine_horizons:
+        group_columns.append("horizon_step")
+
+    summary = (
+        candidate_sample_frame.groupby(group_columns, sort=True)["prediction"]
+        .agg(
+            count="count",
+            mean="mean",
+            std="std",
+            min="min",
+            q05=lambda series: series.quantile(0.05),
+            q25=lambda series: series.quantile(0.25),
+            median="median",
+            q75=lambda series: series.quantile(0.75),
+            q95=lambda series: series.quantile(0.95),
+            max="max",
+        )
+        .reset_index()
+    )
+    sort_columns = ["dropout_p"] if combine_horizons else ["dropout_p", "horizon_step"]
+    return summary.sort_values(sort_columns).reset_index(drop=True)
 
 
 def _build_uncertainty_error_summary(
@@ -433,6 +501,104 @@ def _write_uncertainty_error_plot(
     axis.legend(loc="best")
     figure.tight_layout()
     figure.savefig(plot_path, dpi=150)
+    plt.close(figure)
+
+
+def _write_uncertainty_prediction_distribution_plot(
+    *,
+    candidate_sample_frame: pd.DataFrame,
+    plot_path: Path,
+) -> None:
+    if candidate_sample_frame.empty:
+        raise ValueError("uncertainty candidate sample frame must not be empty")
+    required_columns = {"horizon_step", "dropout_p", "prediction"}
+    missing_columns = required_columns.difference(candidate_sample_frame.columns)
+    if missing_columns:
+        missing_text = ", ".join(sorted(missing_columns))
+        raise ValueError(
+            "uncertainty candidate sample frame missing required columns: "
+            f"{missing_text}"
+        )
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    plot_frame = candidate_sample_frame.copy()
+    plot_frame["horizon_step"] = pd.to_numeric(
+        plot_frame["horizon_step"], errors="raise"
+    ).astype(int)
+    plot_frame["dropout_p"] = pd.to_numeric(plot_frame["dropout_p"], errors="raise")
+    plot_frame["prediction"] = pd.to_numeric(plot_frame["prediction"], errors="raise")
+    sort_columns = ["horizon_step", "dropout_p"]
+    if "sample_idx" in plot_frame.columns:
+        sort_columns.append("sample_idx")
+    plot_frame = plot_frame.sort_values(sort_columns)
+
+    horizons = sorted(plot_frame["horizon_step"].unique().tolist())
+    if not horizons:
+        raise ValueError("uncertainty candidate sample frame must include horizons")
+
+    figure, axes = plt.subplots(
+        len(horizons),
+        1,
+        figsize=(12, 4.8 * len(horizons)),
+        sharex=True,
+    )
+    if len(horizons) == 1:
+        axes = [axes]
+
+    for axis, horizon_step in zip(axes, horizons):
+        horizon_frame = plot_frame[plot_frame["horizon_step"] == horizon_step]
+        dropout_values = sorted(horizon_frame["dropout_p"].unique().tolist())
+        boxplot_values = [
+            horizon_frame.loc[horizon_frame["dropout_p"] == dropout_p, "prediction"]
+            .to_numpy(dtype=float)
+            for dropout_p in dropout_values
+        ]
+        tick_labels = [f"{dropout_p:.2f}" for dropout_p in dropout_values]
+        axis.boxplot(boxplot_values, tick_labels=tick_labels, showfliers=False)
+        mean_values = (
+            horizon_frame.groupby("dropout_p")["prediction"]
+            .mean()
+            .reindex(dropout_values)
+            .to_numpy(dtype=float)
+        )
+        median_values = (
+            horizon_frame.groupby("dropout_p")["prediction"]
+            .median()
+            .reindex(dropout_values)
+            .to_numpy(dtype=float)
+        )
+        x_positions = np.arange(1, len(dropout_values) + 1, dtype=float)
+        axis.plot(
+            x_positions,
+            mean_values,
+            color="tab:red",
+            marker="o",
+            linewidth=1.3,
+            label="mean",
+        )
+        axis.plot(
+            x_positions,
+            median_values,
+            color="tab:blue",
+            marker="x",
+            linewidth=1.0,
+            label="median",
+        )
+        axis.set_title(
+            "AAForecast MC dropout prediction distribution "
+            f"(horizon {horizon_step})"
+        )
+        axis.set_ylabel("prediction")
+        axis.grid(axis="y", alpha=0.25)
+        axis.legend(loc="best")
+
+    axes[-1].set_xlabel("dropout p")
+    figure.tight_layout()
+    figure.savefig(plot_path, dpi=180, bbox_inches="tight")
     plt.close(figure)
 
 

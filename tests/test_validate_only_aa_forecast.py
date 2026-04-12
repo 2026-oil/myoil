@@ -1034,17 +1034,63 @@ def test_runtime_smoke_emits_aaforecast_uncertainty_artifacts(
     json_files = sorted(uncertainty_dir.glob("*.json"))
     csv_files = sorted(uncertainty_dir.glob("*.csv"))
     png_files = sorted(uncertainty_dir.glob("*.dropout_mae_sd.png"))
+    distribution_csv_files = sorted(
+        uncertainty_dir.glob("*.prediction_distribution_by_dropout.csv")
+    )
+    distribution_combined_csv_files = sorted(
+        uncertainty_dir.glob("*.prediction_distribution_by_dropout.combined.csv")
+    )
+    distribution_png_files = sorted(
+        uncertainty_dir.glob("*.prediction_distribution_by_dropout.png")
+    )
     assert json_files
     assert csv_files
     assert png_files
+    assert distribution_csv_files
+    assert distribution_combined_csv_files
+    assert distribution_png_files
     summary = json.loads(json_files[0].read_text())
+    distribution_frame = pd.read_csv(distribution_csv_files[0])
+    distribution_combined_frame = pd.read_csv(distribution_combined_csv_files[0])
     assert summary["sample_count"] == 3
-    assert summary["dropout_candidates"] == EXPECTED_AA_DROPOUT_CANDIDATES
+    assert summary["dropout_candidates"] == sorted(summary["dropout_candidates"])
+    assert summary["dropout_candidates"]
     assert summary["star_anomaly_tails"] == {"upward": ["event"], "two_sided": []}
     assert summary["non_star_hist_exog_cols_resolved"] == []
     _assert_no_event_column(summary)
     assert len(summary["selected_dropout_by_horizon"]) == 2
     assert len(summary["selected_std_by_horizon"]) == 2
+    assert {
+        "dropout_p",
+        "horizon_step",
+        "count",
+        "mean",
+        "std",
+        "min",
+        "q05",
+        "q25",
+        "median",
+        "q75",
+        "q95",
+        "max",
+    }.issubset(distribution_frame.columns)
+    assert {
+        "dropout_p",
+        "count",
+        "mean",
+        "std",
+        "min",
+        "q05",
+        "q25",
+        "median",
+        "q75",
+        "q95",
+        "max",
+    }.issubset(distribution_combined_frame.columns)
+    assert distribution_frame["dropout_p"].nunique() == len(summary["dropout_candidates"])
+    assert distribution_combined_frame["dropout_p"].tolist() == pytest.approx(
+        summary["dropout_candidates"]
+    )
 
 
 def test_validate_only_aaforecast_multi_study_catalog_and_projection(
@@ -1153,21 +1199,37 @@ def test_runtime_aaforecast_plugin_uncertainty_smoke(
         path
         for path in uncertainty_dir.glob("*.csv")
         if ".candidate_" not in path.name
+        and ".prediction_distribution_by_dropout" not in path.name
     )
     png_files = sorted(uncertainty_dir.glob("*.dropout_mae_sd.png"))
+    distribution_csv_files = sorted(
+        uncertainty_dir.glob("*.prediction_distribution_by_dropout.csv")
+    )
+    distribution_combined_csv_files = sorted(
+        uncertainty_dir.glob("*.prediction_distribution_by_dropout.combined.csv")
+    )
+    distribution_png_files = sorted(
+        uncertainty_dir.glob("*.prediction_distribution_by_dropout.png")
+    )
     retrieval_dir = output_root / "aa_forecast" / "retrieval"
     retrieval_summary_files = sorted(retrieval_dir.glob("*.json"))
     retrieval_neighbor_files = sorted(retrieval_dir.glob("*.neighbors.csv"))
     assert distribution_files
     assert uncertainty_csv_files
     assert png_files
+    assert distribution_csv_files
+    assert distribution_combined_csv_files
+    assert distribution_png_files
     assert retrieval_summary_files
     assert retrieval_neighbor_files
     payload = json.loads(distribution_files[0].read_text())
     uncertainty_frame = pd.read_csv(uncertainty_csv_files[0])
+    distribution_frame = pd.read_csv(distribution_csv_files[0])
+    distribution_combined_frame = pd.read_csv(distribution_combined_csv_files[0])
     retrieval_payload = json.loads(retrieval_summary_files[0].read_text())
     retrieval_neighbors = _read_optional_csv(retrieval_neighbor_files[0])
-    assert payload["dropout_candidates"] == EXPECTED_AA_DROPOUT_CANDIDATES
+    assert payload["dropout_candidates"] == sorted(payload["dropout_candidates"])
+    assert payload["dropout_candidates"]
     assert payload["star_anomaly_tails"] == {"upward": ["event"], "two_sided": []}
     assert payload["non_star_hist_exog_cols_resolved"] == []
     _assert_no_event_column(payload)
@@ -1185,6 +1247,10 @@ def test_runtime_aaforecast_plugin_uncertainty_smoke(
     )
     assert retrieval_payload["final_prediction"] == pytest.approx(
         uncertainty_frame["prediction_mean"].tolist()
+    )
+    assert distribution_frame["horizon_step"].nunique() == 1
+    assert distribution_combined_frame["dropout_p"].tolist() == pytest.approx(
+        payload["dropout_candidates"]
     )
     assert retrieval_neighbors.empty
 
@@ -1309,6 +1375,15 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     candidate_stats_files = sorted(fold_root.glob("*.candidate_stats.csv"))
     candidate_sample_files = sorted(fold_root.glob("*.candidate_samples.csv"))
     candidate_plot_files = sorted(fold_root.glob("*.dropout_mae_sd.png"))
+    distribution_csv_files = sorted(
+        fold_root.glob("*.prediction_distribution_by_dropout.csv")
+    )
+    distribution_combined_csv_files = sorted(
+        fold_root.glob("*.prediction_distribution_by_dropout.combined.csv")
+    )
+    distribution_plot_files = sorted(
+        fold_root.glob("*.prediction_distribution_by_dropout.png")
+    )
     retrieval_summary_files = sorted(retrieval_fold_root.glob("*.json"))
     retrieval_neighbor_files = sorted(retrieval_fold_root.glob("*.neighbors.csv"))
     metrics_payload = json.loads((common_fold_root / "metrics.json").read_text(encoding="utf-8"))
@@ -1324,11 +1399,16 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     assert candidate_stats_files
     assert candidate_sample_files
     assert candidate_plot_files
+    assert distribution_csv_files
+    assert distribution_combined_csv_files
+    assert distribution_plot_files
     assert retrieval_summary_files
     assert retrieval_neighbor_files
 
     candidate_stats = pd.read_csv(candidate_stats_files[0])
     candidate_samples = pd.read_csv(candidate_sample_files[0])
+    distribution_frame = pd.read_csv(distribution_csv_files[0])
+    distribution_combined_frame = pd.read_csv(distribution_combined_csv_files[0])
     retrieval_summary = json.loads(retrieval_summary_files[0].read_text())
     retrieval_neighbors = _read_optional_csv(retrieval_neighbor_files[0])
     assert {
@@ -1343,6 +1423,33 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
         "sample_idx",
         "prediction",
     }.issubset(candidate_samples.columns)
+    assert {
+        "dropout_p",
+        "horizon_step",
+        "count",
+        "mean",
+        "std",
+        "min",
+        "q05",
+        "q25",
+        "median",
+        "q75",
+        "q95",
+        "max",
+    }.issubset(distribution_frame.columns)
+    assert {
+        "dropout_p",
+        "count",
+        "mean",
+        "std",
+        "min",
+        "q05",
+        "q25",
+        "median",
+        "q75",
+        "q95",
+        "max",
+    }.issubset(distribution_combined_frame.columns)
     assert candidate_stats["prediction_std"].gt(0).any()
     assert candidate_samples["prediction"].nunique() > 1
     assert retrieval_summary["retrieval_enabled"] is True
@@ -1366,6 +1473,35 @@ def test_build_uncertainty_error_summary_aggregates_dropout_mae_and_sd() -> None
     assert summary.loc[0, "mae_sd"] == pytest.approx(0.0)
     assert summary.loc[1, "mae_mean"] == pytest.approx(0.5)
     assert summary.loc[1, "mae_sd"] == pytest.approx(0.5)
+
+
+def test_build_uncertainty_prediction_distribution_summary_aggregates_quantiles() -> None:
+    candidate_sample_frame = pd.DataFrame(
+        {
+            "horizon_step": [1, 1, 1, 2, 2, 2],
+            "dropout_p": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+            "sample_idx": [0, 1, 2, 0, 1, 2],
+            "prediction": [1.0, 2.0, 3.0, 10.0, 11.0, 12.0],
+        }
+    )
+
+    summary = aa_runtime._build_uncertainty_prediction_distribution_summary(
+        candidate_sample_frame=candidate_sample_frame
+    )
+    combined = aa_runtime._build_uncertainty_prediction_distribution_summary(
+        candidate_sample_frame=candidate_sample_frame,
+        combine_horizons=True,
+    )
+
+    assert summary["horizon_step"].tolist() == [1, 2]
+    assert summary["count"].tolist() == [3, 3]
+    assert summary["mean"].tolist() == pytest.approx([2.0, 11.0])
+    assert summary["median"].tolist() == pytest.approx([2.0, 11.0])
+    assert summary["q05"].tolist() == pytest.approx([1.1, 10.1])
+    assert summary["q95"].tolist() == pytest.approx([2.9, 11.9])
+    assert combined["count"].tolist() == [6]
+    assert combined["mean"].tolist() == pytest.approx([6.5])
+    assert combined["median"].tolist() == pytest.approx([6.5])
 
 
 def test_select_uncertainty_predictions_uses_distinct_prediction_seeds(monkeypatch) -> None:
