@@ -142,6 +142,7 @@ def test_star_precompute_validation_cache_reuses_phase_payload() -> None:
         "count_active_channels",
         "channel_activity",
         "event_summary",
+        "event_trajectory",
     ):
         assert key in payload1
         assert torch.equal(payload1[key], payload2[key])
@@ -214,6 +215,7 @@ def test_star_precompute_supports_zero_anomaly_windows() -> None:
     assert torch.count_nonzero(payload["count_active_channels"]) == 0
     assert torch.count_nonzero(payload["channel_activity"]) == 0
     assert torch.count_nonzero(payload["event_summary"]) == 0
+    assert torch.count_nonzero(payload["event_trajectory"]) == 0
 
 
 def test_event_summary_tracks_recent_upward_activity_strength() -> None:
@@ -266,6 +268,64 @@ def test_event_summary_tracks_recent_upward_activity_strength() -> None:
     assert later.shape == (1, model.EVENT_SUMMARY_SIZE)
     assert later[0, 1] > earlier[0, 1]
     assert later[0, 5] > earlier[0, 5]
+
+
+def test_event_trajectory_tracks_recent_upward_shift() -> None:
+    model = _build_model()
+    earlier_payload = {
+        "critical_mask": torch.tensor([[[True], [False], [False], [False]]]),
+        "target_activity": torch.tensor(
+            [[[3.0], [0.0], [0.0], [0.0]]],
+            dtype=torch.float32,
+        ),
+        "star_hist_activity": torch.tensor(
+            [[[0.0], [0.0], [0.0], [0.0]]],
+            dtype=torch.float32,
+        ),
+        "target_signed_score": torch.tensor(
+            [[[3.0], [0.0], [0.0], [0.0]]],
+            dtype=torch.float32,
+        ),
+        "star_hist_signed_score": torch.tensor(
+            [[[0.0], [0.0], [0.0], [0.0]]],
+            dtype=torch.float32,
+        ),
+    }
+    later_payload = {
+        "critical_mask": torch.tensor([[[False], [False], [False], [True]]]),
+        "target_activity": torch.tensor(
+            [[[0.0], [0.0], [0.0], [3.0]]],
+            dtype=torch.float32,
+        ),
+        "star_hist_activity": torch.tensor(
+            [[[0.0], [0.0], [0.0], [0.0]]],
+            dtype=torch.float32,
+        ),
+        "target_signed_score": torch.tensor(
+            [[[0.0], [0.0], [0.0], [3.0]]],
+            dtype=torch.float32,
+        ),
+        "star_hist_signed_score": torch.tensor(
+            [[[0.0], [0.0], [0.0], [0.0]]],
+            dtype=torch.float32,
+        ),
+    }
+
+    earlier = model._build_event_trajectory_from_payload(
+        earlier_payload,
+        dtype=torch.float32,
+        device=torch.device("cpu"),
+    )
+    later = model._build_event_trajectory_from_payload(
+        later_payload,
+        dtype=torch.float32,
+        device=torch.device("cpu"),
+    )
+
+    assert earlier.shape == (1, model.EVENT_TRAJECTORY_SIZE)
+    assert later.shape == (1, model.EVENT_TRAJECTORY_SIZE)
+    assert later[0, 0] > earlier[0, 0]
+    assert later[0, 10] > earlier[0, 10]
 
 
 def test_count_active_channels_preserves_multi_channel_density() -> None:

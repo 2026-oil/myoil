@@ -280,11 +280,14 @@ def _select_uncertainty_predictions(
 
     std_grid = np.vstack(candidate_stds)
     mean_grid = np.vstack(candidate_means)
-    best_indices = std_grid.argmin(axis=0)
-    horizon_idx = np.arange(std_grid.shape[1])
-    selected_mean = mean_grid[best_indices, horizon_idx]
-    selected_std = std_grid[best_indices, horizon_idx]
-    selected_dropout = np.asarray(dropout_candidates, dtype=float)[best_indices]
+    trajectory_scores = np.sqrt(np.mean(np.square(std_grid), axis=1))
+    selected_path_idx = int(trajectory_scores.argmin())
+    selected_mean = mean_grid[selected_path_idx]
+    selected_std = std_grid[selected_path_idx]
+    selected_dropout_scalar = float(
+        np.asarray(dropout_candidates, dtype=float)[selected_path_idx]
+    )
+    selected_dropout = np.full(std_grid.shape[1], selected_dropout_scalar, dtype=float)
     return {
         "mean": selected_mean,
         "std": selected_std,
@@ -293,6 +296,10 @@ def _select_uncertainty_predictions(
         "candidate_std_grid": std_grid,
         "candidate_dropout_values": np.asarray(dropout_candidates, dtype=float),
         "candidate_samples": candidate_samples,
+        "selection_mode": "trajectory_min_dispersion",
+        "candidate_path_scores": trajectory_scores,
+        "selected_path_idx": selected_path_idx,
+        "selected_path_score": float(trajectory_scores[selected_path_idx]),
     }
 
 
@@ -342,6 +349,14 @@ def _write_uncertainty_artifacts(
             "sample_count": stage_cfg.uncertainty.sample_count,
             "selected_dropout_by_horizon": summary["selected_dropout"].tolist(),
             "selected_std_by_horizon": summary["std"].tolist(),
+            "selection_mode": summary.get("selection_mode", "per_horizon_min_std"),
+            "selected_path_idx": summary.get("selected_path_idx"),
+            "selected_path_score": summary.get("selected_path_score"),
+            "candidate_path_scores": (
+                summary["candidate_path_scores"].tolist()
+                if "candidate_path_scores" in summary
+                else None
+            ),
         },
     )
     pd.DataFrame(
@@ -353,6 +368,10 @@ def _write_uncertainty_artifacts(
         }
     ).to_csv(csv_path, index=False)
     candidate_stats_rows: list[dict[str, float]] = []
+    path_scores = summary.get(
+        "candidate_path_scores",
+        np.zeros(len(summary["candidate_dropout_values"]), dtype=float),
+    )
     for dropout_idx, dropout_p in enumerate(summary["candidate_dropout_values"]):
         for horizon_idx in range(len(summary["mean"])):
             candidate_stats_rows.append(
@@ -365,6 +384,7 @@ def _write_uncertainty_artifacts(
                     "prediction_std": float(
                         summary["candidate_std_grid"][dropout_idx, horizon_idx]
                     ),
+                    "path_score": float(path_scores[dropout_idx]),
                 }
             )
     pd.DataFrame(candidate_stats_rows).to_csv(candidate_stats_path, index=False)

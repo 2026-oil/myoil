@@ -7,6 +7,7 @@ from typing import Optional
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from plugins.aa_forecast import (
     CriticalSparseAttention,
@@ -25,10 +26,12 @@ from ..timexer import FlattenHead
 
 
 class InformerHorizonAwareHead(nn.Module):
-    """Informer-only horizon-aware decoder head with event gating.
+    """Informer-only path-aware MIMO decoder head.
 
-    Keeps the decode specialization local to the Informer path while letting the
-    shared event summary influence each horizon differently.
+    The previous Informer path used per-horizon heads after a shared trunk.
+    That separated horizons, but it still treated each horizon mostly like an
+    independent scalar. This head keeps horizon conditioning while decoding the
+    whole trajectory jointly so h1/h2 can share one path representation.
     """
 
     def __init__(
@@ -37,6 +40,8 @@ class InformerHorizonAwareHead(nn.Module):
         h: int,
         in_features: int,
         event_features: int,
+        path_features: int,
+        regime_features: int,
         hidden_size: int,
         out_features: int,
         num_layers: int,
@@ -46,6 +51,8 @@ class InformerHorizonAwareHead(nn.Module):
         self.h = int(h)
         self.base_in_features = int(in_features)
         self.event_features = int(event_features)
+        self.path_features = int(path_features)
+        self.regime_features = int(regime_features)
         self.hidden_size = int(hidden_size)
         self.horizon_embeddings = nn.Embedding(
             num_embeddings=self.h,
@@ -55,9 +62,47 @@ class InformerHorizonAwareHead(nn.Module):
             nn.Linear(self.event_features + self.hidden_size, self.event_features),
             nn.Sigmoid(),
         )
+        self.path_gate = nn.Sequential(
+            nn.Linear(self.path_features + self.hidden_size, self.path_features),
+            nn.Sigmoid(),
+        )
+        self.regime_projector = MLP(
+            in_features=self.regime_features,
+            out_features=self.hidden_size,
+            hidden_size=max(self.hidden_size, self.regime_features),
+            num_layers=2,
+            activation="ReLU",
+            dropout=dropout,
+        )
+        self.regime_gate = nn.Sequential(
+            nn.Linear(self.hidden_size + self.hidden_size, self.hidden_size),
+            nn.Sigmoid(),
+        )
+        context_feature_size = self.event_features + self.path_features + self.regime_features
+        film_hidden_size = max(self.base_in_features, context_feature_size)
+        self.decoder_scale = MLP(
+            in_features=context_feature_size,
+            out_features=self.base_in_features,
+            hidden_size=film_hidden_size,
+            num_layers=2,
+            activation="ReLU",
+            dropout=dropout,
+        )
+        self.decoder_shift = MLP(
+            in_features=context_feature_size,
+            out_features=self.base_in_features,
+            hidden_size=film_hidden_size,
+            num_layers=2,
+            activation="ReLU",
+            dropout=dropout,
+        )
         self.shared_trunk = MLP(
             in_features=(
-                self.base_in_features + self.hidden_size + (2 * self.event_features)
+                self.base_in_features
+                + self.hidden_size
+                + (2 * self.event_features)
+                + (2 * self.path_features)
+                + (2 * self.hidden_size)
             ),
             out_features=hidden_size,
             hidden_size=hidden_size,
@@ -65,37 +110,71 @@ class InformerHorizonAwareHead(nn.Module):
             activation="ReLU",
             dropout=dropout,
         )
-        head_num_layers = max(1, int(num_layers) - 1)
-        self.horizon_heads = nn.ModuleList(
-            [
-                MLP(
-                    in_features=hidden_size,
-                    out_features=out_features,
-                    hidden_size=hidden_size,
-                    num_layers=head_num_layers,
-                    activation="ReLU",
-                    dropout=dropout,
-                )
-                for _ in range(self.h)
-            ]
+        self.path_mixer = nn.GRU(
+            input_size=hidden_size,
+            hidden_size=hidden_size,
+            num_layers=1,
+            batch_first=True,
+        )
+        self.local_head = nn.Linear(hidden_size, out_features)
+        joint_hidden_size = max(hidden_size, self.h * hidden_size)
+        self.level_head = MLP(
+            in_features=(self.h * hidden_size) + self.event_features + self.path_features,
+            out_features=out_features,
+            hidden_size=joint_hidden_size,
+            num_layers=max(2, int(num_layers)),
+            activation="ReLU",
+            dropout=dropout,
+        )
+        self.global_head = MLP(
+            in_features=(self.h * hidden_size) + self.event_features + self.path_features,
+            out_features=self.h * out_features,
+            hidden_size=joint_hidden_size,
+            num_layers=max(2, int(num_layers)),
+            activation="ReLU",
+            dropout=dropout,
+        )
+        self.delta_head = MLP(
+            in_features=(self.h * hidden_size) + self.event_features + self.path_features,
+            out_features=self.h * out_features,
+            hidden_size=joint_hidden_size,
+            num_layers=max(2, int(num_layers)),
+            activation="ReLU",
+            dropout=dropout,
+        )
+        shock_hidden_size = max(hidden_size, self.event_features + self.path_features)
+        self.event_bias_head = MLP(
+            in_features=self.event_features + self.path_features,
+            out_features=self.h * out_features,
+            hidden_size=shock_hidden_size,
+            num_layers=max(2, int(num_layers)),
+            activation="ReLU",
+            dropout=dropout,
+        )
+        self.event_delta_head = MLP(
+            in_features=self.event_features + self.path_features,
+            out_features=self.h * out_features,
+            hidden_size=shock_hidden_size,
+            num_layers=max(2, int(num_layers)),
+            activation="ReLU",
+            dropout=dropout,
+        )
+        self.event_delta_gate = MLP(
+            self.event_features + self.path_features,
+            out_features,
+            hidden_size=shock_hidden_size,
+            num_layers=2,
+            activation="ReLU",
+            dropout=dropout,
         )
 
-    def build_horizon_context(
-        self,
-        *,
-        batch_size: int,
-        device: torch.device,
-        dtype: torch.dtype,
-    ) -> torch.Tensor:
-        horizon_ids = torch.arange(self.h, device=device)
-        horizon_context = self.horizon_embeddings(horizon_ids)
-        return horizon_context.unsqueeze(0).expand(batch_size, -1, -1).to(dtype=dtype)
-
-    def forward(
+    def _validate_inputs(
         self,
         decoder_input: torch.Tensor,
         event_summary: torch.Tensor,
-    ) -> torch.Tensor:
+        event_path: torch.Tensor,
+        raw_regime: torch.Tensor,
+    ) -> None:
         if decoder_input.ndim != 3:
             raise ValueError(
                 "InformerHorizonAwareHead decoder_input must be rank-3 [B, h, features]"
@@ -117,6 +196,39 @@ class InformerHorizonAwareHead(nn.Module):
             raise ValueError(
                 "InformerHorizonAwareHead event_summary width must match event_features"
             )
+        if event_path.ndim != 2:
+            raise ValueError(
+                "InformerHorizonAwareHead event_path must be rank-2 [B, features]"
+            )
+        if event_path.shape[0] != decoder_input.shape[0]:
+            raise ValueError(
+                "InformerHorizonAwareHead event_path batch must match decoder_input batch"
+            )
+        if event_path.shape[1] != self.path_features:
+            raise ValueError(
+                "InformerHorizonAwareHead event_path width must match path_features"
+            )
+        if raw_regime.ndim != 2:
+            raise ValueError(
+                "InformerHorizonAwareHead raw_regime must be rank-2 [B, features]"
+            )
+        if raw_regime.shape[0] != decoder_input.shape[0]:
+            raise ValueError(
+                "InformerHorizonAwareHead raw_regime batch must match decoder_input batch"
+            )
+        if raw_regime.shape[1] != self.regime_features:
+            raise ValueError(
+                "InformerHorizonAwareHead raw_regime width must match regime_features"
+            )
+
+    def _build_conditioned_features(
+        self,
+        *,
+        decoder_input: torch.Tensor,
+        event_summary: torch.Tensor,
+        event_path: torch.Tensor,
+        raw_regime: torch.Tensor,
+    ) -> torch.Tensor:
         horizon_context = self.build_horizon_context(
             batch_size=decoder_input.shape[0],
             device=decoder_input.device,
@@ -125,23 +237,115 @@ class InformerHorizonAwareHead(nn.Module):
         repeated_event = event_summary.unsqueeze(1).expand(-1, self.h, -1).to(
             dtype=decoder_input.dtype
         )
-        event_gate = self.event_gate(torch.cat([repeated_event, horizon_context], dim=-1))
-        conditioned = torch.cat(
+        repeated_path = event_path.unsqueeze(1).expand(-1, self.h, -1).to(
+            dtype=decoder_input.dtype
+        )
+        context_features = torch.cat(
             [
-                decoder_input,
-                horizon_context,
-                repeated_event,
-                repeated_event * event_gate,
+                event_summary.to(dtype=decoder_input.dtype),
+                event_path.to(dtype=decoder_input.dtype),
+                raw_regime.to(dtype=decoder_input.dtype),
             ],
             dim=-1,
         )
-        trunk_features = self.shared_trunk(conditioned)
+        decoder_scale = (
+            1.0 + torch.tanh(self.decoder_scale(context_features)).unsqueeze(1)
+        )
+        decoder_shift = self.decoder_shift(context_features).unsqueeze(1)
+        modulated_decoder_input = (decoder_input * decoder_scale) + decoder_shift
+        regime_latent = self.regime_projector(
+            raw_regime.to(dtype=decoder_input.dtype)
+        )
+        regime_latent = torch.tanh(
+            torch.nan_to_num(regime_latent, nan=0.0, posinf=10.0, neginf=-10.0)
+        )
+        repeated_regime = regime_latent.unsqueeze(1).expand(-1, self.h, -1)
+        event_gate = self.event_gate(torch.cat([repeated_event, horizon_context], dim=-1))
+        path_gate = self.path_gate(torch.cat([repeated_path, horizon_context], dim=-1))
+        regime_gate = self.regime_gate(torch.cat([repeated_regime, horizon_context], dim=-1))
         return torch.cat(
             [
-                head(trunk_features[:, horizon_idx : horizon_idx + 1, :])
-                for horizon_idx, head in enumerate(self.horizon_heads)
+                modulated_decoder_input,
+                horizon_context,
+                repeated_event,
+                repeated_event * event_gate,
+                repeated_path,
+                repeated_path * path_gate,
+                repeated_regime,
+                repeated_regime * regime_gate,
             ],
-            dim=1,
+            dim=-1,
+        )
+
+    def build_horizon_context(
+        self,
+        *,
+        batch_size: int,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        horizon_ids = torch.arange(self.h, device=device)
+        horizon_context = self.horizon_embeddings(horizon_ids)
+        return horizon_context.unsqueeze(0).expand(batch_size, -1, -1).to(dtype=dtype)
+
+    def forward(
+        self,
+        decoder_input: torch.Tensor,
+        event_summary: torch.Tensor,
+        event_path: torch.Tensor,
+        raw_regime: torch.Tensor,
+    ) -> torch.Tensor:
+        self._validate_inputs(decoder_input, event_summary, event_path, raw_regime)
+        conditioned = self._build_conditioned_features(
+            decoder_input=decoder_input,
+            event_summary=event_summary,
+            event_path=event_path,
+            raw_regime=raw_regime,
+        )
+        trunk_features = self.shared_trunk(conditioned)
+        mixed_path, _ = self.path_mixer(trunk_features)
+        mixed_path = mixed_path + trunk_features
+        joint_context = torch.cat(
+            [
+                mixed_path.reshape(mixed_path.shape[0], -1),
+                event_summary.to(dtype=decoder_input.dtype),
+                event_path.to(dtype=decoder_input.dtype),
+            ],
+            dim=-1,
+        )
+        global_path = self.global_head(joint_context).reshape(
+            decoder_input.shape[0], self.h, -1
+        )
+        level = self.level_head(joint_context).unsqueeze(1)
+        delta_path = self.delta_head(joint_context).reshape(
+            decoder_input.shape[0], self.h, -1
+        )
+        delta_path = torch.cumsum(delta_path, dim=1)
+        shock_context = torch.cat(
+            [
+                event_summary.to(dtype=decoder_input.dtype),
+                event_path.to(dtype=decoder_input.dtype),
+            ],
+            dim=-1,
+        )
+        event_bias = self.event_bias_head(shock_context).reshape(
+            decoder_input.shape[0], self.h, -1
+        )
+        event_delta = self.event_delta_head(shock_context).reshape(
+            decoder_input.shape[0], self.h, -1
+        )
+        event_delta = torch.cumsum(F.softplus(event_delta), dim=1)
+        event_delta_gate = (
+            1.0 + F.softplus(self.event_delta_gate(shock_context))
+        ).unsqueeze(1)
+        local_path = self.local_head(mixed_path)
+        return (
+            level
+            + global_path
+            + delta_path
+            + local_path
+            + event_bias
+            + (event_delta * event_delta_gate)
         )
 
 
@@ -159,6 +363,7 @@ class AAForecast(BaseModel):
     MULTIVARIATE = False
     RECURRENT = False
     EVENT_SUMMARY_SIZE = 9
+    EVENT_TRAJECTORY_SIZE = 15
 
     def __init__(
         self,
@@ -365,6 +570,7 @@ class AAForecast(BaseModel):
             self.itransformer_decoder = None
             self.informer_decoder = None
             self.event_summary_projector = None
+            self.event_trajectory_projector = None
         elif self.backbone == "itransformer":
             self.itransformer_decoder = nn.Linear(
                 2 * self.encoder_hidden_size,
@@ -374,9 +580,18 @@ class AAForecast(BaseModel):
             self.timexer_decoder = None
             self.informer_decoder = None
             self.event_summary_projector = None
+            self.event_trajectory_projector = None
         elif self.backbone == "informer":
             self.event_summary_projector = MLP(
                 in_features=self.EVENT_SUMMARY_SIZE,
+                out_features=self.encoder_hidden_size,
+                hidden_size=max(self.encoder_hidden_size, decoder_hidden_size),
+                num_layers=2,
+                activation="ReLU",
+                dropout=self.encoder_dropout,
+            )
+            self.event_trajectory_projector = MLP(
+                in_features=self.EVENT_TRAJECTORY_SIZE,
                 out_features=self.encoder_hidden_size,
                 hidden_size=max(self.encoder_hidden_size, decoder_hidden_size),
                 num_layers=2,
@@ -387,6 +602,8 @@ class AAForecast(BaseModel):
                 h=self.h,
                 in_features=2 * self.encoder_hidden_size,
                 event_features=self.encoder_hidden_size,
+                path_features=self.encoder_hidden_size,
+                regime_features=4,
                 hidden_size=decoder_hidden_size,
                 out_features=self.loss.outputsize_multiplier,
                 num_layers=decoder_layers,
@@ -408,6 +625,7 @@ class AAForecast(BaseModel):
             self.itransformer_decoder = None
             self.informer_decoder = None
             self.event_summary_projector = None
+            self.event_trajectory_projector = None
 
     def configure_stochastic_inference(
         self,
@@ -439,6 +657,7 @@ class AAForecast(BaseModel):
     ) -> dict[str, torch.Tensor]:
         target_star = self.star(insample_y, tail_modes=("two_sided",))
         star_hist_exog = self._select_hist_exog(hist_exog, self.star_hist_exog_indices)
+        non_star_hist_exog = self._select_hist_exog(hist_exog, self.non_star_hist_exog_indices)
         star_hist_outputs = (
             self.star(
                 star_hist_exog,
@@ -465,6 +684,15 @@ class AAForecast(BaseModel):
             if star_hist_outputs is not None
             else insample_y.new_empty((insample_y.size(0), insample_y.size(1), 0))
         )
+        non_star_regime = (
+            self._build_non_star_regime_descriptor(
+                non_star_hist_exog,
+                dtype=insample_y.dtype,
+                device=insample_y.device,
+            )
+            if non_star_hist_exog is not None
+            else insample_y.new_zeros((insample_y.size(0), 4))
+        )
         target_signed_score = target_star["robust_score_signed"]
         star_hist_signed_score = (
             star_hist_outputs["robust_score_signed"]
@@ -480,6 +708,19 @@ class AAForecast(BaseModel):
                 "star_hist_activity": star_hist_activity,
                 "target_signed_score": target_signed_score,
                 "star_hist_signed_score": star_hist_signed_score,
+                "non_star_regime": non_star_regime,
+            },
+            dtype=insample_y.dtype,
+            device=insample_y.device,
+        )
+        event_trajectory = self._build_event_trajectory_from_payload(
+            {
+                "critical_mask": combined_count > 0,
+                "target_activity": target_activity,
+                "star_hist_activity": star_hist_activity,
+                "target_signed_score": target_signed_score,
+                "star_hist_signed_score": star_hist_signed_score,
+                "non_star_regime": non_star_regime,
             },
             dtype=insample_y.dtype,
             device=insample_y.device,
@@ -525,6 +766,8 @@ class AAForecast(BaseModel):
             "star_hist_signed_score": star_hist_signed_score,
             "channel_activity": torch.cat([target_activity, star_hist_activity], dim=2),
             "event_summary": event_summary,
+            "event_trajectory": event_trajectory,
+            "non_star_regime": non_star_regime,
         }
 
     def _build_star_phase_cache(
@@ -852,6 +1095,151 @@ class AAForecast(BaseModel):
         summary = torch.nan_to_num(summary, nan=0.0, posinf=10.0, neginf=-10.0)
         return summary.clamp(min=-10.0, max=10.0)
 
+    def _build_event_trajectory_from_payload(
+        self,
+        payload: dict[str, torch.Tensor],
+        *,
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> torch.Tensor:
+        critical_mask = payload["critical_mask"].to(device=device, dtype=dtype)
+        target_signed_score = payload.get("target_signed_score")
+        if target_signed_score is None:
+            target_signed_score = payload.get("target_activity")
+        if target_signed_score is None:
+            target_signed_score = payload["channel_activity"][:, :, :1]
+        target_signed_score = target_signed_score.to(device=device, dtype=dtype)
+
+        star_hist_signed_score = payload.get("star_hist_signed_score")
+        if star_hist_signed_score is None:
+            star_hist_signed_score = payload.get("star_hist_activity")
+        if star_hist_signed_score is None:
+            star_hist_signed_score = payload["channel_activity"][:, :, 1:]
+        star_hist_signed_score = star_hist_signed_score.to(device=device, dtype=dtype)
+
+        seq_len = critical_mask.shape[1]
+        recent_steps = max(1, seq_len // 2)
+        time_weights = torch.linspace(
+            0.35,
+            1.0,
+            steps=seq_len,
+            device=device,
+            dtype=dtype,
+        ).view(1, seq_len, 1)
+
+        target_positive = target_signed_score.clamp_min(0.0)
+        hist_positive = star_hist_signed_score.clamp_min(0.0)
+
+        earlier_target_positive = target_positive[:, : seq_len - recent_steps, :]
+        recent_target_positive = target_positive[:, -recent_steps:, :]
+        earlier_hist_positive = hist_positive[:, : seq_len - recent_steps, :]
+        recent_hist_positive = hist_positive[:, -recent_steps:, :]
+
+        recent_up_mass = torch.log1p(
+            self._weighted_mean_feature(
+                target_positive,
+                weights=time_weights,
+                keepdim=False,
+            ).unsqueeze(-1)
+        )
+        earlier_up_mass = torch.log1p(
+            self._mean_feature(earlier_target_positive, keepdim=False).unsqueeze(-1)
+        )
+        up_shift = recent_up_mass - earlier_up_mass
+        terminal_up_mass = torch.log1p(
+            target_positive[:, -1, :].mean(dim=1, keepdim=True)
+        )
+        recent_signed = torch.tanh(
+            self._weighted_mean_feature(
+                target_signed_score,
+                weights=time_weights,
+                keepdim=False,
+            ).unsqueeze(-1)
+        )
+        terminal_signed = torch.tanh(
+            target_signed_score[:, -1, :].mean(dim=1, keepdim=True)
+        )
+        recent_hist_up_mass = torch.log1p(
+            self._weighted_mean_feature(
+                hist_positive,
+                weights=time_weights,
+                keepdim=False,
+            ).unsqueeze(-1)
+        )
+        earlier_hist_up_mass = torch.log1p(
+            self._mean_feature(earlier_hist_positive, keepdim=False).unsqueeze(-1)
+        )
+        hist_up_shift = recent_hist_up_mass - earlier_hist_up_mass
+        terminal_hist_up_mass = torch.log1p(
+            hist_positive[:, -1, :].mean(dim=1, keepdim=True)
+        )
+        hist_recent_signed = torch.tanh(
+            self._weighted_mean_feature(
+                star_hist_signed_score,
+                weights=time_weights,
+                keepdim=False,
+            ).unsqueeze(-1)
+        )
+        target_hist_gap = recent_signed - hist_recent_signed
+        target_persistence = critical_mask[:, -recent_steps:, :].mean(
+            dim=(1, 2), keepdim=False
+        ).unsqueeze(-1)
+        non_star_regime = payload.get("non_star_regime")
+        if non_star_regime is None:
+            non_star_regime = critical_mask.new_zeros((critical_mask.shape[0], 4))
+        else:
+            non_star_regime = non_star_regime.to(device=device, dtype=dtype)
+
+        trajectory = torch.cat(
+            [
+                recent_up_mass,
+                up_shift,
+                terminal_up_mass,
+                recent_signed,
+                terminal_signed,
+                recent_hist_up_mass,
+                hist_up_shift,
+                terminal_hist_up_mass,
+                hist_recent_signed,
+                target_hist_gap,
+                target_persistence,
+                non_star_regime,
+            ],
+            dim=1,
+        )
+        trajectory = torch.nan_to_num(trajectory, nan=0.0, posinf=10.0, neginf=-10.0)
+        return trajectory.clamp(min=-10.0, max=10.0)
+
+    def _build_non_star_regime_descriptor(
+        self,
+        non_star_hist_exog: torch.Tensor | None,
+        *,
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> torch.Tensor:
+        if non_star_hist_exog is None or non_star_hist_exog.numel() == 0:
+            return torch.zeros((1, 4), device=device, dtype=dtype)
+        values = non_star_hist_exog.to(device=device, dtype=dtype)
+        batch_size, seq_len, _ = values.shape
+        recent_steps = max(1, seq_len // 8)
+        earlier = values[:, : seq_len - recent_steps, :]
+        recent = values[:, -recent_steps:, :]
+        baseline = values.mean(dim=1, keepdim=True)
+        baseline_scale = values.std(dim=1, keepdim=True, unbiased=False).clamp_min(1e-4)
+        recent_shift = (recent.mean(dim=1, keepdim=True) - baseline) / baseline_scale
+        terminal_z = (values[:, -1:, :] - baseline) / baseline_scale
+        descriptor = torch.cat(
+            [
+                recent_shift.mean(dim=2, keepdim=False),
+                recent_shift.amax(dim=2, keepdim=False),
+                terminal_z.mean(dim=2, keepdim=False),
+                terminal_z.amax(dim=2, keepdim=False),
+            ],
+            dim=1,
+        )
+        descriptor = torch.nan_to_num(descriptor, nan=0.0, posinf=10.0, neginf=-10.0)
+        return descriptor.clamp(min=-10.0, max=10.0).reshape(batch_size, 4)
+
     def _reduce_time_signal_to_timexer_patches(
         self,
         signal: torch.Tensor,
@@ -1075,6 +1463,32 @@ class AAForecast(BaseModel):
             inference_dropout_p=self._stochastic_dropout_p,
         )
 
+    def _project_event_trajectory(
+        self,
+        event_trajectory: torch.Tensor,
+    ) -> torch.Tensor:
+        if self.event_trajectory_projector is None:
+            raise ValueError(
+                "Event trajectory projector is only available for informer backbone"
+            )
+        event_trajectory = torch.nan_to_num(
+            event_trajectory,
+            nan=0.0,
+            posinf=10.0,
+            neginf=-10.0,
+        ).clamp(min=-10.0, max=10.0)
+        event_path = self.event_trajectory_projector(event_trajectory)
+        event_path = torch.tanh(
+            torch.nan_to_num(event_path, nan=0.0, posinf=10.0, neginf=-10.0)
+        )
+        return _apply_stochastic_dropout(
+            event_path,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
+
     def _build_time_decoder_input(
         self,
         *,
@@ -1100,6 +1514,9 @@ class AAForecast(BaseModel):
         hidden_states: torch.Tensor,
         attended_states: torch.Tensor,
         event_summary: torch.Tensor,
+        event_trajectory: torch.Tensor,
+        non_star_regime: torch.Tensor,
+        anchor_level: torch.Tensor,
     ) -> torch.Tensor:
         if self.informer_decoder is None:
             raise ValueError("Informer decoder is not initialized")
@@ -1108,6 +1525,7 @@ class AAForecast(BaseModel):
             attended_states=attended_states,
         )
         event_context = self._project_event_summary(event_summary)
+        event_path = self._project_event_trajectory(event_trajectory)
         decoder_input = torch.cat([hidden_aligned, attended_aligned], dim=-1)
         decoder_input = _apply_stochastic_dropout(
             decoder_input,
@@ -1116,10 +1534,14 @@ class AAForecast(BaseModel):
             train_dropout_p=self.encoder_dropout,
             inference_dropout_p=self._stochastic_dropout_p,
         )
-        return self.informer_decoder(
+        delta_forecast = self.informer_decoder(
             decoder_input,
             event_context,
+            event_path,
+            non_star_regime,
         )
+        anchor = anchor_level[:, -1:, :].to(dtype=delta_forecast.dtype)
+        return anchor + delta_forecast
 
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]
@@ -1234,6 +1656,26 @@ class AAForecast(BaseModel):
                 device=hidden_states.device,
                 dtype=hidden_states.dtype,
             )
+        event_trajectory = star_payload.get("event_trajectory")
+        if event_trajectory is None:
+            event_trajectory = self._build_event_trajectory_from_payload(
+                star_payload,
+                dtype=hidden_states.dtype,
+                device=hidden_states.device,
+            )
+        else:
+            event_trajectory = event_trajectory.to(
+                device=hidden_states.device,
+                dtype=hidden_states.dtype,
+            )
+        non_star_regime = star_payload.get("non_star_regime")
+        if non_star_regime is None:
+            non_star_regime = hidden_states.new_zeros((hidden_states.shape[0], 4))
+        else:
+            non_star_regime = non_star_regime.to(
+                device=hidden_states.device,
+                dtype=hidden_states.dtype,
+            )
         attended_states, _ = self.attention(
             hidden_states,
             critical_mask,
@@ -1245,6 +1687,9 @@ class AAForecast(BaseModel):
                 hidden_states=hidden_states,
                 attended_states=attended_states,
                 event_summary=event_summary,
+                event_trajectory=event_trajectory,
+                non_star_regime=non_star_regime,
+                anchor_level=insample_y,
             )
         if self.decoder is None:
             raise ValueError("Shared decoder is not initialized")

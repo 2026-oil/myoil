@@ -1,0 +1,47 @@
+aa_forecast:
+  model: informer
+  tune_training: false
+  lowess_frac: 0.35
+  lowess_delta: 0.01
+  uncertainty:
+    enabled: true
+    dropout_candidates:
+    - 0.005
+    - 0.01
+    - 0.03
+    - 0.05
+    - 0.07
+    - 0.09
+    - 0.12
+    - 0.15
+    - 0.18
+    - 0.2
+    - 0.25
+    - 0.3
+    sample_count: 30
+  model_params:
+    hidden_size: 128
+    n_head: 4
+    encoder_layers: 2
+    dropout: 0.0
+    linear_hidden_size: 96
+    factor: 3
+    decoder_hidden_size: 128
+    decoder_layers: 4
+    season_length: 4
+  star_anomaly_tails:
+    upward:
+    - GPRD_THREAT
+    two_sided: []
+  thresh: 3.5
+  retrieval:
+    enabled: false
+    top_k: 1
+    event_score_threshold: 400.0
+    min_similarity: 0.35
+    blend_max: 1.0
+    use_uncertainty_gate: false
+    use_shape_key: false
+    use_event_key: true
+    event_score_log_bonus_alpha: 0.15
+    event_score_log_bonus_cap: 0.1

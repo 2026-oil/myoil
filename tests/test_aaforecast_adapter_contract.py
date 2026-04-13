@@ -248,7 +248,11 @@ def test_informer_uses_horizon_aware_decoder_while_non_informer_paths_keep_share
     assert informer.decoder is None
     assert informer.timexer_decoder is None
     assert informer.itransformer_decoder is None
-    assert len(informer.informer_decoder.horizon_heads) == informer.h
+    assert informer.informer_decoder.path_mixer.input_size == informer.decoder_hidden_size
+    assert informer.informer_decoder.global_head.layers[-1].out_features == (
+        informer.h * informer.loss.outputsize_multiplier
+    )
+    assert informer.event_trajectory_projector is not None
 
     assert patchtst.informer_decoder is None
     assert patchtst.decoder is not None
@@ -263,9 +267,23 @@ def test_informer_horizon_aware_decoder_uses_event_summary_to_separate_outputs()
     repeated_decoder_input = torch.ones(2, informer.h, 2 * informer.hidden_size)
     quiet_event = torch.zeros(2, informer.hidden_size)
     active_event = torch.ones(2, informer.hidden_size)
+    quiet_path = torch.zeros(2, informer.hidden_size)
+    active_path = torch.ones(2, informer.hidden_size)
+    quiet_regime = torch.zeros(2, 4)
+    active_regime = torch.ones(2, 4)
 
-    decoded_quiet = informer.informer_decoder(repeated_decoder_input, quiet_event)
-    decoded_active = informer.informer_decoder(repeated_decoder_input, active_event)
+    decoded_quiet = informer.informer_decoder(
+        repeated_decoder_input,
+        quiet_event,
+        quiet_path,
+        quiet_regime,
+    )
+    decoded_active = informer.informer_decoder(
+        repeated_decoder_input,
+        active_event,
+        active_path,
+        active_regime,
+    )
 
     assert decoded_quiet.shape == (2, informer.h, informer.loss.outputsize_multiplier)
     assert decoded_active.shape == decoded_quiet.shape

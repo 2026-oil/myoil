@@ -1551,6 +1551,81 @@ def test_select_uncertainty_predictions_uses_distinct_prediction_seeds(monkeypat
     assert summary["candidate_samples"]["0.20"] == [[11.0], [12.0], [13.0]]
     assert summary["candidate_std_grid"][0, 0] > 0
     assert summary["candidate_std_grid"][1, 0] > 0
+    assert summary["selection_mode"] == "trajectory_min_dispersion"
+    assert summary["selected_path_idx"] in (0, 1)
+    assert summary["selected_path_score"] >= 0.0
+
+
+def test_select_uncertainty_predictions_keeps_one_dropout_for_full_trajectory(
+    monkeypatch,
+) -> None:
+    current_dropout = {"value": None}
+
+    def fake_predict_with_adapter(_nf, _adapter_inputs, *, random_seed=None):
+        dropout_p = current_dropout["value"]
+        if dropout_p == 0.1:
+            lookup = {
+                7: [10.0, 11.0],
+                8: [10.1, 11.6],
+                9: [9.9, 10.4],
+            }
+        else:
+            lookup = {
+                11: [9.0, 9.4],
+                12: [9.2, 9.5],
+                13: [8.8, 9.6],
+            }
+        values = lookup[int(random_seed)]
+        return pd.DataFrame(
+            {
+                "unique_id": ["series", "series"],
+                "AAForecast": values,
+            }
+        )
+
+    def fake_extract_target_prediction_frame(
+        predictions,
+        *,
+        target_col,
+        model_name,
+        diff_context,
+        restore_target_predictions,
+    ):
+        del target_col, model_name, diff_context, restore_target_predictions
+        return predictions.rename(columns={"AAForecast": "y_hat"})
+
+    def configure_stochastic_inference(*, enabled, dropout_p=None):
+        if enabled and dropout_p is not None:
+            current_dropout["value"] = float(dropout_p)
+
+    monkeypatch.setattr(aa_runtime, "_predict_with_adapter", fake_predict_with_adapter)
+    monkeypatch.setattr(
+        aa_runtime,
+        "_extract_target_prediction_frame",
+        fake_extract_target_prediction_frame,
+    )
+
+    model = SimpleNamespace(
+        random_seed=7,
+        configure_stochastic_inference=configure_stochastic_inference,
+    )
+    summary = aa_runtime._select_uncertainty_predictions(
+        nf=object(),
+        adapter_inputs=object(),
+        model=model,
+        model_name="AAForecast",
+        target_col="series",
+        diff_context=None,
+        restore_target_predictions=None,
+        prediction_column="y_hat",
+        dropout_candidates=(0.1, 0.2),
+        sample_count=3,
+    )
+
+    assert summary["selection_mode"] == "trajectory_min_dispersion"
+    assert summary["selected_path_idx"] == 1
+    assert summary["selected_dropout"].tolist() == [0.2, 0.2]
+    assert summary["mean"].tolist() == pytest.approx([9.0, 9.5])
 
 
 def test_validate_only_rejects_yaml_managed_aaforecast_dropout_candidates(
