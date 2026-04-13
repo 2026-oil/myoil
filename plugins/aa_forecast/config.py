@@ -41,7 +41,7 @@ AA_FORECAST_LINKED_KEYS = {
     "uncertainty",
     "retrieval",
 }
-AA_FORECAST_UNCERTAINTY_KEYS = {"enabled", "sample_count"}
+AA_FORECAST_UNCERTAINTY_KEYS = {"enabled", "sample_count", "dropout_candidates"}
 AA_FORECAST_STAR_ANOMALY_TAIL_KEYS = {"upward", "two_sided"}
 AA_FORECAST_RETRIEVAL_KEYS = {
     "enabled",
@@ -51,6 +51,10 @@ AA_FORECAST_RETRIEVAL_KEYS = {
     "min_similarity",
     "blend_max",
     "use_uncertainty_gate",
+    "use_shape_key",
+    "use_event_key",
+    "event_score_log_bonus_alpha",
+    "event_score_log_bonus_cap",
 }
 
 
@@ -96,6 +100,8 @@ class AAForecastRetrievalConfig:
     use_shape_key: bool = True
     use_event_key: bool = True
     blend_floor: float = 0.0
+    event_score_log_bonus_alpha: float = 0.0
+    event_score_log_bonus_cap: float = 0.0
 
 
 def _default_star_anomaly_tails() -> dict[str, tuple[str, ...]]:
@@ -173,6 +179,8 @@ def aa_forecast_retrieval_public_dict(
         "use_shape_key": retrieval.use_shape_key,
         "use_event_key": retrieval.use_event_key,
         "blend_floor": retrieval.blend_floor,
+        "event_score_log_bonus_alpha": retrieval.event_score_log_bonus_alpha,
+        "event_score_log_bonus_cap": retrieval.event_score_log_bonus_cap,
     }
 
 
@@ -345,6 +353,29 @@ def _coerce_probability(value: Any, *, field_name: str) -> float:
     return parsed
 
 
+def _coerce_probability_tuple(
+    value: Any,
+    *,
+    field_name: str,
+    default: tuple[float, ...],
+) -> tuple[float, ...]:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        raise ValueError(f"{field_name} must be a list of probabilities")
+    if not isinstance(value, (list, tuple)):
+        raise ValueError(f"{field_name} must be a list of probabilities")
+    if not value:
+        raise ValueError(f"{field_name} must not be empty")
+    normalized = tuple(
+        _coerce_probability(item, field_name=f"{field_name}[{idx}]")
+        for idx, item in enumerate(value)
+    )
+    if len(set(normalized)) != len(normalized):
+        raise ValueError(f"{field_name} must not contain duplicates")
+    return tuple(sorted(normalized))
+
+
 def _coerce_non_negative_float(value: Any, *, field_name: str) -> float:
     if isinstance(value, bool):
         raise ValueError(f"{field_name} must be numeric")
@@ -387,9 +418,14 @@ def _normalize_uncertainty_config(
         field_name=f"{section}.enabled",
         default=False,
     )
-    dropout_candidates = AAForecastUncertaintyConfig().dropout_candidates
+    default_uncertainty = AAForecastUncertaintyConfig()
+    dropout_candidates = _coerce_probability_tuple(
+        payload.get("dropout_candidates"),
+        field_name=f"{section}.dropout_candidates",
+        default=default_uncertainty.dropout_candidates,
+    )
     sample_count = _coerce_positive_int(
-        payload.get("sample_count", AAForecastUncertaintyConfig().sample_count),
+        payload.get("sample_count", default_uncertainty.sample_count),
         field_name=f"{section}.sample_count",
     )
     return AAForecastUncertaintyConfig(
@@ -458,9 +494,38 @@ def _normalize_retrieval_config(
         field_name=f"{section}.use_uncertainty_gate",
         default=AAForecastRetrievalConfig().use_uncertainty_gate,
     )
+    use_shape_key = coerce_bool(
+        payload.get("use_shape_key", AAForecastRetrievalConfig().use_shape_key),
+        field_name=f"{section}.use_shape_key",
+        default=AAForecastRetrievalConfig().use_shape_key,
+    )
+    use_event_key = coerce_bool(
+        payload.get("use_event_key", AAForecastRetrievalConfig().use_event_key),
+        field_name=f"{section}.use_event_key",
+        default=AAForecastRetrievalConfig().use_event_key,
+    )
+    event_score_log_bonus_alpha = _coerce_non_negative_float(
+        payload.get(
+            "event_score_log_bonus_alpha",
+            AAForecastRetrievalConfig().event_score_log_bonus_alpha,
+        ),
+        field_name=f"{section}.event_score_log_bonus_alpha",
+    )
+    event_score_log_bonus_cap = _coerce_non_negative_float(
+        payload.get(
+            "event_score_log_bonus_cap",
+            AAForecastRetrievalConfig().event_score_log_bonus_cap,
+        ),
+        field_name=f"{section}.event_score_log_bonus_cap",
+    )
     if enabled and not uncertainty.enabled:
         raise ValueError(
             f"{section}.enabled=true requires aa_forecast.uncertainty.enabled=true"
+        )
+    if enabled and not (use_shape_key or use_event_key):
+        raise ValueError(
+            f"{section}.enabled=true requires at least one of "
+            f"{section}.use_shape_key or {section}.use_event_key to be true"
         )
     return AAForecastRetrievalConfig(
         enabled=enabled,
@@ -470,6 +535,10 @@ def _normalize_retrieval_config(
         min_similarity=min_similarity,
         blend_max=blend_max,
         use_uncertainty_gate=use_uncertainty_gate,
+        use_shape_key=use_shape_key,
+        use_event_key=use_event_key,
+        event_score_log_bonus_alpha=event_score_log_bonus_alpha,
+        event_score_log_bonus_cap=event_score_log_bonus_cap,
     )
 
 

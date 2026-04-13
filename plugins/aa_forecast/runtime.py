@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,9 @@ import torch
 from neuralforecast import NeuralForecast
 
 from . import config as _cfg
+
+RETRIEVAL_SHAPE_WEIGHT = 0.20
+RETRIEVAL_EVENT_WEIGHT = 0.80
 
 
 def _stage_root(run_root: Path) -> Path:
@@ -794,7 +798,30 @@ def _retrieve_event_neighbors(
         event_similarity = _cosine_similarity(
             query["event_vector"], entry["event_vector"]
         )
-        similarity = 0.4 * shape_similarity + 0.6 * event_similarity
+        event_component = event_similarity
+        if retrieval_cfg.use_event_key and retrieval_cfg.event_score_log_bonus_alpha > 0.0:
+            query_event_score = max(float(query["event_score"]), 1e-8)
+            candidate_event_score = max(float(entry["event_score"]), 1e-8)
+            event_score_log_bonus = min(
+                max(math.log(candidate_event_score / query_event_score), 0.0),
+                retrieval_cfg.event_score_log_bonus_cap,
+            )
+            event_component = event_component + (
+                retrieval_cfg.event_score_log_bonus_alpha * event_score_log_bonus
+            )
+        if retrieval_cfg.use_shape_key and retrieval_cfg.use_event_key:
+            similarity = (
+                RETRIEVAL_SHAPE_WEIGHT * shape_similarity
+                + RETRIEVAL_EVENT_WEIGHT * event_component
+            )
+        elif retrieval_cfg.use_event_key:
+            similarity = event_component
+        elif retrieval_cfg.use_shape_key:
+            similarity = shape_similarity
+        else:
+            raise ValueError(
+                "aa_forecast retrieval requires at least one similarity key enabled"
+            )
         if similarity < retrieval_cfg.min_similarity:
             continue
         scored_neighbors.append(

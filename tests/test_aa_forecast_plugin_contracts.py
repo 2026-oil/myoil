@@ -1059,6 +1059,53 @@ def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(
     assert predictions["aaforecast_retrieval_applied"].tolist() == [True]
 
 
+def test_retrieve_event_neighbors_event_score_bonus_can_flip_top1() -> None:
+    retrieval_cfg = SimpleNamespace(
+        top_k=1,
+        event_score_threshold=0.1,
+        min_similarity=0.0,
+        temperature=0.1,
+        use_shape_key=False,
+        use_event_key=True,
+        event_score_log_bonus_alpha=0.15,
+        event_score_log_bonus_cap=0.1,
+    )
+    query = {
+        "event_score": 1.0,
+        "shape_vector": np.array([1.0, 0.0], dtype=float),
+        "event_vector": np.array([1.0, 0.0], dtype=float),
+    }
+    bank = [
+        {
+            "candidate_end_ds": "plain-top1",
+            "candidate_future_end_ds": "plain-top1+2",
+            "shape_vector": np.array([1.0, 0.0], dtype=float),
+            "event_vector": np.array([0.885, np.sqrt(1 - 0.885**2)], dtype=float),
+            "event_score": 1.0,
+            "anchor_target_value": 1.0,
+            "future_returns": np.array([0.02, 0.03], dtype=float),
+        },
+        {
+            "candidate_end_ds": "spike-analogue",
+            "candidate_future_end_ds": "spike-analogue+2",
+            "shape_vector": np.array([1.0, 0.0], dtype=float),
+            "event_vector": np.array([0.872, np.sqrt(1 - 0.872**2)], dtype=float),
+            "event_score": 1.2,
+            "anchor_target_value": 1.0,
+            "future_returns": np.array([0.08, 0.18], dtype=float),
+        },
+    ]
+
+    result = aa_runtime._retrieve_event_neighbors(
+        query=query,
+        bank=bank,
+        retrieval_cfg=retrieval_cfg,
+    )
+
+    assert result["retrieval_applied"] is True
+    assert result["top_neighbors"][0]["candidate_end_ds"] == "spike-analogue"
+
+
 def test_predict_aa_forecast_fold_records_retrieval_skip_without_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
