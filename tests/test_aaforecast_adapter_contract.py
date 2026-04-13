@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import torch
 
+from neuralforecast.models.aaforecast.model import AAForecast
 from neuralforecast.models.aaforecast.backbones import (
     AA_SUPPORTED_BACKBONES,
     build_aaforecast_backbone,
@@ -11,6 +12,38 @@ from plugins.aa_forecast.modules import (
     ITransformerTokenSparseAttention,
     TimeXerTokenSparseAttention,
 )
+
+
+def _make_aaforecast(backbone: str) -> AAForecast:
+    return AAForecast(
+        h=2,
+        input_size=4,
+        backbone=backbone,
+        hidden_size=8,
+        encoder_hidden_size=8,
+        encoder_n_layers=1,
+        encoder_layers=1,
+        encoder_dropout=0.1,
+        n_head=2,
+        n_heads=2,
+        dropout=0.1,
+        linear_hidden_size=16,
+        factor=1,
+        decoder_hidden_size=8,
+        decoder_layers=2,
+        d_ff=16,
+        use_norm=True,
+        hist_exog_list=["event"],
+        star_hist_exog_list=["event"],
+        non_star_hist_exog_list=[],
+        star_hist_exog_tail_modes=["upward"],
+        scaler_type="identity",
+        max_steps=1,
+        val_check_steps=1,
+        batch_size=1,
+        windows_batch_size=1,
+        inference_windows_batch_size=1,
+    ).eval()
 
 
 def test_adapter_contract_requires_b_time_hidden_output() -> None:
@@ -205,3 +238,37 @@ def test_supported_backbones_registry_remains_stable_after_router_split() -> Non
         "patchtst",
         "timexer",
     }
+
+
+def test_informer_uses_horizon_aware_decoder_while_non_informer_paths_keep_shared_decoder() -> None:
+    informer = _make_aaforecast("informer")
+    patchtst = _make_aaforecast("patchtst")
+
+    assert informer.informer_decoder is not None
+    assert informer.decoder is None
+    assert informer.timexer_decoder is None
+    assert informer.itransformer_decoder is None
+    assert len(informer.informer_decoder.horizon_heads) == informer.h
+
+    assert patchtst.informer_decoder is None
+    assert patchtst.decoder is not None
+    assert patchtst.decoder.layers[0].in_features == 2 * patchtst.encoder_hidden_size
+
+
+def test_informer_horizon_aware_decoder_uses_event_summary_to_separate_outputs() -> None:
+    torch.manual_seed(7)
+    informer = _make_aaforecast("informer")
+    assert informer.informer_decoder is not None
+
+    repeated_decoder_input = torch.ones(2, informer.h, 2 * informer.hidden_size)
+    quiet_event = torch.zeros(2, informer.hidden_size)
+    active_event = torch.ones(2, informer.hidden_size)
+
+    decoded_quiet = informer.informer_decoder(repeated_decoder_input, quiet_event)
+    decoded_active = informer.informer_decoder(repeated_decoder_input, active_event)
+
+    assert decoded_quiet.shape == (2, informer.h, informer.loss.outputsize_multiplier)
+    assert decoded_active.shape == decoded_quiet.shape
+    adjacent_gap = (decoded_active[:, 0, :] - decoded_active[:, 1, :]).abs().mean().item()
+    assert adjacent_gap > 1e-6
+    assert not torch.allclose(decoded_quiet, decoded_active)

@@ -24,6 +24,127 @@ from .models.base import AATimeXerTokenStates
 from ..timexer import FlattenHead
 
 
+class InformerHorizonAwareHead(nn.Module):
+    """Informer-only horizon-aware decoder head with event gating.
+
+    Keeps the decode specialization local to the Informer path while letting the
+    shared event summary influence each horizon differently.
+    """
+
+    def __init__(
+        self,
+        *,
+        h: int,
+        in_features: int,
+        event_features: int,
+        hidden_size: int,
+        out_features: int,
+        num_layers: int,
+        dropout: float,
+    ) -> None:
+        super().__init__()
+        self.h = int(h)
+        self.base_in_features = int(in_features)
+        self.event_features = int(event_features)
+        self.hidden_size = int(hidden_size)
+        self.horizon_embeddings = nn.Embedding(
+            num_embeddings=self.h,
+            embedding_dim=self.hidden_size,
+        )
+        self.event_gate = nn.Sequential(
+            nn.Linear(self.event_features + self.hidden_size, self.event_features),
+            nn.Sigmoid(),
+        )
+        self.shared_trunk = MLP(
+            in_features=(
+                self.base_in_features + self.hidden_size + (2 * self.event_features)
+            ),
+            out_features=hidden_size,
+            hidden_size=hidden_size,
+            num_layers=1,
+            activation="ReLU",
+            dropout=dropout,
+        )
+        head_num_layers = max(1, int(num_layers) - 1)
+        self.horizon_heads = nn.ModuleList(
+            [
+                MLP(
+                    in_features=hidden_size,
+                    out_features=out_features,
+                    hidden_size=hidden_size,
+                    num_layers=head_num_layers,
+                    activation="ReLU",
+                    dropout=dropout,
+                )
+                for _ in range(self.h)
+            ]
+        )
+
+    def build_horizon_context(
+        self,
+        *,
+        batch_size: int,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        horizon_ids = torch.arange(self.h, device=device)
+        horizon_context = self.horizon_embeddings(horizon_ids)
+        return horizon_context.unsqueeze(0).expand(batch_size, -1, -1).to(dtype=dtype)
+
+    def forward(
+        self,
+        decoder_input: torch.Tensor,
+        event_summary: torch.Tensor,
+    ) -> torch.Tensor:
+        if decoder_input.ndim != 3:
+            raise ValueError(
+                "InformerHorizonAwareHead decoder_input must be rank-3 [B, h, features]"
+            )
+        if decoder_input.shape[1] != self.h:
+            raise ValueError(
+                f"InformerHorizonAwareHead expected horizon dimension {self.h}, "
+                f"got {decoder_input.shape[1]}"
+            )
+        if event_summary.ndim != 2:
+            raise ValueError(
+                "InformerHorizonAwareHead event_summary must be rank-2 [B, features]"
+            )
+        if event_summary.shape[0] != decoder_input.shape[0]:
+            raise ValueError(
+                "InformerHorizonAwareHead event_summary batch must match decoder_input batch"
+            )
+        if event_summary.shape[1] != self.event_features:
+            raise ValueError(
+                "InformerHorizonAwareHead event_summary width must match event_features"
+            )
+        horizon_context = self.build_horizon_context(
+            batch_size=decoder_input.shape[0],
+            device=decoder_input.device,
+            dtype=decoder_input.dtype,
+        )
+        repeated_event = event_summary.unsqueeze(1).expand(-1, self.h, -1).to(
+            dtype=decoder_input.dtype
+        )
+        event_gate = self.event_gate(torch.cat([repeated_event, horizon_context], dim=-1))
+        conditioned = torch.cat(
+            [
+                decoder_input,
+                horizon_context,
+                repeated_event,
+                repeated_event * event_gate,
+            ],
+            dim=-1,
+        )
+        trunk_features = self.shared_trunk(conditioned)
+        return torch.cat(
+            [
+                head(trunk_features[:, horizon_idx : horizon_idx + 1, :])
+                for horizon_idx, head in enumerate(self.horizon_heads)
+            ],
+            dim=1,
+        )
+
+
 class AAForecast(BaseModel):
     """AAForecast
 
@@ -37,6 +158,7 @@ class AAForecast(BaseModel):
     EXOGENOUS_STAT = False
     MULTIVARIATE = False
     RECURRENT = False
+    EVENT_SUMMARY_SIZE = 9
 
     def __init__(
         self,
@@ -241,6 +363,8 @@ class AAForecast(BaseModel):
             )
             self.decoder = None
             self.itransformer_decoder = None
+            self.informer_decoder = None
+            self.event_summary_projector = None
         elif self.backbone == "itransformer":
             self.itransformer_decoder = nn.Linear(
                 2 * self.encoder_hidden_size,
@@ -248,6 +372,29 @@ class AAForecast(BaseModel):
             )
             self.decoder = None
             self.timexer_decoder = None
+            self.informer_decoder = None
+            self.event_summary_projector = None
+        elif self.backbone == "informer":
+            self.event_summary_projector = MLP(
+                in_features=self.EVENT_SUMMARY_SIZE,
+                out_features=self.encoder_hidden_size,
+                hidden_size=max(self.encoder_hidden_size, decoder_hidden_size),
+                num_layers=2,
+                activation="ReLU",
+                dropout=self.encoder_dropout,
+            )
+            self.informer_decoder = InformerHorizonAwareHead(
+                h=self.h,
+                in_features=2 * self.encoder_hidden_size,
+                event_features=self.encoder_hidden_size,
+                hidden_size=decoder_hidden_size,
+                out_features=self.loss.outputsize_multiplier,
+                num_layers=decoder_layers,
+                dropout=self.encoder_dropout,
+            )
+            self.decoder = None
+            self.timexer_decoder = None
+            self.itransformer_decoder = None
         else:
             self.decoder = MLP(
                 in_features=2 * self.encoder_hidden_size,
@@ -259,6 +406,8 @@ class AAForecast(BaseModel):
             )
             self.timexer_decoder = None
             self.itransformer_decoder = None
+            self.informer_decoder = None
+            self.event_summary_projector = None
 
     def configure_stochastic_inference(
         self,
@@ -316,12 +465,32 @@ class AAForecast(BaseModel):
             if star_hist_outputs is not None
             else insample_y.new_empty((insample_y.size(0), insample_y.size(1), 0))
         )
+        target_signed_score = target_star["robust_score_signed"]
+        star_hist_signed_score = (
+            star_hist_outputs["robust_score_signed"]
+            if star_hist_outputs is not None
+            else insample_y.new_empty((insample_y.size(0), insample_y.size(1), 0))
+        )
+        event_summary = self._build_event_summary_from_payload(
+            {
+                "critical_mask": combined_count > 0,
+                "count_active_channels": combined_count,
+                "channel_activity": torch.cat([target_activity, star_hist_activity], dim=2),
+                "target_activity": target_activity,
+                "star_hist_activity": star_hist_activity,
+                "target_signed_score": target_signed_score,
+                "star_hist_signed_score": star_hist_signed_score,
+            },
+            dtype=insample_y.dtype,
+            device=insample_y.device,
+        )
         return {
             "target_trend": target_star["trend"],
             "target_seasonal": target_star["seasonal"],
             "target_anomalies": target_star["anomalies"],
             "target_residual": target_star["residual"],
             "target_activity": target_activity,
+            "target_signed_score": target_signed_score,
             "star_hist_trend": (
                 star_hist_outputs["trend"]
                 if star_hist_outputs is not None
@@ -353,7 +522,9 @@ class AAForecast(BaseModel):
             "critical_mask": combined_count > 0,
             "count_active_channels": combined_count,
             "star_hist_activity": star_hist_activity,
+            "star_hist_signed_score": star_hist_signed_score,
             "channel_activity": torch.cat([target_activity, star_hist_activity], dim=2),
+            "event_summary": event_summary,
         }
 
     def _build_star_phase_cache(
@@ -558,6 +729,129 @@ class AAForecast(BaseModel):
     def _reduce_critical_mask(mask: torch.Tensor | None, *, template: torch.Tensor) -> torch.Tensor:
         return AAForecast._count_active_channels(mask, template=template) > 0
 
+    @staticmethod
+    def _mean_feature(
+        values: torch.Tensor,
+        *,
+        keepdim: bool = True,
+    ) -> torch.Tensor:
+        if values.numel() == 0 or values.shape[-1] == 0:
+            shape = (values.shape[0], 1) if keepdim else (values.shape[0],)
+            return values.new_zeros(shape)
+        return values.mean(dim=(1, 2), keepdim=keepdim)
+
+    @staticmethod
+    def _weighted_mean_feature(
+        values: torch.Tensor,
+        *,
+        weights: torch.Tensor,
+        keepdim: bool = True,
+    ) -> torch.Tensor:
+        if values.numel() == 0 or values.shape[-1] == 0:
+            shape = (values.shape[0], 1) if keepdim else (values.shape[0],)
+            return values.new_zeros(shape)
+        denom = weights.sum().clamp_min(1e-6) * values.shape[-1]
+        reduced = (values * weights).sum(dim=(1, 2), keepdim=keepdim) / denom
+        return reduced
+
+    def _build_event_summary_from_payload(
+        self,
+        payload: dict[str, torch.Tensor],
+        *,
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> torch.Tensor:
+        critical_mask = payload["critical_mask"].to(device=device, dtype=dtype)
+        count_active_channels = payload["count_active_channels"].to(
+            device=device,
+            dtype=dtype,
+        )
+        channel_activity = payload["channel_activity"].to(device=device, dtype=dtype).clamp_min(0.0)
+        seq_len = critical_mask.shape[1]
+        time_weights = torch.linspace(
+            0.25,
+            1.0,
+            steps=seq_len,
+            device=device,
+            dtype=dtype,
+        ).view(1, seq_len, 1)
+
+        target_activity = payload.get("target_activity")
+        if target_activity is None:
+            target_activity = channel_activity[:, :, :1]
+        else:
+            target_activity = target_activity.to(device=device, dtype=dtype).clamp_min(0.0)
+
+        star_hist_activity = payload.get("star_hist_activity")
+        if star_hist_activity is None:
+            star_hist_activity = channel_activity[:, :, 1:]
+        else:
+            star_hist_activity = star_hist_activity.to(device=device, dtype=dtype).clamp_min(0.0)
+
+        target_signed_score = payload.get("target_signed_score")
+        if target_signed_score is None:
+            target_positive = target_activity
+        else:
+            target_positive = target_signed_score.to(device=device, dtype=dtype).clamp_min(0.0)
+
+        star_hist_signed_score = payload.get("star_hist_signed_score")
+        if star_hist_signed_score is None:
+            hist_positive = star_hist_activity
+        else:
+            hist_positive = star_hist_signed_score.to(device=device, dtype=dtype).clamp_min(0.0)
+
+        density = critical_mask.to(dtype=dtype).mean(dim=1)
+        recent_density = (
+            critical_mask.to(dtype=dtype) * time_weights
+        ).sum(dim=1) / time_weights.sum().clamp_min(1e-6)
+        mean_count = torch.log1p(count_active_channels.mean(dim=1))
+        recent_activity = torch.log1p(
+            self._weighted_mean_feature(
+                channel_activity,
+                weights=time_weights,
+                keepdim=False,
+            ).unsqueeze(-1)
+        )
+        target_up_mass = torch.log1p(
+            self._mean_feature(target_positive, keepdim=False).unsqueeze(-1)
+        )
+        target_up_recent = torch.log1p(
+            self._weighted_mean_feature(
+                target_positive,
+                weights=time_weights,
+                keepdim=False,
+            ).unsqueeze(-1)
+        )
+        hist_up_mass = torch.log1p(
+            self._mean_feature(hist_positive, keepdim=False).unsqueeze(-1)
+        )
+        hist_up_recent = torch.log1p(
+            self._weighted_mean_feature(
+                hist_positive,
+                weights=time_weights,
+                keepdim=False,
+            ).unsqueeze(-1)
+        )
+        peak_activity = torch.log1p(
+            channel_activity.amax(dim=(1, 2), keepdim=False).unsqueeze(-1)
+        )
+        summary = torch.cat(
+            [
+                density,
+                recent_density,
+                mean_count,
+                recent_activity,
+                target_up_mass,
+                target_up_recent,
+                hist_up_mass,
+                hist_up_recent,
+                peak_activity,
+            ],
+            dim=1,
+        )
+        summary = torch.nan_to_num(summary, nan=0.0, posinf=10.0, neginf=-10.0)
+        return summary.clamp(min=-10.0, max=10.0)
+
     def _reduce_time_signal_to_timexer_patches(
         self,
         signal: torch.Tensor,
@@ -723,6 +1017,110 @@ class AAForecast(BaseModel):
         ).mean(dim=1)
         return pooled.reshape(decoded.shape[0], self.h, -1)
 
+    def _build_time_decoder_features(
+        self,
+        *,
+        hidden_states: torch.Tensor,
+        attended_states: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        hidden_aligned = _align_horizon(
+            hidden_states,
+            h=self.h,
+            input_size=self.input_size,
+            sequence_adapter=self.sequence_adapter,
+        )
+        attended_aligned = _align_horizon(
+            attended_states,
+            h=self.h,
+            input_size=self.input_size,
+            sequence_adapter=self.sequence_adapter,
+        )
+        hidden_aligned = _apply_stochastic_dropout(
+            hidden_aligned,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
+        attended_aligned = _apply_stochastic_dropout(
+            attended_aligned,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
+        return hidden_aligned, attended_aligned
+
+    def _project_event_summary(
+        self,
+        event_summary: torch.Tensor,
+    ) -> torch.Tensor:
+        if self.event_summary_projector is None:
+            raise ValueError("Event summary projector is only available for informer backbone")
+        event_summary = torch.nan_to_num(
+            event_summary,
+            nan=0.0,
+            posinf=10.0,
+            neginf=-10.0,
+        ).clamp(min=-10.0, max=10.0)
+        event_latent = self.event_summary_projector(event_summary)
+        event_latent = torch.tanh(
+            torch.nan_to_num(event_latent, nan=0.0, posinf=10.0, neginf=-10.0)
+        )
+        return _apply_stochastic_dropout(
+            event_latent,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
+
+    def _build_time_decoder_input(
+        self,
+        *,
+        hidden_states: torch.Tensor,
+        attended_states: torch.Tensor,
+    ) -> torch.Tensor:
+        hidden_aligned, attended_aligned = self._build_time_decoder_features(
+            hidden_states=hidden_states,
+            attended_states=attended_states,
+        )
+        decoder_input = torch.cat([hidden_aligned, attended_aligned], dim=-1)
+        return _apply_stochastic_dropout(
+            decoder_input,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
+
+    def _decode_informer_forecast(
+        self,
+        *,
+        hidden_states: torch.Tensor,
+        attended_states: torch.Tensor,
+        event_summary: torch.Tensor,
+    ) -> torch.Tensor:
+        if self.informer_decoder is None:
+            raise ValueError("Informer decoder is not initialized")
+        hidden_aligned, attended_aligned = self._build_time_decoder_features(
+            hidden_states=hidden_states,
+            attended_states=attended_states,
+        )
+        event_context = self._project_event_summary(event_summary)
+        decoder_input = torch.cat([hidden_aligned, attended_aligned], dim=-1)
+        decoder_input = _apply_stochastic_dropout(
+            decoder_input,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
+        return self.informer_decoder(
+            decoder_input,
+            event_context,
+        )
+
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]
         hist_exog = windows_batch["hist_exog"]
@@ -824,45 +1222,34 @@ class AAForecast(BaseModel):
             device=hidden_states.device,
             dtype=hidden_states.dtype,
         )
+        event_summary = star_payload.get("event_summary")
+        if event_summary is None:
+            event_summary = self._build_event_summary_from_payload(
+                star_payload,
+                dtype=hidden_states.dtype,
+                device=hidden_states.device,
+            )
+        else:
+            event_summary = event_summary.to(
+                device=hidden_states.device,
+                dtype=hidden_states.dtype,
+            )
         attended_states, _ = self.attention(
             hidden_states,
             critical_mask,
             count_active_channels,
             channel_activity,
         )
-
-        hidden_aligned = _align_horizon(
-            hidden_states,
-            h=self.h,
-            input_size=self.input_size,
-            sequence_adapter=self.sequence_adapter,
-        )
-        attended_aligned = _align_horizon(
-            attended_states,
-            h=self.h,
-            input_size=self.input_size,
-            sequence_adapter=self.sequence_adapter,
-        )
-        hidden_aligned = _apply_stochastic_dropout(
-            hidden_aligned,
-            training=self.training,
-            stochastic_inference_enabled=self._stochastic_inference_enabled,
-            train_dropout_p=self.encoder_dropout,
-            inference_dropout_p=self._stochastic_dropout_p,
-        )
-        attended_aligned = _apply_stochastic_dropout(
-            attended_aligned,
-            training=self.training,
-            stochastic_inference_enabled=self._stochastic_inference_enabled,
-            train_dropout_p=self.encoder_dropout,
-            inference_dropout_p=self._stochastic_dropout_p,
-        )
-        decoder_input = torch.cat([hidden_aligned, attended_aligned], dim=-1)
-        decoder_input = _apply_stochastic_dropout(
-            decoder_input,
-            training=self.training,
-            stochastic_inference_enabled=self._stochastic_inference_enabled,
-            train_dropout_p=self.encoder_dropout,
-            inference_dropout_p=self._stochastic_dropout_p,
+        if self.backbone == "informer":
+            return self._decode_informer_forecast(
+                hidden_states=hidden_states,
+                attended_states=attended_states,
+                event_summary=event_summary,
+            )
+        if self.decoder is None:
+            raise ValueError("Shared decoder is not initialized")
+        decoder_input = self._build_time_decoder_input(
+            hidden_states=hidden_states,
+            attended_states=attended_states,
         )
         return self.decoder(decoder_input)[:, -self.h :]
