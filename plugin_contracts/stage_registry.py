@@ -1,15 +1,19 @@
 """Global registry for :class:`~plugin_contracts.stage_plugin.StagePlugin` instances.
 
-Concrete stage plugins (e.g. ``bs_preforcast``) register themselves at import
+Concrete stage plugins (e.g. ``aa_forecast``) register themselves at import
 time so that the runtime never references them directly.
 """
 from __future__ import annotations
 
+import importlib
+import importlib.util
+import pkgutil
 from typing import Any
 
 from plugin_contracts.stage_plugin import StagePlugin
 
 _STAGE_PLUGINS: dict[str, StagePlugin] = {}
+_PLUGINS_DISCOVERED = False
 
 
 def register_stage_plugin(plugin: StagePlugin) -> None:
@@ -25,21 +29,30 @@ def get_stage_plugin(key: str) -> StagePlugin | None:
 
 
 def all_stage_plugins() -> dict[str, StagePlugin]:
+    _ensure_plugins_loaded()
     return dict(_STAGE_PLUGINS)
 
 
 def _ensure_plugins_loaded() -> None:
-    """Trigger lazy discovery of known stage-plugin packages.
+    """Trigger lazy discovery of installed stage-plugin packages.
 
     Called once during config loading so that plugins registered via their
-    package ``__init__`` are available without requiring an explicit import
+    package ``plugin.py`` are available without requiring an explicit import
     in the runtime bootstrap path.
     """
-    if _STAGE_PLUGINS:
+    global _PLUGINS_DISCOVERED
+    if _PLUGINS_DISCOVERED:
         return
-    import plugins.aa_forecast.plugin  # noqa: F401  side-effect: registers plugin
-    import plugins.bs_preforcast.plugin  # noqa: F401  side-effect: registers plugin
-    import plugins.nec.plugin  # noqa: F401  side-effect: registers plugin
+
+    import plugins
+
+    for module_info in sorted(pkgutil.iter_modules(plugins.__path__), key=lambda item: item.name):
+        plugin_module_name = f"{plugins.__name__}.{module_info.name}.plugin"
+        if importlib.util.find_spec(plugin_module_name) is None:
+            continue
+        importlib.import_module(plugin_module_name)
+
+    _PLUGINS_DISCOVERED = True
 
 
 def get_stage_plugin_for_payload(payload: dict[str, Any]) -> StagePlugin | None:
