@@ -343,9 +343,6 @@ class InformerHorizonAwareHead(nn.Module):
         self.prototype_increment_bank = nn.Parameter(
             0.05 * torch.randn(6, self.h, out_features)
         )
-        self.prototype_level_bank = nn.Parameter(
-            0.05 * torch.randn(6, out_features)
-        )
         self.memory_transport_gate_head = MLP(
             in_features=trajectory_context_features,
             out_features=out_features,
@@ -853,10 +850,7 @@ class InformerHorizonAwareHead(nn.Module):
         prototype_query = self.prototype_query_head(prototype_context)
         prototype_logits = torch.matmul(prototype_query, self.prototype_key_bank.t())
         prototype_weights = torch.softmax(prototype_logits, dim=1)
-        prototype_level = torch.matmul(
-            prototype_weights,
-            self.prototype_level_bank,
-        ).unsqueeze(1) * anchor_scale
+        prototype_level = self.prototype_level_head(prototype_context).unsqueeze(1) * anchor_scale
         prototype_increments = torch.einsum('bp,pho->bho', prototype_weights, self.prototype_increment_bank)
         prototype_gain = torch.sigmoid(self.prototype_gain_head(prototype_context)).unsqueeze(1)
         prototype_curve = prototype_increments * prototype_gain * anchor_scale
