@@ -939,7 +939,7 @@ class InformerHorizonAwareHead(nn.Module):
         semantic_spike_component = (
             semantic_spike_curve * semantic_spike_gate * semantic_spike_gain * anchor_scale
         )
-        prototype_component = (prototype_level + prototype_curve) * family_gate
+        prototype_component = (prototype_level + prototype_curve) * family_gate * memory_confidence.unsqueeze(1)
         memory_transport_states, _ = self.memory_transport_attention(
             mixed_path,
             memory_bank,

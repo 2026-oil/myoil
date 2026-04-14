@@ -2602,3 +2602,9 @@
   - the improvement is material on both horizons (`76.0894 / 79.7352` -> `76.4732 / 80.7693`), so prototype-style internal memory transport is now the new local best.
   - despite the gain, the remaining blocker is still absolute amplitude transport, especially on h2.
 - 판단: NEW BEST KEEP ON informer_test
+
+## Iteration 2026-04-15 restore exact prototype keep after confidence-damping ablation
+- timestamp: 2026-04-15T04:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact prototype keep basis after confirming that removing its confidence damping regresses the bundle
+- 판단: RESTORE TO EXACT PROTOTYPE KEEP BASIS
