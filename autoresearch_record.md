@@ -2300,3 +2300,24 @@
   - bounding the active semantic spike gain removes another obvious upward-inducing bias source while preserving the desired ordering and directionality.
   - performance is slightly below the current best guardrail-compliant keep (`76.0894 / 79.7352`), but materially above the no-cumsum-only ablation and therefore serves as blocker narrowing rather than a new keep.
 - 판단: SAFE FAILURE / KEEP AS BLOCKER NARROWING EVIDENCE
+
+## Iteration 2026-04-15 informer_test top1 memory-confidence context (blocked before bundle completion)
+- timestamp: 2026-04-15T03:xx:00+09:00
+- git branch: informer_test
+- experiment title: inject bounded top1 memory-confidence context into the recovered Informer attended path to strengthen semantic tradeoff activation without retrieval or output shaping
+- 가설 배경:
+  - `iter_20260415_drop_sem_curve_restore_gru_bundle1`의 low run은 `selection_mode=trajectory_min_dispersion`, `candidate_semantic_scores=0` 이었고,
+  - 이후 best keep `iter_20260415_anomaly_context_restore_gru_bundle1`는 semantic score가 양수로 회복되며 `76.0894 / 79.7352`까지 개선됨.
+  - 그래서 retrieval `top_k=1` 철학을 직접 retrieval로 쓰지 않고, internal top1 confidence를 decoder transformer context에 넣으면 semantic activation이 더 안정화될 수 있다는 가설을 세움.
+- 정적 검증:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py` PASS
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py` PASS (`36 passed`)
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml` PASS
+- 런타임 결과:
+  - strict 3-way bundle `iter_20260415_memory_conf_restore_gru_bundle3`에서 AA-Informer training 단계 초기에 shape contract failure 발생
+  - log path: `runs/iter_20260415_memory_conf_restore_gru_bundle3/logs/aa_informer.log`
+  - failure: `RuntimeError: The size of tensor a (64) must match the size of tensor b (15) at non-singleton dimension 0`
+- 핵심 진단:
+  - internal memory confidence는 informer decode path에 넣을 만한 신호 후보이지만, 현재 implementation은 batch/time contract를 깨뜨림.
+  - 즉 이 hypothesis는 개념적으로는 non-duplicate였지만, 현재 informer path shape contract를 다시 흔드는 방식이라 바로 다음 live lane으로 쓰기에는 위험.
+- 판단: BLOCKED, revert implementation and keep only blocker note
