@@ -379,52 +379,6 @@ def test_informer_semantic_spike_gain_is_bounded_without_forced_amplification() 
     assert torch.all(gain <= 1)
 
 
-def test_informer_horizon_aware_decoder_accepts_optional_anomaly_summary() -> None:
-    torch.manual_seed(19)
-    informer = _make_aaforecast("informer")
-    head = informer.informer_decoder
-    assert head is not None
-
-    decoder_input = torch.ones(2, informer.h, 2 * informer.hidden_size)
-    event_summary = torch.zeros(2, informer.hidden_size)
-    event_path = torch.zeros(2, informer.hidden_size)
-    raw_regime = torch.zeros(2, informer.NON_STAR_REGIME_SIZE)
-    pooled_context = torch.zeros(2, informer.hidden_size)
-    memory_signal = torch.zeros(2, 1)
-    anchor_value = torch.ones(2, informer.loss.outputsize_multiplier)
-    memory_token = torch.zeros(2, informer.hidden_size)
-    memory_bank = torch.zeros(2, 2, informer.hidden_size)
-
-    decoded_quiet = head(
-        decoder_input,
-        event_summary,
-        event_path,
-        raw_regime,
-        pooled_context,
-        memory_signal,
-        anchor_value,
-        memory_token,
-        memory_bank,
-        torch.zeros(2, 2),
-    )
-    decoded_active = head(
-        decoder_input,
-        event_summary,
-        event_path,
-        raw_regime,
-        pooled_context,
-        memory_signal,
-        anchor_value,
-        memory_token,
-        memory_bank,
-        torch.ones(2, 2),
-    )
-
-    assert decoded_quiet.shape == (2, informer.h, informer.loss.outputsize_multiplier)
-    assert decoded_active.shape == decoded_quiet.shape
-    assert not torch.allclose(decoded_quiet, decoded_active)
-
-
 def test_informer_horizon_aware_decoder_accepts_auxiliary_memory_context() -> None:
     torch.manual_seed(11)
     informer = _make_aaforecast("informer")

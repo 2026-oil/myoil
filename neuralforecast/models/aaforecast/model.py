@@ -371,7 +371,7 @@ class InformerHorizonAwareHead(nn.Module):
             dropout=dropout,
         )
         semantic_spike_context_features = (
-            trajectory_context_features + self.pooled_features + out_features + 3
+            trajectory_context_features + self.pooled_features + out_features + 1
         )
         self.semantic_spike_seed_head = MLP(
             in_features=semantic_spike_context_features,
@@ -619,7 +619,6 @@ class InformerHorizonAwareHead(nn.Module):
         anchor_value: torch.Tensor | None = None,
         memory_token: torch.Tensor | None = None,
         memory_bank: torch.Tensor | None = None,
-        anomaly_summary: torch.Tensor | None = None,
     ) -> torch.Tensor:
         self._validate_inputs(
             decoder_input,
@@ -833,17 +832,12 @@ class InformerHorizonAwareHead(nn.Module):
             ).unsqueeze(1)
             * anchor_scale
         )
-        if anomaly_summary is None:
-            anomaly_summary = decoder_input.new_zeros((decoder_input.shape[0], 2))
-        else:
-            anomaly_summary = anomaly_summary.to(dtype=decoder_input.dtype)
         semantic_spike_context = torch.cat(
             [
                 trajectory_context,
                 memory_token,
                 anchor_value,
                 memory_signal,
-                anomaly_summary,
             ],
             dim=-1,
         )
@@ -2587,13 +2581,6 @@ class AAForecast(BaseModel):
             train_dropout_p=self.encoder_dropout,
             inference_dropout_p=self._stochastic_dropout_p,
         )
-        anomaly_summary = torch.cat(
-            [
-                regime_intensity.mean(dim=1),
-                regime_density.mean(dim=1),
-            ],
-            dim=-1,
-        )
         delta_forecast = self.informer_decoder(
             decoder_input,
             event_context,
@@ -2604,7 +2591,6 @@ class AAForecast(BaseModel):
             anchor_level[:, -1, :],
             memory_token,
             memory_bank,
-            anomaly_summary,
         )
         latest_decoder_debug = getattr(self.informer_decoder, "latest_debug", None)
         latest_memory_debug = getattr(self, "_latest_memory_debug", None)

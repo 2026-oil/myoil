@@ -2381,3 +2381,18 @@
   - moving anomaly/regime summary into the semantic spike context is shape-safe and cleaner than attended-path contamination, but it still does not recover the semantic-amplitude gap.
   - this suggests the missing lift is not explained by absent low-dimensional regime summary alone.
 - 판단: SAFE FAILURE / KEEP AS BLOCKER NARROWING EVIDENCE
+
+## Iteration 2026-04-15 restore clean guardrail basis after semantic-anomaly-summary regression
+- timestamp: 2026-04-15T03:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the active informer_test branch to the last clean guardrail basis after the semantic-anomaly-summary context variant under-shot the keep
+- 핵심 진단:
+  - semantic-anomaly-summary injection into `semantic_spike_context` was shape-safe but still regressed below the current guardrail-compliant keep.
+  - continuing on top of that regressed basis would violate the heartbeat rule and risk direction drift.
+- active basis after restore:
+  - recovered Informer decoder semantics retained
+  - anomaly-intensity context family retained only at the previously verified level
+  - no attended event-summary/event-path injection
+  - no active cumsum semantic spike forcing
+  - no forced >1 semantic spike gain floor
+- 판단: RESTORE ACTIVE BASIS
