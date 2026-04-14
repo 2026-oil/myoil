@@ -2635,3 +2635,9 @@
   - sharpening prototype selection with confidence-scaled logits is too aggressive and degrades both horizons.
   - prototype family remains valid, but this temperature-like selector sharpening should be treated as a rejected sub-branch.
 - 판단: SAFE FAILURE / REJECT PROTOTYPE-SELECTION SHARPENING
+
+## Iteration 2026-04-15 restore exact prototype keep basis after selector-sharpening regression
+- timestamp: 2026-04-15T04:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact prototype keep basis after rejecting confidence-scaled prototype selection sharpening
+- 판단: RESTORE TO EXACT PROTOTYPE KEEP BASIS
