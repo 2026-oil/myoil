@@ -2797,3 +2797,21 @@
 - git branch: informer_test
 - experiment title: restore the exact active keep basis after rejecting sqrt-scaled prototype gain
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 confidence-guided negative drag on the active compliant prototype keep
+- timestamp: 2026-04-15T06:xx:00+09:00
+- git branch: informer_test
+- experiment title: attenuate semantic negative drag by top1 confidence on top of the active compliant prototype keep
+- run/artifact path: runs/iter_20260415_proto_negdrag_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.5615 / 74.2198`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.4330 / 78.9598`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - target gates missed; this remains below the active compliant keep `75.7647 / 79.2877`
+- 핵심 진단:
+  - confidence-guided negative-drag attenuation still has signal, but once the active keep is constrained by the semantic-spike guardrails, it no longer beats the keep.
+  - therefore it stays a useful side branch, not the new baseline.
+- 판단: SAFE FAILURE / BELOW ACTIVE COMPLIANT KEEP
