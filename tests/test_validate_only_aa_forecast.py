@@ -1628,6 +1628,88 @@ def test_select_uncertainty_predictions_keeps_one_dropout_for_full_trajectory(
     assert summary["mean"].tolist() == pytest.approx([9.0, 9.5])
 
 
+def test_select_uncertainty_predictions_can_use_semantic_tradeoff(
+    monkeypatch,
+) -> None:
+    current_dropout = {"value": None}
+    model = SimpleNamespace(
+        random_seed=7,
+        configure_stochastic_inference=None,
+        _latest_decoder_debug={},
+    )
+
+    def fake_predict_with_adapter(_nf, _adapter_inputs, *, random_seed=None):
+        dropout_p = current_dropout["value"]
+        if dropout_p == 0.1:
+            lookup = {
+                7: [10.0, 10.5],
+                8: [10.1, 10.7],
+                9: [9.9, 10.3],
+            }
+            support = 0.2
+            direction = 0.56
+        else:
+            lookup = {
+                11: [9.0, 9.7],
+                12: [9.05, 9.75],
+                13: [8.95, 9.65],
+            }
+            support = 1.5
+            direction = 0.80
+        model._latest_decoder_debug = {
+            "semantic_spike_component": torch.tensor([support, support]),
+            "semantic_baseline_curve": torch.tensor([0.0, 0.0]),
+            "semantic_spike_direction": torch.tensor([direction]),
+        }
+        values = lookup[int(random_seed)]
+        return pd.DataFrame(
+            {
+                "unique_id": ["series", "series"],
+                "AAForecast": values,
+            }
+        )
+
+    def fake_extract_target_prediction_frame(
+        predictions,
+        *,
+        target_col,
+        model_name,
+        diff_context,
+        restore_target_predictions,
+    ):
+        del target_col, model_name, diff_context, restore_target_predictions
+        return predictions.rename(columns={"AAForecast": "y_hat"})
+
+    def configure_stochastic_inference(*, enabled, dropout_p=None):
+        if enabled and dropout_p is not None:
+            current_dropout["value"] = float(dropout_p)
+
+    model.configure_stochastic_inference = configure_stochastic_inference
+    monkeypatch.setattr(aa_runtime, "_predict_with_adapter", fake_predict_with_adapter)
+    monkeypatch.setattr(
+        aa_runtime,
+        "_extract_target_prediction_frame",
+        fake_extract_target_prediction_frame,
+    )
+
+    summary = aa_runtime._select_uncertainty_predictions(
+        nf=SimpleNamespace(models=[model]),
+        adapter_inputs=object(),
+        model=model,
+        model_name="AAForecast",
+        target_col="series",
+        diff_context=None,
+        restore_target_predictions=None,
+        prediction_column="y_hat",
+        dropout_candidates=(0.1, 0.2),
+        sample_count=3,
+    )
+
+    assert summary["selection_mode"] == "trajectory_semantic_tradeoff"
+    assert summary["selected_path_idx"] == 1
+    assert summary["selected_dropout"].tolist() == [0.2, 0.2]
+
+
 def test_validate_only_rejects_yaml_managed_aaforecast_dropout_candidates(
     tmp_path: Path,
 ) -> None:

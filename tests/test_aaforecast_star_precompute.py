@@ -143,6 +143,12 @@ def test_star_precompute_validation_cache_reuses_phase_payload() -> None:
         "channel_activity",
         "event_summary",
         "event_trajectory",
+        "non_star_regime_activity",
+        "non_star_star_activity",
+        "non_star_star_count",
+        "non_star_regime_count",
+        "regime_intensity",
+        "regime_density",
     ):
         assert key in payload1
         assert torch.equal(payload1[key], payload2[key])
@@ -216,6 +222,12 @@ def test_star_precompute_supports_zero_anomaly_windows() -> None:
     assert torch.count_nonzero(payload["channel_activity"]) == 0
     assert torch.count_nonzero(payload["event_summary"]) == 0
     assert torch.count_nonzero(payload["event_trajectory"]) == 0
+    assert torch.count_nonzero(payload["non_star_regime_activity"]) == 0
+    assert torch.count_nonzero(payload["non_star_star_activity"]) == 0
+    assert torch.count_nonzero(payload["non_star_star_count"]) == 0
+    assert torch.count_nonzero(payload["non_star_regime_count"]) == 0
+    assert torch.count_nonzero(payload["regime_intensity"]) == 0
+    assert torch.count_nonzero(payload["regime_density"]) == 0
 
 
 def test_event_summary_tracks_recent_upward_activity_strength() -> None:
@@ -326,6 +338,36 @@ def test_event_trajectory_tracks_recent_upward_shift() -> None:
     assert later.shape == (1, model.EVENT_TRAJECTORY_SIZE)
     assert later[0, 0] > earlier[0, 0]
     assert later[0, 10] > earlier[0, 10]
+
+
+def test_non_star_regime_activity_tracks_joint_positive_burst() -> None:
+    model = _build_model()
+    quiet = torch.tensor(
+        [[[0.0, 0.0], [0.2, 0.1], [0.0, 0.3], [0.1, 0.0]]], dtype=torch.float32
+    )
+    burst = torch.tensor(
+        [[[0.0, 0.0], [0.2, 0.1], [5.0, 4.5], [6.0, 5.5]]], dtype=torch.float32
+    )
+
+    quiet_activity, quiet_count = model._build_non_star_regime_activity(
+        quiet,
+        dtype=torch.float32,
+        device=torch.device("cpu"),
+        batch_size=1,
+        seq_len=4,
+    )
+    burst_activity, burst_count = model._build_non_star_regime_activity(
+        burst,
+        dtype=torch.float32,
+        device=torch.device("cpu"),
+        batch_size=1,
+        seq_len=4,
+    )
+
+    assert quiet_activity.shape == quiet.shape
+    assert quiet_count.shape == (1, 4, 1)
+    assert burst_activity.sum() > quiet_activity.sum()
+    assert burst_count[:, -2:, :].sum() > quiet_count[:, -2:, :].sum()
 
 
 def test_count_active_channels_preserves_multi_channel_density() -> None:

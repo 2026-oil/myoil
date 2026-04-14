@@ -20,22 +20,24 @@ aa_forecast:
     - 0.3
     sample_count: 30
   model_params: 
-    hidden_size: 128
+    hidden_size: 160
     n_head: 4
     encoder_layers: 2
     dropout: 0.0
-    linear_hidden_size: 96
+    linear_hidden_size: 128
     factor: 3
-    decoder_hidden_size: 128
+    decoder_hidden_size: 192
     decoder_layers: 4
     season_length: 4
   star_anomaly_tails:
     upward:
     - GPRD_THREAT
+    - BS_Core_Index_A
+    - GPRD
     two_sided: []
   thresh: 3.5
   retrieval:
-    enabled: true
+    enabled: false
     top_k: 1
     event_score_threshold: 400.0
     min_similarity: 0.35

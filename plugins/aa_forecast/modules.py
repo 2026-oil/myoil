@@ -117,9 +117,8 @@ class STARFeatureExtractor(nn.Module):
         mad = (
             (residual - residual_center)
             .abs()
-            .median(dim=1, keepdim=True)
-            .values.clamp_min(1e-4)
         )
+        mad = mad.median(dim=1, keepdim=True).values.clamp_min(1e-4)
         signed_score = 0.6745 * (residual - residual_center) / mad
         abs_score = signed_score.abs()
         return signed_score, abs_score

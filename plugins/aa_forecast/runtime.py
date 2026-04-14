@@ -249,14 +249,57 @@ def _select_uncertainty_predictions(
     dropout_candidates: tuple[float, ...],
     sample_count: int,
 ) -> dict[str, Any]:
+    def _extract_debug_scalar(
+        debug: dict[str, Any] | None,
+        key: str,
+        *,
+        positive_only: bool = False,
+        negative_only: bool = False,
+    ) -> float | None:
+        if not isinstance(debug, dict):
+            return None
+        value = debug.get(key)
+        if value is None:
+            return None
+        if hasattr(value, "detach"):
+            value = value.detach().cpu().numpy()
+        arr = np.asarray(value, dtype=float).reshape(-1)
+        if arr.size == 0:
+            return None
+        if positive_only:
+            arr = np.clip(arr, 0.0, None)
+        if negative_only:
+            arr = np.clip(-arr, 0.0, None)
+        return float(arr.mean())
+
+    def _normalize(values: np.ndarray) -> np.ndarray:
+        values = np.asarray(values, dtype=float)
+        if values.size == 0:
+            return values
+        min_value = float(values.min())
+        max_value = float(values.max())
+        if not np.isfinite(min_value) or not np.isfinite(max_value):
+            return np.zeros_like(values)
+        spread = max_value - min_value
+        if spread <= 1e-8:
+            return np.zeros_like(values)
+        return (values - min_value) / spread
+
     candidate_means: list[np.ndarray] = []
     candidate_stds: list[np.ndarray] = []
     candidate_samples: dict[str, list[list[float]]] = {}
+    candidate_spike_support: list[float] = []
+    candidate_baseline_drag: list[float] = []
+    candidate_direction_mean: list[float] = []
     base_seed = int(getattr(model, "random_seed", 1) or 1)
     seed_stride = max(sample_count, 1) + 1
     for dropout_idx, dropout_p in enumerate(dropout_candidates):
         model.configure_stochastic_inference(enabled=True, dropout_p=dropout_p)
         samples: list[np.ndarray] = []
+        sample_spike_supports: list[float] = []
+        sample_baseline_drags: list[float] = []
+        sample_direction_means: list[float] = []
+        sample_semantic_scores: list[float] = []
         for sample_idx in range(sample_count):
             sample_seed = base_seed + dropout_idx * seed_stride + sample_idx
             predictions = _predict_with_adapter(
@@ -272,15 +315,93 @@ def _select_uncertainty_predictions(
                 restore_target_predictions=restore_target_predictions,
             )
             samples.append(restored[prediction_column].to_numpy(dtype=float))
+            active_model = None
+            if hasattr(nf, "models") and getattr(nf, "models"):
+                active_model = nf.models[0]
+            if active_model is None:
+                active_model = model
+            debug = getattr(active_model, "_latest_decoder_debug", None)
+            spike_support = _extract_debug_scalar(
+                debug,
+                "semantic_spike_component",
+                positive_only=True,
+            )
+            baseline_drag = _extract_debug_scalar(
+                debug,
+                "semantic_baseline_curve",
+                negative_only=True,
+            )
+            if baseline_drag is None:
+                baseline_drag = _extract_debug_scalar(
+                    debug,
+                    "semantic_baseline_level",
+                    negative_only=True,
+                )
+            direction_mean = _extract_debug_scalar(
+                debug,
+                "semantic_spike_direction",
+            )
+            if spike_support is not None:
+                sample_spike_supports.append(spike_support)
+            if baseline_drag is not None:
+                sample_baseline_drags.append(baseline_drag)
+            if direction_mean is not None:
+                sample_direction_means.append(direction_mean)
+            semantic_score = 0.0
+            if spike_support is not None and direction_mean is not None:
+                semantic_score = float(spike_support) * max(float(direction_mean), 0.0)
+                if baseline_drag is not None:
+                    semantic_score = semantic_score / (1.0 + max(float(baseline_drag), 0.0))
+            sample_semantic_scores.append(float(semantic_score))
         stacked = np.vstack(samples)
         candidate_means.append(stacked.mean(axis=0))
         candidate_stds.append(stacked.std(axis=0))
         candidate_samples[f"{dropout_p:.2f}"] = stacked.tolist()
+        candidate_spike_support.append(
+            float(np.mean(sample_spike_supports)) if sample_spike_supports else 0.0
+        )
+        candidate_baseline_drag.append(
+            float(np.mean(sample_baseline_drags)) if sample_baseline_drags else 0.0
+        )
+        candidate_direction_mean.append(
+            float(np.mean(sample_direction_means)) if sample_direction_means else 0.0
+        )
     model.configure_stochastic_inference(enabled=False)
 
     std_grid = np.vstack(candidate_stds)
     mean_grid = np.vstack(candidate_means)
-    trajectory_scores = np.sqrt(np.mean(np.square(std_grid), axis=1))
+    dispersion_scores = np.sqrt(np.mean(np.square(std_grid), axis=1))
+    spike_supports = np.asarray(candidate_spike_support, dtype=float)
+    baseline_drags = np.asarray(candidate_baseline_drag, dtype=float)
+    direction_means = np.asarray(candidate_direction_mean, dtype=float)
+    has_semantic_signal = bool(
+        np.nanmax(spike_supports) > 0.35 and np.nanmax(direction_means) > 0.45
+    )
+    if has_semantic_signal:
+        semantic_scores = (
+            spike_supports
+            * np.clip(direction_means, 0.0, None)
+            / (1.0 + np.clip(baseline_drags, 0.0, None))
+        )
+        min_dispersion = float(np.nanmin(dispersion_scores))
+        semantic_tolerance = 0.15
+        eligible_mask = dispersion_scores <= (min_dispersion * (1.0 + semantic_tolerance))
+        if not np.any(eligible_mask):
+            eligible_mask = np.ones_like(dispersion_scores, dtype=bool)
+        eligible_semantic = np.where(eligible_mask, semantic_scores, -np.inf)
+        best_semantic = float(np.nanmax(eligible_semantic))
+        trajectory_scores = dispersion_scores.copy()
+        semantic_tie_mask = np.isfinite(eligible_semantic) & (
+            eligible_semantic >= (best_semantic - 1e-12)
+        )
+        if np.any(semantic_tie_mask):
+            tie_break = dispersion_scores.copy()
+            tie_break[~semantic_tie_mask] = tie_break[~semantic_tie_mask] + 1e6
+            trajectory_scores = tie_break
+        selection_mode = "trajectory_semantic_tradeoff"
+    else:
+        trajectory_scores = dispersion_scores
+        selection_mode = "trajectory_min_dispersion"
     selected_path_idx = int(trajectory_scores.argmin())
     selected_mean = mean_grid[selected_path_idx]
     selected_std = std_grid[selected_path_idx]
@@ -296,8 +417,15 @@ def _select_uncertainty_predictions(
         "candidate_std_grid": std_grid,
         "candidate_dropout_values": np.asarray(dropout_candidates, dtype=float),
         "candidate_samples": candidate_samples,
-        "selection_mode": "trajectory_min_dispersion",
+        "selection_mode": selection_mode,
         "candidate_path_scores": trajectory_scores,
+        "candidate_dispersion_scores": dispersion_scores,
+        "candidate_spike_support": spike_supports,
+        "candidate_baseline_drag": baseline_drags,
+        "candidate_direction_mean": direction_means,
+        "candidate_semantic_scores": (
+            semantic_scores if has_semantic_signal else np.zeros_like(dispersion_scores)
+        ),
         "selected_path_idx": selected_path_idx,
         "selected_path_score": float(trajectory_scores[selected_path_idx]),
     }
@@ -357,6 +485,31 @@ def _write_uncertainty_artifacts(
                 if "candidate_path_scores" in summary
                 else None
             ),
+            "candidate_dispersion_scores": (
+                summary["candidate_dispersion_scores"].tolist()
+                if "candidate_dispersion_scores" in summary
+                else None
+            ),
+            "candidate_spike_support": (
+                summary["candidate_spike_support"].tolist()
+                if "candidate_spike_support" in summary
+                else None
+            ),
+            "candidate_baseline_drag": (
+                summary["candidate_baseline_drag"].tolist()
+                if "candidate_baseline_drag" in summary
+                else None
+            ),
+            "candidate_direction_mean": (
+                summary["candidate_direction_mean"].tolist()
+                if "candidate_direction_mean" in summary
+                else None
+            ),
+            "candidate_semantic_scores": (
+                summary["candidate_semantic_scores"].tolist()
+                if "candidate_semantic_scores" in summary
+                else None
+            ),
         },
     )
     pd.DataFrame(
@@ -372,6 +525,26 @@ def _write_uncertainty_artifacts(
         "candidate_path_scores",
         np.zeros(len(summary["candidate_dropout_values"]), dtype=float),
     )
+    dispersion_scores = summary.get(
+        "candidate_dispersion_scores",
+        np.zeros(len(summary["candidate_dropout_values"]), dtype=float),
+    )
+    spike_support = summary.get(
+        "candidate_spike_support",
+        np.zeros(len(summary["candidate_dropout_values"]), dtype=float),
+    )
+    baseline_drag = summary.get(
+        "candidate_baseline_drag",
+        np.zeros(len(summary["candidate_dropout_values"]), dtype=float),
+    )
+    direction_mean = summary.get(
+        "candidate_direction_mean",
+        np.zeros(len(summary["candidate_dropout_values"]), dtype=float),
+    )
+    semantic_scores = summary.get(
+        "candidate_semantic_scores",
+        np.zeros(len(summary["candidate_dropout_values"]), dtype=float),
+    )
     for dropout_idx, dropout_p in enumerate(summary["candidate_dropout_values"]):
         for horizon_idx in range(len(summary["mean"])):
             candidate_stats_rows.append(
@@ -385,6 +558,11 @@ def _write_uncertainty_artifacts(
                         summary["candidate_std_grid"][dropout_idx, horizon_idx]
                     ),
                     "path_score": float(path_scores[dropout_idx]),
+                    "dispersion_score": float(dispersion_scores[dropout_idx]),
+                    "semantic_spike_support": float(spike_support[dropout_idx]),
+                    "semantic_baseline_drag": float(baseline_drag[dropout_idx]),
+                    "semantic_direction_mean": float(direction_mean[dropout_idx]),
+                    "semantic_score": float(semantic_scores[dropout_idx]),
                 }
             )
     pd.DataFrame(candidate_stats_rows).to_csv(candidate_stats_path, index=False)
