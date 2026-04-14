@@ -2396,3 +2396,28 @@
   - no active cumsum semantic spike forcing
   - no forced >1 semantic spike gain floor
 - 판단: RESTORE ACTIVE BASIS
+
+## Iteration 2026-04-15 informer_test semantic-spike top1 memory-confidence context
+- timestamp: 2026-04-15T03:xx:00+09:00
+- git branch: informer_test
+- experiment title: feed bounded top1 memory-bank confidence directly into semantic_spike_context as a shape-safe retrieval-inspired signal, while keeping attended-path families off
+- data-driven motivation:
+  - low anchor run failed because semantic tradeoff never activated (`trajectory_min_dispersion`, semantic scores zero)
+  - attended event-summary and event-path injections both regressed, so the next shape-safe memory-bank hypothesis moved the retrieval-like signal into `semantic_spike_context` itself instead of the attended path
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/{aaforecast-informer,aaforecast-gru,baseline}.yaml`
+- run/artifact path: runs/iter_20260415_memory_confctx_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.2731 / 73.8778`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.3858 / 78.2059`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - target gates still missed; AA-Informer improved relative to the event-path and anomaly-summary safe failures, but still did not reach the current best keep
+- 핵심 진단:
+  - this is the strongest shape-safe memory-bank style lever tried after the keep branch split, which makes it informative even though it still under-shoots.
+  - top1 memory confidence is therefore a promising but insufficient signal by itself; the remaining amplitude gap is still not solved.
+- 판단: SAFE FAILURE / STRONGEST POST-KEEP MEMORY-BANK LEVER SO FAR
