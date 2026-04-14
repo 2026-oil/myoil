@@ -2773,3 +2773,21 @@
 - git branch: informer_test
 - experiment title: restore the exact active keep basis after recording the completed prototype top-2 masking safe failure
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 prototype gain-lift via sqrt(gain) safe failure
+- timestamp: 2026-04-15T06:xx:00+09:00
+- git branch: informer_test
+- experiment title: soften the bounded prototype gain by replacing `sigmoid(gain)` with `sqrt(sigmoid(gain))` on top of the exact active keep
+- run/artifact path: runs/iter_20260415_proto_gainlift_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.7415 / 74.9676`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `74.2164 / 75.7251`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - target gates missed badly; AA-Informer regressed toward the baseline band and fell far below the active keep
+- 핵심 진단:
+  - broadening prototype gain this way is too aggressive and destabilizes the transport path.
+  - the active bounded prototype gain should remain unchanged.
+- 판단: SAFE FAILURE / REJECT PROTOTYPE GAIN LIFT
