@@ -2567,3 +2567,12 @@
   - latest memory-bank high-water mark (`iter_20260415_negweight_restore_gru_bundle1`) still under-shot the keep
   - 다음 iter도 strongest verified keep basis에서만 비교해야 하므로, safe-failure state를 active base로 남기지 않음
 - 판단: RESTORE TO EXACT KEEP BASIS
+
+## Iteration 2026-04-15 restore exact keep basis before prototype-level memory-bank probe
+- timestamp: 2026-04-15T04:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact keep basis before trying the next memory-bank hypothesis
+- 이유:
+  - strongest memory-bank lane (`negweight_restore_gru_bundle1`) still under-shot the keep
+  - 다음 가설도 exact keep basis에서만 비교해야 attribution이 유지됨
+- 판단: RESTORE TO EXACT KEEP BASIS
