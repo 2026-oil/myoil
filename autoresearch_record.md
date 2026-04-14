@@ -2701,3 +2701,21 @@
   - the earlier higher-amplitude prototype lane relied on a semantic-spike path that no longer satisfies the current guardrails.
   - this bundle preserves the decoder/memory-bank gain while bringing the active semantic-spike path back inside the user's no-cumsum and bounded-gain constraints, so it is the current compliant keep.
 - 판단: ACTIVE KEEP UNDER CURRENT GUARDRAILS
+
+## Iteration 2026-04-15 prototype-family gate floor on the active keep
+- timestamp: 2026-04-15T05:xx:00+09:00
+- git branch: informer_test
+- experiment title: raise the prototype family gate floor from pure sigmoid to `0.5 + 0.5 * sigmoid(...)` on top of the exact active prototype keep
+- run/artifact path: runs/iter_20260415_proto_gatefloor_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `72.9041 / 73.1754`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.0721 / 77.5639`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - target gates missed; this regressed below the active keep
+- 핵심 진단:
+  - forcing a higher prototype-family floor weakens the keep instead of helping transport.
+  - the prototype family gate should stay fully learned rather than partially forced upward.
+- 판단: SAFE FAILURE / REJECT PROTOTYPE-GATE FLOOR
