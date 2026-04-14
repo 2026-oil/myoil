@@ -846,7 +846,7 @@ class InformerHorizonAwareHead(nn.Module):
             ],
             dim=-1,
         )
-        family_gate = (0.5 + 0.5 * torch.sigmoid(self.family_blend_gate_head(prototype_context))).unsqueeze(1)
+        family_gate = torch.sigmoid(self.family_blend_gate_head(prototype_context)).unsqueeze(1)
         prototype_query = self.prototype_query_head(prototype_context)
         prototype_logits = torch.matmul(prototype_query, self.prototype_key_bank.t())
         prototype_weights = torch.softmax(prototype_logits, dim=1)
@@ -926,7 +926,6 @@ class InformerHorizonAwareHead(nn.Module):
             + (0.5 * memory_signal)
         ).unsqueeze(1)
         semantic_negative_weight = 0.9 * (1.0 - semantic_spike_direction).pow(2)
-        semantic_negative_weight = semantic_negative_weight * (1.0 - 0.5 * family_gate)
         semantic_spike_curve = (
             (semantic_spike_direction * semantic_spike_pos_curve)
             - (semantic_negative_weight * semantic_spike_neg_curve)
