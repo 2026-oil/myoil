@@ -2356,3 +2356,28 @@
   - low anchor의 selector fallback은 사실이지만, attended transformer path에 broad event summary 또는 narrower event path를 직접 주입하는 두 시도 모두 현재 best keep보다 나빴음.
   - 따라서 active branch basis는 anomaly-intensity keep 이전/이후의 guardrail-compliant core로 유지하고, attended path contamination family는 실험 결과상 비활성화하는 것이 맞음.
 - 판단: RESTORE ACTIVE BASIS
+
+## Iteration 2026-04-15 informer_test anomaly-summary semantic-spike context
+- timestamp: 2026-04-15T03:xx:00+09:00
+- git branch: informer_test
+- experiment title: inject summarized regime intensity/density directly into the semantic spike context instead of the attended path, following the low-run selector-fallback diagnosis while avoiding attended-path drift
+- data-driven motivation:
+  - low anchor `iter_20260415_drop_sem_curve_restore_gru_bundle1` failed to activate semantic tradeoff (`trajectory_min_dispersion`, semantic scores zero)
+  - broad attended event-summary/event-path injections already regressed, so the next narrow hypothesis moved the anomaly/regime summary into the semantic spike context itself
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/{aaforecast-informer,aaforecast-gru,baseline}.yaml`
+- run/artifact path: runs/iter_20260415_anomaly_summary_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `72.8245 / 73.6237`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.2786 / 77.9705`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - target gates still missed, and AA-Informer stayed well below the current best keep
+- 핵심 진단:
+  - moving anomaly/regime summary into the semantic spike context is shape-safe and cleaner than attended-path contamination, but it still does not recover the semantic-amplitude gap.
+  - this suggests the missing lift is not explained by absent low-dimensional regime summary alone.
+- 판단: SAFE FAILURE / KEEP AS BLOCKER NARROWING EVIDENCE
