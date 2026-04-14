@@ -1,0 +1,24 @@
+task:
+  name: brentoil_case1_parity_aaforecast_informer_stability_cw
+dataset:
+  path: data/df.csv
+  target_col: Com_BrentCrudeOil
+  dt_col: dt
+  hist_exog_cols:
+  - GPRD_THREAT
+  - BS_Core_Index_A
+  - GPRD
+  - GPRD_ACT
+  - BS_Core_Index_B
+  - BS_Core_Index_C
+  - Idx_OVX
+  - Com_LMEX
+  - Com_BloombergCommodity_BCOM
+  - Idx_DxyUSD
+  futr_exog_cols: []
+  static_exog_cols: []
+training_search:
+  enabled: false
+aa_forecast:
+  enabled: true
+  config_path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml

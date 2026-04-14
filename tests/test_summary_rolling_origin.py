@@ -16,10 +16,12 @@ import runtime_support.runner as runtime
 class _FakeAxis:
     def __init__(self) -> None:
         self.plot_calls: list[tuple[object, object]] = []
+        self.plot_kwargs: list[dict[str, object]] = []
         self.step_calls: list[tuple[object, object]] = []
 
-    def plot(self, x, y, **_kwargs):
+    def plot(self, x, y, **kwargs):
         self.plot_calls.append((x, y))
+        self.plot_kwargs.append(kwargs)
 
     def step(self, x, y, **_kwargs):
         self.step_calls.append((x, y))
@@ -562,6 +564,8 @@ def test_plot_last_fold_overlay_connects_input_actual_to_output_and_predictions(
         "2024-03-03",
     ]
     assert pred_y.tolist() == [11.0, 12.5, 13.5]
+    assert price_axis.plot_kwargs[2]["marker"] == "o"
+    assert price_axis.plot_kwargs[2]["markevery"] == [1, 2]
 
 
 def test_plot_last_fold_overlay_skips_future_only_prediction_segment(
@@ -682,6 +686,8 @@ def test_plot_last_fold_overlay_includes_future_only_prediction_segment_when_ena
         "2024-03-03",
     ]
     assert pred_y.tolist() == [11.0, 12.5, 13.5]
+    assert price_axis.plot_kwargs[2]["marker"] == "o"
+    assert price_axis.plot_kwargs[2]["markevery"] == [1, 2]
 
 
 def test_plot_last_fold_overlay_adds_lower_context_subplot_for_aaforecast(

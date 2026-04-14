@@ -2259,11 +2259,15 @@ def _plot_last_fold_overlay(
         )
         if connected_model_frame.empty:
             continue
+        prediction_point_indices = list(range(1, len(connected_model_frame)))
         price_ax.plot(
             connected_model_frame["ds"],
             connected_model_frame["y_hat"],
             label=model_name,
             linewidth=1.8,
+            marker="o",
+            markersize=5,
+            markevery=prediction_point_indices if prediction_point_indices else None,
         )
     price_ax.set_title(title)
     price_ax.set_ylabel("y")

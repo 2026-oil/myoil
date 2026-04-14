@@ -100,23 +100,7 @@ uv run main.py --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.ya
 reference\aaforecast 에 있는 aaforecast 논문 이미지가 아키텍쳐임
 (https://github.com/ashfarhangi/AA-Forecast 논문 github)
 
-- aaforecast 예측 아키텍쳐 흐름 star 분해 -> aa-model -> 몬테카를로 시뮬레이션 이 포멧은 유지하되, 현재 모델이 GRU를 메인으로 사용하나, 
-내부 인코더를 gru 말고, 아래 모델들로 사용하는 것을 허용함.
-
-- GRU 중심으로 시작, 필요할 때만 다른 모델로 이동해도됨.
-
-- iter 50까지 진행. non-stop
-- 실험 진행 내용에 대해서는 autoresearch_record.md에 업데이트하면서 진행
-- autoresearch_record.md에 지금은 어떤 실험이었는지 안적혀있는데, autoresearch_record.md에 어떤 브랜치의 어떤 실험이었고, 어떤 yaml을 사용하였는지가 있어야함.
-
-
-- 이런시도도 가능
-  transformations_target: diff
-  transformations_exog: diff
-
-- yaml\plugins\aa_forecast\retreival 에 있는 플러그인을 사용해보는 시도도 가능하고
-retreival의 하이퍼파라미터를 수정해보는것도 가능
-
+- aaforecast 예측 아키텍쳐 흐름 star 분해 -> aa-model -> 몬테카를로 시뮬레이션 이 포멧은 유지하되
 
 - 필요 시 setting.yaml 수정해도됨.
 - GPU 2장 필요하다면 다 사용하도록.
@@ -142,3 +126,58 @@ retreival의 하이퍼파라미터를 수정해보는것도 가능
   
 
 - 모든 조건 PASS 전까지 리서치 멈추지 말 것.
+- h1 이 75 이상 예측 h2가 80이상 예측이 나와야함.
+
+
+---
+
+
+현재 결과가 runs/ 실험 내용들 보면 알겠지만, h1, h2가 전체적으로 70중후반대에 예측이 갇히는 현상이 발생함.
+
+이 부분을 타게해야되는데 data-driven으로 문제정의를하고 model-driven으로 개선을 진행하고자함.
+
+절대 특정 호라이즌에 보상을 주거나하는 식으로 조절하지말고 모델 기반으로 개선을 이어나가고자함.
+
+만약 이런 부분이 기존에 있었다면 해당 부분은 제거하고 진행하도록
+
+코드 구현은 KISS, DRY 법칙을 최대한 지키도록,
+
+큰 방향은 
+
+
+
+  retrieval:
+    enabled: true
+    top_k: 1
+    event_score_threshold: 400.0
+    min_similarity: 0.35
+    blend_max: 1.0
+    use_uncertainty_gate: false
+    use_shape_key: false
+    use_event_key: true
+    event_score_log_bonus_alpha: 0.15
+    event_score_log_bonus_cap: 0.1
+
+
+이 플러그인을 설정해서 하는 경우 성능이 되게 잘나오는데 
+
+해당 철학을 aa-forecast 인코더 디코더 부분에 transformer로 녹여내서 고도화를해보고 싶어.
+
+runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+결과를 기반으로 분석해도됨.
+
+
+지금 단순히 dense 만으로 예측 값을 내고 있지는 않은지도 추가 점검해서 고도화 
+
+인코딩이나 디코더가 데이터 이해를 잘 못하는 모델의 문제는 아닌지 이 부분도 검토해보도록
+
+
+잘못나오는 예측에 대해서는
+
+전체 적으로 모델이 학습이 제대로 된것에 대해 의심이 되는데,
+과거에 유가가 급등했던 부분을 학습했던 윈도우를 학습 완료된 모델에 다시 input으로 넣어서 예측 결과를 실제와 비교해보는 것도 진행해보기도하면서,
+
+
+
+점검할 수 있는 모든 것들은 점검하되, 절대로 특정 호라이즌에 가중치를 주거나 호라이즌 driven한 그런 분석은 진행하지말고 분석 결과로 이런 데이터에서 어떻게 아키텍쳐를 수정을해야 지금 나오는 스파이크를 aa-forecast 가 포착하여 향후 스파이크를 예측으로 담아낼지에 더 초점을 맞추는 식으로 고도화 진행해줘.
+

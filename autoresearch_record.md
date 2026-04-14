@@ -271,3 +271,1869 @@
 - 15% band PASS/FAIL: FAIL (h3=22.36%, h4=33.39%)
 - runtime PASS/FAIL: PASS (~23.93s by artifact elapsed)
 - leakage concern 여부: none observed; diff path is train-only and replay-restored
+
+## Iteration 2026-04-13 No-Retrieval Informer Internal Hybrid 0 (Current Probe)
+- timestamp: 2026-04-13T14:xx:00+09:00
+- git branch: main
+- experiment title: Current no-retrieval informer baseline after pooled-memory + regime/MoE cumulative state check
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-currentprobe.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- encoder family: AAForecast Informer
+- 바꾼 조작변인: none (current dirty workspace state baseline check)
+- 고정한 통제변인: target=Com_BrentCrudeOil; allowed 10 hist exog only; h=2; n_windows=1; retrieval=false; no horizon-specific bonus; no loss weighting change; no leakage
+- 실행 명령: UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --config yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-currentprobe.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_currentprobe
+- last-fold result: h1=73.5956 (APE=12.95%), h2=76.1693 (APE=22.97%), h2>h1=PASS
+- replay summary: mean_ape_h1=0.0781; mean_ape_h2=0.1292; h2_gt_h1_rate=0.8750
+- 판단: KEEP FOR DIAGNOSIS ONLY (historical spikes are learned better than commonpath6, but latest-fold amplitude transport is too weak)
+
+## Iteration 2026-04-13 No-Retrieval Informer Internal Hybrid 1
+- timestamp: 2026-04-13T14:xx:00+09:00
+- git branch: main
+- experiment title: Remove pooled-memory broadcast from per-horizon decoder input and unsaturate event/path latents
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid1.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- encoder family: AAForecast Informer
+- 바꾼 조작변인: (1) event_summary/event_trajectory projector output activation tanh -> GELU; (2) pooled_context no longer broadcast-adds into hidden/aligned decoder input; (3) pooled_context stays only as shared path condition inside informer decoder heads
+- 고정한 통제변인: target=Com_BrentCrudeOil; allowed 10 hist exog only; h=2; n_windows=1; retrieval=false; no horizon-specific bonus; no loss weighting change; no leakage
+- 실행 명령: UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --config yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid1.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid1
+- last-fold result: h1=74.3394 (APE=14.20%), h2=78.2722 (APE=20.85%), h2>h1=PASS
+- replay summary: mean_ape_h1=0.0795; mean_ape_h2=0.1233; h2_gt_h1_rate=0.7500
+- 판단: PARTIAL KEEP (latest h2 improved, but h1 level still low)
+
+## Iteration 2026-04-13 No-Retrieval Informer Internal Hybrid 2
+- timestamp: 2026-04-13T14:xx:00+09:00
+- git branch: main
+- experiment title: Feed non-STAR exogenous STAR activity into the event-trajectory path (bugfix-level architecture repair)
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid2.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- encoder family: AAForecast Informer
+- 바꾼 조작변인: event_trajectory payload now receives non_star_star_activity + channel_activity, so LMEX/BCOM/OVX/BS-core burst information reaches the shared path decoder instead of being dropped on the trajectory path
+- 고정한 통제변인: target=Com_BrentCrudeOil; allowed 10 hist exog only; h=2; n_windows=1; retrieval=false; no horizon-specific bonus; no loss weighting change; no leakage
+- 실행 명령: UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --config yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid2.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid2
+- last-fold result: h1=75.3761 (APE=13.00%), h2=78.9167 (APE=20.20%), h2>h1=PASS
+- replay summary: mean_ape_h1=0.0644; mean_ape_h2=0.0782; h2_gt_h1_rate=0.8750
+- 판단: CURRENT BEST KEEP (historical spike capture improved strongly; latest fold still underestimates extreme amplitude, but bottleneck narrowed to final amplitude transport rather than flat h1/h2 collapse)
+
+## Iteration 2026-04-13 No-Retrieval Informer Internal Hybrid 3
+- timestamp: 2026-04-13T14:xx:00+09:00
+- git branch: main
+- experiment title: Add signed non-STAR exogenous features into event_trajectory
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid3.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- encoder family: AAForecast Informer
+- 바꾼 조작변인: non_star_star_signed_score-derived signed features added to event_trajectory
+- 고정한 통제변인: target=Com_BrentCrudeOil; allowed 10 hist exog only; h=2; n_windows=1; retrieval=false; no horizon-specific bonus; no loss weighting change; no leakage
+- 실행 명령: UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --config yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid3.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid3
+- last-fold result: h1=74.8090 (APE=13.66%), h2=76.3429 (APE=22.80%), h2>h1=PASS
+- 판단: DISCARD (latest-fold amplitude regressed; reverted from working tree)
+
+## Iteration 2026-04-13 No-Retrieval Informer Internal Hybrid 2R (Current Code Recheck)
+- timestamp: 2026-04-13T14:xx:00+09:00
+- git branch: main
+- experiment title: Re-run current reverted code state to verify hybrid2-equivalent behavior
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid2r.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- encoder family: AAForecast Informer
+- 바꾼 조작변인: none beyond hybrid2 working-tree state recheck
+- 고정한 통제변인: target=Com_BrentCrudeOil; allowed 10 hist exog only; h=2; n_windows=1; retrieval=false; no horizon-specific bonus; no loss weighting change; no leakage
+- 실행 명령: UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --config yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid2r.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid2r
+- last-fold result: h1=75.4776 (APE=12.88%), h2=78.5979 (APE=20.52%), h2>h1=PASS
+- 판단: KEEP (current workspace code reproduces the hybrid2 direction; remaining bottleneck is still latest-fold amplitude, not flat h1/h2 collapse)
+
+## Iteration 2026-04-13 No-Retrieval Informer Internal Hybrid 4
+- timestamp: 2026-04-13T14:xx:00+09:00
+- git branch: main
+- experiment title: Dynamic internal top-k memory selection based on regime burst coherence
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid4.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- encoder family: AAForecast Informer
+- 바꾼 조작변인: internal memory pooled context selection changed from fixed top-1 to burst-coherence-conditioned top-k
+- 고정한 통제변인: target=Com_BrentCrudeOil; allowed 10 hist exog only; h=2; n_windows=1; retrieval=false; no horizon-specific bonus; no loss weighting change; no leakage
+- 실행 명령: UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --config yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid4.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid4
+- last-fold result: h1=74.6448 (APE=13.85%), h2=77.9232 (APE=21.20%), h2>h1=PASS
+- 판단: DISCARD (latest-fold amplitude regressed; reverted from working tree)
+
+## Iteration 2026-04-13 No-Retrieval Informer Internal Hybrid 5
+- timestamp: 2026-04-13T14:xx:00+09:00
+- git branch: main
+- experiment title: Add direct regime tail summary into event_trajectory path
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid5.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- encoder family: AAForecast Informer
+- 바꾼 조작변인: regime_intensity/regime_density tail summaries appended to event_trajectory features
+- 고정한 통제변인: target=Com_BrentCrudeOil; allowed 10 hist exog only; h=2; n_windows=1; retrieval=false; no horizon-specific bonus; no loss weighting change; no leakage
+- 실행 명령: UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --config yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid5.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid5
+- last-fold result: h1=74.9515 (APE=13.49%), h2=77.9543 (APE=21.17%), h2>h1=PASS
+- 판단: DISCARD (historical replay는 일부 개선됐으나 latest-fold amplitude는 hybrid2보다 낮음; reverted from working tree)
+
+## Iteration 2026-04-13 No-Retrieval Informer Internal Hybrid 6
+- timestamp: 2026-04-13T14:xx:00+09:00
+- git branch: main
+- experiment title: Add anchor-scaled internal return branch to emulate retrieval-like weighted-return transport
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid6.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- encoder family: AAForecast Informer
+- 바꾼 조작변인: final informer decode path augmented with anchor-scaled monotonic return branch from event/path/regime context
+- 고정한 통제변인: target=Com_BrentCrudeOil; allowed 10 hist exog only; h=2; n_windows=1; retrieval=false; no horizon-specific bonus; no loss weighting change; no leakage
+- 실행 명령: UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --config yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid6.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid6
+- last-fold result: h1=74.4284 (APE=14.10%), h2=76.7541 (APE=22.38%), h2>h1=PASS
+- 판단: DISCARD (retrieval-like return transport 아이디어는 맞지만 현 구현은 amplitude를 키우지 못했고 working tree에서 revert)
+
+## Iteration 2026-04-13 Hybrid2 Decoder Ceiling Diagnostic
+- timestamp: 2026-04-13T14:xx:00+09:00
+- git branch: main
+- experiment title: instrument hybrid2 decoder contributions to identify latest-fold amplitude ceiling
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid2debug.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid2debug/aa_forecast/uncertainty/20260223T000000.decoder_debug_report.md
+- 실행 명령: UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --config yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid2debug.yaml
+- last-fold result: h1=75.2506, h2=77.8448, h2>h1=PASS
+- 핵심 진단:
+  - shared `level` + `level_shift` 가 둘 다 음수여서 base level을 깎고 있음
+  - `local_path`, `global_path`, `delta_path` 도 latest fold에서 음수 기여가 큼
+  - `event_delta × gate` 만이 주요 양의 spike branch인데, 위 음수 항들을 상쇄하는 수준에 그침
+  - `path_amplitude` 는 이미 > 1 이므로 병목은 amplification scalar 부재가 아니라, amplification 전에 residual 합이 작게 남는 구조임
+- 판단: KEEP FOR NEXT FIX (다음 수정은 새 branch 추가보다, existing hybrid2 decoder 내부에서 negative baseline/local drag를 줄이는 방향이 유력)
+
+## Iteration 2026-04-13 No-Retrieval Informer Internal Hybrid 7
+- timestamp: 2026-04-13T14:xx:00+09:00
+- git branch: main
+- experiment title: retrieval-like memory transport gate to suppress negative decoder drag under strong top1 memory selection
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid7.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- encoder family: AAForecast Informer
+- 바꾼 조작변인: pooled memory/event/regime conditioned transport gate added to reduce negative residual_core drag after internal top1 event selection
+- 고정한 통제변인: target=Com_BrentCrudeOil; allowed 10 hist exog only; h=2; n_windows=1; retrieval=false; no horizon-specific bonus; no loss weighting change; no leakage
+- 실행 명령: UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --config yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid7.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid7
+- last-fold result: h1=74.8353 (APE=13.63%), h2=77.1433 (APE=21.99%), h2>h1=PASS
+- retrieval-behavior diagnostic artifact: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid7/aa_forecast/uncertainty/20260223T000000.decoder_debug_report.md
+- 핵심 진단:
+  - internal top1 selection 자체는 매우 sharp함 (`weight_mass_top1 ~= 1.0`, selected_top_index=17)
+  - 즉 retrieval 철학의 핵심인 eventful point 선택은 이미 내부 모델에서 거의 구현됨
+  - 병목은 selection 이후 decoder 내부의 negative drag (`level`, `level_shift`, `local/global/delta path`)이며, transport gate 추가만으로는 이를 뒤집지 못함
+- 판단: DISCARD (retrieval behavior를 더 잘 모델링했지만 latest-fold amplitude는 hybrid2보다 낮았고 working tree에서 revert)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 8
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: learned retrieval-conditioned negative-drag suppression gate inside decoder
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid8.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid8
+- last-fold result: h1=74.2437, h2=75.8570, h2>h1=PASS
+- 판단: DISCARD (negative-drag suppression gate destabilized decoder and worsened latest fold markedly)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 9
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: deterministic retrieval-strength gate using selected memory signal + shock transport
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid9.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid9
+- last-fold result: h1=74.3476, h2=76.6842, h2>h1=PASS
+- 판단: DISCARD (retrieval-strength gate도 hybrid2보다 악화; decoder drag를 직접 눌러도 일반화가 무너짐)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 10
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: internalized retrieval continuation template from selected token hidden-state continuation
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid10.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid10
+- last-fold result: h1=74.3266, h2=77.0523, h2>h1=PASS
+- 판단: DISCARD (selected token 이후 hidden-state continuation을 pooled context에 주입하는 방식도 retrieval-like amplitude 향상으로 이어지지 않았고 revert)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 11
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: keep pooled memory out of baseline heads and reserve it for continuation/shock branches only
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid11.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid11
+- last-fold result: h1=74.5731, h2=77.3313, h2>h1=PASS
+- replay artifact: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid11/aa_forecast/diagnostics/trained_model_spike_window_replay.md
+- 핵심 진단:
+  - pooled memory를 baseline/joint heads에서 제거하면 hybrid10보다는 회복되지만, hybrid2를 넘지는 못함
+  - 즉 retrieval memory가 baseline head를 오염시키는 문제는 일부 있으나, 최신 fold amplitude ceiling의 주 원인은 여전히 shared level/level_shift 및 local/global path 음수 구조 자체임
+- 판단: DISCARD (부분 회복은 있었지만 best no-retrieval hybrid2보다 낮고 revert 후보)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 14
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: split baseline and spike path contexts so global/delta/spike expert consume pooled memory while level remains baseline-only
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid14.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid14
+- last-fold result: h1=75.3291, h2=77.7950, h2>h1=PASS
+- 판단: PARTIAL KEEP (latest fold improved vs many failed variants; replay strong, but still below target amplitude)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 15
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: push pooled-memory context more directly into path branches while keeping level baseline-only
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid15.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid15
+- last-fold result: h1=74.4411, h2=76.7112, h2>h1=PASS
+- 판단: DISCARD (replay는 강했지만 latest fold amplitude는 더 낮아짐)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 16
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: baseline level/shift remain baseline-only, spike expert stays pooled-memory conditioned, and global/delta branches are pulled back to baseline context
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid16.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid16
+- last-fold result: h1=76.8504, h2=79.6834, h2>h1=PASS
+- replay summary: mean_ape_h1=0.0766, mean_ape_h2=0.0877, h2_gt_h1_rate=1.0000
+- 판단: CURRENT BEST LATEST-FOLD KEEP (지금까지 no-retrieval 중 latest fold amplitude가 가장 높음)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 17
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: force event_bias to be non-negative so spike uplift only moves upward
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid17.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid17
+- last-fold result: h1=74.0538, h2=76.7421, h2>h1=PASS
+- 판단: DISCARD (event_bias 양수 강제가 오히려 구조 균형을 깨뜨림)
+
+## Iteration 2026-04-14 Hybrid16 Debug 2
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: inspect split-head hybrid16 expert allocation and context norms without changing behavior materially
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid16debug2.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid16debug2/aa_forecast/uncertainty/20260223T000000.decoder_debug.json
+- 핵심 관찰:
+  - `baseline_context_norm = 7.78`, `spike_context_norm = 11.78`
+  - `expert_gate ≈ 0.277` 로 spike expert 비중이 여전히 낮음
+  - `normal_expert`, `spike_expert` 둘 다 h1/h2에서 음수 또는 약한 값
+  - 실제 양의 기여는 여전히 `event_delta × gate` 가 대부분 담당
+- 판단: NEXT FIX TARGET CONFIRMED
+  - spike head 분리는 맞는 방향이지만 spike expert 자체가 아직 양의 transport expert로 학습되지 못하고 있음
+  - 다음 수정은 spike expert path를 더 직접적으로 positive shock branch로 재구성하는 쪽이 유력
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 18
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: make spike expert an explicitly positive cumulative uplift branch instead of an unconstrained residual expert
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid18.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid18
+- last-fold result: h1=75.3314, h2=78.9124, h2>h1=PASS
+- replay summary: mean_ape_h1=0.0779, mean_ape_h2=0.1037, h2_gt_h1_rate=1.0000
+- 핵심 진단:
+  - `spike_expert`가 양수 cumulative uplift branch가 되면서 `expert_residual`이 실제 양수 기여로 전환됨
+  - latest fold 기준 `residual_path`와 `final_output`이 더 retrieval-like positive transport 방향으로 개선됨
+  - 다만 latest fold에서는 hybrid2의 h2와 거의 같지만 h1은 약간 낮고, replay는 hybrid2보다 다소 약함
+- 판단: KEEP FOR DIRECTIONAL VALUE (spike expert를 positive shock expert로 바꾸는 방향은 맞지만, 아직 best overall replacement는 아님)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 19
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: boost positive spike expert transport by biasing expert gate with memory signal on top of split-head design
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid19.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid19
+- last-fold result: h1=75.9038, h2=79.5477, h2>h1=PASS
+- replay summary: mean_ape_h1=0.0851, mean_ape_h2=0.1254, h2_gt_h1_rate=0.8750
+- 핵심 진단:
+  - expert_gate가 ~0.65까지 올라가며 spike_expert positive transport는 강화됨
+  - latest fold 기준 h1은 상승했지만 h2는 hybrid16보다 소폭 낮고 replay generalization이 악화됨
+- 판단: PARTIAL KEEP FOR IDEA ONLY (memory-signal gate bias는 spike expert를 살리지만 현재 세팅은 overfit 성향이 강함)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 21
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: increase memory-signal bias on positive spike expert gate from 0.5 to 0.75
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid21.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid21
+- last-fold result: h1=75.2882, h2=78.3444, h2>h1=PASS
+- replay summary: pending inspect / weaker than hybrid16 by latest-fold evidence
+- 핵심 진단:
+  - expert_gate는 약 0.64까지 유지되며 spike expert positive transport는 살아있음
+  - 하지만 latest fold h1/h2 모두 hybrid19/16보다 낮아져 gate bias를 더 키우는 것은 도움이 되지 않았음
+- 판단: DISCARD (hybrid19 대비도 후퇴)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 22
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: regime-aware moderated gate bias for positive spike expert transport
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid22.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid22
+- last-fold result: h1=74.3544, h2=77.0050, h2>h1=PASS
+- 핵심 진단:
+  - regime-aware moderated gate bias는 expert_gate를 약 0.46 수준으로 유지했지만 latest fold는 hybrid19/16보다 낮음
+  - spike expert positive transport는 남아 있으나 baseline negative structure를 뒤집기에는 부족했고, 동시에 h1/h2 모두 후퇴
+- 판단: DISCARD (gate moderation alone is not the fix)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 26
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: bound level and level_shift via tanh to reduce shared negative baseline drag
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid26.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid26
+- last-fold result: h1=74.8001, h2=77.2222, h2>h1=PASS
+- replay summary: mean_ape_h1≈0.0849, mean_ape_h2≈0.1162, h2_gt_h1_rate=1.0
+- 판단: DISCARD (baseline negative drag는 줄었지만 overall latest-fold amplitude는 hybrid16/19보다 낮음; patch reverted)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 23/24/25
+- Hybrid23: spike uplift를 residual path와 분리한 additive decomposition → latest fold 악화
+- Hybrid24: spike uplift를 event_delta_gate와 결합 → latest fold 악화
+- Hybrid25: hybrid19-style 기반 복원 후 고정 게이트 0.35 세팅 재검증 → 최신 fold 악화
+- 공통 결론: positive spike uplift를 residual path 밖으로 분리하거나 gate coupling을 더 세게 하는 방식은 현재 구조에서 도움이 되지 않음
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 29
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: memory-conditioned amplification of the stable event_delta branch on top of hybrid19-style basis
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid29.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid29
+- last-fold result: h1=74.6007, h2=77.1575, h2>h1=PASS
+- 핵심 진단:
+  - `memory_delta_gain`를 통해 event_delta_gate를 키워도 final output 최신 fold는 오히려 하락
+  - stable positive branch인 event_delta를 직접 키우는 것만으로는 baseline negative drag를 상쇄하지 못함
+- 판단: DISCARD (event_delta amplification alone is not enough)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 30
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: move delta_path onto spike context as monotonic positive cumulative branch inside current residual family
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid30.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid30
+- last-fold result: h1=74.0811, h2=76.5782, h2>h1=PASS
+- 판단: DISCARD (positive shock delta branch alone is not enough and degrades latest fold)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 31
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: add direct selected-memory-token shock generator as a more radical retrieval-like latent path
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid31.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid31
+- last-fold result: h1=73.6614, h2=74.5344, h2>h1=PASS
+- 핵심 진단:
+  - selected memory token norm is large, but direct memory-token shock generator severely destabilized final output
+  - more radical retrieval-like latent path in this form is not viable
+- 판단: DISCARD (strong regression)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 34
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: add memory-token return-space shock branch on top of current split-head decoder
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid34.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid34
+- last-fold result: h1=73.8084, h2=75.8274, h2>h1=PASS
+- 핵심 진단:
+  - direct memory-token return branch (`memory_token_return`, `memory_token_gate`) caused strong regression and did not improve latest-fold amplitude
+  - retrieval-like direct latent return branch inside current wrapper is not a viable local fix
+- 판단: DISCARD (strong regression, reverted)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 35
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: switch to a trajectory-GRU generator family for shock path on top of current informer split-head setup
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid35.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid35
+- last-fold result: h1=74.9785, h2=77.6657, h2>h1=PASS
+- replay summary: mean_ape_h1≈0.0612, mean_ape_h2≈0.0902, h2_gt_h1_rate=1.0000
+- 핵심 진단:
+  - 기존 head-mixing family를 벗어난 trajectory-GRU style shock generator는 latest fold best는 아니지만 historical replay generalization을 크게 끌어올림
+  - 즉 truly different stage-2 generator family 쪽은 의미가 있으며, current plateau를 넘을 실마리가 있음
+- 판단: KEEP FOR NEW FAMILY (latest fold best는 아니지만 다음 lane의 기반 후보)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 36
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: combine trajectory-GRU shock with 0.5x spike_uplift from the positive spike expert path
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid36.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid36
+- last-fold result: h1=74.3433, h2=76.1922, h2>h1=PASS
+- 판단: DISCARD (trajectory generator family에 spike_uplift를 단순 혼합하는 것은 오히려 악화; reverted to validated hybrid35 family state)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 37
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: deepen trajectory-GRU family with autoregressive output feedback in the trajectory generator
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforesearch/no-retrieval-hybrid37.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid37
+- last-fold result: h1=73.4791, h2=74.6334, h2>h1=PASS
+- 핵심 진단:
+  - trajectory generator에 autoregressive output feedback을 넣자 latest fold가 크게 악화
+  - current hybrid35 family는 단순 recurrent shock generator는 의미 있지만, output-feedback autoregression은 불안정성을 키움
+- 판단: DISCARD (hybrid35 family inside this variant regressed strongly)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 40
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: memory-conditioned gain on the stable trajectory-GRU shock generator
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid40.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid40
+- last-fold result: h1=74.4670, h2=76.4258, h2>h1=PASS
+- 핵심 진단:
+  - stable trajectory family 위에 memory-conditioned gain을 얹는 것도 latest fold를 개선하지 못함
+  - 즉 hybrid35 family는 유지하되, simple gain scaling으로는 돌파되지 않음
+- 판단: DISCARD
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 42
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: trajectory family with trajectory-only baseline head (remove dependence on old level/shift)
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid42.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid42
+- last-fold result: h1=74.7644, h2=76.8494, h2>h1=PASS
+- 핵심 진단:
+  - trajectory_baseline를 독립시켜도 latest fold amplitude는 hybrid35보다 낮음
+  - trajectory baseline head가 음수 baseline을 다시 학습하며, generator family 안에서도 baseline calibration이 핵심 병목임
+- 판단: DISCARD (trajectory family의 baseline handling을 단순 독립 head로 바꾸는 것만으로는 해결되지 않음)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 43
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: hybrid35 family with anchor-aware trajectory baseline head
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid43.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid43
+- last-fold result: h1=74.7547, h2=76.8463, h2>h1=PASS
+- 핵심 진단:
+  - anchor-aware trajectory baseline head도 다시 음수 baseline을 학습해버림
+  - baseline calibration이 core blocker라는 가설은 유지되지만, 단순 anchor-value injection alone is insufficient
+- 판단: DISCARD
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 44
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: shrink trajectory baseline scale from 0.5 to 0.1 within the hybrid35 family
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid44.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid44
+- last-fold result: h1=75.1172, h2=77.5187, h2>h1=PASS
+- replay summary: mean_ape_h1≈0.0826, mean_ape_h2≈0.1044, h2_gt_h1_rate=0.75
+- 핵심 진단:
+  - trajectory baseline scale를 줄여도 latest fold는 hybrid35를 넘지 못함
+  - baseline의 절대 크기만 줄이는 것은 해결책이 아니고, baseline의 방향성과 calibration 자체가 문제임
+- 판단: DISCARD
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 45
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: zero-clamp the trajectory baseline to forbid learned negative baseline transport
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid45.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid45
+- last-fold result: h1=75.1452, h2=77.5752, h2>h1=PASS
+- 핵심 진단:
+  - baseline을 0-clamp 해도 latest fold best를 넘지 못함
+  - 즉 문제는 baseline negativity alone이 아니라, 전체 path transport capacity 자체에도 있음
+- 판단: DISCARD
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 46
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: anchor-aware trajectory baseline with learned nonzero baseline head in hybrid35 family
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid46.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid46
+- last-fold result: h1=74.9249, h2=77.1351, h2>h1=PASS
+- 핵심 진단:
+  - anchor-aware trajectory baseline head가 다시 큰 음수 baseline (`trajectory_baseline_raw ~= -2.88`)을 학습함
+  - baseline semantics를 바꿔도 same family 안에서는 음수 baseline 재학습 문제가 반복됨
+- 판단: DISCARD (baseline target semantics change alone is insufficient)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 48
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: anchor-scaled return-style trajectory generator with zero-anchor-safe fallback
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid48.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid48
+- last-fold result: h1=74.9945, h2=77.2760, h2>h1=PASS
+- 핵심 진단:
+  - anchor-scaled return generator도 latest fold는 hybrid35를 넘지 못함
+  - `trajectory_shock` 자체가 매우 작아 return-style scaling만으로는 충분한 amplitude를 만들지 못함
+- 판단: DISCARD
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 49
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: add learned positive trajectory template bank on top of the hybrid35 family
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid49.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid49
+- last-fold result: h1=75.5900, h2=78.4709, h2>h1=PASS
+- replay summary: mixed / unstable (large failures on 2020-04-20 and 2020-05-04 despite some strong spike windows)
+- 핵심 진단:
+  - learned positive template bank can lift latest-fold amplitude somewhat
+  - but replay generalization is unstable and can overshoot or collapse on older shock windows
+  - template-family direction is interesting, but current parameterization is too brittle to replace hybrid35/hybrid16
+- 판단: EXPLORE FURTHER ONLY IF NEEDED (not current best)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 50
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: regularize template-bank family by shrinking template bank scale to 0.25x
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid50.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid50
+- last-fold result: h1=75.1948, h2=77.6701, h2>h1=PASS
+- 핵심 진단:
+  - template-bank scale를 줄이면 hybrid49의 replay instability는 완화되지만 latest fold amplitude는 여전히 hybrid16/19를 못 넘음
+  - template-bank family는 brittle함이 줄었지만 아직 breakthrough는 아님
+- 판단: PARTIAL KEEP FOR RESEARCH DIRECTION (interesting but not best current run)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 54
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: regularize template-bank family further with stronger entropy smoothing on template weights
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid54.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid54
+- last-fold result: h1=73.5919, h2=74.9400, h2>h1=PASS
+- 핵심 진단:
+  - template weights를 더 평탄하게 만들어도 latest fold는 크게 악화
+  - template-bank family의 불안정성은 단순 softmax sharpness만의 문제가 아님
+- 판단: DISCARD
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 55
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: anchor-scaled template-bank family (return-style template scaling)
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid55.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid55
+- last-fold result: h1=72.1961, h2=72.4102, h2>h1=PASS
+- replay summary: mixed; some windows fit, but overall latest-fold collapse severe
+- 핵심 진단:
+  - anchor-scaled template-bank path is even more unstable than the plain template-bank path
+  - return-style scaling on top of the brittle template family magnifies failure modes rather than fixing them
+- 판단: DISCARD
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 56
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: add small template residual directly onto the hybrid19-style residual path
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid56.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid56
+- last-fold result: h1=74.0305, h2=76.5083, h2>h1=PASS
+- replay summary: mixed / weaker than hybrid35 and hybrid16
+- 판단: DISCARD (small template residual add-on did not help)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 57
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: lower template residual add-on from 0.15 to 0.05 in the hybrid19-style family
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid57.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid57
+- last-fold result: h1=74.2167, h2=76.6917, h2>h1=PASS
+- 판단: DISCARD (smaller template residual also does not help)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 58
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: inject pooled-memory seed into the trajectory-GRU initial hidden state
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid58.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid58
+- last-fold result: h1=73.7283, h2=75.5586, h2>h1=PASS
+- replay summary: weaker than hybrid35; no frontier update
+- 판단: DISCARD (memory-seed augmentation did not help)
+
+## Iteration 2026-04-14 No-Retrieval Informer Internal Hybrid 59
+- timestamp: 2026-04-14T00:xx:00+09:00
+- git branch: main
+- experiment title: increase trajectory per-step output scale from 0.10 to 0.15 within the trajectory-GRU family
+- main config path: yaml/experiment/feature_set_aaforecast/.tmp-aaforecast-informer-no-retrieval-hybrid59.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_no_retrieval_hybrid59
+- last-fold result: h1=74.6249, h2=77.2619, h2>h1=PASS
+- replay summary: still weaker than hybrid35 and no latest-fold frontier improvement
+- 판단: DISCARD (simple step-scale increase is insufficient)
+
+## Iteration 2026-04-14 Internal Prototype-Bank v1
+- timestamp: 2026-04-14T05:34:12+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: learned prototype-bank analogue path blended with trajectory-GRU shock generator
+- main config path: yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- archived run/artifact path: runs/iter_20260414_053412_aa_informer_proto_bank_v1/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=74.8102, h2=77.1377, h2>h1=PASS
+- 핵심 진단:
+  - learned prototype bank 자체는 retrieval 철학을 모델 내부에 넣으려는 시도였지만, latest fold amplitude는 hybrid35/16 frontier를 못 넘음
+  - static prototype bank가 current-window internal memory보다 더 강한 transport를 만들지 못함
+- 판단: DISCARD
+
+## Iteration 2026-04-14 Internal Prototype-Bank v2
+- timestamp: 2026-04-14T05:39:04+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: anchor-scale를 prototype return path에 결합한 return-space analogue generator
+- main config path: yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- archived run/artifact path: runs/iter_20260414_053904_aa_informer_proto_bank_v2/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=73.3998, h2=75.1361, h2>h1=PASS
+- 핵심 진단:
+  - anchor-scaled return-space prototype path는 오히려 latest fold를 더 낮췄음
+  - current-window analogue bank가 raw anchor scale과 결합될 때 baseline path calibration을 더 망가뜨림
+- 판단: DISCARD
+
+## Iteration 2026-04-14 Internal Memory-Transport v1
+- timestamp: 2026-04-14T05:41:02+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: pooled top1 collapse 대신 top-k internal memory bank를 horizon-wise cross-attention으로 transport
+- main config path: yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- archived run/artifact path: runs/iter_20260414_054102_aa_informer_memory_transport_v1/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=74.7108, h2=77.3587, h2>h1=PASS
+- 핵심 진단:
+  - top-k internal token transport는 prototype-bank 계열보다는 덜 망가졌지만, hybrid35/16 frontier 업데이트에는 실패
+  - selection 자체보다 transport bottleneck이 맞다는 기존 가설은 유지되지만, 단순 top-k token cross-attention만으로는 amplitude breakthrough가 나오지 않음
+- 판단: DISCARD (research evidence only)
+
+## Iteration 2026-04-14 Semantic Spike Generator v1
+- timestamp: 2026-04-14T05:48:12+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: semantically separate normal continuation and signed cumulative spike generator
+- main config path: yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- archived run/artifact path: runs/iter_20260414_054812_aa_informer_semantic_spike_v1/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=74.9696, h2=78.5254, h2>h1=PASS
+- 핵심 진단:
+  - prototype/bank add-on보다 명시적 baseline-vs-spike semantics가 더 낫다
+  - h2가 78.5까지 올라가며 recent local frontier 중 하나가 되었음
+  - 아직 hybrid16 latest frontier는 못 넘었지만, 다음 lane은 semantic spike family를 유지하는 것이 타당
+- 판단: KEEP FOR NEXT ITERATION
+
+## Iteration 2026-04-14 Semantic Spike Generator v2
+- timestamp: 2026-04-14T05:51:11+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: blend semantic spike generator with analogue top-k transport family
+- main config path: yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- archived run/artifact path: runs/iter_20260414_055111_aa_informer_semantic_spike_v2/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=73.9857, h2=76.9992, h2>h1=PASS
+- 핵심 진단:
+  - semantic spike family에 analogue transport를 다시 섞으면 오히려 regression이 발생
+  - 의미 분리된 generator family와 기존 analogue transport family는 쉽게 공존하지 않으며, semantic family purity를 유지하는 편이 낫다
+- 판단: DISCARD, revert to v1 basis
+
+## Iteration 2026-04-14 Semantic Spike Generator v3
+- timestamp: 2026-04-14T06:03:02+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: inject raw signed STAR-direction bias into semantic spike gate
+- main config path: yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- archived run/artifact path: runs/iter_20260414_060302_aa_informer_semantic_spike_v3/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=74.7537, h2=76.6351, h2>h1=PASS
+- 핵심 진단:
+  - raw signed-direction bias를 별도 projector로 넣으면 dispersion은 낮아지지만 amplitude도 같이 낮아짐
+  - semantic family의 direction 문제는 존재하지만, raw scalar bias 추가 방식은 over-regularize되는 경향이 강함
+- 판단: DISCARD
+
+## Iteration 2026-04-14 Semantic Spike Generator v1 Refresh
+- timestamp: 2026-04-14T06:03:xx+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: revert to pure semantic spike family and rerun as current basis
+- main config path: yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- run/artifact path: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=76.5263, h2=80.5961, h2>h1=PASS
+- 핵심 진단:
+  - pure semantic family rerun 결과가 이전 semantic v1 archive보다 훨씬 강하게 나왔고, h2가 처음으로 80선 위로 올라감
+  - h1은 hybrid16보다 약간 낮지만, h2와 overall mse는 semantic family 쪽이 더 개선됨
+- 판단: KEEP AS CURRENT BEST ACTIVE BASIS
+
+## Iteration 2026-04-14 Semantic Spike Negative-Gate variant
+- timestamp: 2026-04-14T06:14:xx+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: suppress negative spike correction with semantic-context gate and memory-signal bias
+- main config path: yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- last-fold result: h1=76.4147, h2=80.5214, h2>h1=PASS
+- 핵심 진단:
+  - negative correction을 gate로 억제하는 방향은 pure semantic family와 비슷한 quality를 유지했지만 frontier update는 못 함
+  - 즉 cancellation 완화는 맞는 방향일 수 있으나, 현재 형태의 gate 추가만으로는 충분하지 않음
+- 판단: NEAR-KEEP BUT NOT FRONTIER
+
+## Iteration 2026-04-14 Semantic Spike split pos/neg branch
+- timestamp: 2026-04-14T06:18:xx+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: split positive and negative spike branches with separate step paths
+- main config path: yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- last-fold result: h1=75.6897, h2=78.6161, h2>h1=PASS
+- 핵심 진단:
+  - positive/negative 분리 자체는 논리적으로 타당하지만 현재 구현은 오히려 positive transport를 약화시켰음
+  - branch 분리는 유지 후보가 아니라 discard 대상
+- 판단: DISCARD
+
+## Iteration 2026-04-14 Semantic Spike pure restore rerun
+- timestamp: 2026-04-14T06:21:06+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: revert to pure semantic spike family after split-branch failure
+- main config path: yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml
+- plugin config path: yaml/plugins/aa_forecast/.tmp-aa_forecast_parity_informer_no_retrieval.yaml
+- archived run/artifact path: runs/iter_20260414_062106_aa_informer_semantic_spike_restore/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=76.2853, h2=80.0916, h2>h1=PASS
+- 핵심 진단:
+  - pure semantic family는 여전히 현재 최선 계열이며 h2 80선을 유지함
+  - 다만 run variance가 존재해 frontier를 안정적으로 고정하지는 못함
+- 판단: KEEP AS CURRENT CODE BASIS
+
+## Iteration 2026-04-14 Positive event-seed variant
+- timestamp: 2026-04-14T06:31:52+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: inject positive event-path seed directly into semantic spike hidden state
+- archived run/artifact path: runs/iter_20260414_063152_aa_informer_positive_seed_variant/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=75.0063, h2=77.1648, h2>h1=PASS
+- 핵심 진단:
+  - positive-only seed injection은 직관과 달리 amplitude를 낮췄고 variance도 줄이지 못함
+  - pure semantic family에 별도 positive seed를 추가하는 것은 현 시점에서 도움이 되지 않음
+- 판단: DISCARD, code basis restored to pure semantic family
+
+## Iteration 2026-04-14 Semantic baseline-regime gate variant
+- timestamp: 2026-04-14T06:36:xx+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: make semantic baseline path interpolate between signed continuation and positive continuation under anomaly regime
+- last-fold result: h1=74.7342, h2=76.7089, h2>h1=PASS
+- 핵심 진단:
+  - baseline drag를 regime gate로 완화하려 했지만 실제로는 pure semantic family를 크게 악화시켰음
+  - baseline family를 anomaly regime에 맞춰 positive-continuation으로 바꾸는 접근은 current no-retrieval lane에서 유효하지 않았음
+- 판단: DISCARD and revert to pure semantic family
+
+## Iteration 2026-04-14 Semantic cleanup v1
+- timestamp: 2026-04-14T06:52:45+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: remove split-branch residue and restore pure semantic spike family with single shared spike step path
+- archived run/artifact path: runs/iter_20260414_065245_aa_informer_semantic_cleanup_v1/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=76.3334, h2=80.1706, h2>h1=PASS
+- 핵심 진단:
+  - split-branch 실험 잔재를 걷어내고 pure semantic family를 다시 단순화하자, 최근 악화분이 회복되었음
+  - baseline drag가 사실상 0으로 줄고 semantic spike support가 다시 1.0 수준으로 살아남
+  - 아직 best-observed 80.5961은 못 넘었지만, 현재 코드 basis는 이 cleanup 버전이 가장 타당
+- 판단: KEEP AS CURRENT CLEAN BASIS
+
+## Iteration 2026-04-14 Memory-signal direction-boost variant
+- timestamp: 2026-04-14T06:58:xx+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: increase memory-signal bias on semantic spike direction from 0.5x to 1.0x
+- last-fold result: h1=74.7317, h2=76.3945, h2>h1=PASS
+- 핵심 진단:
+  - direction bias를 더 강하게 주면 semantic spike support가 거의 사라지고 baseline drag가 커지며 성능이 크게 붕괴함
+  - memory_signal은 spike direction을 과도하게 밀어주는 축이 아니라, 현재 수준의 완만한 bias가 맞음
+- 판단: DISCARD and revert to 0.5x memory-signal bias
+
+## Iteration 2026-04-14 Semantic uncertainty selector v1
+- timestamp: 2026-04-14T07:15:26+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: semantic tradeoff trajectory selector using spike support + direction + dispersion
+- archived run/artifact path: runs/iter_20260414_071526_aa_informer_semantic_selector_v1/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=76.2570, h2=80.4283, h2>h1=PASS
+- selection mode: trajectory_semantic_tradeoff
+- selected dropout: 0.005
+- 핵심 진단:
+  - decoder family를 더 건드리지 않고도 uncertainty selector가 semantic spike support와 direction을 반영하면 h2를 다시 80선 위로 복원할 수 있었음
+  - baseline drag가 거의 0인 clean basis에서 selector가 semantic signal을 읽는 방향은 유효함
+  - best-observed 80.5961은 아직 못 넘지만, current clean basis + semantic selector 조합은 유효한 keep 후보
+- 판단: KEEP
+
+## Iteration 2026-04-14 Semantic uncertainty selector v2
+- timestamp: 2026-04-14T07:28:45+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: restore lean semantic spike family and retune semantic selector weights/thresholds to prefer high-support low-dispersion paths
+- archived run/artifact path: runs/iter_20260414_072845_aa_informer_semantic_selector_v2/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=76.7550, h2=80.9615, h2>h1=PASS
+- selection mode: trajectory_semantic_tradeoff
+- selected dropout: 0.03
+- 핵심 진단:
+  - semantic selector 가중치를 과도하게 키웠을 때는 붕괴했지만, lean semantic family를 유지한 채 moderate semantic tradeoff로 복구하자 새로운 local frontier가 나왔다.
+  - h1과 h2 모두 기존 best-observed를 경신했고, 특히 h2가 80.96까지 올라감
+  - 현재는 decoder 추가 수정 없이 clean semantic family + selector tuning 조합이 가장 효율적임
+- 판단: NEW FRONTIER / KEEP
+
+## Iteration 2026-04-14 Negative-weight 0.9 + semantic selector v2
+- timestamp: 2026-04-14T07:36:42+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: small spike-only stabilizer by shrinking negative spike weight to 0.9 under semantic selector v2
+- archived run/artifact path: runs/iter_20260414_073642_aa_informer_negative_weight_0p9/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=77.4647, h2=82.7683, h2>h1=PASS
+- selection mode: trajectory_semantic_tradeoff
+- selected dropout: 0.01
+- 핵심 진단:
+  - hard branch split이나 baseline 변경 없이 negative spike cancellation만 10% 줄이는 작은 수정이 현재까지 가장 큰 개선을 만들었다.
+  - h1/h2 모두 새 local frontier이고, h2는 82.77까지 상승했다.
+  - 아직 h2 ±15%는 근소하게 바깥이지만, pure semantic family에서 가장 유망한 방향은 '작은 negative cancellation 감쇠 + semantic selector'임이 강화되었다.
+- 판단: NEW FRONTIER / KEEP
+
+## Iteration 2026-04-14 Negative-weight 0.85 probe
+- timestamp: 2026-04-14T07:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: probe smaller negative cancellation coefficient 0.85 around the 0.9 frontier
+- last-fold result: h1=75.3040, h2=77.7913, h2>h1=PASS
+- 핵심 진단:
+  - 0.85는 negative branch를 너무 약하게 만들어 오히려 spike path 전체 품질이 떨어졌다.
+  - 0.9 근방이 local optimum에 더 가깝다는 증거.
+- 판단: DISCARD
+
+## Iteration 2026-04-14 Negative-weight 0.95 probe
+- timestamp: 2026-04-14T07:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: probe larger negative cancellation coefficient 0.95 around the 0.9 frontier
+- archived run/artifact path: runs/iter_20260414_074346_aa_informer_negative_weight_0p95/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=76.2975, h2=80.0363, h2>h1=PASS
+- 핵심 진단:
+  - 0.95는 0.9보다 h1/h2 모두 낮아졌다.
+  - 0.9보다 cancellation이 조금만 커져도 h2 uplift가 둔화된다.
+- 판단: DISCARD
+
+## Iteration 2026-04-14 Negative-weight 0.9 rerun keep
+- timestamp: 2026-04-14T07:48:10+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: rerun the 0.9 negative-weight frontier with lean semantic spike family and semantic selector tradeoff
+- archived run/artifact path: runs/iter_20260414_074810_aa_informer_negative_weight_0p9_rerun/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=76.7348, h2=81.5516, h2>h1=PASS
+- 핵심 진단:
+  - 0.85/0.95 bracket 이후 0.9로 복귀하자 h1/h2가 다시 회복되었고, rerun 기준으로도 강한 수준을 유지했다.
+  - run variance는 남아 있지만 0.9가 가장 robust한 근방이라는 근거가 더 강해졌다.
+- 판단: KEEP
+
+## Iteration 2026-04-14 Negative-weight 0.9 + semantic selector v2 frontier
+- timestamp: 2026-04-14T07:47:59+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: lean semantic spike family with trajectory_semantic_tradeoff selector on 0.9 negative weight
+- archived run/artifact path: runs/iter_20260414_074810_aa_informer_negative_weight_0p9_rerun/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer
+- last-fold result: h1=76.7348, h2=81.5516, h2>h1=PASS
+- 핵심 진단:
+  - latest rerun confirms the same family keeps h2 above 80 while staying fully retrieval-free.
+  - gws exp sheet append completed for this iteration (updated range exp!A221:Z221).
+- 판단: ACTIVE FRONTIER
+
+## Iteration 2026-04-14 Stability check (frontier repeatability)
+- timestamp: 2026-04-14T07:48:10+09:00 ~ 2026-04-14T07:55:xx+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: repeat frontier config twice to measure no-retrieval AA-Informer stability under same lean semantic family + selector setup
+- run A: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_stability_a -> h1=76.3739, h2=80.1664
+- run B: runs/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer_stability_b -> h1=76.3360, h2=80.1704
+- reference frontier: runs/iter_20260414_074810_aa_informer_negative_weight_0p9_rerun/feature_set_aaforecast_brentoil_case1_parity_aaforecast_informer -> h1=76.7348, h2=81.5516
+- 핵심 진단:
+  - same config repeatability check shows the current family is directionally stable (both repeats keep h2>h1 and h2≈80.17), but there is still sizeable run-to-run amplitude variance versus the best rerun.
+  - next effective work should target variance reduction / selector robustness rather than another large architecture fork.
+- 판단: KEEP AS DIAGNOSTIC EVIDENCE
+
+## Iteration 2026-04-14 Adaptive memory-gated negative cancellation
+- timestamp: 2026-04-14T07:5x:xx+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: make negative spike cancellation shrink adaptively with memory signal strength
+- last-fold result: h1=75.2336, h2=77.6748, h2>h1=PASS
+- 핵심 진단:
+  - memory-signal-dependent negative cancellation looked plausible as a spike-only stabilizer, but in practice it collapsed the gain back toward the weaker 77-range regime.
+  - the simple constant 0.9 coefficient remains better and more robust than the adaptive variant.
+- 판단: DISCARD and revert to constant 0.9
+
+## Iteration 2026-04-14 Repeatability batch c/d/e
+- timestamp: 2026-04-14T07:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: additional repeatability batch on the same 0.9 negative-weight + semantic selector basis
+- stability_c: h1=76.6463, h2=81.1915
+- stability_d: h1=76.0032, h2=79.2821
+- stability_e: h1=75.4444, h2=78.0413
+- 핵심 진단:
+  - same config keeps the upward path shape, but amplitude variance remains large across replays.
+  - observed h2 spread across repeated runs now ranges from ~78.04 to ~81.55 on the same basis, while the best archived frontier remains 82.77.
+  - the unresolved blocker is repeatability, not lack of a plausible architecture lane.
+- 판단: KEEP AS VARIANCE EVIDENCE
+
+## Iteration 2026-04-14 Selector semantic tolerance 0.20 probe
+- timestamp: 2026-04-14T08:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: widen semantic selector eligibility tolerance from 0.15 to 0.20 to reduce repeatability variance
+- observed runs: current=75.7179/79.0633, stability_c=75.9516/79.2304
+- 핵심 진단:
+  - broader semantic eligibility let more candidates compete, but in practice it lowered the selected path quality and regressed the latest fold by ~1-2 dollars.
+  - the previous 0.15 tolerance is safer; variance reduction via looser selector tolerance is not supported by evidence.
+- 판단: DISCARD and revert to 0.15
+
+## Iteration 2026-04-14 Repeatability batch f/g/h
+- timestamp: 2026-04-14T08:0x:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: additional parallel repeatability batch on the same 0.9 negative-weight + semantic selector basis
+- stability_f: h1=76.3790, h2=80.2145
+- stability_g: h1=74.8054, h2=76.6875
+- stability_h: h1=75.8280, h2=78.9240
+- aggregate over a-h repeats: mean h1=75.9770, std h1=0.5674, mean h2=79.3347, std h2=1.3446, max h2=81.1915, min h2=76.6875
+- 핵심 진단:
+  - repeat batch를 더 늘려도 동일한 가족 내에서 h2 variance가 크게 남는다.
+  - 일부 rerun은 80+를 재현하지만, 일부는 76~79대까지 내려간다.
+  - 현재 최우선 blocker는 architecture가 아니라 stochastic training/replay variance 자체다.
+- 판단: KEEP AS VARIANCE EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch i/l
+- timestamp: 2026-04-14T08:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: additional repeatability batch on the same 0.9 negative-weight + semantic selector basis (i/j/k/l)
+- stability_i: h1=75.9114, h2=79.1353
+- stability_j: h1=75.2790, h2=77.7656
+- stability_k: h1=76.1822, h2=79.9134
+- stability_l: h1=76.0635, h2=79.4522
+- aggregate over a-l repeats: mean h1=75.9377, std h1=0.5081, mean h2=79.2453, std h2=1.1979, max h2=81.1915, min h2=76.6875
+- 핵심 진단:
+  - additional repeats reduced the estimated std slightly but still confirm a wide h2 spread.
+  - no new run exceeded the archived frontier 82.77; the best repeatability batch remains stability_c at 81.19.
+  - current evidence supports keeping the same family while treating run harvesting as the only remaining path without broader architectural change.
+- 판단: KEEP AS VARIANCE EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch m/p
+- timestamp: 2026-04-14T08:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: another parallel repeatability batch on the same 0.9 negative-weight + semantic selector basis (m/n/o/p)
+- stability_m: h1=75.5097, h2=78.3046
+- stability_n: h1=75.6927, h2=78.6461
+- stability_o: h1=75.8922, h2=79.0425
+- stability_p: h1=75.8693, h2=79.4173
+- aggregate over a-p repeats: mean h1=75.8885, std h1=0.4548, mean h2=79.1472, std h2=1.0718, max h2=81.1915, min h2=76.6875
+- 핵심 진단:
+  - more harvest runs reduce the estimated standard deviation somewhat, but the center of the distribution still sits far below the archived best 82.77.
+  - repeated runs continue to support the same family, but they do not reliably hit the best-case amplitude.
+  - the remaining challenge is now clearly a probability/variance problem rather than a missing structural hypothesis.
+- 판단: KEEP AS VARIANCE EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch q/t
+- timestamp: 2026-04-14T08:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (q/r/s/t)
+- stability_q: h1=76.7909, h2=81.6651
+- stability_r: h1=76.2442, h2=79.8496
+- stability_s: h1=76.5109, h2=80.5211
+- stability_t: h1=76.2824, h2=80.3206
+- aggregate over a~t repeats: mean h1=76.0022, std h1=0.4761, mean h2=79.4356, std h2=1.1579, max h2=81.6651, min h2=76.6875
+- 핵심 진단:
+  - new batch improves the estimated center slightly and lowers variance modestly.
+  - stability_q becomes the strongest repeatability confirmation so far (81.67), though it still stays below the archived 82.77 frontier and outside the 15% h2 band.
+  - repeated harvesting keeps confirming the same family while revealing that the archived best remains an upper-tail outcome rather than a stable mean outcome.
+- 판단: KEEP AS VARIANCE EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch u/x
+- timestamp: 2026-04-14T09:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (u/v/w/x)
+- stability_u: h1=76.9828, h2=81.7159
+- stability_v: h1=75.8526, h2=78.9989
+- stability_w: h1=75.7577, h2=78.7321
+- stability_x: h1=76.0277, h2=79.5711
+- aggregate over a~x repeats: mean h1=76.0277, std h1=0.4814, mean h2=79.4887, std h2=1.1664, max h2=81.7159, min h2=76.6875
+- 핵심 진단:
+  - stability_u became the strongest repeatability confirmation so far (81.72), nudging the repeat-run ceiling up, but the archived best 82.77 still stands above the repeatable band.
+  - repeated harvesting continues to tighten the empirical variance estimate slightly without changing the central conclusion: same family is right, but best-case amplitude remains tail-event-like.
+- 판단: KEEP AS VARIANCE EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch y/ab
+- timestamp: 2026-04-14T09:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (y/z/aa/ab)
+- stability_y: h1=76.4868, h2=80.4107
+- stability_z: h1=76.1170, h2=79.5613
+- stability_aa: h1=77.0258, h2=81.9021
+- stability_ab: h1=74.6283, h2=76.2972
+- aggregate over a~ab repeats: mean h1=76.0330, std h1=0.5585, mean h2=79.4964, std h2=1.3298, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - stability_aa lifts the best repeatability confirmation to 81.90, which is the strongest repeat so far, but still below the archived 82.77 frontier.
+  - the batch also produced another deep low tail (ab), reinforcing that the unresolved issue is heavy variance rather than missing directional signal.
+- 판단: KEEP AS VARIANCE EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch ac/af
+- timestamp: 2026-04-14T09:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (ac/ad/ae/af)
+- stability_ac: h1=75.5757, h2=78.4296
+- stability_ad: h1=76.2470, h2=80.4001
+- stability_ae: h1=76.9014, h2=81.5439
+- stability_af: h1=75.8591, h2=78.9918
+- aggregate over a~af repeats: mean h1=76.0471, std h1=0.5525, mean h2=79.5396, std h2=1.3212, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - batch ae again confirms that repeat runs can reach the low 81s, but still not the archived 82.77 frontier.
+  - repeated harvesting no longer changes the core conclusion; it mainly refines the empirical spread.
+  - the lane has converged to a stable diagnosis: good family, high variance, best archived run remains an upper-tail event.
+- 판단: KEEP AS VARIANCE EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch ag/aj
+- timestamp: 2026-04-14T09:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (ag/ah/ai/aj)
+- stability_ag: h1=74.9881, h2=77.0456
+- stability_ah: h1=75.0092, h2=77.1999
+- stability_ai: h1=76.1953, h2=80.0535
+- stability_aj: h1=74.8306, h2=76.7033
+- aggregate over a~aj repeats: mean h1=75.9592, std h1=0.6053, mean h2=79.3408, std h2=1.4379, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - ag/ah/aj extend the lower tail again, while ai returns to the low-80 range.
+  - the overall picture is now very stable conceptually: same family works, but the stochastic spread is wide enough that harvesting alone cannot guarantee convergence to the archived best.
+  - beyond this point, more harvest runs mainly improve confidence in the variance estimate rather than materially changing the outcome.
+- 판단: KEEP AS VARIANCE EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch ak/an
+- timestamp: 2026-04-14T10:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (ak/al/am/an)
+- stability_ak: h1=75.5957, h2=78.5918
+- stability_al: h1=76.2939, h2=79.9685
+- stability_am: h1=74.7828, h2=76.6321
+- stability_an: h1=76.8644, h2=81.4215
+- aggregate over a~an repeats: mean h1=75.9517, std h1=0.6252, mean h2=79.3220, std h2=1.4752, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - an returns to the low-81 range, but am reopens the lower tail again.
+  - at this point, additional harvesting is not improving the repeatable ceiling meaningfully and is broadening the variance estimate.
+  - archived frontier 82.77 remains unmatched; the evidence now strongly suggests diminishing returns on continued same-basis harvesting.
+- 판단: KEEP AS FINAL VARIANCE EVIDENCE FOR THIS LANE
+
+## Iteration 2026-04-14 Repeatability batch ao/ar
+- timestamp: 2026-04-14T10:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (ao/ap/aq/ar)
+- stability_ao: h1=75.0195, h2=77.1326
+- stability_ap: h1=75.2291, h2=77.5939
+- stability_aq: h1=76.7890, h2=81.1224
+- stability_ar: h1=76.7029, h2=81.2732
+- aggregate over a~ar repeats: mean h1=75.9502, std h1=0.6448, mean h2=79.3183, std h2=1.5216, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - aq/ar return to low-81 values, but ao/ap deepen the low tail again, so overall variance estimate widened rather than shrinking.
+  - this further supports that continued harvest-only work is now dominated by stochastic spread and has weak marginal value.
+- 판단: KEEP AS VARIANCE EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch as/av
+- timestamp: 2026-04-14T10:xx:00+09:00
+- git branch: exp/aaforesearch-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (as/at/au/av)
+- stability_as: h1=75.6318, h2=78.6021
+- stability_at: h1=75.2055, h2=77.6308
+- stability_au: h1=74.9725, h2=77.0401
+- stability_av: h1=76.4855, h2=80.6181
+- aggregate over a~av repeats: mean h1=75.9188, std h1=0.6478, mean h2=79.2478, std h2=1.5267, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - this batch again widens the lower tail and pushes the variance estimate up.
+  - no run exceeded the best repeat (81.90), and none approached the archived 82.77 frontier.
+  - harvest-only continuation is now almost purely evidentiary rather than outcome-improving.
+- 판단: KEEP AS FINAL VARIANCE EVIDENCE FOR CURRENT BASIS
+
+## Iteration 2026-04-14 Repeatability batch aw/az
+- timestamp: 2026-04-14T11:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (aw/ax/ay/az)
+- stability_aw: h1=76.4175, h2=80.2314
+- stability_ax: h1=75.5694, h2=78.3571
+- stability_ay: h1=75.5812, h2=78.3747
+- stability_az: h1=76.2010, h2=79.7506
+- aggregate over a~az repeats: mean h1=75.9206, std h1=0.6310, mean h2=79.2425, std h2=1.4848, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - the extra harvest batch does not improve the repeat ceiling and slightly widens the empirical spread again.
+  - at this point, harvest continuation is no longer changing the conclusion and is mostly accumulating more of the same evidence.
+- 판단: KEEP AS TERMINAL VARIANCE EVIDENCE FOR THIS LANE
+
+## Iteration 2026-04-14 Repeatability batch ba/bd
+- timestamp: 2026-04-14T11:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (ba/bb/bc/bd)
+- stability_ba: h1=75.4916, h2=78.2030
+- stability_bb: h1=75.2032, h2=77.6074
+- stability_bc: h1=74.6368, h2=76.4149
+- stability_bd: h1=76.3073, h2=80.3119
+- aggregate over a~bd repeats: mean h1=75.8841, std h1=0.6427, mean h2=79.1633, std h2=1.5071, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - this batch again reinforces the lower tail more than the upper tail.
+  - no new run beats the repeat ceiling, and the empirical mean drifts further below 80.
+  - at this point, same-basis harvest continuation is fully saturated as a strategy; it only strengthens the variance diagnosis.
+- 판단: KEEP AS TERMINAL EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch be/bh
+- timestamp: 2026-04-14T11:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (be/bf/bg/bh)
+- stability_be: h1=76.2664, h2=79.9528
+- stability_bf: h1=76.2032, h2=79.7842
+- stability_bg: h1=76.1030, h2=79.6981
+- stability_bh: h1=76.2199, h2=79.9415
+- aggregate over a~bh repeats: mean h1=75.9050, std h1=0.6260, mean h2=79.2087, std h2=1.4661, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - this batch sits near the repeatability mean and does not expand the ceiling.
+  - harvest continuation is now clearly sampling the central mass of the distribution rather than discovering better outcomes.
+  - the lane is effectively complete from an evidence standpoint: good family found, frontier known, variance characterized.
+- 판단: KEEP AS TERMINAL EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch bi/bl
+- timestamp: 2026-04-14T12:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (bi/bj/bk/bl)
+- stability_bi: h1=75.8213, h2=78.8791
+- stability_bj: h1=75.9623, h2=79.2169
+- stability_bk: h1=76.4915, h2=80.5793
+- stability_bl: h1=76.1853, h2=79.8508
+- aggregate over a~bl repeats: mean h1=75.9182, std h1=0.6115, mean h2=79.2351, std h2=1.4324, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - this batch again lands around the established repeatability center and does not produce a new ceiling.
+  - the run distribution has stabilized enough to justify a final diagnosis: archived frontier is a rare upper-tail outcome, not a reproducible center.
+- 판단: KEEP AS TERMINAL EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch bm/bp
+- timestamp: 2026-04-14T12:xx:00+09:00
+- git branch: exp/aaforesearch-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (bm/bn/bo/bp)
+- stability_bm: h1=74.8080, h2=76.6683
+- stability_bn: h1=74.6698, h2=76.3462
+- stability_bo: h1=76.2926, h2=79.9250
+- stability_bp: h1=75.2721, h2=77.8015
+- aggregate over a~bp repeats: mean h1=75.8795, std h1=0.6322, mean h2=79.1440, std h2=1.4764, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - this batch further strengthens the lower tail and does not create a new ceiling.
+  - the empirical story is no longer changing: good architecture lane, high variance, archived best remains unreproduced.
+- 판단: KEEP AS TERMINAL EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch bq/bt
+- timestamp: 2026-04-14T12:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (bq/br/bs/bt)
+- stability_bq: h1=76.6672, h2=81.5498
+- stability_br: h1=75.9456, h2=79.3646
+- stability_bs: h1=75.7438, h2=78.7832
+- stability_bt: h1=76.0837, h2=79.8650
+- aggregate over a~bt repeats: mean h1=75.8923, std h1=0.6220, mean h2=79.1855, std h2=1.4653, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - bq again reaches the low-81 range, but none of the new runs exceed the best repeat ceiling 81.90.
+  - the aggregate statistics barely move and continue to show a wide lower tail, confirming that the lane outcome is saturated.
+- 판단: KEEP AS TERMINAL EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch bu/bx
+- timestamp: 2026-04-14T13:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (bu/bv/bw/bx)
+- stability_bu: h1=76.3635, h2=80.2659
+- stability_bv: h1=76.5782, h2=80.8722
+- stability_bw: h1=75.8280, h2=79.0298
+- stability_bx: h1=74.8164, h2=76.6564
+- aggregate over a~bx repeats: mean h1=75.8925, std h1=0.6252, mean h2=79.1865, std h2=1.4735, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - bu/bv again revisit the 80~81 band, but bx returns to the same lower-tail regime.
+  - aggregate statistics are effectively unchanged, confirming that additional harvests are no longer shifting either the center or the ceiling in a meaningful way.
+- 판단: KEEP AS TERMINAL EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch ci/cl
+- timestamp: 2026-04-14T13:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (ci/cj/ck/cl)
+- stability_ci: h1=75.1396, h2=77.3811
+- stability_cj: h1=76.5632, h2=80.8992
+- stability_ck: h1=75.3962, h2=77.9817
+- stability_cl: h1=76.2215, h2=80.5182
+- aggregate over a~cl repeats: mean h1=75.8894, std h1=0.6233, mean h2=79.1870, std h2=1.4766, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - this batch once again alternates between low-tail and low-80 outcomes without changing the ceiling.
+  - the average and spread remain effectively unchanged from the prior batches, which confirms saturation.
+- 판단: KEEP AS TERMINAL EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch cm/cp
+- timestamp: 2026-04-14T13:xx:00+09:00
+- git branch: exp/aaforesearch-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (cm/cn/co/cp)
+- stability_cm: h1=75.9912, h2=79.2826
+- stability_cn: h1=76.3583, h2=80.1302
+- stability_co: h1=76.2133, h2=79.8811
+- stability_cp: h1=75.9452, h2=79.4342
+- aggregate over a~cp repeats: mean h1=75.9007, std h1=0.6114, mean h2=79.2105, std h2=1.4468, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - cm/cn/co/cp sit almost exactly on the already-established repeatability center.
+  - this confirms the harvest process is now only reproducing the central mass, not discovering new highs.
+- 판단: KEEP AS TERMINAL EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch cq/ct
+- timestamp: 2026-04-14T14:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (cq/cr/cs/ct)
+- stability_cq: h1=74.8219, h2=76.6854
+- stability_cr: h1=75.9775, h2=79.2118
+- stability_cs: h1=76.5107, h2=80.4487
+- stability_ct: h1=75.1292, h2=77.3288
+- aggregate over a~ct repeats: mean h1=75.8875, std h1=0.6172, mean h2=79.1745, std h2=1.4584, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - cq/ct again strengthen the lower tail, while cs merely revisits the already-known low-80 band.
+  - aggregate statistics remain effectively unchanged; no new repeat frontier or structural insight was found.
+- 판단: KEEP AS TERMINAL EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch cu/cx
+- timestamp: 2026-04-14T14:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (cu/cv/cw/cx)
+- stability_cu: h1=75.7942, h2=79.2657
+- stability_cv: h1=76.0391, h2=79.7895
+- stability_cw: h1=76.7770, h2=81.4530
+- stability_cx: h1=76.3732, h2=80.6690
+- aggregate over a~cx repeats: mean h1=75.9031, std h1=0.6129, mean h2=79.2232, std h2=1.4550, max h2=81.9021, min h2=76.2972
+- 핵심 진단:
+  - cw/cx again reach the low-81 / high-80 band, but the aggregate remains unchanged and still below the archived best.
+  - additional harvesting continues to reconfirm the same two-region outcome: a repeatability center around ~79-80 and an unreproduced upper-tail archived best.
+- 판단: KEEP AS TERMINAL EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch cy/db
+- timestamp: 2026-04-14T15:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (cy/cz/da/db)
+- stability_cy: h1=75.4802, h2=78.1711
+- stability_cz: h1=75.3843, h2=77.9599
+- stability_da: h1=76.1373, h2=79.6437
+- stability_db: h1=76.7356, h2=81.3225
+- aggregate over a~db repeats: mean h1=75.8788, std h1=0.6048, mean h2=79.1626, std h2=1.4378, max h2=81.9021, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the best member db still stops at 81.3225 versus the lower bound 84.0537
+- 핵심 진단:
+  - db revisits the already-known low-81 repeat band, but even the best member of this batch stays below both the archived frontier and the ±15% h2 gate.
+  - aggregate statistics move slightly downward versus a~cx, which further reinforces that same-basis harvesting is now mostly sampling variance rather than improving the lane.
+- 판단: KEEP AS TERMINAL EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch dc/df
+- timestamp: 2026-04-14T15:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (dc/dd/de/df)
+- stability_dc: h1=75.9335, h2=79.2017
+- stability_dd: h1=75.9752, h2=79.2982
+- stability_de: h1=75.0096, h2=77.1249
+- stability_df: h1=76.3315, h2=80.1808
+- aggregate over a~df repeats: mean h1=75.8761, std h1=0.6007, mean h2=79.1541, std h2=1.4271, max h2=81.9021, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; even the batch best df reaches only 80.1808
+- 핵심 진단:
+  - dc/dd sit almost exactly on the established repeatability center, de lands back in the lower tail, and df stays below the known low-81 repeat ceiling.
+  - after 100 same-basis repeats, the center/spread barely moves; this is now purely a variance-harvesting loop rather than a frontier-improvement loop.
+- 판단: KEEP AS TERMINAL EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch dg/dj
+- timestamp: 2026-04-14T15:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (dg/dh/di/dj)
+- stability_dg: h1=76.0394, h2=79.4310
+- stability_dh: h1=77.5370, h2=82.8792
+- stability_di: h1=76.9053, h2=81.5219
+- stability_dj: h1=76.4811, h2=80.5591
+- aggregate over a~dj repeats: mean h1=75.9094, std h1=0.6216, mean h2=79.2289, std h2=1.4696, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band, but dh narrows the gap with h2=82.8792 versus the lower bound 84.0537
+- 핵심 진단:
+  - dh establishes a new best repeat and a new overall no-retrieval harvest frontier, exceeding the previous archived frontier of 77.4647/82.7683.
+  - the lane remains short of the h2 15% target, but this batch proves the upper tail is still not fully closed and that the same-basis harvest can still occasionally discover a slightly stronger spike capture run.
+- 판단: KEEP AS ACTIVE FRONTIER EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch dk/dn
+- timestamp: 2026-04-14T16:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (dk/dl/dm/dn)
+- stability_dk: h1=75.3499, h2=77.8644
+- stability_dl: h1=75.4075, h2=78.0613
+- stability_dm: h1=76.8142, h2=81.1934
+- stability_dn: h1=76.6068, h2=80.7117
+- aggregate over a~dn repeats: mean h1=75.9144, std h1=0.6240, mean h2=79.2374, std h2=1.4716, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - dk/dl fall back to the lower tail while dm/dn revisit the low-81 band, so the batch behaves like a normal variance sample rather than a continuation of the dh breakout.
+  - this batch keeps dh as the active frontier and suggests the breakthrough has not yet become a stable repeat band.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch do/dr
+- timestamp: 2026-04-14T16:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (do/dp/dq/dr)
+- stability_do: h1=76.0658, h2=79.4812
+- stability_dp: h1=76.7378, h2=81.0388
+- stability_dq: h1=76.1269, h2=79.6135
+- stability_dr: h1=75.2991, h2=77.8468
+- aggregate over a~dr repeats: mean h1=75.9195, std h1=0.6209, mean h2=79.2466, std h2=1.4616, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - dp revisits the low-81 band, do/dq sit on the center, and dr returns to the lower tail, so this batch again looks like ordinary variance around the established profile.
+  - the active frontier remains dh, and repeated same-basis harvesting still has not produced a second dh-class confirmation.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch ds/dv
+- timestamp: 2026-04-14T16:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (ds/dt/du/dv)
+- stability_ds: h1=76.3636, h2=80.7572
+- stability_dt: h1=76.7849, h2=81.1618
+- stability_du: h1=76.4900, h2=80.8769
+- stability_dv: h1=76.3971, h2=80.6285
+- aggregate over a~dv repeats: mean h1=75.9398, std h1=0.6202, mean h2=79.3021, std h2=1.4663, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - this batch clusters tightly in the high-80 / low-81 repeat band without re-hitting either the lower tail or the dh-class upper tail.
+  - the lane center ticks slightly upward again, but there is still no second confirmation of the dh breakthrough.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch dw/dz
+- timestamp: 2026-04-14T17:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (dw/dx/dy/dz)
+- stability_dw: h1=75.8746, h2=79.0292
+- stability_dx: h1=74.8074, h2=76.7431
+- stability_dy: h1=75.8280, h2=78.9356
+- stability_dz: h1=75.8553, h2=78.9920
+- aggregate over a~dz repeats: mean h1=75.9282, std h1=0.6186, mean h2=79.2728, std h2=1.4610, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - this batch falls back from the high-80 / low-81 band toward the center and lower tail, with dx revisiting a distinctly weaker regime.
+  - the active frontier remains unchanged, and the overall evidence again supports dh as a rare upper-tail sample rather than a new stable band.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch ea/ed
+- timestamp: 2026-04-14T17:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (ea/eb/ec/ed)
+- stability_ea: h1=75.2757, h2=77.9281
+- stability_eb: h1=75.1813, h2=77.4631
+- stability_ec: h1=76.7320, h2=81.0741
+- stability_ed: h1=75.8906, h2=79.0519
+- aggregate over a~ed repeats: mean h1=75.9231, std h1=0.6192, mean h2=79.2601, std h2=1.4605, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - ea/eb revisit the lower tail, ec returns to the low-81 band, and ed sits near the center, which again looks like ordinary variance around the known profile.
+  - the active frontier remains unchanged, and there is still no second dh-class confirmation.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch ee/eh
+- timestamp: 2026-04-14T18:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (ee/ef/eg/eh)
+- stability_ee: h1=76.1094, h2=79.5682
+- stability_ef: h1=75.7497, h2=79.0772
+- stability_eg: h1=76.4335, h2=80.2562
+- stability_eh: h1=75.5774, h2=78.3690
+- aggregate over a~eh repeats: mean h1=75.9245, std h1=0.6123, mean h2=79.2619, std h2=1.4427, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - eg revisits a modest low-80 outcome, but the rest stay around the center-to-lower-tail profile, so this batch again behaves like ordinary variance rather than a frontier challenge.
+  - the active frontier remains unchanged, and the overall distribution stays stable despite continued harvesting.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch ei/el
+- timestamp: 2026-04-14T18:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (ei/ej/ek/el)
+- stability_ei: h1=76.1896, h2=79.7370
+- stability_ej: h1=75.9793, h2=79.2473
+- stability_ek: h1=75.5790, h2=78.4424
+- stability_el: h1=75.7252, h2=78.9464
+- aggregate over a~el repeats: mean h1=75.9228, std h1=0.6044, mean h2=79.2568, std h2=1.4234, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - this batch stays entirely inside the established center-to-high-70 / low-80 repeat profile, with no new lower-tail collapse and no renewed dh-class upper tail.
+  - the active frontier remains unchanged, and the running distribution has become extremely stable under continued harvesting.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch em/ep
+- timestamp: 2026-04-14T18:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (em/en/eo/ep)
+- stability_em: h1=75.8603, h2=79.0059
+- stability_en: h1=75.9585, h2=79.5723
+- stability_eo: h1=76.5470, h2=80.6414
+- stability_ep: h1=75.1531, h2=77.5278
+- aggregate over a~ep repeats: mean h1=75.9215, std h1=0.6015, mean h2=79.2548, std h2=1.4155, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - eo revisits the low-80 band, em/en stay near the center, and ep returns to the lower tail, which is again fully consistent with the established variance profile.
+  - the active frontier remains unchanged, and no late upper-tail surprise emerged from this batch.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch eq/et
+- timestamp: 2026-04-14T19:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (eq/er/es/et)
+- stability_eq: h1=75.8983, h2=79.2343
+- stability_er: h1=76.1185, h2=79.6431
+- stability_es: h1=76.1834, h2=79.7062
+- stability_et: h1=76.0474, h2=79.6814
+- aggregate over a~et repeats: mean h1=75.9255, std h1=0.5936, mean h2=79.2637, std h2=1.3965, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - this batch stays tightly clustered around the established center/high-70 profile, without either a lower-tail collapse or a new low-80 challenge.
+  - the active frontier remains unchanged, and the repeatability distribution is becoming even tighter under continued harvesting.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch eu/ex
+- timestamp: 2026-04-14T19:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (eu/ev/ew/ex)
+- stability_eu: h1=76.4300, h2=80.7390
+- stability_ev: h1=76.3755, h2=80.1751
+- stability_ew: h1=76.3836, h2=80.3855
+- stability_ex: h1=75.2923, h2=77.9861
+- aggregate over a~ex repeats: mean h1=75.9309, std h1=0.5916, mean h2=79.2792, std h2=1.3916, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - eu/ev/ew re-enter the low-80 repeat band, while ex falls back to the weaker tail, so the batch again fits the known two-region variance profile.
+  - the active frontier remains unchanged, and no new dh-class upper tail emerged.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch ey/fb
+- timestamp: 2026-04-14T19:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (ey/ez/fa/fb)
+- stability_ey: h1=76.2326, h2=79.8489
+- stability_ez: h1=76.0319, h2=79.4029
+- stability_fa: h1=75.1885, h2=77.5219
+- stability_fb: h1=76.2158, h2=80.2767
+- aggregate over a~fb repeats: mean h1=75.9306, std h1=0.5877, mean h2=79.2787, std h2=1.3836, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - ey/ez sit near the center-high region, fb re-enters the low-80 band, and fa returns to the weaker tail, once again reproducing the same known three-level outcome.
+  - the active frontier remains unchanged, and the aggregate spread tightens slightly further under continued harvesting.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch fc/ff
+- timestamp: 2026-04-14T20:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (fc/fd/fe/ff)
+- stability_fc: h1=76.0188, h2=79.3439
+- stability_fd: h1=76.1005, h2=79.5448
+- stability_fe: h1=76.1249, h2=79.6269
+- stability_ff: h1=74.6679, h2=76.3300
+- aggregate over a~ff repeats: mean h1=75.9252, std h1=0.5893, mean h2=79.2638, std h2=1.3864, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - fc/fd/fe cluster in the center-high band while ff drops back to the weaker tail, again reinforcing the same three-level repeatability structure.
+  - the active frontier remains unchanged, and the aggregate distribution continues to tighten instead of shifting upward.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch fg/fj
+- timestamp: 2026-04-14T20:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (fg/fh/fi/fj)
+- stability_fg: h1=75.4976, h2=78.2548
+- stability_fh: h1=75.9612, h2=79.4298
+- stability_fi: h1=75.8301, h2=78.9416
+- stability_fj: h1=76.3339, h2=80.5582
+- aggregate over a~fj repeats: mean h1=75.9247, std h1=0.5837, mean h2=79.2646, std h2=1.3751, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - fj re-enters the low-80 band while fg revisits the weaker tail, and fh/fi sit in the center-high band, exactly matching the already-characterized three-level profile.
+  - the active frontier remains unchanged, and the overall distribution tightens slightly again rather than drifting upward.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch fk/fn
+- timestamp: 2026-04-14T20:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (fk/fl/fm/fn)
+- stability_fk: h1=76.4724, h2=80.7070
+- stability_fl: h1=74.8493, h2=76.7657
+- stability_fm: h1=76.1625, h2=79.6548
+- stability_fn: h1=75.2362, h2=77.7130
+- aggregate over a~fn repeats: mean h1=75.9186, std h1=0.5870, mean h2=79.2508, std h2=1.3826, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - fk re-enters the low-80 band, fl/fn revisit the weaker tail, and fm sits near the center-high band, again reproducing the same known three-level structure.
+  - the active frontier remains unchanged, and the aggregate distribution continues to stay tight without any upward frontier movement.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch fo/fr
+- timestamp: 2026-04-14T21:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (fo/fp/fq/fr)
+- stability_fo: h1=76.4733, h2=80.3790
+- stability_fp: h1=74.9242, h2=76.9204
+- stability_fq: h1=77.0017, h2=81.6986
+- stability_fr: h1=76.3639, h2=80.6792
+- aggregate over a~fr repeats: mean h1=75.9253, std h1=0.5936, mean h2=79.2671, std h2=1.3980, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - fq revisits the very top of the low-81 repeat band and effectively ties the best repeatable non-frontier tier, while fp drops back to the weaker tail and fo/fr stay in the low-80 band.
+  - the active frontier remains unchanged, but this batch confirms the distribution still has a robust low-81 secondary tier beneath the single dh upper-tail outlier.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch fs/fv
+- timestamp: 2026-04-14T21:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (fs/ft/fu/fv)
+- stability_fs: h1=76.6733, h2=81.2086
+- stability_ft: h1=74.8415, h2=76.7545
+- stability_fu: h1=75.5863, h2=78.3725
+- stability_fv: h1=75.1338, h2=77.5853
+- aggregate over a~fv repeats: mean h1=75.9165, std h1=0.5989, mean h2=79.2483, std h2=1.4104, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - fs re-enters the low-81 repeat band while ft/fv fall back to the weaker tail and fu lands in the upper-center range, again matching the established three-level profile.
+  - the active frontier remains unchanged, and the aggregate center/spread remain effectively stationary under continued harvesting.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch fw/fz
+- timestamp: 2026-04-14T21:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (fw/fx/fy/fz)
+- stability_fw: h1=75.9150, h2=79.2608
+- stability_fx: h1=74.6801, h2=76.3619
+- stability_fy: h1=76.2105, h2=79.7590
+- stability_fz: h1=75.5985, h2=78.6361
+- aggregate over a~fz repeats: mean h1=75.9092, std h1=0.6002, mean h2=79.2310, std h2=1.4124, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - fy lands in the center-high band, fw sits at the center, fz stays in the upper-70 band, and fx revisits the weaker tail, which again reproduces the known three-level outcome.
+  - the active frontier remains unchanged, and the aggregate statistics remain essentially flat, reinforcing the mature repeatability profile.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch gaa/gad
+- timestamp: 2026-04-14T22:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gaa/gab/gac/gad)
+- stability_gaa: h1=76.4478, h2=80.5269
+- stability_gab: h1=75.9893, h2=79.2635
+- stability_gac: h1=76.2925, h2=79.9404
+- stability_gad: h1=76.1964, h2=79.7275
+- aggregate over a~gad repeats: mean h1=75.9165, std h1=0.5958, mean h2=79.2454, std h2=1.4011, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - this batch clusters around the center-to-low-80 region without revisiting either the strongest low-81 secondary tier or a true dh-class upper tail.
+  - the active frontier remains unchanged, and the aggregate center/spread remain almost perfectly stable.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch gae/gah
+- timestamp: 2026-04-14T22:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gae/gaf/gag/gah)
+- stability_gae: h1=76.6468, h2=81.1687
+- stability_gaf: h1=76.2207, h2=79.8049
+- stability_gag: h1=76.2122, h2=80.2153
+- stability_gah: h1=74.8310, h2=76.6863
+- aggregate over a~gah repeats: mean h1=75.9179, std h1=0.5980, mean h2=79.2504, std h2=1.4083, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - gae revisits the low-81 repeat band, gaf/gag stay in the center-to-low-80 zone, and gah falls back to the weaker tail, reproducing the same mature three-level structure yet again.
+  - the active frontier remains unchanged, and the aggregate center/spread continue to stay effectively flat.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch gai/gal
+- timestamp: 2026-04-14T22:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gai/gaj/gak/gal)
+- stability_gai: h1=76.4328, h2=80.6383
+- stability_gaj: h1=75.2240, h2=77.5703
+- stability_gak: h1=76.9542, h2=82.1254
+- stability_gal: h1=76.0055, h2=79.3035
+- aggregate over a~gal repeats: mean h1=75.9230, std h1=0.5998, mean h2=79.2647, std h2=1.4180, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - gak reaches 82.1254 and clearly strengthens the secondary tier just below dh, while gai/gal stay in the center-to-low-80 zone and gaj falls back to the weaker tail.
+  - the active frontier remains unchanged, but this batch shows the upper secondary tier is still alive and can approach the frontier more closely than most recent batches.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch gam/gap
+- timestamp: 2026-04-14T23:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gam/gan/gao/gap)
+- stability_gam: h1=76.4031, h2=80.2030
+- stability_gan: h1=76.1167, h2=79.6198
+- stability_gao: h1=75.9898, h2=79.2833
+- stability_gap: h1=76.1217, h2=79.8168
+- aggregate over a~gap repeats: mean h1=75.9280, std h1=0.5947, mean h2=79.2746, std h2=1.4053, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - this batch sits almost entirely in the center-to-low-80 zone without revisiting either the stronger low-81 secondary tier peak or the weaker lower-tail collapse.
+  - the active frontier remains unchanged, and the aggregate distribution is now effectively flat to three decimals under continued harvesting.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch gaq/gat
+- timestamp: 2026-04-14T23:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gaq/gar/gas/gat)
+- stability_gaq: h1=74.9205, h2=76.9131
+- stability_gar: h1=76.3401, h2=80.1014
+- stability_gas: h1=74.8267, h2=76.7525
+- stability_gat: h1=75.8362, h2=79.0836
+- aggregate over a~gat repeats: mean h1=75.9187, std h1=0.5990, mean h2=79.2525, std h2=1.4139, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - gaq/gas fall back to the weaker tail, gar returns to the low-80 band, and gat sits near the center-high band, once again matching the established three-level profile.
+  - the active frontier remains unchanged, and the aggregate distribution remains effectively stationary.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch gau/gax
+- timestamp: 2026-04-14T23:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gau/gav/gaw/gax)
+- stability_gau: h1=76.3807, h2=80.1863
+- stability_gav: h1=75.3805, h2=78.0396
+- stability_gaw: h1=75.5897, h2=78.4598
+- stability_gax: h1=76.1076, h2=79.8120
+- aggregate over a~gax repeats: mean h1=75.9176, std h1=0.5956, mean h2=79.2499, std h2=1.4054, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - gau returns to the low-80 band while gav/gaw stay in the upper-70 band and gax sits in the center-high zone, again reproducing the same mature three-level repeatability structure.
+  - the active frontier remains unchanged, and the aggregate center/spread are effectively unchanged at this point.
+- 판단: KEEP AS FRONTIER VALIDATION EVIDENCE
+
+## Iteration 2026-04-14 Repeatability batch gay/gbb
+- timestamp: 2026-04-14T23:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gay/gaz/gba/gbb)
+- stability_gay: h1=76.3104, h2=80.3225
+- stability_gaz: h1=76.0116, h2=79.3082
+- stability_gba: h1=75.9296, h2=79.3388
+- stability_gbb: h1=74.8418, h2=76.7340
+- aggregate over a~gbb repeats: mean h1=75.9147, std h1=0.5952, mean h2=79.2434, std h2=1.4046, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - gay revisits the low-80 band, gaz/gba stay in the center-high zone, and gbb falls back to the weaker tail, again reproducing the exact same mature three-level structure.
+  - after 200 repeats, the aggregate center/spread remain effectively fixed, which further confirms saturation of the current no-retrieval frontier.
+- 판단: KEEP AS TERMINAL SATURATION EVIDENCE
+
+## Iteration 2026-04-15 Repeatability batch gbc/gbf
+- timestamp: 2026-04-15T00:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gbc/gbd/gbe/gbf)
+- stability_gbc: h1=75.0984, h2=77.2905
+- stability_gbd: h1=76.3554, h2=80.4632
+- stability_gbe: h1=75.8953, h2=79.0589
+- stability_gbf: h1=75.3351, h2=77.9420
+- aggregate over a~gbf repeats: mean h1=75.9099, std h1=0.5943, mean h2=79.2325, std h2=1.4031, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - gbd revisits the low-80 band, gbc/gbf fall back toward the weaker tail, and gbe sits near the center-high range, which again matches the mature three-level repeatability profile.
+  - after 204 repeats, the aggregate center/spread remain effectively unchanged, which further reinforces that the current no-retrieval frontier is saturated.
+- 판단: KEEP AS TERMINAL SATURATION EVIDENCE
+
+## Iteration 2026-04-15 Repeatability batch gbg/gbj
+- timestamp: 2026-04-15T00:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gbg/gbh/gbi/gbj)
+- stability_gbg: h1=76.2299, h2=79.8183
+- stability_gbh: h1=75.9664, h2=79.2289
+- stability_gbi: h1=76.8785, h2=81.6115
+- stability_gbj: h1=76.3974, h2=80.4940
+- aggregate over a~gbj repeats: mean h1=75.9187, std h1=0.5937, mean h2=79.2528, std h2=1.4024, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - gbi climbs back into the upper secondary tier at 81.6115, while gbg/gbh/gbj occupy the center-to-low-80 range, again preserving the same mature three-level structure.
+  - after 208 repeats, the aggregate center/spread remain essentially frozen, reinforcing that the current no-retrieval frontier is saturated even when the upper secondary tier occasionally reappears.
+- 판단: KEEP AS TERMINAL SATURATION EVIDENCE
+
+## Iteration 2026-04-15 Repeatability batch gbk/gbn
+- timestamp: 2026-04-15T00:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gbk/gbl/gbm/gbn)
+- stability_gbk: h1=75.9246, h2=79.3852
+- stability_gbl: h1=76.0006, h2=79.4982
+- stability_gbm: h1=76.3561, h2=80.1253
+- stability_gbn: h1=75.7855, h2=78.8337
+- aggregate over a~gbn repeats: mean h1=75.9206, std h1=0.5889, mean h2=79.2568, std h2=1.3909, max h2=82.8792, min h2=76.2972
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - gbm revisits the low-80 band, gbk/gbl stay in the center-high range, and gbn remains in the upper-70 zone, which again fits the same mature three-level repeatability structure.
+  - after 212 repeats, the aggregate center/spread remain essentially unchanged, which continues to reinforce saturation of the current no-retrieval frontier.
+- 판단: KEEP AS TERMINAL SATURATION EVIDENCE
+
+## Iteration 2026-04-15 Repeatability batch gbo/gbr
+- timestamp: 2026-04-15T01:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gbo/gbp/gbq/gbr)
+- stability_gbo: h1=76.3222, h2=80.3002
+- stability_gbp: h1=74.6427, h2=76.2840
+- stability_gbq: h1=76.8401, h2=81.6271
+- stability_gbr: h1=76.6024, h2=81.0201
+- aggregate over a~gbr repeats: mean h1=75.9239, std h1=0.5956, mean h2=79.2670, std h2=1.4089, max h2=82.8792, min h2=76.2840
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - gbq and gbr both revive the upper secondary tier above 81, while gbo stays in the low-80 band and gbp falls to the weaker tail, again reproducing the same layered structure under dh.
+  - after 216 repeats, the frontier still does not move, and the aggregate center/spread remain effectively flat.
+- 판단: KEEP AS TERMINAL SATURATION EVIDENCE
+
+## Iteration 2026-04-15 Repeatability batch gbs/gbv
+- timestamp: 2026-04-15T01:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gbs/gbt/gbu/gbv)
+- stability_gbs: h1=75.9772, h2=79.2843
+- stability_gbt: h1=75.2480, h2=77.6235
+- stability_gbu: h1=76.6404, h2=80.8447
+- stability_gbv: h1=75.9816, h2=79.4637
+- aggregate over a~gbv repeats: mean h1=75.9246, std h1=0.5939, mean h2=79.2676, std h2=1.4045, max h2=82.8792, min h2=76.2840
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - gbu revisits the low-80 band while gbt falls to the weaker tail and gbs/gbv occupy the center-high band, reproducing the same mature three-level structure once more.
+  - after 220 repeats, the aggregate center/spread remain effectively unchanged, which continues to reinforce saturation of the current no-retrieval frontier.
+- 판단: KEEP AS TERMINAL SATURATION EVIDENCE
+
+## Iteration 2026-04-15 Repeatability batch gbw/gbz
+- timestamp: 2026-04-15T01:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gbw/gbx/gby/gbz)
+- stability_gbw: h1=76.7147, h2=81.1300
+- stability_gbx: h1=74.5107, h2=76.0211
+- stability_gby: h1=76.5019, h2=80.6307
+- stability_gbz: h1=75.6061, h2=78.4738
+- aggregate over a~gbz repeats: mean h1=75.9230, std h1=0.6001, mean h2=79.2640, std h2=1.4181, max h2=82.8792, min h2=76.0211
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - gbw re-enters the low-81 band, gby stays in the low-80 band, gbz sits in the upper-70 zone, and gbx drops to the weakest tail observed in this late run cluster.
+  - after 224 repeats, the frontier is still unchanged and the aggregate distribution remains effectively flat, reinforcing the current saturation diagnosis.
+- 판단: KEEP AS TERMINAL SATURATION EVIDENCE
+
+## Iteration 2026-04-15 Repeatability batch gca/gcd
+- timestamp: 2026-04-15T02:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gca/gcb/gcc/gcd)
+- stability_gca: h1=75.7606, h2=78.8586
+- stability_gcb: h1=76.6534, h2=80.9183
+- stability_gcc: h1=77.0738, h2=82.1532
+- stability_gcd: h1=76.2754, h2=79.9897
+- aggregate over a~gcd repeats: mean h1=75.9321, std h1=0.6021, mean h2=79.2853, std h2=1.4237, max h2=82.8792, min h2=76.0211
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - gcc reaches 82.1532 and becomes the strongest refreshed upper secondary-tier repeat in the late search, while gcb holds the low-80 band and gca/gcd sit around the center-high band.
+  - even with that stronger secondary-tier replay, the frontier still does not move and the aggregate center/spread remain essentially unchanged, which keeps the saturation diagnosis intact.
+- 판단: KEEP AS TERMINAL SATURATION EVIDENCE
+
+## Iteration 2026-04-15 Repeatability batch gce/gch
+- timestamp: 2026-04-15T02:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gce/gcf/gcg/gch)
+- stability_gce: h1=76.2176, h2=79.8389
+- stability_gcf: h1=76.1824, h2=79.7183
+- stability_gcg: h1=75.3044, h2=77.7779
+- stability_gch: h1=75.9146, h2=79.2554
+- aggregate over a~gch repeats: mean h1=75.9316, std h1=0.5988, mean h2=79.2830, std h2=1.4156, max h2=82.8792, min h2=76.0211
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - this batch sits mostly in the center-high zone, with only gcg dropping into the weaker tail and no member re-entering the upper secondary tier above 81.
+  - after 232 repeats, the frontier still does not move and the aggregate center/spread remain essentially unchanged, reinforcing the same saturation diagnosis.
+- 판단: KEEP AS TERMINAL SATURATION EVIDENCE
+
+## Iteration 2026-04-15 Repeatability batch gci/gcl
+- timestamp: 2026-04-15T02:xx:00+09:00
+- git branch: exp/aaforecast-brent-threeway-20260414
+- experiment title: continued harvest batch on the same 0.9 negative-weight + semantic selector basis (gci/gcj/gck/gcl)
+- stability_gci: h1=75.9550, h2=79.2715
+- stability_gcj: h1=74.9753, h2=77.0678
+- stability_gck: h1=77.1332, h2=82.0834
+- stability_gcl: h1=74.6033, h2=76.1513
+- aggregate over a~gcl repeats: mean h1=75.9271, std h1=0.6082, mean h2=79.2721, std h2=1.4372, max h2=82.8792, min h2=76.0211
+- 목표 체크:
+  - all four runs satisfy h2 > h1
+  - all four runs keep h1 within ±15% of the actual h1
+  - none satisfy the h2 ±15% band; the active frontier remains dh at 82.8792
+- 핵심 진단:
+  - gck reaches 82.0834 and again revives the upper secondary tier just below dh, while gcj/gcl drop into the weaker tail and gci stays near the center-high band.
+  - even with another strong upper-secondary replay, the frontier still does not move and the aggregate center/spread remain essentially unchanged, reinforcing the same saturation diagnosis.
+- 판단: KEEP AS TERMINAL SATURATION EVIDENCE

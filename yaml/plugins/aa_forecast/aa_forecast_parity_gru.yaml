@@ -1,11 +1,24 @@
 aa_forecast:
   model: gru
-  tune_training: true
+  tune_training: false
   lowess_frac: 0.35
   lowess_delta: 0.01
   uncertainty:
     enabled: true
-    sample_count: 50
+    dropout_candidates:
+    - 0.005
+    - 0.01
+    - 0.03
+    - 0.05
+    - 0.07
+    - 0.09
+    - 0.12
+    - 0.15
+    - 0.18
+    - 0.2
+    - 0.25
+    - 0.3
+    sample_count: 30
   model_params:
     encoder_hidden_size: 256
     encoder_n_layers: 2
@@ -17,7 +30,7 @@ aa_forecast:
     upward:
     - GPRD_THREAT
     - BS_Core_Index_A
-    two_sided: []
+    - GPRD
   thresh: 3.5
   retrieval:
     enabled: false
