@@ -2464,3 +2464,29 @@
   - heartbeat rule상 accumulated safe-failure edits (`no_cumsum`, bounded gain, memory-confidence variants) 위에서 다음 가설을 계속 쌓지 않음
   - 현재 best keep artifact는 여전히 `iter_20260415_anomaly_context_restore_gru_bundle1` 이므로, 다음 가설도 그 basis에서 출발해야 비교가 명확함
 - 판단: RESTORE TO EXACT KEEP BASIS
+
+## Iteration 2026-04-15 informer_test gate semantic_memory_step by top1 confidence
+- timestamp: 2026-04-15T03:xx:00+09:00
+- git branch: informer_test
+- experiment title: gate semantic_memory_step itself by bounded top1 memory-bank confidence before the semantic spike step head, keeping the broader semantic context clean
+- data-driven motivation:
+  - broader top1 confidence in `semantic_spike_context` was the strongest post-keep memory-bank lever so far
+  - step-local confidence concatenation almost collapsed AA-Informer to the baseline band
+  - next hypothesis was that the same signal might work better as a direct gate on the retrieved semantic memory step rather than as another concatenated feature
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/{aaforecast-informer,aaforecast-gru,baseline}.yaml`
+- run/artifact path: runs/iter_20260415_memconf_gate_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `72.9438 / 73.7040`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.5090 / 78.3367`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - target gates still missed; AA-Informer improved over the step-local concatenation variant but still underperformed the broader confidence-context trial and the best keep
+- 핵심 진단:
+  - if top1 memory confidence is used locally, gating the retrieved semantic memory step is clearly better than concatenating the scalar into the step features.
+  - nevertheless, it still does not beat the anomaly-intensity keep, so the memory-bank lane remains promising but subordinate.
+- 판단: SAFE FAILURE / BEST STEP-LOCAL MEMORY-BANK VARIANT SO FAR
