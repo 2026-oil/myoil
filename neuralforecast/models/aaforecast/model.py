@@ -935,7 +935,6 @@ class InformerHorizonAwareHead(nn.Module):
         )
         final_output = (
             semantic_baseline_level
-            + semantic_baseline_curve
             + semantic_spike_component
         )
         def _summary_tensor(value: torch.Tensor) -> torch.Tensor:
@@ -1239,6 +1238,14 @@ class AAForecast(BaseModel):
             self.memory_token_shock_gate = None
             self.event_trajectory_projector = None
         elif self.backbone == "informer":
+            self.event_summary_projector = MLP(
+                in_features=self.EVENT_SUMMARY_SIZE,
+                out_features=self.encoder_hidden_size,
+                hidden_size=max(self.encoder_hidden_size, decoder_hidden_size),
+                num_layers=2,
+                activation="ReLU",
+                dropout=self.encoder_dropout,
+            )
             self.regime_time_projector = MLP(
                 in_features=2,
                 out_features=self.encoder_hidden_size,
@@ -1247,22 +1254,60 @@ class AAForecast(BaseModel):
                 activation="ReLU",
                 dropout=self.encoder_dropout,
             )
-            self.decoder = MLP(
-                in_features=2 * self.encoder_hidden_size,
-                out_features=self.loss.outputsize_multiplier,
-                hidden_size=decoder_hidden_size,
-                num_layers=decoder_layers,
+            self.memory_query_projector = MLP(
+                in_features=(2 * self.encoder_hidden_size) + self.NON_STAR_REGIME_SIZE,
+                out_features=self.encoder_hidden_size,
+                hidden_size=max(self.encoder_hidden_size, decoder_hidden_size),
+                num_layers=2,
                 activation="ReLU",
                 dropout=self.encoder_dropout,
             )
-            self.informer_decoder = None
-            self.event_summary_projector = None
-            self.memory_query_projector = None
-            self.memory_key_projector = None
-            self.memory_value_projector = None
-            self.memory_token_shock_head = None
-            self.memory_token_shock_gate = None
-            self.event_trajectory_projector = None
+            self.memory_key_projector = nn.Linear(
+                self.encoder_hidden_size,
+                self.encoder_hidden_size,
+            )
+            self.memory_value_projector = nn.Linear(
+                self.encoder_hidden_size,
+                self.encoder_hidden_size,
+            )
+            memory_token_in_features = 3 * self.encoder_hidden_size
+            self.memory_token_shock_head = MLP(
+                in_features=memory_token_in_features,
+                out_features=self.h * self.loss.outputsize_multiplier,
+                hidden_size=max(memory_token_in_features, decoder_hidden_size),
+                num_layers=max(2, decoder_layers),
+                activation="ReLU",
+                dropout=self.encoder_dropout,
+            )
+            self.memory_token_shock_gate = MLP(
+                in_features=memory_token_in_features,
+                out_features=self.loss.outputsize_multiplier,
+                hidden_size=max(memory_token_in_features, decoder_hidden_size),
+                num_layers=2,
+                activation="ReLU",
+                dropout=self.encoder_dropout,
+            )
+            self.event_trajectory_projector = MLP(
+                in_features=self.EVENT_TRAJECTORY_SIZE,
+                out_features=self.encoder_hidden_size,
+                hidden_size=max(self.encoder_hidden_size, decoder_hidden_size),
+                num_layers=2,
+                activation="ReLU",
+                dropout=self.encoder_dropout,
+            )
+            self.informer_decoder = InformerHorizonAwareHead(
+                h=self.h,
+                in_features=2 * self.encoder_hidden_size,
+                event_features=self.encoder_hidden_size,
+                path_features=self.encoder_hidden_size,
+                regime_features=self.NON_STAR_REGIME_SIZE,
+                pooled_features=self.encoder_hidden_size,
+                hidden_size=decoder_hidden_size,
+                out_features=self.loss.outputsize_multiplier,
+                num_layers=decoder_layers,
+                dropout=self.encoder_dropout,
+            )
+            self.decoder = None
             self.timexer_decoder = None
             self.itransformer_decoder = None
         else:
@@ -2480,23 +2525,72 @@ class AAForecast(BaseModel):
         regime_intensity: torch.Tensor,
         regime_density: torch.Tensor,
     ) -> torch.Tensor:
-        del event_summary
-        del event_trajectory
-        del non_star_regime
-        del anchor_level
-        del regime_intensity
-        del regime_density
-        if self.decoder is None:
-            raise ValueError("Shared decoder is not initialized")
-        decoder_input = self._build_time_decoder_input(
+        if self.informer_decoder is None:
+            raise ValueError("Informer decoder is not initialized")
+        hidden_aligned, attended_aligned = self._build_time_decoder_features(
             hidden_states=hidden_states,
             attended_states=attended_states,
         )
-        self._latest_decoder_debug = {
-            "decoder_type": "shared_gru_style",
-            "decoder_input_shape": tuple(decoder_input.shape),
-        }
-        return self.decoder(decoder_input)[:, -self.h :]
+        regime_time_latent = self._project_regime_time_context(
+            regime_intensity,
+            regime_density,
+        )
+        regime_time_aligned = _align_horizon(
+            regime_time_latent,
+            h=self.h,
+            input_size=self.input_size,
+            sequence_adapter=self.sequence_adapter,
+        )
+        event_context = self._project_event_summary(event_summary)
+        event_path = self._project_event_trajectory(event_trajectory)
+        pooled_context = self._build_memory_pooled_context(
+            hidden_states=hidden_states,
+            attended_states=attended_states,
+            event_context=event_context,
+            event_path=event_path,
+            non_star_regime=non_star_regime,
+            regime_intensity=regime_intensity,
+            regime_density=regime_density,
+        )
+        memory_token = getattr(self, "_latest_memory_token", None)
+        if memory_token is None:
+            memory_token = pooled_context
+        memory_bank = getattr(self, "_latest_memory_bank", None)
+        decoder_input = torch.cat(
+            [
+                hidden_aligned + regime_time_aligned,
+                attended_aligned + regime_time_aligned,
+            ],
+            dim=-1,
+        )
+        decoder_input = _apply_stochastic_dropout(
+            decoder_input,
+            training=self.training,
+            stochastic_inference_enabled=self._stochastic_inference_enabled,
+            train_dropout_p=self.encoder_dropout,
+            inference_dropout_p=self._stochastic_dropout_p,
+        )
+        delta_forecast = self.informer_decoder(
+            decoder_input,
+            event_context,
+            event_path,
+            non_star_regime,
+            pooled_context,
+            getattr(self, "_latest_memory_signal", None),
+            anchor_level[:, -1, :],
+            memory_token,
+            memory_bank,
+        )
+        latest_decoder_debug = getattr(self.informer_decoder, "latest_debug", None)
+        latest_memory_debug = getattr(self, "_latest_memory_debug", None)
+        if isinstance(latest_decoder_debug, dict) and isinstance(latest_memory_debug, dict):
+            merged_debug = dict(latest_decoder_debug)
+            merged_debug.update(latest_memory_debug)
+            self._latest_decoder_debug = merged_debug
+        else:
+            self._latest_decoder_debug = latest_decoder_debug
+        anchor = anchor_level[:, -1:, :].to(dtype=delta_forecast.dtype)
+        return anchor + delta_forecast
 
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]

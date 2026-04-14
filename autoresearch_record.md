@@ -2137,3 +2137,84 @@
   - gck reaches 82.0834 and again revives the upper secondary tier just below dh, while gcj/gcl drop into the weaker tail and gci stays near the center-high band.
   - even with another strong upper-secondary replay, the frontier still does not move and the aggregate center/spread remain essentially unchanged, reinforcing the same saturation diagnosis.
 - 판단: KEEP AS TERMINAL SATURATION EVIDENCE
+
+## Iteration 2026-04-15 informer_test shared-decoder diagnostic bundle
+- timestamp: 2026-04-15T02:xx:00+09:00
+- git branch: informer_test
+- experiment title: verify the current informer_test shared-decoder shortcut against the strict 3-way Brent bundle before changing code
+- code/config basis: branch HEAD `84af4e06` shared decoder shortcut; current `yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml -> yaml/plugins/aa_forecast/aa_forecast_parity_informer_stability_dh.yaml`; current GRU parity plugin
+- run/artifact path: runs/iter_20260415_dh_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.6099 / 74.4525`
+  - AA-GRU = `73.2513 / 73.8125`
+  - AA-Informer = `73.4537 / 73.9671`
+- 목표 체크:
+  - all three kept `h2 > h1`
+  - strict ordering failed: `baseline > AA-Informer > AA-GRU`
+  - target gates missed badly (`AA-Informer h1=73.4537`, `h2=73.9671`)
+- 핵심 진단:
+  - the branch-local shared decoder shortcut regresses the restored semantic frontier materially below the archived `stability_dh` band and even below the recent strict 3-way rerun.
+  - this confirmed the next non-duplicate lever had to be structural decoder recovery, not another same-basis harvest.
+- 판단: DISCARD AS REGRESSION DIAGNOSTIC
+
+## Iteration 2026-04-15 informer_test curve-only semantic decoder restore (current GRU control)
+- timestamp: 2026-04-15T02:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the Informer-specific AA decode path from `main`, then remove `semantic_baseline_curve` from the final output while keeping the current GRU control unchanged
+- code/config basis: recovered Informer-specific event/path/memory decoder path + curve-only final output; current `yaml/plugins/aa_forecast/aa_forecast_parity_gru.yaml`
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/{aaforecast-informer,aaforecast-gru,baseline}.yaml`
+- run/artifact path: runs/iter_20260415_drop_sem_curve_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.2639 / 74.0916`
+  - AA-GRU = `73.2513 / 73.8125`
+  - AA-Informer = `76.3882 / 80.2534`
+- 목표 체크:
+  - all three kept `h2 > h1`
+  - `AA-Informer` regained a materially stronger semantic frontier relative to the shared-decoder shortcut
+  - ordering still failed narrowly because `plain_informer` edged `AA-GRU` by a small margin
+- 핵심 진단:
+  - restoring the Informer-specific AA decoder semantics is the right structural direction: `AA-Informer` improved from `73.4537 / 73.9671` to `76.3882 / 80.2534` without retrieval, drift, uplift, or leakage.
+  - the remaining problem on this basis is not the Informer path itself but bundle-level ordering around the AA-GRU control.
+- 판단: KEEP AS STRUCTURAL RECOVERY EVIDENCE
+
+## Iteration 2026-04-15 informer_test curve-only semantic decoder + restore GRU control (bundle1)
+- timestamp: 2026-04-15T02:xx:00+09:00
+- git branch: informer_test
+- experiment title: keep the restored curve-only Informer decoder path and switch the GRU control back to the restore-side parity contract (`tune_training=true`, `sample_count=50`, STAR upward=`GPRD_THREAT, BS_Core_Index_A`)
+- code/config basis: same curve-only Informer decoder as above + restore `yaml/plugins/aa_forecast/aa_forecast_parity_gru.yaml`
+- run/artifact path: runs/iter_20260415_drop_sem_curve_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.0882 / 77.3382`
+- 목표 체크:
+  - strict ordering recovered: `baseline < AA-GRU < AA-Informer`
+  - all three kept `h2 > h1`
+  - target gates still missed and the first restore-GRU repeat under-shot the better current-GRU curve-only run
+- 핵심 진단:
+  - restore-side GRU control cleanly repairs the bundle ordering, but the first same-basis Informer rerun was a low sample from the improved semantic family.
+  - because the basis was newly changed and remained structurally promising, one bounded repeat was justified to measure whether the order-preserving bundle could climb back toward the low-80 band.
+- 판단: KEEP AS ORDER-RECOVERY EVIDENCE, REPEAT ONCE
+
+## Iteration 2026-04-15 informer_test curve-only semantic decoder + restore GRU control (bundle2)
+- timestamp: 2026-04-15T02:xx:00+09:00
+- git branch: informer_test
+- experiment title: bounded repeatability check on the order-preserving curve-only Informer + restore-GRU bundle
+- code/config basis: same as bundle1 above; no further code or YAML changes
+- run/artifact path: runs/iter_20260415_drop_sem_curve_restore_gru_bundle2
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.9993 / 79.4679`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - `AA-Informer h1` stays inside the 15% band; `h2` still misses both the 15% band and the absolute `>=85` target
+- 핵심 진단:
+  - the recovered Informer decoder + restore GRU control is now the best **order-preserving** basis verified on `informer_test` in this Ralph loop.
+  - it is still below the archived no-retrieval frontier (`stability_dh = 77.5370 / 82.8792`) and below the restore-branch curve-only best (`77.1500 / 81.9808`), so the remaining blocker is semantic-amplitude gap rather than ordering or directionality.
+  - two repeats were enough to show the current order-preserving basis can reach the high-79 band but not the target gates; more same-basis repeats would likely enter diminishing-return territory.
+- 판단: CURRENT BEST ORDER-PRESERVING KEEP ON informer_test
