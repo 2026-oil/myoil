@@ -2421,3 +2421,12 @@
   - this is the strongest shape-safe memory-bank style lever tried after the keep branch split, which makes it informative even though it still under-shoots.
   - top1 memory confidence is therefore a promising but insufficient signal by itself; the remaining amplitude gap is still not solved.
 - 판단: SAFE FAILURE / STRONGEST POST-KEEP MEMORY-BANK LEVER SO FAR
+
+## Iteration 2026-04-15 restore clean guardrail basis after top1 memory-confidence safe failure
+- timestamp: 2026-04-15T03:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the active informer_test branch to the last clean guardrail basis after the top1 memory-confidence semantic-spike context variant under-shot the keep
+- 핵심 진단:
+  - top1 memory-confidence in `semantic_spike_context` was the strongest post-keep memory-bank-style lever so far, but it still underperformed the anomaly-intensity keep.
+  - continuing on top of that basis would drift away from the last verified guardrail-compliant line.
+- 판단: RESTORE ACTIVE BASIS
