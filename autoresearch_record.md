@@ -2815,3 +2815,9 @@
   - confidence-guided negative-drag attenuation still has signal, but once the active keep is constrained by the semantic-spike guardrails, it no longer beats the keep.
   - therefore it stays a useful side branch, not the new baseline.
 - 판단: SAFE FAILURE / BELOW ACTIVE COMPLIANT KEEP
+
+## Iteration 2026-04-15 restore exact active keep after the negative-drag side-branch rerun
+- timestamp: 2026-04-15T06:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active compliant keep basis after recording the negative-drag side-branch rerun
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS

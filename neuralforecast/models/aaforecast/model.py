@@ -926,7 +926,6 @@ class InformerHorizonAwareHead(nn.Module):
             + (0.5 * memory_signal)
         ).unsqueeze(1)
         semantic_negative_weight = 0.9 * (1.0 - semantic_spike_direction).pow(2)
-        semantic_negative_weight = semantic_negative_weight * (1.0 - 0.5 * memory_confidence.unsqueeze(1))
         semantic_spike_curve = (
             (semantic_spike_direction * semantic_spike_pos_curve)
             - (semantic_negative_weight * semantic_spike_neg_curve)
