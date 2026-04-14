@@ -303,7 +303,7 @@ class InformerHorizonAwareHead(nn.Module):
             dropout=dropout,
         )
         prototype_context_features = (
-            trajectory_context_features + self.pooled_features + out_features + 1
+            trajectory_context_features + self.pooled_features + out_features + 2
         )
         self.family_blend_gate_head = MLP(
             in_features=prototype_context_features,
@@ -843,6 +843,7 @@ class InformerHorizonAwareHead(nn.Module):
                 memory_token,
                 anchor_value,
                 memory_signal,
+                memory_confidence,
             ],
             dim=-1,
         )
