@@ -2749,3 +2749,21 @@
 - git branch: informer_test
 - experiment title: restore the exact active keep basis before trying top-k masking inside the prototype family
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 prototype top-2 masking on the active keep
+- timestamp: 2026-04-15T06:xx:00+09:00
+- git branch: informer_test
+- experiment title: restrict prototype selection to the top-2 logits before softmax on top of the exact active keep
+- run/artifact path: runs/iter_20260415_proto_top2_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.7442 / 74.4499`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.7319 / 79.0933`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - target gates still missed; AA-Informer remains below the active keep
+- 핵심 진단:
+  - prototype top-2 masking is cleaner than full-bank averaging and does improve over several rejected prototype branches, but it still under-performs the active guardrail-compliant keep.
+  - this suggests the current keep benefits from broader prototype mixing than a strict top-2 mask allows.
+- 판단: SAFE FAILURE / REJECT PROTOTYPE TOP-2 MASKING

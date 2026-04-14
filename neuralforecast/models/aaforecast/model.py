@@ -849,7 +849,14 @@ class InformerHorizonAwareHead(nn.Module):
         family_gate = torch.sigmoid(self.family_blend_gate_head(prototype_context)).unsqueeze(1)
         prototype_query = self.prototype_query_head(prototype_context)
         prototype_logits = torch.matmul(prototype_query, self.prototype_key_bank.t())
-        prototype_weights = torch.softmax(prototype_logits, dim=1)
+        prototype_top_values, prototype_top_indices = torch.topk(
+            prototype_logits,
+            k=min(2, self.prototype_key_bank.shape[0]),
+            dim=1,
+        )
+        masked_prototype_logits = torch.full_like(prototype_logits, -1e9)
+        masked_prototype_logits.scatter_(1, prototype_top_indices, prototype_top_values)
+        prototype_weights = torch.softmax(masked_prototype_logits, dim=1)
         prototype_level = self.prototype_level_head(prototype_context).unsqueeze(1) * anchor_scale
         prototype_increments = torch.einsum('bp,pho->bho', prototype_weights, self.prototype_increment_bank)
         prototype_gain = torch.sigmoid(self.prototype_gain_head(prototype_context)).unsqueeze(1)
