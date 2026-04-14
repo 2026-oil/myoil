@@ -302,33 +302,6 @@ def test_informer_horizon_aware_decoder_uses_event_summary_to_separate_outputs()
     assert not torch.allclose(decoded_quiet, decoded_active)
 
 
-def test_informer_memory_builder_exposes_top1_confidence() -> None:
-    informer = _make_aaforecast("informer")
-    event_context = torch.randn(2, informer.encoder_hidden_size)
-    event_path = torch.randn(2, informer.encoder_hidden_size)
-    non_star_regime = torch.randn(2, informer.NON_STAR_REGIME_SIZE)
-    hidden_states = torch.randn(2, informer.input_size, informer.encoder_hidden_size)
-    attended_states = torch.randn(2, informer.input_size, informer.encoder_hidden_size)
-    regime_intensity = torch.rand(2, informer.input_size, 1)
-    regime_density = torch.rand(2, informer.input_size, 1)
-
-    pooled = informer._build_memory_pooled_context(
-        hidden_states=hidden_states,
-        attended_states=attended_states,
-        event_context=event_context,
-        event_path=event_path,
-        non_star_regime=non_star_regime,
-        regime_intensity=regime_intensity,
-        regime_density=regime_density,
-    )
-
-    assert pooled.shape == (2, informer.encoder_hidden_size)
-    confidence = informer._latest_memory_confidence
-    assert confidence.shape == (2, 1)
-    assert torch.all(confidence >= 0)
-    assert torch.all(confidence <= 1)
-
-
 def test_informer_horizon_aware_decoder_accepts_auxiliary_memory_context() -> None:
     torch.manual_seed(11)
     informer = _make_aaforecast("informer")

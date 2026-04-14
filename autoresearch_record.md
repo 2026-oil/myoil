@@ -2558,3 +2558,12 @@
   - confidence-guided attenuation of the semantic negative branch is better than the destructive confidence-replacement lane and slightly better than the broader confidence-context trial.
   - however, even this more targeted use of the memory-bank hint still does not close the gap to the anomaly-intensity keep, so the current keep remains the active basis.
 - 판단: SAFE FAILURE / STRONGEST MEMORY-BANK VARIANT SO FAR, STILL BELOW KEEP
+
+## Iteration 2026-04-15 restore exact keep basis after strongest memory-bank safe failure
+- timestamp: 2026-04-15T04:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore model/test files exactly to the last best-keep commit (`addc7741`) after completing the strongest memory-bank safe failure
+- 이유:
+  - latest memory-bank high-water mark (`iter_20260415_negweight_restore_gru_bundle1`) still under-shot the keep
+  - 다음 iter도 strongest verified keep basis에서만 비교해야 하므로, safe-failure state를 active base로 남기지 않음
+- 판단: RESTORE TO EXACT KEEP BASIS
