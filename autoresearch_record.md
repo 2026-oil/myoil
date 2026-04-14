@@ -2455,3 +2455,12 @@
   - localizing top1 memory confidence to the semantic spike step generator is worse than using it in the broader semantic context.
   - this narrows the memory-bank lane further: the useful retrieval-inspired signal, if any, is not helping when constrained to the per-step spike generator.
 - 판단: SAFE FAILURE / REJECT STEP-LOCAL MEMORY-CONFIDENCE LANE
+
+## Iteration 2026-04-15 restore exact best-keep basis before the next decoder/memory-bank lever
+- timestamp: 2026-04-15T03:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore model/test files exactly to the last best-keep commit (`addc7741`) before continuing further decoder/memory-bank hypotheses
+- 이유:
+  - heartbeat rule상 accumulated safe-failure edits (`no_cumsum`, bounded gain, memory-confidence variants) 위에서 다음 가설을 계속 쌓지 않음
+  - 현재 best keep artifact는 여전히 `iter_20260415_anomaly_context_restore_gru_bundle1` 이므로, 다음 가설도 그 basis에서 출발해야 비교가 명확함
+- 판단: RESTORE TO EXACT KEEP BASIS

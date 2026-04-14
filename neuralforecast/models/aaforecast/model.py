@@ -388,7 +388,6 @@ class InformerHorizonAwareHead(nn.Module):
                 + self.hidden_size
                 + self.path_features
                 + self.regime_features
-                + 1
             ),
             out_features=hidden_size,
             hidden_size=max(
@@ -868,11 +867,6 @@ class InformerHorizonAwareHead(nn.Module):
                 memory_bank,
                 need_weights=False,
             )
-            memory_confidence = getattr(self, "_latest_memory_confidence", None)
-            if memory_confidence is None:
-                memory_confidence = decoder_input.new_zeros((decoder_input.shape[0], 1))
-            else:
-                memory_confidence = memory_confidence.to(dtype=decoder_input.dtype)
             semantic_step_features = torch.cat(
                 [
                     semantic_spike_hidden,
@@ -880,7 +874,6 @@ class InformerHorizonAwareHead(nn.Module):
                     horizon_context[:, step_idx, :],
                     event_path.to(dtype=decoder_input.dtype),
                     raw_regime.to(dtype=decoder_input.dtype),
-                    memory_confidence,
                 ],
                 dim=-1,
             )
@@ -897,14 +890,20 @@ class InformerHorizonAwareHead(nn.Module):
             semantic_spike_neg_steps.append(
                 F.softplus(self.semantic_spike_neg_out_head(semantic_spike_hidden))
             )
-        semantic_spike_pos_curve = torch.stack(semantic_spike_pos_steps, dim=1)
-        semantic_spike_neg_curve = torch.stack(semantic_spike_neg_steps, dim=1)
+        semantic_spike_pos_curve = torch.cumsum(
+            torch.stack(semantic_spike_pos_steps, dim=1),
+            dim=1,
+        )
+        semantic_spike_neg_curve = torch.cumsum(
+            torch.stack(semantic_spike_neg_steps, dim=1),
+            dim=1,
+        )
         semantic_spike_gate = torch.sigmoid(
             self.semantic_spike_gate_head(semantic_spike_context)
             + (0.5 * memory_signal)
         ).unsqueeze(1)
-        semantic_spike_gain = torch.sigmoid(
-            self.semantic_spike_gain_head(semantic_spike_context)
+        semantic_spike_gain = (
+            1.0 + F.softplus(self.semantic_spike_gain_head(semantic_spike_context))
         ).unsqueeze(1)
         semantic_spike_direction = torch.sigmoid(
             self.semantic_spike_direction_head(semantic_spike_context)
@@ -2493,7 +2492,6 @@ class AAForecast(BaseModel):
         gather_index = top_indices.unsqueeze(-1).expand(-1, -1, values.shape[-1])
         self._latest_memory_bank = values.gather(1, gather_index)
         self._latest_memory_signal = torch.log1p(top_values.mean(dim=1, keepdim=True).clamp_min(0.0))
-        self._latest_memory_confidence = weights.detach().amax(dim=1)
         return _apply_stochastic_dropout(
             pooled,
             training=self.training,
