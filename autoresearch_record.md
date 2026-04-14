@@ -2737,3 +2737,9 @@
 - git branch: informer_test
 - experiment title: restore the exact active keep basis after rejecting additive blending between prototype gate and confidence
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 restore exact active keep after split-transport regression
+- timestamp: 2026-04-15T06:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after rejecting split-gated prototype transport
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
