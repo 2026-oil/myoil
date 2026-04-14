@@ -2821,3 +2821,22 @@
 - git branch: informer_test
 - experiment title: restore the exact active compliant keep basis after recording the negative-drag side-branch rerun
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+
+## Iteration 2026-04-15 prototype soft-to-top1 confidence mixing on the active keep
+- timestamp: 2026-04-15T08:xx:00+09:00
+- git branch: informer_test
+- experiment title: interpolate prototype selector weights from the soft bank mix toward the top-1 prototype by bounded memory confidence on top of the exact active keep
+- run/artifact path: runs/iter_20260415_proto_top1mix_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.4079 / 78.5449`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - target gates missed; AA-Informer stays below the active keep `75.7647 / 79.2877`
+- 핵심 진단:
+  - confidence-pulling the prototype mix toward a hard top-1 choice weakens the broader bank transport that the active keep seems to need.
+  - this also collapses the competing non-AA informer baseline inside the same bundle, so the change is not a stable decoder-side improvement.
+- 판단: SAFE FAILURE / REJECT PROTOTYPE TOP1 MIX
