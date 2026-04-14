@@ -933,13 +933,18 @@ class InformerHorizonAwareHead(nn.Module):
         semantic_spike_component = (
             semantic_spike_curve * semantic_spike_gate * semantic_spike_gain * anchor_scale
         )
-        prototype_component = (prototype_level + prototype_curve) * family_gate * memory_confidence.unsqueeze(1)
         memory_transport_states, _ = self.memory_transport_attention(
             mixed_path,
             memory_bank,
             memory_bank,
             need_weights=False,
         )
+        prototype_memory_curve = 0.1 * torch.tanh(self.local_head(memory_transport_states)) * anchor_scale
+        prototype_component = (
+            prototype_level
+            + prototype_curve
+            + (prototype_memory_curve * memory_confidence.unsqueeze(1))
+        ) * family_gate * memory_confidence.unsqueeze(1)
         memory_transport = torch.cumsum(
             F.softplus(self.local_head(memory_transport_states)),
             dim=1,

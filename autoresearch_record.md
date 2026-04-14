@@ -2873,3 +2873,22 @@
 - git branch: informer_test
 - experiment title: restore the exact active keep basis after recording the completed prototype memory-hint rejection
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+
+## Iteration 2026-04-15 prototype memory-curve residual on the active keep
+- timestamp: 2026-04-15T10:xx:00+09:00
+- git branch: informer_test
+- experiment title: add a bounded decoder memory residual directly to the prototype curve while keeping the soft bank selector unchanged on top of the exact active keep
+- run/artifact path: runs/iter_20260415_proto_memcurve_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.1604 / 73.5527`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.9243 / 79.7528`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - target gates still missed, but this cleanly improves over the active keep `75.7647 / 79.2877`
+- 핵심 진단:
+  - the soft prototype selector works better when decoder memory is injected as a bounded post-selection transport residual than when the selector itself is hardened or query-hinted.
+  - this is a decoder-side memory-bank refinement that preserves the anti-leakage guardrails and currently becomes the strongest compliant keep.
+- 판단: NEW ACTIVE COMPLIANT KEEP
