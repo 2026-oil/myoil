@@ -2499,3 +2499,28 @@
   - heartbeat 규칙상 다음 가설도 strongest verified keep basis에서 비교 가능해야 함
   - step-local memory-confidence gate trial도 keep를 못 넘었기 때문에 그 basis 위에서 계속 확장하지 않음
 - 판단: RESTORE TO EXACT KEEP BASIS
+
+## Iteration 2026-04-15 informer_test replace memory_signal with bounded confidence on spike gate/direction
+- timestamp: 2026-04-15T04:xx:00+09:00
+- git branch: informer_test
+- experiment title: replace the semantic spike gate/direction bias source from log-memory-signal to bounded top1 memory confidence, keeping the rest of the keep basis intact
+- data-driven motivation:
+  - broader top1 confidence in semantic context and step-local memory gates were both more promising than attended-path families, but still below the keep
+  - next hypothesis was that the *placement* of the retrieval-inspired signal may be fine while the old log-memory signal itself is too noisy, so the direct bias source was swapped to bounded confidence
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/{aaforecast-informer,aaforecast-gru,baseline}.yaml`
+- run/artifact path: runs/iter_20260415_confsignal_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `74.5352 / 75.9477`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - target gates missed badly; AA-Informer regressed below every other memory-bank variant tried after the keep
+- 핵심 진단:
+  - bounded top1 confidence can work as an auxiliary signal, but it is not a drop-in replacement for the existing `memory_signal` bias source.
+  - replacing `memory_signal` directly is too destructive and collapses the amplitude toward the baseline band.
+- 판단: SAFE FAILURE / REJECT MEMORY-SIGNAL REPLACEMENT
