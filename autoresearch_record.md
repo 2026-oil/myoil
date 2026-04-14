@@ -2649,3 +2649,9 @@
 - 이유:
   - selector sharpening was rejected, so the next prototype-family change must branch from the exact keep again
 - 판단: RESTORE TO EXACT PROTOTYPE KEEP BASIS
+
+## Iteration 2026-04-15 restore exact prototype keep basis after curve-normalization regression
+- timestamp: 2026-04-15T04:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact prototype keep basis after rejecting confidence-normalized prototype curves
+- 판단: RESTORE TO EXACT PROTOTYPE KEEP BASIS
