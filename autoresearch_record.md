@@ -2321,3 +2321,29 @@
   - internal memory confidence는 informer decode path에 넣을 만한 신호 후보이지만, 현재 implementation은 batch/time contract를 깨뜨림.
   - 즉 이 hypothesis는 개념적으로는 non-duplicate였지만, 현재 informer path shape contract를 다시 흔드는 방식이라 바로 다음 live lane으로 쓰기에는 위험.
 - 판단: BLOCKED, revert implementation and keep only blocker note
+
+## Iteration 2026-04-15 informer_test event-summary-attended-path ablation
+- timestamp: 2026-04-15T03:xx:00+09:00
+- git branch: informer_test
+- experiment title: push projected event summary directly into the recovered Informer attended path to stabilize semantic activation on top of the low run's selector fallback diagnosis
+- data-driven motivation:
+  - anchor run `iter_20260415_drop_sem_curve_restore_gru_bundle1` stayed low because `selection_mode=trajectory_min_dispersion` and all `candidate_semantic_scores` were zero.
+  - best keep `iter_20260415_anomaly_context_restore_gru_bundle1` recovered positive semantic scores and improved to `76.0894 / 79.7352`.
+  - next hypothesis was that bringing projected event summary into the attended transformer path could further stabilize semantic activation without retrieval, drift, uplift, or leakage.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/{aaforecast-informer,aaforecast-gru,baseline}.yaml`
+- run/artifact path: runs/iter_20260415_event_context_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.4657 / 74.4226`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.2613 / 77.9998`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - target gates still missed, and AA-Informer regressed versus the current best keep
+- 핵심 진단:
+  - event-summary injection into the attended path is shape-safe and preserves the ordering story, but it lowers amplitude compared with the anomaly-intensity keep.
+  - this suggests the low-run problem is not solved by simply pushing more event-summary context into the transformer path; the current useful signal remains closer to anomaly-intensity than to a broad event-summary residual.
+- 판단: SAFE FAILURE / KEEP AS BLOCKER NARROWING EVIDENCE
