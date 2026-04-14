@@ -2725,3 +2725,9 @@
 - git branch: informer_test
 - experiment title: restore the exact active keep basis after rejecting the prototype-family gate floor
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 restore exact active keep after curve-only transport regression
+- timestamp: 2026-04-15T05:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after rejecting curve-only prototype transport
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
