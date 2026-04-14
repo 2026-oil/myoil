@@ -2608,3 +2608,12 @@
 - git branch: informer_test
 - experiment title: restore the exact prototype keep basis after confirming that removing its confidence damping regresses the bundle
 - 판단: RESTORE TO EXACT PROTOTYPE KEEP BASIS
+
+## Iteration 2026-04-15 restore exact prototype keep basis before prototype-selection sharpening
+- timestamp: 2026-04-15T04:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact prototype keep basis before the next prototype-family refinement
+- 이유:
+  - prototype keep is now the active best
+  - every next hypothesis should branch from that exact keep state, not from the latest prototype safe failure
+- 판단: RESTORE TO EXACT PROTOTYPE KEEP BASIS
