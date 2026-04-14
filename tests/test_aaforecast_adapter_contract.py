@@ -240,107 +240,49 @@ def test_supported_backbones_registry_remains_stable_after_router_split() -> Non
     }
 
 
-def test_informer_uses_horizon_aware_decoder_while_non_informer_paths_keep_shared_decoder() -> None:
+def test_informer_now_uses_shared_decoder_like_gru_style_paths() -> None:
     informer = _make_aaforecast("informer")
     patchtst = _make_aaforecast("patchtst")
 
-    assert informer.informer_decoder is not None
-    assert informer.decoder is None
+    assert informer.informer_decoder is None
+    assert informer.decoder is not None
     assert informer.timexer_decoder is None
     assert informer.itransformer_decoder is None
-    assert informer.informer_decoder.path_mixer.input_size == informer.decoder_hidden_size
-    assert informer.informer_decoder.path_attention.embed_dim == informer.decoder_hidden_size
-    assert informer.informer_decoder.global_head.layers[-1].out_features == (
-        informer.h * informer.loss.outputsize_multiplier
-    )
-    assert informer.informer_decoder.normal_expert_head.layers[-1].out_features == (
-        informer.h * informer.loss.outputsize_multiplier
-    )
-    assert informer.informer_decoder.spike_expert_head.layers[-1].out_features == (
-        informer.h * informer.loss.outputsize_multiplier
-    )
-    assert informer.event_trajectory_projector is not None
-    assert informer.memory_query_projector is not None
-    assert informer.memory_key_projector is not None
-    assert informer.memory_value_projector is not None
+    assert informer.decoder.layers[0].in_features == 2 * informer.encoder_hidden_size
+    assert informer.regime_time_projector is not None
+    assert informer.event_trajectory_projector is None
+    assert informer.memory_query_projector is None
+    assert informer.memory_key_projector is None
+    assert informer.memory_value_projector is None
 
     assert patchtst.informer_decoder is None
     assert patchtst.decoder is not None
     assert patchtst.decoder.layers[0].in_features == 2 * patchtst.encoder_hidden_size
 
 
-def test_informer_horizon_aware_decoder_uses_event_summary_to_separate_outputs() -> None:
+def test_informer_decode_path_uses_shared_decoder_contract() -> None:
     torch.manual_seed(7)
     informer = _make_aaforecast("informer")
-    assert informer.informer_decoder is not None
+    hidden_states = torch.randn(2, informer.input_size, informer.hidden_size)
+    attended_states = torch.randn(2, informer.input_size, informer.hidden_size)
+    anchor_level = torch.randn(2, informer.input_size, 1)
+    regime_signal = torch.randn(2, informer.input_size, 1)
 
-    repeated_decoder_input = torch.ones(2, informer.h, 2 * informer.hidden_size)
-    quiet_event = torch.zeros(2, informer.hidden_size)
-    active_event = torch.ones(2, informer.hidden_size)
-    quiet_path = torch.zeros(2, informer.hidden_size)
-    active_path = torch.ones(2, informer.hidden_size)
-    quiet_regime = torch.zeros(2, informer.NON_STAR_REGIME_SIZE)
-    active_regime = torch.ones(2, informer.NON_STAR_REGIME_SIZE)
-
-    decoded_quiet = informer.informer_decoder(
-        repeated_decoder_input,
-        quiet_event,
-        quiet_path,
-        quiet_regime,
-    )
-    decoded_active = informer.informer_decoder(
-        repeated_decoder_input,
-        active_event,
-        active_path,
-        active_regime,
-    )
-
-    assert decoded_quiet.shape == (2, informer.h, informer.loss.outputsize_multiplier)
-    assert decoded_active.shape == decoded_quiet.shape
-    adjacent_gap = (decoded_active[:, 0, :] - decoded_active[:, 1, :]).abs().mean().item()
-    assert adjacent_gap > 1e-6
-    assert not torch.allclose(decoded_quiet, decoded_active)
-
-
-def test_informer_horizon_aware_decoder_accepts_auxiliary_memory_context() -> None:
-    torch.manual_seed(11)
-    informer = _make_aaforecast("informer")
-    assert informer.informer_decoder is not None
-
-    repeated_decoder_input = torch.ones(2, informer.h, 2 * informer.hidden_size)
-    event_summary = torch.zeros(2, informer.hidden_size)
-    event_path = torch.zeros(2, informer.hidden_size)
-    raw_regime = torch.zeros(2, informer.NON_STAR_REGIME_SIZE)
-    pooled_context = torch.full((2, informer.hidden_size), 0.25)
-    memory_signal = torch.full((2, 1), 0.5)
-    anchor_value = torch.full((2, informer.loss.outputsize_multiplier), 0.75)
-    memory_token = torch.full((2, informer.hidden_size), 1.0)
-    memory_bank = torch.full((2, 3, informer.hidden_size), 0.2)
-    quiet_memory_bank = torch.zeros_like(memory_bank)
-
-    decoded = informer.informer_decoder(
-        repeated_decoder_input,
-        event_summary,
-        event_path,
-        raw_regime,
-        pooled_context,
-        memory_signal,
-        anchor_value,
-        memory_token,
-        memory_bank,
-    )
-    decoded_quiet_memory = informer.informer_decoder(
-        repeated_decoder_input,
-        event_summary,
-        event_path,
-        raw_regime,
-        pooled_context,
-        memory_signal,
-        anchor_value,
-        memory_token,
-        quiet_memory_bank,
+    decoded = informer._decode_informer_forecast(
+        hidden_states=hidden_states,
+        attended_states=attended_states,
+        event_summary=torch.randn(2, informer.EVENT_SUMMARY_SIZE),
+        event_trajectory=torch.randn(2, informer.EVENT_TRAJECTORY_SIZE),
+        non_star_regime=torch.randn(2, informer.NON_STAR_REGIME_SIZE),
+        anchor_level=anchor_level,
+        regime_intensity=regime_signal,
+        regime_density=regime_signal,
     )
 
     assert decoded.shape == (2, informer.h, informer.loss.outputsize_multiplier)
-    assert decoded_quiet_memory.shape == decoded.shape
-    assert not torch.allclose(decoded, decoded_quiet_memory)
+    assert informer._latest_decoder_debug["decoder_type"] == "shared_gru_style"
+    assert informer._latest_decoder_debug["decoder_input_shape"] == (
+        2,
+        informer.h,
+        2 * informer.hidden_size,
+    )
