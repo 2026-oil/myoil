@@ -2767,3 +2767,9 @@
   - prototype top-2 masking is cleaner than full-bank averaging and does improve over several rejected prototype branches, but it still under-performs the active guardrail-compliant keep.
   - this suggests the current keep benefits from broader prototype mixing than a strict top-2 mask allows.
 - 판단: SAFE FAILURE / REJECT PROTOTYPE TOP-2 MASKING
+
+## Iteration 2026-04-15 restore exact active keep after prototype top-2 masking regression
+- timestamp: 2026-04-15T06:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed prototype top-2 masking safe failure
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
