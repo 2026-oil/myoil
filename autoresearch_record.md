@@ -2490,3 +2490,12 @@
   - if top1 memory confidence is used locally, gating the retrieved semantic memory step is clearly better than concatenating the scalar into the step features.
   - nevertheless, it still does not beat the anomaly-intensity keep, so the memory-bank lane remains promising but subordinate.
 - 판단: SAFE FAILURE / BEST STEP-LOCAL MEMORY-BANK VARIANT SO FAR
+
+## Iteration 2026-04-15 restore exact best-keep basis before the next memory-bank lever
+- timestamp: 2026-04-15T03:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore model/test files exactly to the last best-keep commit (`addc7741`) before trying another narrow memory-bank style decoder hypothesis
+- 이유:
+  - heartbeat 규칙상 다음 가설도 strongest verified keep basis에서 비교 가능해야 함
+  - step-local memory-confidence gate trial도 keep를 못 넘었기 때문에 그 basis 위에서 계속 확장하지 않음
+- 판단: RESTORE TO EXACT KEEP BASIS
