@@ -2430,3 +2430,28 @@
   - top1 memory-confidence in `semantic_spike_context` was the strongest post-keep memory-bank-style lever so far, but it still underperformed the anomaly-intensity keep.
   - continuing on top of that basis would drift away from the last verified guardrail-compliant line.
 - 판단: RESTORE ACTIVE BASIS
+
+## Iteration 2026-04-15 informer_test semantic-spike step-level top1 memory-confidence
+- timestamp: 2026-04-15T03:xx:00+09:00
+- git branch: informer_test
+- experiment title: feed bounded top1 memory-bank confidence only into the semantic spike step features, keeping the rest of the recovered decoder basis unchanged
+- data-driven motivation:
+  - top1 memory confidence inside `semantic_spike_context` was the strongest post-keep memory-bank lever so far, but still under-shot the keep.
+  - the next narrower hypothesis was to keep that retrieval-inspired signal local to the per-step semantic spike generator rather than the whole semantic context.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/{aaforecast-informer,aaforecast-gru,baseline}.yaml`
+- run/artifact path: runs/iter_20260415_memory_stepconf_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.1508 / 74.0763`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `73.9224 / 75.0311`
+- 목표 체크:
+  - strict ordering barely holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - target gates missed badly and AA-Informer nearly collapses back to baseline level
+- 핵심 진단:
+  - localizing top1 memory confidence to the semantic spike step generator is worse than using it in the broader semantic context.
+  - this narrows the memory-bank lane further: the useful retrieval-inspired signal, if any, is not helping when constrained to the per-step spike generator.
+- 판단: SAFE FAILURE / REJECT STEP-LOCAL MEMORY-CONFIDENCE LANE
