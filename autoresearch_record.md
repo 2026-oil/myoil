@@ -2533,3 +2533,28 @@
   - heartbeat rule상 새 가설은 strongest verified keep basis에서만 비교해야 함
   - 직전 substitution-style memory-bank trial은 keep보다 크게 약했으므로 그 위에 더 쌓지 않음
 - 판단: RESTORE TO EXACT KEEP BASIS
+
+## Iteration 2026-04-15 informer_test attenuate semantic negative branch by top1 confidence
+- timestamp: 2026-04-15T04:xx:00+09:00
+- git branch: informer_test
+- experiment title: attenuate `semantic_negative_weight` using bounded top1 memory-bank confidence while keeping the anomaly-intensity keep basis otherwise intact
+- data-driven motivation:
+  - bounded top1 confidence worked better as an auxiliary memory-bank hint than as a full replacement signal
+  - the next narrow hypothesis was to use that hint only where it is most intuitively aligned with the failure mode: reduce the negative semantic drag when top1 memory confidence is high
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/{aaforecast-informer,aaforecast-gru,baseline}.yaml`
+- run/artifact path: runs/iter_20260415_negweight_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.0749 / 73.3109`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.4638 / 78.2516`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - target gates still missed; AA-Informer improves slightly over the broader confidence-context trial but still stays under the keep
+- 핵심 진단:
+  - confidence-guided attenuation of the semantic negative branch is better than the destructive confidence-replacement lane and slightly better than the broader confidence-context trial.
+  - however, even this more targeted use of the memory-bank hint still does not close the gap to the anomaly-intensity keep, so the current keep remains the active basis.
+- 판단: SAFE FAILURE / STRONGEST MEMORY-BANK VARIANT SO FAR, STILL BELOW KEEP

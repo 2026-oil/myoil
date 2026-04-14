@@ -905,11 +905,17 @@ class InformerHorizonAwareHead(nn.Module):
         semantic_spike_gain = (
             1.0 + F.softplus(self.semantic_spike_gain_head(semantic_spike_context))
         ).unsqueeze(1)
+        memory_confidence_signal = getattr(self, "_latest_memory_confidence", None)
+        if memory_confidence_signal is None:
+            memory_confidence_signal = decoder_input.new_zeros((decoder_input.shape[0], 1))
+        else:
+            memory_confidence_signal = memory_confidence_signal.to(dtype=decoder_input.dtype)
         semantic_spike_direction = torch.sigmoid(
             self.semantic_spike_direction_head(semantic_spike_context)
             + (0.5 * memory_signal)
         ).unsqueeze(1)
         semantic_negative_weight = 0.9 * (1.0 - semantic_spike_direction).pow(2)
+        semantic_negative_weight = semantic_negative_weight * (1.0 - (0.5 * memory_confidence_signal.unsqueeze(1)))
         semantic_spike_curve = (
             (semantic_spike_direction * semantic_spike_pos_curve)
             - (semantic_negative_weight * semantic_spike_neg_curve)
@@ -2492,6 +2498,7 @@ class AAForecast(BaseModel):
         gather_index = top_indices.unsqueeze(-1).expand(-1, -1, values.shape[-1])
         self._latest_memory_bank = values.gather(1, gather_index)
         self._latest_memory_signal = torch.log1p(top_values.mean(dim=1, keepdim=True).clamp_min(0.0))
+        self._latest_memory_confidence = weights.detach().amax(dim=1)
         return _apply_stochastic_dropout(
             pooled,
             training=self.training,
