@@ -2218,3 +2218,30 @@
   - it is still below the archived no-retrieval frontier (`stability_dh = 77.5370 / 82.8792`) and below the restore-branch curve-only best (`77.1500 / 81.9808`), so the remaining blocker is semantic-amplitude gap rather than ordering or directionality.
   - two repeats were enough to show the current order-preserving basis can reach the high-79 band but not the target gates; more same-basis repeats would likely enter diminishing-return territory.
 - 판단: CURRENT BEST ORDER-PRESERVING KEEP ON informer_test
+
+## Iteration 2026-04-15 informer_test anomaly-intensity context + restore GRU control
+- timestamp: 2026-04-15T02:xx:00+09:00
+- git branch: informer_test
+- experiment title: add explicit anomaly-intensity context to the recovered Informer semantic decoder while keeping the restore-side GRU control and curve-only semantic output basis
+- code/config basis:
+  - recovered Informer-specific AA decoder semantics
+  - curve-only semantic output (`semantic_baseline_level + semantic_spike_component`)
+  - informer-local `transformer_anomaly_projection(count_active_channels)` added on the aligned attended path
+  - restore `yaml/plugins/aa_forecast/aa_forecast_parity_gru.yaml`
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/{aaforecast-informer,aaforecast-gru,baseline}.yaml`
+- run/artifact path: runs/iter_20260415_anomaly_context_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.1788 / 73.6098`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `76.0894 / 79.7352`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - `AA-Informer h1` stays inside the 15% band; `h2` still misses the 15% band and the absolute `>=85` target
+- 핵심 진단:
+  - adding observed anomaly-intensity context is directionally helpful on top of the restored curve-only Informer basis: this run edges the previous best order-preserving keep (`75.9993 / 79.4679`) to `76.0894 / 79.7352` while preserving the desired ordering.
+  - the gain is incremental rather than frontier-breaking, which reinforces that the remaining blocker is semantic-amplitude ceiling rather than directionality or bundle ordering.
+- 판단: CURRENT BEST ORDER-PRESERVING KEEP ON informer_test

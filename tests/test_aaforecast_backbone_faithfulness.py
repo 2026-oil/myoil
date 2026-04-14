@@ -258,6 +258,24 @@ def test_aaforecast_non_gru_backbones_match_standalone_encoder_only_pre_bridge(
     assert torch.allclose(adapter_raw, standalone_raw, atol=1e-6, rtol=1e-5)
 
 
+def test_informer_exposes_anomaly_projection_and_preserves_forward_contract() -> None:
+    model = _make_model(
+        "informer",
+        hidden_size=8,
+        n_head=2,
+        encoder_layers=1,
+        dropout=0.1,
+        linear_hidden_size=16,
+        factor=1,
+    )
+
+    assert model.transformer_anomaly_projection is not None
+    weight = model.transformer_anomaly_projection.weight
+    assert weight.shape == (model.encoder_hidden_size, 1)
+    outputs = model(_windows_batch())
+    assert outputs.shape == (2, 2, 1)
+
+
 def test_aaforecast_gru_adapter_matches_shared_gru_encoder_hidden_states() -> None:
     torch.manual_seed(7)
     model = _make_model(

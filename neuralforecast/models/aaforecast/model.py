@@ -1331,6 +1331,12 @@ class AAForecast(BaseModel):
             self.memory_token_shock_gate = None
             self.event_trajectory_projector = None
 
+        self.transformer_anomaly_projection = (
+            nn.Linear(1, self.encoder_hidden_size)
+            if self.backbone == "informer"
+            else None
+        )
+
     def configure_stochastic_inference(
         self,
         *,
@@ -2524,6 +2530,7 @@ class AAForecast(BaseModel):
         anchor_level: torch.Tensor,
         regime_intensity: torch.Tensor,
         regime_density: torch.Tensor,
+        count_active_channels: torch.Tensor,
     ) -> torch.Tensor:
         if self.informer_decoder is None:
             raise ValueError("Informer decoder is not initialized")
@@ -2531,6 +2538,16 @@ class AAForecast(BaseModel):
             hidden_states=hidden_states,
             attended_states=attended_states,
         )
+        if self.transformer_anomaly_projection is not None:
+            count_aligned = _align_horizon(
+                count_active_channels,
+                h=self.h,
+                input_size=self.input_size,
+                sequence_adapter=self.sequence_adapter,
+            )
+            attended_aligned = attended_aligned + self.transformer_anomaly_projection(
+                count_aligned
+            )
         regime_time_latent = self._project_regime_time_context(
             regime_intensity,
             regime_density,
@@ -2765,6 +2782,7 @@ class AAForecast(BaseModel):
                 anchor_level=insample_y,
                 regime_intensity=regime_intensity,
                 regime_density=regime_density,
+                count_active_channels=count_active_channels,
             )
         if self.decoder is None:
             raise ValueError("Shared decoder is not initialized")
