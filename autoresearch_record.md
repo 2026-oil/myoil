@@ -2524,3 +2524,12 @@
   - bounded top1 confidence can work as an auxiliary signal, but it is not a drop-in replacement for the existing `memory_signal` bias source.
   - replacing `memory_signal` directly is too destructive and collapses the amplitude toward the baseline band.
 - 판단: SAFE FAILURE / REJECT MEMORY-SIGNAL REPLACEMENT
+
+## Iteration 2026-04-15 restore exact best-keep basis before negative-drag memory-bank probe
+- timestamp: 2026-04-15T04:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore model/test files exactly to the last best-keep commit (`addc7741`) before the next narrow memory-bank hypothesis
+- 이유:
+  - heartbeat rule상 새 가설은 strongest verified keep basis에서만 비교해야 함
+  - 직전 substitution-style memory-bank trial은 keep보다 크게 약했으므로 그 위에 더 쌓지 않음
+- 판단: RESTORE TO EXACT KEEP BASIS
