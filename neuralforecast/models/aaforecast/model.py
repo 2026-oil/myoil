@@ -890,14 +890,8 @@ class InformerHorizonAwareHead(nn.Module):
             semantic_spike_neg_steps.append(
                 F.softplus(self.semantic_spike_neg_out_head(semantic_spike_hidden))
             )
-        semantic_spike_pos_curve = torch.cumsum(
-            torch.stack(semantic_spike_pos_steps, dim=1),
-            dim=1,
-        )
-        semantic_spike_neg_curve = torch.cumsum(
-            torch.stack(semantic_spike_neg_steps, dim=1),
-            dim=1,
-        )
+        semantic_spike_pos_curve = torch.stack(semantic_spike_pos_steps, dim=1)
+        semantic_spike_neg_curve = torch.stack(semantic_spike_neg_steps, dim=1)
         semantic_spike_gate = torch.sigmoid(
             self.semantic_spike_gate_head(semantic_spike_context)
             + (0.5 * memory_signal)
