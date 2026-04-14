@@ -896,8 +896,8 @@ class InformerHorizonAwareHead(nn.Module):
             self.semantic_spike_gate_head(semantic_spike_context)
             + (0.5 * memory_signal)
         ).unsqueeze(1)
-        semantic_spike_gain = (
-            1.0 + F.softplus(self.semantic_spike_gain_head(semantic_spike_context))
+        semantic_spike_gain = torch.sigmoid(
+            self.semantic_spike_gain_head(semantic_spike_context)
         ).unsqueeze(1)
         semantic_spike_direction = torch.sigmoid(
             self.semantic_spike_direction_head(semantic_spike_context)

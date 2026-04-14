@@ -345,6 +345,40 @@ def test_informer_semantic_spike_path_is_not_cumulative_forced() -> None:
     assert torch.allclose(decoded[:, 0, :], decoded[:, 1, :], atol=1e-6, rtol=1e-6)
 
 
+def test_informer_semantic_spike_gain_is_bounded_without_forced_amplification() -> None:
+    torch.manual_seed(17)
+    informer = _make_aaforecast("informer")
+    head = informer.informer_decoder
+    assert head is not None
+
+    decoder_input = torch.randn(2, informer.h, 2 * informer.hidden_size)
+    event_summary = torch.randn(2, informer.hidden_size)
+    event_path = torch.randn(2, informer.hidden_size)
+    raw_regime = torch.randn(2, informer.NON_STAR_REGIME_SIZE)
+    pooled_context = torch.randn(2, informer.hidden_size)
+    memory_signal = torch.randn(2, 1)
+    anchor_value = torch.ones(2, informer.loss.outputsize_multiplier)
+    memory_token = torch.randn(2, informer.hidden_size)
+    memory_bank = torch.randn(2, 3, informer.hidden_size)
+
+    decoded = head(
+        decoder_input,
+        event_summary,
+        event_path,
+        raw_regime,
+        pooled_context,
+        memory_signal,
+        anchor_value,
+        memory_token,
+        memory_bank,
+    )
+
+    gain = head.latest_debug["semantic_spike_gain"]
+    assert decoded.shape == (2, informer.h, informer.loss.outputsize_multiplier)
+    assert torch.all(gain >= 0)
+    assert torch.all(gain <= 1)
+
+
 def test_informer_horizon_aware_decoder_accepts_auxiliary_memory_context() -> None:
     torch.manual_seed(11)
     informer = _make_aaforecast("informer")

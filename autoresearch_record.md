@@ -2273,3 +2273,30 @@
   - removing cumulative forcing from the active semantic spike path is guardrail-compliant and the new unit test confirms the decoder no longer doubles later horizons just because the same positive step repeats.
   - however, the measured bundle regressed versus the previous anomaly-intensity keep (`76.0894 / 79.7352` -> `75.6107 / 79.3387`), so this ablation narrows the blocker but does not improve the active frontier.
 - 판단: SAFE FAILURE / KEEP AS BLOCKER NARROWING EVIDENCE
+
+## Iteration 2026-04-15 informer_test no-forced semantic amplification gain + restore GRU control
+- timestamp: 2026-04-15T02:xx:00+09:00
+- git branch: informer_test
+- experiment title: remove the active semantic spike branch's forced amplification floor by replacing `1 + softplus(...)` with bounded sigmoid gain, while keeping the recovered Informer decoder, anomaly-intensity context, and restore-side GRU control
+- code/config basis:
+  - recovered Informer-specific AA decoder semantics
+  - informer-local anomaly-intensity context via aligned `count_active_channels`
+  - restore `yaml/plugins/aa_forecast/aa_forecast_parity_gru.yaml`
+  - semantic spike gain changed from forced `>1` amplification to bounded `[0,1]` modulation
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/{aaforecast-informer,aaforecast-gru,baseline}.yaml`
+- run/artifact path: runs/iter_20260415_no_ampgain_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.9310 / 79.5332`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - `AA-Informer h1` stays inside the 15% band; `h2` still misses the 15% band and the absolute `>=85` target
+- 핵심 진단:
+  - bounding the active semantic spike gain removes another obvious upward-inducing bias source while preserving the desired ordering and directionality.
+  - performance is slightly below the current best guardrail-compliant keep (`76.0894 / 79.7352`), but materially above the no-cumsum-only ablation and therefore serves as blocker narrowing rather than a new keep.
+- 판단: SAFE FAILURE / KEEP AS BLOCKER NARROWING EVIDENCE
