@@ -2554,7 +2554,6 @@ class AAForecast(BaseModel):
         )
         event_context = self._project_event_summary(event_summary)
         event_path = self._project_event_trajectory(event_trajectory)
-        attended_aligned = attended_aligned + event_context.unsqueeze(1)
         pooled_context = self._build_memory_pooled_context(
             hidden_states=hidden_states,
             attended_states=attended_states,

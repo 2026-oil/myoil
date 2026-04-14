@@ -2347,3 +2347,12 @@
   - event-summary injection into the attended path is shape-safe and preserves the ordering story, but it lowers amplitude compared with the anomaly-intensity keep.
   - this suggests the low-run problem is not solved by simply pushing more event-summary context into the transformer path; the current useful signal remains closer to anomaly-intensity than to a broad event-summary residual.
 - 판단: SAFE FAILURE / KEEP AS BLOCKER NARROWING EVIDENCE
+
+## Iteration 2026-04-15 restore guardrail basis after attended-context regressions
+- timestamp: 2026-04-15T03:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the guardrail-compliant informer_test basis after both attended event-summary and attended event-path context regressions
+- 핵심 진단:
+  - low anchor의 selector fallback은 사실이지만, attended transformer path에 broad event summary 또는 narrower event path를 직접 주입하는 두 시도 모두 현재 best keep보다 나빴음.
+  - 따라서 active branch basis는 anomaly-intensity keep 이전/이후의 guardrail-compliant core로 유지하고, attended path contamination family는 실험 결과상 비활성화하는 것이 맞음.
+- 판단: RESTORE ACTIVE BASIS
