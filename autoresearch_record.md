@@ -2866,3 +2866,10 @@
   - adding a decoder memory hint directly into the prototype query weakens the active keep instead of sharpening bank selection productively.
   - the same change also destabilizes the non-AA informer competitor inside the bundle, so it should be treated as a rejection rather than a transport improvement.
 - 판단: SAFE FAILURE / REJECT PROTOTYPE MEMORY HINT
+
+
+## Iteration 2026-04-15 restore exact active keep after prototype memory-hint regression
+- timestamp: 2026-04-15T09:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed prototype memory-hint rejection
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
