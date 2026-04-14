@@ -2576,3 +2576,29 @@
   - strongest memory-bank lane (`negweight_restore_gru_bundle1`) still under-shot the keep
   - 다음 가설도 exact keep basis에서만 비교해야 attribution이 유지됨
 - 판단: RESTORE TO EXACT KEEP BASIS
+
+## Iteration 2026-04-15 informer_test prototype-style memory-bank decoder lane
+- timestamp: 2026-04-15T04:xx:00+09:00
+- git branch: informer_test
+- experiment title: add a prototype-style internal memory-bank family to the recovered Informer decoder while preserving the strict anti-leakage AA pipeline
+- hypothesis:
+  - previous memory-bank variants suggested that retrieval-inspired signals help most when they bias transport rather than replace the core signal.
+  - next non-duplicate step was therefore a prototype-style decoder family: learned prototype query, learned prototype level, learned prototype increment bank, and family gate, all still inside the decoder and with retrieval disabled.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/{aaforecast-informer,aaforecast-gru,baseline}.yaml`
+- run/artifact path: runs/iter_20260415_proto_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `76.4732 / 80.7693`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - `AA-Informer h1` stays inside the 15% band; `h2` still misses the 15% band and the absolute `>=85` target
+- 핵심 진단:
+  - this is the first decoder/memory-bank lane on informer_test that **beats the anomaly-intensity keep** while staying inside every anti-cheating guardrail.
+  - the improvement is material on both horizons (`76.0894 / 79.7352` -> `76.4732 / 80.7693`), so prototype-style internal memory transport is now the new local best.
+  - despite the gain, the remaining blocker is still absolute amplitude transport, especially on h2.
+- 판단: NEW BEST KEEP ON informer_test

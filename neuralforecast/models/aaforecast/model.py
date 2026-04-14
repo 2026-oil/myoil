@@ -832,6 +832,28 @@ class InformerHorizonAwareHead(nn.Module):
             ).unsqueeze(1)
             * anchor_scale
         )
+        memory_confidence = getattr(self, "_latest_memory_confidence", None)
+        if memory_confidence is None:
+            memory_confidence = decoder_input.new_zeros((decoder_input.shape[0], 1))
+        else:
+            memory_confidence = memory_confidence.to(dtype=decoder_input.dtype)
+        prototype_context = torch.cat(
+            [
+                trajectory_context,
+                memory_token,
+                anchor_value,
+                memory_signal,
+            ],
+            dim=-1,
+        )
+        family_gate = torch.sigmoid(self.family_blend_gate_head(prototype_context)).unsqueeze(1)
+        prototype_query = self.prototype_query_head(prototype_context)
+        prototype_logits = torch.matmul(prototype_query, self.prototype_key_bank.t())
+        prototype_weights = torch.softmax(prototype_logits, dim=1)
+        prototype_level = self.prototype_level_head(prototype_context).unsqueeze(1) * anchor_scale
+        prototype_increments = torch.einsum('bp,pho->bho', prototype_weights, self.prototype_increment_bank)
+        prototype_gain = torch.sigmoid(self.prototype_gain_head(prototype_context)).unsqueeze(1)
+        prototype_curve = prototype_increments * prototype_gain * anchor_scale
         semantic_spike_context = torch.cat(
             [
                 trajectory_context,
@@ -917,6 +939,7 @@ class InformerHorizonAwareHead(nn.Module):
         semantic_spike_component = (
             semantic_spike_curve * semantic_spike_gate * semantic_spike_gain * anchor_scale
         )
+        prototype_component = (prototype_level + prototype_curve) * family_gate * memory_confidence.unsqueeze(1)
         memory_transport_states, _ = self.memory_transport_attention(
             mixed_path,
             memory_bank,
@@ -936,6 +959,7 @@ class InformerHorizonAwareHead(nn.Module):
         final_output = (
             semantic_baseline_level
             + semantic_spike_component
+            + prototype_component
         )
         def _summary_tensor(value: torch.Tensor) -> torch.Tensor:
             if value.ndim >= 3:
@@ -2492,6 +2516,7 @@ class AAForecast(BaseModel):
         gather_index = top_indices.unsqueeze(-1).expand(-1, -1, values.shape[-1])
         self._latest_memory_bank = values.gather(1, gather_index)
         self._latest_memory_signal = torch.log1p(top_values.mean(dim=1, keepdim=True).clamp_min(0.0))
+        self._latest_memory_confidence = weights.detach().amax(dim=1)
         return _apply_stochastic_dropout(
             pooled,
             training=self.training,
