@@ -2661,3 +2661,9 @@
 - git branch: informer_test
 - experiment title: restore the exact prototype keep basis after rejecting confidence-appended prototype context
 - 판단: RESTORE TO EXACT PROTOTYPE KEEP BASIS
+
+## Iteration 2026-04-15 restore exact prototype keep basis after 8-slot regression
+- timestamp: 2026-04-15T05:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact prototype keep basis after rejecting the 8-slot prototype expansion
+- 판단: RESTORE TO EXACT PROTOTYPE KEEP BASIS
