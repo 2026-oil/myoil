@@ -846,7 +846,7 @@ class InformerHorizonAwareHead(nn.Module):
             ],
             dim=-1,
         )
-        family_gate = torch.sigmoid(self.family_blend_gate_head(prototype_context)).unsqueeze(1)
+        family_gate = (0.5 + 0.5 * torch.sigmoid(self.family_blend_gate_head(prototype_context))).unsqueeze(1)
         prototype_query = self.prototype_query_head(prototype_context)
         prototype_logits = torch.matmul(prototype_query, self.prototype_key_bank.t())
         prototype_weights = torch.softmax(prototype_logits, dim=1)

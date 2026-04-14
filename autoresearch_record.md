@@ -2679,3 +2679,25 @@
 - git branch: informer_test
 - experiment title: restore the exact active keep basis before the next prototype-family transport refinement
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 informer_test active guardrail-compliant prototype keep
+- timestamp: 2026-04-15T05:xx:00+09:00
+- git branch: informer_test
+- experiment title: keep the prototype-style internal memory-bank decoder while enforcing the active semantic-spike anti-cheating guardrails
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/{aaforecast-informer,aaforecast-gru,baseline}.yaml`
+- run/artifact path: runs/iter_20260415_guardrail_proto_keep_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `72.9805 / 74.8289`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.7647 / 79.2877`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - target gates still missed, but this is the strongest informer_test basis that satisfies the current anti-cheating guardrails
+- 핵심 진단:
+  - the earlier higher-amplitude prototype lane relied on a semantic-spike path that no longer satisfies the current guardrails.
+  - this bundle preserves the decoder/memory-bank gain while bringing the active semantic-spike path back inside the user's no-cumsum and bounded-gain constraints, so it is the current compliant keep.
+- 판단: ACTIVE KEEP UNDER CURRENT GUARDRAILS
