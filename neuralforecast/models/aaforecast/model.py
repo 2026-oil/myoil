@@ -853,7 +853,6 @@ class InformerHorizonAwareHead(nn.Module):
         prototype_level = self.prototype_level_head(prototype_context).unsqueeze(1) * anchor_scale
         prototype_increments = torch.einsum('bp,pho->bho', prototype_weights, self.prototype_increment_bank)
         prototype_gain = torch.sigmoid(self.prototype_gain_head(prototype_context)).unsqueeze(1)
-        prototype_gain = torch.sqrt(prototype_gain.clamp_min(1e-8))
         prototype_curve = prototype_increments * prototype_gain * anchor_scale
         semantic_spike_context = torch.cat(
             [

@@ -2791,3 +2791,9 @@
   - broadening prototype gain this way is too aggressive and destabilizes the transport path.
   - the active bounded prototype gain should remain unchanged.
 - 판단: SAFE FAILURE / REJECT PROTOTYPE GAIN LIFT
+
+## Iteration 2026-04-15 restore exact active keep after prototype gain-lift regression
+- timestamp: 2026-04-15T06:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after rejecting sqrt-scaled prototype gain
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
