@@ -2847,3 +2847,22 @@
 - git branch: informer_test
 - experiment title: restore the exact active keep basis after recording the completed prototype top1-mix rejection
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+
+## Iteration 2026-04-15 prototype memory-hinted query on the active keep
+- timestamp: 2026-04-15T09:xx:00+09:00
+- git branch: informer_test
+- experiment title: feed one decoder memory-attention hint back into the prototype query before bank selection on top of the exact active keep
+- run/artifact path: runs/iter_20260415_proto_memhint_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.5397 / 78.4758`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - target gates missed; AA-Informer stays below the active keep `75.7647 / 79.2877`
+- 핵심 진단:
+  - adding a decoder memory hint directly into the prototype query weakens the active keep instead of sharpening bank selection productively.
+  - the same change also destabilizes the non-AA informer competitor inside the bundle, so it should be treated as a rejection rather than a transport improvement.
+- 판단: SAFE FAILURE / REJECT PROTOTYPE MEMORY HINT

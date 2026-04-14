@@ -848,6 +848,13 @@ class InformerHorizonAwareHead(nn.Module):
         )
         family_gate = torch.sigmoid(self.family_blend_gate_head(prototype_context)).unsqueeze(1)
         prototype_query = self.prototype_query_head(prototype_context)
+        prototype_memory_hint, _ = self.memory_transport_attention(
+            prototype_query.unsqueeze(1),
+            memory_bank,
+            memory_bank,
+            need_weights=False,
+        )
+        prototype_query = prototype_query + prototype_memory_hint.squeeze(1)
         prototype_logits = torch.matmul(prototype_query, self.prototype_key_bank.t())
         prototype_weights = torch.softmax(prototype_logits, dim=1)
         prototype_level = self.prototype_level_head(prototype_context).unsqueeze(1) * anchor_scale
