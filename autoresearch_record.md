@@ -3485,3 +3485,35 @@
 - experiment title: restore the exact active keep basis after recording the completed no-family-gate regression
 - restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 prototype memory residual sqrt-family-gate relaxation on the active keep
+- timestamp: 2026-04-15T16:xx:00+09:00
+- git branch: informer_test
+- experiment title: keep the prototype level-plus-curve path under the full family gate, but relax only the prototype memory residual to `sqrt(family_gate)` while retaining the active keep's confidence damping
+- hypothesis:
+  - the fully ungated memory-residual variant over-strengthened the non-AA baseline path, but the current keep may still be over-suppressing the prototype memory residual by forcing it through the full family gate.
+  - the narrowest middle-ground test was therefore to let the residual see `sqrt(family_gate)` instead of either full `family_gate` or no family gate.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/baseline.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_memcurve_sqrtgate_restore_gru_bundle1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_memcurve_sqrtgate_restore_gru_bundle1`
+- run/artifact path: runs/iter_20260415_proto_memcurve_sqrtgate_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.6428 / 78.9815`
+- active keep comparison:
+  - current compliant keep AA-Informer = `76.1788 / 80.0079`
+  - sqrt-family-gate delta vs keep = `-0.5360 / -1.0264`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - both horizons regress below the active keep.
+- 핵심 진단:
+  - a partial family-gate relaxation is safer than fully bypassing the gate, but the active keep still benefits from keeping the prototype memory residual under the full family-gated compromise.
+  - this suggests the gate pressure on the residual is not the main remaining h2 blocker.
+- 판단: SAFE FAILURE / REJECT SQRT-FAMILY-GATE PROTOTYPE MEMORY RESIDUAL
