@@ -64,7 +64,6 @@ AA_FORECAST_STAGE_ONLY_PARAM_REGISTRY = {
         "dropout": _probability(),
         "linear_hidden_size": _positive_int(low=1, high=8192),
         "factor": _positive_int(low=1, high=64),
-        "semantic_negative_scale": {"type": "float", "low": 0.0, "high": 2.0},
     },
     "itransformer": {
         **_AA_COMMON_PARAM_REGISTRY,

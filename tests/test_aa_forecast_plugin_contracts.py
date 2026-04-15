@@ -741,6 +741,51 @@ def test_load_app_config_rejects_backbone_specific_unknown_model_param(
         load_app_config(tmp_path, config_path=config_path)
 
 
+def test_load_app_config_rejects_stale_informer_semantic_negative_scale(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "data.csv").write_text(
+        "dt,target,event\n2020-01-01,1,0\n2020-01-08,2,1\n",
+        encoding="utf-8",
+    )
+    plugin_path = tmp_path / "aa_plugin.yaml"
+    plugin_path.write_text(
+        "aa_forecast:\n"
+        "  model: informer\n"
+        "  tune_training: false\n"
+        "  star_anomaly_tails:\n"
+        "    upward:\n"
+        "      - event\n"
+        "    two_sided: []\n"
+        "  model_params:\n"
+        "    hidden_size: 8\n"
+        "    semantic_negative_scale: 0.95\n",
+        encoding="utf-8",
+    )
+    payload = {
+        "task": {"name": "reject_stale_informer_semantic_negative_scale"},
+        "dataset": {
+            "path": "data.csv",
+            "target_col": "target",
+            "dt_col": "dt",
+            "hist_exog_cols": ["event"],
+            "futr_exog_cols": [],
+            "static_exog_cols": [],
+        },
+        "training": {"loss": "mse"},
+        "cv": {"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0},
+        "scheduler": {"gpu_ids": [0], "max_concurrent_jobs": 1, "worker_devices": 1},
+        "aa_forecast": {"enabled": True, "config_path": str(plugin_path)},
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    with pytest.raises(
+        ValueError,
+        match=r"unsupported key\(s\) for aa_forecast\.model='informer': semantic_negative_scale",
+    ):
+        load_app_config(tmp_path, config_path=config_path)
+
+
 def test_load_app_config_rejects_legacy_aa_forecast_mode_key(tmp_path: Path) -> None:
     (tmp_path / "data.csv").write_text(
         "dt,target,event\n2020-01-01,1,0\n2020-01-08,2,1\n",
