@@ -226,13 +226,7 @@ def test_aaforecast_non_gru_backbones_preserve_forward_contract_after_module_spl
     _expected_fragment: str,
 ) -> None:
     model = _make_model(backbone, **params)
-    windows_batch = {
-        "insample_y": torch.arange(8, dtype=torch.float32).reshape(2, 4, 1),
-        "hist_exog": torch.arange(32, dtype=torch.float32).reshape(2, 4, 4),
-        "futr_exog": torch.empty(2, 4, 0),
-        "stat_exog": torch.empty(2, 0),
-    }
-    outputs = model(windows_batch)
+    outputs = model(_windows_batch())
     assert outputs.shape == (2, 2, 1)
 
 
@@ -278,102 +272,7 @@ def test_informer_exposes_anomaly_projection_and_preserves_forward_contract() ->
     assert model.transformer_anomaly_projection is not None
     weight = model.transformer_anomaly_projection.weight
     assert weight.shape == (model.encoder_hidden_size, 1)
-    windows_batch = {
-        "insample_y": torch.arange(8, dtype=torch.float32).reshape(2, 4, 1),
-        "hist_exog": torch.arange(32, dtype=torch.float32).reshape(2, 4, 4),
-        "futr_exog": torch.empty(2, 4, 0),
-        "stat_exog": torch.empty(2, 0),
-    }
-    outputs = model(windows_batch)
-    assert outputs.shape == (2, 2, 1)
-
-
-def test_informer_cross_bridge_selects_named_star_and_non_star_context() -> None:
-    model = AAForecast(
-        h=2,
-        input_size=4,
-        backbone="informer",
-        hist_exog_list=[
-            "GPRD_THREAT",
-            "BS_Core_Index_A",
-            "BS_Core_Index_C",
-            "Idx_OVX",
-        ],
-        star_hist_exog_list=["GPRD_THREAT", "BS_Core_Index_A"],
-        non_star_hist_exog_list=["BS_Core_Index_C", "Idx_OVX"],
-        star_hist_exog_tail_modes=["upward", "upward"],
-        informer_bridge_exog_list=[
-            "GPRD_THREAT",
-            "BS_Core_Index_A",
-            "BS_Core_Index_C",
-            "Idx_OVX",
-        ],
-        informer_bridge_hidden_size=8,
-        informer_bridge_layers=1,
-        scaler_type="identity",
-        max_steps=1,
-        val_check_steps=1,
-        batch_size=1,
-        windows_batch_size=1,
-        inference_windows_batch_size=1,
-        hidden_size=8,
-        n_head=2,
-        encoder_layers=1,
-        dropout=0.1,
-        linear_hidden_size=16,
-        factor=1,
-    ).eval()
-
-    assert model.informer_bridge_sources == (
-        ("star_activity", 0),
-        ("star_activity", 1),
-        ("non_star_raw", 0),
-        ("non_star_raw", 1),
-    )
-    assert model.informer_cross_bridge is not None
-
-    star_payload = {
-        "star_hist_activity": torch.tensor(
-            [[
-                [1.0, 2.0],
-                [3.0, 4.0],
-                [5.0, 6.0],
-                [7.0, 8.0],
-            ]]
-        )
-    }
-    hist_exog = torch.tensor(
-        [[
-            [10.0, 20.0, 30.0, 40.0],
-            [11.0, 21.0, 31.0, 41.0],
-            [12.0, 22.0, 32.0, 42.0],
-            [13.0, 23.0, 33.0, 43.0],
-        ]]
-    )
-    context = model._build_informer_bridge_context(
-        hist_exog=hist_exog,
-        star_payload=star_payload,
-        template=torch.zeros(1, 4, 1),
-    )
-
-    assert context is not None
-    expected = torch.tensor(
-        [[
-            [1.0, 2.0, 30.0, 40.0],
-            [3.0, 4.0, 31.0, 41.0],
-            [5.0, 6.0, 32.0, 42.0],
-            [7.0, 8.0, 33.0, 43.0],
-        ]]
-    )
-    assert torch.equal(context, expected)
-
-    windows_batch = {
-        "insample_y": torch.arange(8, dtype=torch.float32).reshape(2, 4, 1),
-        "hist_exog": torch.arange(32, dtype=torch.float32).reshape(2, 4, 4),
-        "futr_exog": torch.empty(2, 4, 0),
-        "stat_exog": torch.empty(2, 0),
-    }
-    outputs = model(windows_batch)
+    outputs = model(_windows_batch())
     assert outputs.shape == (2, 2, 1)
 
 

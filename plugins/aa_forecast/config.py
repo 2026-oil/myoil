@@ -297,13 +297,6 @@ def _validate_param_value_against_spec(
         if parsed < low or parsed > high:
             raise ValueError(f"{field_name} must satisfy {low} <= value <= {high}")
         return
-    if spec_type == "string_list":
-        if isinstance(value, str) or not isinstance(value, (list, tuple)):
-            raise ValueError(f"{field_name} must be a list of strings")
-        for item in value:
-            if not isinstance(item, str) or not item.strip():
-                raise ValueError(f"{field_name} must contain only non-empty strings")
-        return
     raise ValueError(f"{field_name} uses unsupported schema type: {spec_type}")
 
 
