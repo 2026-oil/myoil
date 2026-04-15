@@ -3095,3 +3095,10 @@
   - the active keep does appear sensitive to confidence placement, but removing the inner damping alone still weakens the prototype family's amplitude transport relative to the keep.
   - this suggests the keep's double confidence structure is not merely over-damping noise; it is helping stabilize the useful prototype memory residual.
 - 판단: SAFE FAILURE / REJECT SINGLE-CONFIDENCE PROTOTYPE MEMORY-CURVE DAMPING
+
+## Iteration 2026-04-15 restore exact active keep after single-confidence damping regression
+- timestamp: 2026-04-15T15:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed single-confidence damping regression
+- restored anchor commit: `cf2060d8` (`Restore the exact active keep after the memory-gain rejection`)
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
