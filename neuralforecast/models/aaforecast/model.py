@@ -832,28 +832,6 @@ class InformerHorizonAwareHead(nn.Module):
             ).unsqueeze(1)
             * anchor_scale
         )
-        memory_confidence = getattr(self, "_latest_memory_confidence", None)
-        if memory_confidence is None:
-            memory_confidence = decoder_input.new_zeros((decoder_input.shape[0], 1))
-        else:
-            memory_confidence = memory_confidence.to(dtype=decoder_input.dtype)
-        prototype_context = torch.cat(
-            [
-                trajectory_context,
-                memory_token,
-                anchor_value,
-                memory_signal,
-            ],
-            dim=-1,
-        )
-        family_gate = torch.sigmoid(self.family_blend_gate_head(prototype_context)).unsqueeze(1)
-        prototype_query = self.prototype_query_head(prototype_context)
-        prototype_logits = torch.matmul(prototype_query, self.prototype_key_bank.t())
-        prototype_weights = torch.softmax(prototype_logits, dim=1)
-        prototype_level = self.prototype_level_head(prototype_context).unsqueeze(1) * anchor_scale
-        prototype_increments = torch.einsum('bp,pho->bho', prototype_weights, self.prototype_increment_bank)
-        prototype_gain = torch.sigmoid(self.prototype_gain_head(prototype_context)).unsqueeze(1)
-        prototype_curve = prototype_increments * prototype_gain * anchor_scale
         semantic_spike_context = torch.cat(
             [
                 trajectory_context,
@@ -912,14 +890,20 @@ class InformerHorizonAwareHead(nn.Module):
             semantic_spike_neg_steps.append(
                 F.softplus(self.semantic_spike_neg_out_head(semantic_spike_hidden))
             )
-        semantic_spike_pos_curve = torch.stack(semantic_spike_pos_steps, dim=1)
-        semantic_spike_neg_curve = torch.stack(semantic_spike_neg_steps, dim=1)
+        semantic_spike_pos_curve = torch.cumsum(
+            torch.stack(semantic_spike_pos_steps, dim=1),
+            dim=1,
+        )
+        semantic_spike_neg_curve = torch.cumsum(
+            torch.stack(semantic_spike_neg_steps, dim=1),
+            dim=1,
+        )
         semantic_spike_gate = torch.sigmoid(
             self.semantic_spike_gate_head(semantic_spike_context)
             + (0.5 * memory_signal)
         ).unsqueeze(1)
-        semantic_spike_gain = torch.sigmoid(
-            self.semantic_spike_gain_head(semantic_spike_context)
+        semantic_spike_gain = (
+            1.0 + F.softplus(self.semantic_spike_gain_head(semantic_spike_context))
         ).unsqueeze(1)
         semantic_spike_direction = torch.sigmoid(
             self.semantic_spike_direction_head(semantic_spike_context)
@@ -939,13 +923,6 @@ class InformerHorizonAwareHead(nn.Module):
             memory_bank,
             need_weights=False,
         )
-        prototype_memory_curve = 0.1 * torch.tanh(self.local_head(memory_transport_states)) * anchor_scale
-        prototype_memory_confidence = torch.sqrt(memory_confidence.clamp_min(0.0)).unsqueeze(1)
-        prototype_component = (
-            prototype_level
-            + prototype_curve
-            + (prototype_memory_curve * prototype_memory_confidence)
-        ) * family_gate * memory_confidence.unsqueeze(1)
         memory_transport = torch.cumsum(
             F.softplus(self.local_head(memory_transport_states)),
             dim=1,
@@ -958,8 +935,8 @@ class InformerHorizonAwareHead(nn.Module):
         )
         final_output = (
             semantic_baseline_level
+            + semantic_baseline_curve
             + semantic_spike_component
-            + prototype_component
         )
         def _summary_tensor(value: torch.Tensor) -> torch.Tensor:
             if value.ndim >= 3:
@@ -1354,12 +1331,6 @@ class AAForecast(BaseModel):
             self.memory_token_shock_head = None
             self.memory_token_shock_gate = None
             self.event_trajectory_projector = None
-
-        self.transformer_anomaly_projection = (
-            nn.Linear(1, self.encoder_hidden_size)
-            if self.backbone == "informer"
-            else None
-        )
 
     def configure_stochastic_inference(
         self,
@@ -2516,7 +2487,6 @@ class AAForecast(BaseModel):
         gather_index = top_indices.unsqueeze(-1).expand(-1, -1, values.shape[-1])
         self._latest_memory_bank = values.gather(1, gather_index)
         self._latest_memory_signal = torch.log1p(top_values.mean(dim=1, keepdim=True).clamp_min(0.0))
-        self._latest_memory_confidence = weights.detach().amax(dim=1)
         return _apply_stochastic_dropout(
             pooled,
             training=self.training,
@@ -2555,7 +2525,6 @@ class AAForecast(BaseModel):
         anchor_level: torch.Tensor,
         regime_intensity: torch.Tensor,
         regime_density: torch.Tensor,
-        count_active_channels: torch.Tensor,
     ) -> torch.Tensor:
         if self.informer_decoder is None:
             raise ValueError("Informer decoder is not initialized")
@@ -2563,16 +2532,6 @@ class AAForecast(BaseModel):
             hidden_states=hidden_states,
             attended_states=attended_states,
         )
-        if self.transformer_anomaly_projection is not None:
-            count_aligned = _align_horizon(
-                count_active_channels,
-                h=self.h,
-                input_size=self.input_size,
-                sequence_adapter=self.sequence_adapter,
-            )
-            attended_aligned = attended_aligned + self.transformer_anomaly_projection(
-                count_aligned
-            )
         regime_time_latent = self._project_regime_time_context(
             regime_intensity,
             regime_density,
@@ -2807,7 +2766,6 @@ class AAForecast(BaseModel):
                 anchor_level=insample_y,
                 regime_intensity=regime_intensity,
                 regime_density=regime_density,
-                count_active_channels=count_active_channels,
             )
         if self.decoder is None:
             raise ValueError("Shared decoder is not initialized")
