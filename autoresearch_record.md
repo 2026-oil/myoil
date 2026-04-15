@@ -3757,3 +3757,30 @@
   - the same 14c6c967 code basis still has slightly more stochastic upside than the previously promoted rerun artifact.
   - the code basis remains unchanged, but the best recorded compliant frontier moves upward again to this run artifact.
 - 판단: NEW ACTIVE COMPLIANT KEEP (RERUN)
+
+## Iteration 2026-04-15 exact active keep rerun 5
+- timestamp: 2026-04-15T17:xx:00+09:00
+- git branch: informer_test
+- experiment title: bounded repeatability rerun on the exact active keep at `14c6c967` with no code changes
+- code/config basis:
+  - exact active keep commit `14c6c967`
+  - no model/YAML/test changes before the run; this iteration only re-ran the strict 3-way bundle to harvest variance on the current best-compliant basis
+- verification bundle:
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_sqrtconf_rerun5`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_sqrtconf_rerun5`
+- run/artifact path: runs/iter_20260415_proto_sqrtconf_rerun5
+- final-fold result:
+  - baseline (plain_informer) = `72.9299 / 73.3410`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.4123 / 78.4332`
+- current active keep comparison:
+  - current compliant keep AA-Informer = `76.2956 / 80.1195`
+  - rerun5 delta vs current keep = `-0.8833 / -1.6863`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - this rerun does not beat the current keep artifact on either horizon.
+- 핵심 진단:
+  - same-basis harvest still shows substantial variance, but this particular rerun lands well below the current frontier.
+  - the best recorded compliant artifact therefore remains rerun4.
+- 판단: REPEATABILITY EVIDENCE ONLY / KEEP UNCHANGED
