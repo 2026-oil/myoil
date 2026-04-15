@@ -159,6 +159,14 @@ def test_build_summary_artifacts_do_not_write_per_window_bundles(
     monkeypatch.setattr(runtime, "_write_loss_artifact_summary", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         runtime,
+        "_write_summary_fold_plot",
+        lambda _run_root, fold_root, _fold_forecasts, _selected_models, *, fold_idx: (
+            fold_root / "plot.png"
+        ).write_text(f"fold-{fold_idx}", encoding="utf-8")
+        or fold_root / "plot.png",
+    )
+    monkeypatch.setattr(
+        runtime,
         "_load_summary_loaded_config",
         lambda _run_root: SimpleNamespace(
             config=SimpleNamespace(
@@ -275,8 +283,16 @@ def test_build_summary_artifacts_do_not_write_per_window_bundles(
     assert not stale_summary_markdown.exists()
     assert artifact_paths["leaderboard"].endswith("summary/leaderboard.csv")
     assert artifact_paths["result"].endswith("summary/result.csv")
+    assert artifact_paths["fold_bundles_root"].endswith("summary/folds")
     assert not stale_window_dir.exists()
     assert not any((run_root / "summary").glob("test_*"))
+    assert sorted(artifact_paths) == ["fold_bundles_root", "leaderboard", "result"]
+    assert (run_root / "summary" / "folds" / "fold_000" / "predictions.csv").exists()
+    assert (run_root / "summary" / "folds" / "fold_000" / "metrics.csv").exists()
+    assert (run_root / "summary" / "folds" / "fold_000" / "plot.png").exists()
+    assert (run_root / "summary" / "folds" / "fold_001" / "predictions.csv").exists()
+    assert (run_root / "summary" / "folds" / "fold_001" / "metrics.csv").exists()
+    assert (run_root / "summary" / "folds" / "fold_001" / "plot.png").exists()
     assert result_frame.columns.tolist() == [
         "model",
         "fold_idx",
@@ -321,6 +337,216 @@ def test_build_summary_artifacts_do_not_write_per_window_bundles(
             "y_hat": 16.8,
         },
     ]
+
+
+def test_write_per_fold_summary_bundles_rejects_invalid_metric_fold_idx(
+    tmp_path: Path,
+) -> None:
+    forecasts = pd.DataFrame(
+        [
+            {
+                "model": "Naive",
+                "fold_idx": 0,
+                "cutoff": "2024-02-04",
+                "train_end_ds": "2024-02-04",
+                "unique_id": "target",
+                "ds": "2024-02-11",
+                "horizon_step": 1,
+                "y": 15.0,
+                "y_hat": 14.5,
+            }
+        ]
+    )
+    metrics = pd.DataFrame(
+        [
+            {
+                "model": "Naive",
+                "fold_idx": "bad",
+                "cutoff": "2024-02-04",
+                "MAE": 1.0,
+                "MSE": 1.0,
+                "RMSE": 1.0,
+            }
+        ]
+    )
+
+    with pytest.raises(ValueError, match="summary metrics contains invalid fold_idx values"):
+        runtime._write_per_fold_summary_bundles(
+            tmp_path,
+            tmp_path / "summary",
+            pd.DataFrame([{"rank": 1, "model": "Naive"}]),
+            metrics,
+            forecasts,
+        )
+
+
+def test_write_per_fold_summary_bundles_rejects_invalid_metric_cutoff(
+    tmp_path: Path,
+) -> None:
+    forecasts = pd.DataFrame(
+        [
+            {
+                "model": "Naive",
+                "fold_idx": 0,
+                "cutoff": "2024-02-04",
+                "train_end_ds": "2024-02-04",
+                "unique_id": "target",
+                "ds": "2024-02-11",
+                "horizon_step": 1,
+                "y": 15.0,
+                "y_hat": 14.5,
+            }
+        ]
+    )
+    metrics = pd.DataFrame(
+        [
+            {
+                "model": "Naive",
+                "fold_idx": 0,
+                "cutoff": "not-a-date",
+                "MAE": 1.0,
+                "MSE": 1.0,
+                "RMSE": 1.0,
+            }
+        ]
+    )
+
+    with pytest.raises(ValueError, match="summary metrics contains invalid cutoff values"):
+        runtime._write_per_fold_summary_bundles(
+            tmp_path,
+            tmp_path / "summary",
+            pd.DataFrame([{"rank": 1, "model": "Naive"}]),
+            metrics,
+            forecasts,
+        )
+
+
+def test_write_per_fold_summary_bundles_rejects_forecast_metric_fold_coverage_mismatch(
+    tmp_path: Path,
+) -> None:
+    forecasts = pd.DataFrame(
+        [
+            {
+                "model": "Naive",
+                "fold_idx": 0,
+                "cutoff": "2024-02-04",
+                "train_end_ds": "2024-02-04",
+                "unique_id": "target",
+                "ds": "2024-02-11",
+                "horizon_step": 1,
+                "y": 15.0,
+                "y_hat": 14.5,
+            }
+        ]
+    )
+    metrics = pd.DataFrame(
+        [
+            {
+                "model": "Naive",
+                "fold_idx": 1,
+                "cutoff": "2024-02-11",
+                "MAE": 1.0,
+                "MSE": 1.0,
+                "RMSE": 1.0,
+            }
+        ]
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="summary per-fold bundle generation requires matching forecast/metric fold coverage",
+    ):
+        runtime._write_per_fold_summary_bundles(
+            tmp_path,
+            tmp_path / "summary",
+            pd.DataFrame([{"rank": 1, "model": "Naive"}]),
+            metrics,
+            forecasts,
+        )
+
+
+def test_write_per_fold_summary_bundles_rejects_metrics_only_extra_fold(
+    tmp_path: Path,
+) -> None:
+    forecasts = pd.DataFrame(
+        [
+            {
+                "model": "Naive",
+                "fold_idx": 0,
+                "cutoff": "2024-02-04",
+                "train_end_ds": "2024-02-04",
+                "unique_id": "target",
+                "ds": "2024-02-11",
+                "horizon_step": 1,
+                "y": 15.0,
+                "y_hat": 14.5,
+            }
+        ]
+    )
+    metrics = pd.DataFrame(
+        [
+            {
+                "model": "Naive",
+                "fold_idx": 0,
+                "cutoff": "2024-02-04",
+                "MAE": 1.0,
+                "MSE": 1.0,
+                "RMSE": 1.0,
+            },
+            {
+                "model": "Naive",
+                "fold_idx": 1,
+                "cutoff": "2024-02-11",
+                "MAE": 2.0,
+                "MSE": 2.0,
+                "RMSE": 2.0,
+            },
+        ]
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="summary per-fold bundle generation requires matching forecast/metric fold coverage",
+    ):
+        runtime._write_per_fold_summary_bundles(
+            tmp_path,
+            tmp_path / "summary",
+            pd.DataFrame([{"rank": 1, "model": "Naive"}]),
+            metrics,
+            forecasts,
+        )
+
+
+def test_write_summary_fold_plot_preserves_aaforecast_context_fail_fast(
+    tmp_path: Path,
+) -> None:
+    forecasts = pd.DataFrame(
+        [
+            {
+                "model": "AAForecast",
+                "fold_idx": 0,
+                "cutoff": "2024-02-04",
+                "train_end_ds": "2024-02-04",
+                "unique_id": "target",
+                "ds": "2024-02-11",
+                "horizon_step": 1,
+                "y": 15.0,
+                "y_hat": 14.5,
+                "aaforecast_context_artifact": "aa_forecast/context/missing.csv",
+            }
+        ]
+    )
+    fold_root = tmp_path / "summary" / "folds" / "fold_000"
+    fold_root.mkdir(parents=True)
+
+    with pytest.raises(FileNotFoundError, match="AAForecast context artifact"):
+        runtime._write_summary_fold_plot(
+            tmp_path,
+            fold_root,
+            forecasts,
+            ["AAForecast"],
+            fold_idx=0,
+        )
 
 
 def test_plot_last_fold_overlay_uses_single_panel_without_aaforecast_context(

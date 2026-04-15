@@ -715,6 +715,36 @@ def _compute_metrics(actual: pd.Series, predicted: pd.Series) -> dict[str, float
     }
 
 
+def _maybe_post_predict_fold(
+    loaded: LoadedConfig,
+    job: JobConfig,
+    *,
+    target_predictions: pd.DataFrame,
+    train_df: pd.DataFrame,
+    transformed_train_df: pd.DataFrame,
+    future_df: pd.DataFrame,
+    fitted_model: Any | None,
+    run_root: Path | None,
+) -> pd.DataFrame:
+    """Call the active stage plugin's ``post_predict_fold`` if it exists."""
+    stage_result = get_active_stage_plugin(loaded.config)
+    if stage_result is None:
+        return target_predictions
+    plugin, _ = stage_result
+    post_predict = getattr(plugin, "post_predict_fold", None)
+    if not callable(post_predict):
+        return target_predictions
+    return post_predict(
+        loaded, job,
+        target_predictions=target_predictions,
+        train_df=train_df,
+        transformed_train_df=transformed_train_df,
+        future_df=future_df,
+        fitted_model=fitted_model,
+        run_root=run_root,
+    )
+
+
 def _fit_and_predict_fold(
     loaded: LoadedConfig,
     job: JobConfig,
@@ -788,6 +818,15 @@ def _fit_and_predict_fold(
             prediction_col=job.model,
             diff_context=diff_context,
         )
+        target_predictions = _maybe_post_predict_fold(
+            loaded, job,
+            target_predictions=target_predictions,
+            train_df=train_df,
+            transformed_train_df=transformed_train_df,
+            future_df=future_df,
+            fitted_model=None,
+            run_root=run_root,
+        )
         target_actuals = future_df[target_col].reset_index(drop=True)
         train_end_ds = pd.to_datetime(train_df[dt_col].iloc[-1])
         return target_predictions, target_actuals, train_end_ds, train_df, curve_source
@@ -834,6 +873,15 @@ def _fit_and_predict_fold(
         target_predictions,
         prediction_col=pred_col,
         diff_context=diff_context,
+    )
+    target_predictions = _maybe_post_predict_fold(
+        loaded, job,
+        target_predictions=target_predictions,
+        train_df=train_df,
+        transformed_train_df=transformed_train_df,
+        future_df=future_df,
+        fitted_model=nf,
+        run_root=run_root,
     )
     target_actuals = future_df[target_col].reset_index(drop=True)
     train_end_ds = pd.to_datetime(train_df[dt_col].iloc[-1])
@@ -1785,12 +1833,21 @@ def _normalize_summary_window_frame(
         raise ValueError(f"{frame_name} contains invalid fold_idx values")
     normalized["fold_idx"] = normalized["fold_idx"].astype(int)
 
-    normalized["normalized_cutoff"] = normalized["cutoff"].map(
-        _normalize_summary_timestamp
-    )
+    try:
+        normalized["normalized_cutoff"] = normalized["cutoff"].map(
+            _normalize_summary_timestamp
+        )
+    except Exception as exc:
+        raise ValueError(f"{frame_name} contains invalid cutoff values") from exc
     if normalized["normalized_cutoff"].isna().any():
         raise ValueError(f"{frame_name} contains invalid cutoff values")
     return normalized
+
+
+def _normalize_summary_metrics_frame(metrics_frame: pd.DataFrame) -> pd.DataFrame:
+    return _normalize_summary_window_frame(
+        metrics_frame, frame_name="summary metrics"
+    )
 
 
 def _build_leaderboard(metrics_frame: pd.DataFrame) -> pd.DataFrame:
@@ -1887,6 +1944,8 @@ def _write_summary_results_csv(forecasts: pd.DataFrame, output_path: Path) -> Pa
     result_frame = forecasts.copy()
     if "_summary_source_root" in result_frame.columns:
         result_frame = result_frame.drop(columns=["_summary_source_root"])
+    if "normalized_cutoff" in result_frame.columns:
+        result_frame = result_frame.drop(columns=["normalized_cutoff"])
     sort_columns = [
         column
         for column in ("model", "fold_idx", "cutoff", "ds", "horizon_step")
@@ -1902,6 +1961,38 @@ def _write_summary_results_csv(forecasts: pd.DataFrame, output_path: Path) -> Pa
     ]
     result_frame = result_frame[front_columns + remaining_columns]
     result_frame.to_csv(output_path, index=False)
+    return output_path
+
+
+def _write_summary_metrics_csv(metrics: pd.DataFrame, output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    metric_frame = metrics.copy()
+    if "normalized_cutoff" in metric_frame.columns:
+        metric_frame = metric_frame.drop(columns=["normalized_cutoff"])
+    ordered_columns = [
+        "model",
+        "fold_idx",
+        "cutoff",
+        "MAE",
+        "MSE",
+        "RMSE",
+        "MAPE",
+        "NRMSE",
+        "R2",
+    ]
+    sort_columns = [
+        column for column in ("model", "fold_idx", "cutoff") if column in metric_frame.columns
+    ]
+    if sort_columns:
+        metric_frame = metric_frame.sort_values(sort_columns, kind="stable").reset_index(
+            drop=True
+        )
+    front_columns = [column for column in ordered_columns if column in metric_frame.columns]
+    remaining_columns = [
+        column for column in metric_frame.columns if column not in front_columns
+    ]
+    metric_frame = metric_frame[front_columns + remaining_columns]
+    metric_frame.to_csv(output_path, index=False)
     return output_path
 
 
@@ -1947,6 +2038,88 @@ def _build_summary_plot_bundle(
         )
         plot_paths[slug] = str(plot_path)
     return plot_paths
+
+
+def _summary_fold_dir(summary_dir: Path, fold_idx: int) -> Path:
+    return summary_dir / "folds" / f"fold_{fold_idx:03d}"
+
+
+def _write_summary_fold_plot(
+    run_root: Path,
+    fold_root: Path,
+    fold_forecasts: pd.DataFrame,
+    selected_models: list[str],
+    *,
+    fold_idx: int,
+) -> Path:
+    plot_path = fold_root / "plot.png"
+    _plot_last_fold_overlay(
+        fold_forecasts,
+        selected_models,
+        plot_path,
+        title=f"Fold {fold_idx:03d} predictions (all models)",
+        run_root=run_root,
+    )
+    return plot_path
+
+
+def _write_per_fold_summary_bundles(
+    run_root: Path,
+    summary_dir: Path,
+    leaderboard: pd.DataFrame,
+    metrics_frame: pd.DataFrame,
+    forecasts: pd.DataFrame,
+) -> Path | None:
+    if forecasts.empty:
+        return None
+    normalized_forecasts = _normalize_summary_window_frame(
+        forecasts, frame_name="summary forecasts"
+    )
+    normalized_metrics = _normalize_summary_metrics_frame(metrics_frame)
+    forecast_fold_indices = sorted(normalized_forecasts["fold_idx"].unique().tolist())
+    metric_fold_indices = sorted(normalized_metrics["fold_idx"].unique().tolist())
+    if forecast_fold_indices != metric_fold_indices:
+        raise ValueError(
+            "summary per-fold bundle generation requires matching forecast/metric fold coverage"
+        )
+
+    folds_root = summary_dir / "folds"
+    folds_root.mkdir(parents=True, exist_ok=True)
+    leaderboard_models = leaderboard["model"].tolist() if "model" in leaderboard.columns else []
+    for fold_idx in forecast_fold_indices:
+        fold_root = _summary_fold_dir(summary_dir, fold_idx)
+        fold_root.mkdir(parents=True, exist_ok=True)
+        fold_forecasts = normalized_forecasts[
+            normalized_forecasts["fold_idx"] == fold_idx
+        ].copy()
+        fold_metrics = normalized_metrics[
+            normalized_metrics["fold_idx"] == fold_idx
+        ].copy()
+        if fold_forecasts.empty:
+            raise ValueError(
+                f"summary per-fold bundle generation requires forecast rows for fold {fold_idx}"
+            )
+        if fold_metrics.empty:
+            raise ValueError(
+                f"summary per-fold bundle generation requires metric rows for fold {fold_idx}"
+            )
+        _write_summary_results_csv(fold_forecasts, fold_root / "predictions.csv")
+        _write_summary_metrics_csv(fold_metrics, fold_root / "metrics.csv")
+        fold_model_set = set(fold_forecasts["model"].tolist())
+        ordered_models = [model for model in leaderboard_models if model in fold_model_set]
+        ordered_models.extend(
+            model
+            for model in dict.fromkeys(fold_forecasts["model"].tolist())
+            if model not in set(ordered_models)
+        )
+        _write_summary_fold_plot(
+            run_root,
+            fold_root,
+            fold_forecasts,
+            ordered_models,
+            fold_idx=fold_idx,
+        )
+    return folds_root
 
 
 def _write_summary_bundle(
@@ -2496,6 +2669,15 @@ def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
             title_prefix="Last fold predictions",
         )
     )
+    fold_bundles_root = _write_per_fold_summary_bundles(
+        run_root,
+        summary_dir,
+        leaderboard,
+        metrics,
+        forecasts,
+    )
+    if fold_bundles_root is not None:
+        plot_paths["fold_bundles_root"] = str(fold_bundles_root)
     return plot_paths
 
 
