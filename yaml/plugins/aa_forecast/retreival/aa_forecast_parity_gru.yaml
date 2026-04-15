@@ -1,6 +1,6 @@
 aa_forecast:
   model: gru
-  tune_training: true
+  tune_training: false
   lowess_frac: 0.35
   lowess_delta: 0.01
   uncertainty:

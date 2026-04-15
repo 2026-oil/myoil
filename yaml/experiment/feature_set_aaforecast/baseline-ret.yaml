@@ -14,6 +14,7 @@ dataset:
   - Idx_OVX
   - Com_LMEX
   - Com_BloombergCommodity_BCOM
+  - Idx_DxyUSD
   futr_exog_cols: []
   static_exog_cols: []
 retrieval:
