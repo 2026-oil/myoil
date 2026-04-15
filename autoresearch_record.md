@@ -3696,3 +3696,10 @@
   - simply making the prototype increment bank start larger does not improve the active keep and instead weakens both horizons.
   - this suggests the remaining bottleneck is not an under-scaled increment-bank initialization.
 - 판단: SAFE FAILURE / REJECT 0.07 PROTOTYPE INCREMENT-BANK INIT SCALE
+
+## Iteration 2026-04-15 restore exact active keep after increment-bank init-scale regression
+- timestamp: 2026-04-15T17:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed increment-bank init-scale regression
+- restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
