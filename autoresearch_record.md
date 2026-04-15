@@ -2984,3 +2984,36 @@
 - experiment title: restore the exact active keep basis after recording the completed P1-only Informer routing regression
 - restored anchor commit: `cf2060d8` (`Restore the exact active keep after the memory-gain rejection`)
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 informer P1+P2 thin cross-variate bridge on the active keep
+- timestamp: 2026-04-15T14:xx:00+09:00
+- git branch: informer_test
+- experiment title: restart from the exact active keep basis, restore the upward STAR pair (`GPRD_THREAT`, `BS_Core_Index_A`), and add a one-block cross-variate bridge from `{GPRD_THREAT, BS_Core_Index_A, BS_Core_Index_C, Idx_OVX}` into the Informer target signal before the encoder
+- code/config basis:
+  - kept the active keep decoder/backbone path intact and did **not** promote extra channels into Informer `c_in`.
+  - added a thin one-block target bridge that reads name-selected STAR activity for the upward pair plus raw normalized non-STAR channels for `BS_Core_Index_C` and `Idx_OVX`, then applies a small gated residual to the target stream before the Informer encoder.
+  - extended the aa_forecast linked-config validator/search-space registry so the bridge knobs are accepted during validate-only.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py plugins/aa_forecast/config.py plugins/aa_forecast/search_space.py scripts/run_aaforesearch_3way_iter.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/baseline.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_p1p2_crossbridge_bundle1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_p1p2_crossbridge_bundle1`
+- run/artifact path: runs/iter_20260415_p1p2_crossbridge_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.2907 / 73.9099`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `72.8212 / 72.8057`
+- active keep comparison:
+  - current compliant keep AA-Informer = `75.9243 / 79.7528`
+  - P1+P2 delta vs keep = `-3.1031 / -6.9471`
+- 목표 체크:
+  - strict 3-way controls stayed valid: Brent target, final-fold horizon 2, retrieval disabled, no lineup expansion.
+  - the thin bridge improved materially over the failed P1-only routing probe, but AA-Informer still stayed below both AA-GRU and the baseline.
+  - AA-Informer again lost monotonicity (`y_hat2 <= y_hat1`), so P1+P2 is still a clear regression against the active keep.
+- 핵심 진단:
+  - keeping the target stream first-class and only injecting a small selected-context bridge is less destructive than direct signal-path promotion, but it still weakens the active keep’s current decoder-side transport enough to lose the bundle.
+  - on this basis, the current keep remains better than both the standalone routing parity probe and the thin pre-encoder bridge variant.
+- 판단: SAFE FAILURE / REJECT P1+P2 THIN CROSS-VARIATE BRIDGE

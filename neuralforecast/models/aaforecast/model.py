@@ -1011,6 +1011,49 @@ class InformerHorizonAwareHead(nn.Module):
         return final_output
 
 
+class InformerCrossVariateBridge(nn.Module):
+    def __init__(
+        self,
+        *,
+        signal_features: int,
+        context_features: int,
+        hidden_size: int,
+        num_layers: int,
+        dropout: float,
+    ) -> None:
+        super().__init__()
+        if signal_features <= 0:
+            raise ValueError("InformerCrossVariateBridge requires at least one signal feature")
+        if context_features <= 0:
+            raise ValueError("InformerCrossVariateBridge requires at least one context feature")
+        if num_layers not in (1, 2):
+            raise ValueError(
+                f"InformerCrossVariateBridge num_layers must be 1 or 2, got {num_layers}"
+            )
+        joined_features = signal_features + context_features
+        hidden_size = max(int(hidden_size), joined_features)
+        self.blocks = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.LayerNorm(joined_features),
+                    nn.Linear(joined_features, hidden_size),
+                    nn.GELU(),
+                    nn.Dropout(dropout),
+                    nn.Linear(hidden_size, signal_features),
+                )
+                for _ in range(num_layers)
+            ]
+        )
+        self.block_gates = nn.Parameter(torch.full((num_layers,), -2.0))
+
+    def forward(self, signal: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
+        bridged = signal
+        for gate, block in zip(self.block_gates, self.blocks):
+            residual = torch.tanh(block(torch.cat([bridged, context], dim=-1)))
+            bridged = bridged + (torch.sigmoid(gate) * residual)
+        return bridged
+
+
 class AAForecast(BaseModel):
     """AAForecast
 
@@ -1061,6 +1104,9 @@ class AAForecast(BaseModel):
         star_hist_exog_list=None,
         non_star_hist_exog_list=None,
         star_hist_exog_tail_modes=None,
+        informer_bridge_exog_list=None,
+        informer_bridge_hidden_size: int = 16,
+        informer_bridge_layers: int = 0,
         uncertainty_enabled: bool = False,
         uncertainty_dropout_candidates=None,
         uncertainty_sample_count: int = 5,
@@ -1165,6 +1211,9 @@ class AAForecast(BaseModel):
         self.star_hist_exog_list = tuple(star_hist_exog_list or ())
         self.non_star_hist_exog_list = tuple(non_star_hist_exog_list or ())
         self.star_hist_exog_tail_modes = tuple(star_hist_exog_tail_modes or ())
+        self.informer_bridge_exog_list = tuple(informer_bridge_exog_list or ())
+        self.informer_bridge_layers = int(informer_bridge_layers)
+        self.informer_bridge_hidden_size = int(informer_bridge_hidden_size)
         self.star_hist_exog_indices, self.non_star_hist_exog_indices = (
             self._resolve_hist_exog_groups()
         )
@@ -1174,6 +1223,28 @@ class AAForecast(BaseModel):
             self.non_star_policy_regime_indices,
         ) = self._resolve_non_star_regime_groups()
         self.target_token_indices = self._resolve_target_token_indices()
+        self.informer_bridge_sources = self._resolve_informer_bridge_sources()
+        if self.informer_bridge_layers and self.backbone != "informer":
+            raise ValueError(
+                "AAForecast informer_bridge_layers is only supported with backbone='informer'"
+            )
+        if self.informer_bridge_layers and self.exclude_insample_y:
+            raise ValueError(
+                "AAForecast informer bridge requires the target signal in the encoder input"
+            )
+        self.informer_cross_bridge = None
+        if self.backbone == "informer" and self.informer_bridge_layers:
+            if not self.informer_bridge_sources:
+                raise ValueError(
+                    "AAForecast informer bridge requires informer_bridge_exog_list to select at least one hist exog column"
+                )
+            self.informer_cross_bridge = InformerCrossVariateBridge(
+                signal_features=1,
+                context_features=len(self.informer_bridge_sources),
+                hidden_size=self.informer_bridge_hidden_size,
+                num_layers=self.informer_bridge_layers,
+                dropout=self.dropout,
+            )
 
         feature_size = (
             (0 if exclude_insample_y else 1)
@@ -1760,12 +1831,68 @@ class AAForecast(BaseModel):
         target_indices.extend(range(target_star_offset, target_star_offset + 4))
         return tuple(target_indices)
 
+    def _resolve_informer_bridge_sources(self) -> tuple[tuple[str, int], ...]:
+        if not self.informer_bridge_exog_list:
+            return ()
+        hist_names = set(self.hist_exog_list or ())
+        unknown = sorted(set(self.informer_bridge_exog_list).difference(hist_names))
+        if unknown:
+            raise ValueError(
+                "AAForecast informer_bridge_exog_list contains unknown hist exog column(s): "
+                + ", ".join(unknown)
+            )
+        star_lookup = {name: idx for idx, name in enumerate(self.star_hist_exog_list)}
+        non_star_lookup = {
+            name: idx for idx, name in enumerate(self.non_star_hist_exog_list)
+        }
+        sources: list[tuple[str, int]] = []
+        for name in self.informer_bridge_exog_list:
+            if name in star_lookup:
+                sources.append(("star_activity", star_lookup[name]))
+            elif name in non_star_lookup:
+                sources.append(("non_star_raw", non_star_lookup[name]))
+        return tuple(sources)
+
     @staticmethod
     def _select_hist_exog(hist_exog: torch.Tensor, indices: tuple[int, ...]) -> torch.Tensor | None:
         if not indices:
             return None
         index_tensor = torch.as_tensor(indices, device=hist_exog.device, dtype=torch.long)
         return torch.index_select(hist_exog, dim=2, index=index_tensor)
+
+    def _build_informer_bridge_context(
+        self,
+        *,
+        hist_exog: torch.Tensor | None,
+        star_payload: dict[str, torch.Tensor],
+        template: torch.Tensor,
+    ) -> torch.Tensor | None:
+        if not self.informer_bridge_sources:
+            return None
+        context_parts: list[torch.Tensor] = []
+        star_hist_activity = star_payload["star_hist_activity"].to(
+            device=template.device,
+            dtype=template.dtype,
+        )
+        non_star_hist_exog = self._select_hist_exog(hist_exog, self.non_star_hist_exog_indices)
+        if non_star_hist_exog is not None:
+            non_star_hist_exog = non_star_hist_exog.to(
+                device=template.device,
+                dtype=template.dtype,
+            )
+        for source_kind, source_idx in self.informer_bridge_sources:
+            if source_kind == "star_activity":
+                context_parts.append(star_hist_activity[..., source_idx : source_idx + 1])
+            elif source_kind == "non_star_raw":
+                if non_star_hist_exog is None:
+                    raise ValueError(
+                        "AAForecast informer bridge expected non-STAR hist exog inputs"
+                    )
+                context_parts.append(non_star_hist_exog[..., source_idx : source_idx + 1])
+            else:
+                raise ValueError(f"Unsupported informer bridge source kind: {source_kind}")
+        context = torch.cat(context_parts, dim=2)
+        return torch.nan_to_num(context, nan=0.0, posinf=10.0, neginf=-10.0)
 
     @staticmethod
     def _count_active_channels(
@@ -2664,6 +2791,17 @@ class AAForecast(BaseModel):
                     star_payload["star_hist_residual"],
                 ]
             )
+        if self.backbone == "informer" and self.informer_cross_bridge is not None:
+            bridge_context = self._build_informer_bridge_context(
+                hist_exog=hist_exog,
+                star_payload=star_payload,
+                template=insample_y,
+            )
+            if bridge_context is not None:
+                encoder_parts[0] = self.informer_cross_bridge(
+                    encoder_parts[0].to(dtype=insample_y.dtype),
+                    bridge_context,
+                )
         encoder_input = torch.cat(encoder_parts, dim=2)
 
         backbone_states = self.encoder(encoder_input)

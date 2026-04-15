@@ -61,6 +61,9 @@ AA_FORECAST_STAGE_ONLY_PARAM_REGISTRY = {
         "dropout": _probability(),
         "linear_hidden_size": _positive_int(low=1, high=8192),
         "factor": _positive_int(low=1, high=64),
+        "informer_bridge_exog_list": {"type": "string_list"},
+        "informer_bridge_hidden_size": _positive_int(low=1, high=1024),
+        "informer_bridge_layers": {"type": "categorical", "choices": [0, 1, 2]},
     },
     "itransformer": {
         **_AA_COMMON_PARAM_REGISTRY,
