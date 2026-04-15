@@ -14,19 +14,19 @@
 
 공통 target series:
 
-\[
+$$
 y = [100, 101, 102, 120, 132, 126, 107, 110, 121, 132]
-\]
+$$
 
 공통 toy exogenous 예시:
 
-\[
+$$
 GPRD\_THREAT = [10, 12, 13, 14, 15, 14, 12, 14, 30, 35]
-\]
+$$
 
-\[
+$$
 BS\_Core\_Index\_A = [0.1, 0.1, 0.2, 0.3, 0.4, 0.3, 0.2, 0.3, 1.4, 1.6]
-\]
+$$
 
 toy default:
 - `L = 4`
@@ -42,45 +42,45 @@ toy default:
 
 | 기호 | 의미 |
 |---|---|
-| \(L\) | input window length |
-| \(H\) | forecast horizon |
-| \(Q\) | 현재 query window |
-| \(W^{(i)}\) | 과거 candidate window |
-| \(a^{(i)}\) | candidate 마지막 anchor 값 |
-| \(r_h^{(i)}\) | candidate의 h-step future return |
-| \(w_i\) | softmax로 얻은 neighbor weight |
-| \(\hat y_h^{base}\) | retrieval 이전 base prediction |
-| \(\hat y_h^{mem}\) | retrieval memory prediction |
-| \(\hat y_h^{final}\) | 최종 blended prediction |
-| \(\lambda_h\) | horizon별 blend weight |
+| $L$ | input window length |
+| $H$ | forecast horizon |
+| $Q$ | 현재 query window |
+| $W^{(i)}$ | 과거 candidate window |
+| $a^{(i)}$ | candidate 마지막 anchor 값 |
+| $r_h^{(i)}$ | candidate의 h-step future return |
+| $w_i$ | softmax로 얻은 neighbor weight |
+| $\hat y_h^{base}$ | retrieval 이전 base prediction |
+| $\hat y_h^{mem}$ | retrieval memory prediction |
+| $\hat y_h^{final}$ | 최종 blended prediction |
+| $\lambda_h$ | horizon별 blend weight |
 
 ## sliding window 수식
 
 현재 query window:
 
-\[
+$$
 Q = [y_{T-L+1}, \dots, y_T]
-\]
+$$
 
 과거 candidate window:
 
-\[
+$$
 W^{(i)} = [y_{i-L+1}, \dots, y_i]
-\]
+$$
 
 candidate anchor:
 
-\[
+$$
 a^{(i)} = y_i
-\]
+$$
 
 ## future return 수식
 
-candidate 뒤의 미래값이 \(y^{(i)}_{future, h}\) 일 때:
+candidate 뒤의 미래값이 $y^{(i)}_{future, h}$ 일 때:
 
-\[
+$$
 r_h^{(i)} = \frac{y^{(i)}_{future,h} - a^{(i)}}{\max(|a^{(i)}|, \epsilon)}
-\]
+$$
 
 이 수식은 standalone retrieval (`plugins/retrieval/runtime.py`) 과 AA retrieval (`plugins/aa_forecast/runtime.py`) 모두의 핵심 공통 구조입니다.
 
@@ -88,47 +88,47 @@ r_h^{(i)} = \frac{y^{(i)}_{future,h} - a^{(i)}}{\max(|a^{(i)}|, \epsilon)}
 
 neighbor 가중 평균 수익률:
 
-\[
+$$
 \bar r_h = \sum_i w_i r_h^{(i)}
-\]
+$$
 
 memory prediction:
 
-\[
+$$
 \hat y_h^{mem} = y_T + |y_T| \bar r_h
-\]
+$$
 
 ## blend 수식
 
 최종 예측:
 
-\[
+$$
 \hat y_h^{final} = (1-\lambda_h) \hat y_h^{base} + \lambda_h \hat y_h^{mem}
-\]
+$$
 
-standalone retrieval과 AA retrieval 모두 `blend_floor`, `blend_max`, `mean_similarity`, `uncertainty_scale` 을 이용해 \(\lambda_h\) 를 만듭니다.
+standalone retrieval과 AA retrieval 모두 `blend_floor`, `blend_max`, `mean_similarity`, `uncertainty_scale` 을 이용해 $\lambda_h$ 를 만듭니다.
 
 ## event / shape signature 직관
 
 ### shape signature
 
-\[
+$$
 s_{shape} = normalize(y_{t-L+1:t})
-\]
+$$
 
 ### event signature
 
 STAR 이후 payload에서 대략 다음 조각을 normalize 해서 사용합니다.
 
-\[
+$$
 s_{event} = normalize([critical\_mask, count\_active, channel\_activity, activity\_sums, activity\_max])
-\]
+$$
 
 ### event score
 
-\[
+$$
 event\_score = \sum count\_active\_channels + \sum |channel\_activity|
-\]
+$$
 
 > [!NOTE]
 > Provenance: `repo default`
@@ -152,24 +152,24 @@ event\_score = \sum count\_active\_channels + \sum |channel\_activity|
 ## toy에서 자주 재사용하는 candidate 예시
 
 query:
-\[
+$$
 Q = [107, 110, 121, 132]
-\]
+$$
 
 candidate A:
-\[
+$$
 A = [100, 101, 102, 120]
-\]
+$$
 
 candidate B:
-\[
+$$
 B = [132, 126, 107, 110]
-\]
+$$
 
 candidate B의 future return:
-\[
+$$
 [(121-110)/110, (132-110)/110] = [0.10, 0.20]
-\]
+$$
 
 이 예시는 retrieval가 “과거의 상대 수익률 경로를 현재 scale에 다시 입힌다”는 직관을 설명할 때 반복 사용합니다.
 

@@ -57,109 +57,109 @@ baseline 대비 추가되는 것은 아래뿐입니다.
 ## 6. Core formulas used in this variant
 
 future return:
-\[
+$$
 r_h^{(i)} = \frac{y^{(i)}_{future,h} - a^{(i)}}{\max(|a^{(i)}|, \epsilon)}
-\]
+$$
 
 memory prediction:
-\[
+$$
 \hat y_h^{mem} = y_T + |y_T|\bar r_h
-\]
+$$
 
 final blend:
-\[
+$$
 \hat y_h^{final} = (1-\lambda_h)\hat y_h^{base} + \lambda_h\hat y_h^{mem}
-\]
+$$
 
 현재 detail config는 `use_uncertainty_gate: true`, `blend_max: 1.0` 이므로 toy에서는:
-\[
+$$
 \lambda_h = mean\_similarity \times uncertainty\_scale_h
-\]
+$$
 처럼 읽으면 됩니다.
 
 ## 7. Toy sample setup
 
 공통 toy target series:
-\[
+$$
 [100, 101, 102, 120, 132, 126, 107, 110, 121, 132]
-\]
+$$
 
 query:
-\[
+$$
 Q = [107, 110, 121, 132]
-\]
+$$
 
 candidate B:
-\[
+$$
 B = [132, 126, 107, 110]
-\]
+$$
 
 candidate B의 future return:
-\[
+$$
 [(121-110)/110, (132-110)/110] = [0.10, 0.20]
-\]
+$$
 
 ## 8. Step-by-step hand calculation
 
 ### Step 1 — current last value (literal)
 
-\[
+$$
 y_T = 132
-\]
+$$
 
 ### Step 2 — retrieved return path (literal)
 
 `top_k=1` 이므로 weighted return도 그대로:
-\[
+$$
 \bar r = [0.10, 0.20]
-\]
+$$
 
 ### Step 3 — memory prediction (literal)
 
-\[
+$$
 \hat y^{mem} = 132 + 132 \times [0.10, 0.20] = [145.2, 158.4]
-\]
+$$
 
 ### Step 4 — uncertainty gate (literal)
 
 toy에서 uncertainty scale을
-\[
+$$
 [0.5, 1.0]
-\]
+$$
 
 그리고 mean similarity를
-\[
+$$
 0.887
-\]
+$$
 
 로 두면,
-\[
+$$
 \lambda = [0.4435, 0.887]
-\]
+$$
 
 ### Step 5 — GRU subsection (schematic base + literal blend)
 
 baseline GRU base output을 teaching용으로
-\[
+$$
 \hat y^{GRU}_{base} = [136, 138]
-\]
+$$
 
 라고 두면,
-\[
+$$
 \hat y^{GRU}_{final} = [140.0802, 156.0948]
-\]
+$$
 
 ### Step 6 — Informer subsection (schematic base + literal blend)
 
 baseline Informer base output을 teaching용으로
-\[
+$$
 \hat y^{Informer}_{base} = [135, 140]
-\]
+$$
 
 라고 두면,
-\[
+$$
 \hat y^{Informer}_{final} = [139.5237, 156.3208]
-\]
+$$
 
 ## 9. Interpretation
 

@@ -48,21 +48,21 @@ baseline 대비 바뀌는 것은 다음입니다.
 ## 6. Core formulas used in this variant
 
 LOWESS trend를 toy에선
-\[
+$$
 T_t = LOWESS(y_t)
-\]
+$$
 
 로 표기합니다.
 
 toy residual:
-\[
+$$
 residual_t = y_t - T_t
-\]
+$$
 
 toy anomaly mask는 설명용으로
-\[
+$$
 critical_t = \mathbb{1}(|residual_t| > threshold)
-\]
+$$
 
 처럼 둡니다.
 
@@ -74,26 +74,26 @@ critical_t = \mathbb{1}(|residual_t| > threshold)
 ## 7. Toy sample setup
 
 target toy window:
-\[
+$$
 [100, 101, 102, 120]
-\]
+$$
 
 toy trend를 단순화해서
-\[
+$$
 T = [100, 101, 102, 103]
-\]
+$$
 
 라고 두면,
-\[
+$$
 residual = [0, 0, 0, 17]
-\]
+$$
 
 즉 마지막 시점이 event처럼 보입니다.
 
 toy exogenous `GPRD_THREAT` 는
-\[
+$$
 [10, 12, 14, 35]
-\]
+$$
 
 로 두고 마지막 시점 burst를 강조합니다.
 
@@ -124,9 +124,9 @@ AA-GRU 입력은 개념적으로 아래 조각의 concat 입니다.
 ### Step 4 — GRU learned layer (schematic)
 
 그 다음부터는 GRU backbone이 learned recurrence로 미래 2-step을 만듭니다. teaching용으로 base output을
-\[
+$$
 \hat y^{AA-GRU}_{base} = [140, 146]
-\]
+$$
 
 라고 적을 수 있지만, 이 숫자 자체는 literal 재현값이 아니라 schematic placeholder 입니다.
 
