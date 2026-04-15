@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,21 @@ from plugins.retrieval.runtime import (
 )
 
 from . import config as _cfg
+
+_RETRIEVAL_OVERRIDE_KEYS = {
+    "top_k",
+    "recency_gap_steps",
+    "event_score_threshold",
+    "min_similarity",
+    "temperature",
+    "blend_floor",
+    "blend_max",
+    "use_uncertainty_gate",
+    "use_shape_key",
+    "use_event_key",
+    "event_score_log_bonus_alpha",
+    "event_score_log_bonus_cap",
+}
 
 
 def _stage_root(run_root: Path) -> Path:
@@ -88,6 +104,60 @@ def _aa_params_override(loaded: Any) -> dict[str, Any]:
         "uncertainty_sample_count": stage_cfg.uncertainty.sample_count,
         "scaler_type": scaler_type,
     }
+
+
+def _split_runtime_overrides(
+    params_override: dict[str, Any] | None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    if not params_override:
+        return {}, {}
+    model_override = dict(params_override)
+    retrieval_override = {
+        key: model_override.pop(key)
+        for key in tuple(model_override.keys())
+        if key in _RETRIEVAL_OVERRIDE_KEYS
+    }
+    return model_override, retrieval_override
+
+
+def _apply_retrieval_overrides(
+    retrieval_cfg: _cfg.AAForecastRetrievalConfig,
+    retrieval_override: dict[str, Any],
+) -> _cfg.AAForecastRetrievalConfig:
+    if not retrieval_override:
+        return retrieval_cfg
+    patched = replace(retrieval_cfg, **retrieval_override)
+    if patched.top_k <= 0:
+        raise ValueError("aa_forecast retrieval top_k override must be positive")
+    if patched.recency_gap_steps < 0:
+        raise ValueError("aa_forecast retrieval recency_gap_steps override must be >= 0")
+    if patched.event_score_threshold < 0:
+        raise ValueError(
+            "aa_forecast retrieval event_score_threshold override must be >= 0"
+        )
+    if not (0.0 <= patched.min_similarity <= 1.0):
+        raise ValueError(
+            "aa_forecast retrieval min_similarity override must satisfy 0 <= value <= 1"
+        )
+    if patched.temperature <= 0:
+        raise ValueError("aa_forecast retrieval temperature override must be > 0")
+    if not (0.0 <= patched.blend_floor <= 1.0):
+        raise ValueError(
+            "aa_forecast retrieval blend_floor override must satisfy 0 <= value <= 1"
+        )
+    if not (0.0 <= patched.blend_max <= 1.0):
+        raise ValueError(
+            "aa_forecast retrieval blend_max override must satisfy 0 <= value <= 1"
+        )
+    if patched.blend_floor > patched.blend_max:
+        raise ValueError(
+            "aa_forecast retrieval override must satisfy blend_floor <= blend_max"
+        )
+    if patched.enabled and not (patched.use_shape_key or patched.use_event_key):
+        raise ValueError(
+            "aa_forecast retrieval override requires use_shape_key or use_event_key"
+        )
+    return patched
 
 
 def _extract_target_prediction_frame(
@@ -1297,9 +1367,12 @@ def predict_aa_forecast_fold(
         job,
         dt_col,
     )
+    model_trial_override, retrieval_trial_override = _split_runtime_overrides(
+        params_override
+    )
     merged_params_override = {
         **_aa_params_override(effective_config),
-        **(params_override or {}),
+        **model_trial_override,
     }
     stage_cfg = loaded.config.stage_plugin_config
     model = build_model(
@@ -1422,7 +1495,9 @@ def predict_aa_forecast_fold(
                 target_actuals=future_df[target_col].reset_index(drop=True),
             )
     retrieval_artifact = None
-    retrieval_cfg = stage_cfg.retrieval
+    retrieval_cfg = _apply_retrieval_overrides(
+        stage_cfg.retrieval, retrieval_trial_override
+    )
     if retrieval_cfg.enabled:
         if uncertainty_summary is None:
             raise ValueError(

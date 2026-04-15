@@ -1,5 +1,5 @@
 aa_forecast:
-  model: vanillatransformer
+  model: timexer
   tune_training: false
   lowess_frac: 0.35
   lowess_delta: 0.01
@@ -8,10 +8,12 @@ aa_forecast:
     sample_count: 50
   model_params:
     hidden_size: 128
-    n_head: 8
-    encoder_layers: 2
+    n_heads: 8
+    e_layers: 2
     dropout: 0.1
-    linear_hidden_size: 256
+    d_ff: 256
+    patch_len: 8
+    use_norm: true
     decoder_hidden_size: 128
     decoder_layers: 4
     season_length: 4
@@ -23,10 +25,5 @@ aa_forecast:
     two_sided: []
   thresh: 3.5
   retrieval:
-    enabled: false
-    top_k: 5
-    recency_gap_steps: 8
-    event_score_threshold: 1.0
-    min_similarity: 0.55
-    blend_max: 0.25
-    use_uncertainty_gate: true
+    enabled: true
+    config_path: ../retrieval/baseline_retrieval.yaml

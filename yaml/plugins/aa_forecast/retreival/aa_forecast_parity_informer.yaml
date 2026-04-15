@@ -20,6 +20,7 @@ aa_forecast:
     upward:
     - GPRD_THREAT
     - BS_Core_Index_A
+    - BS_Core_Index_C
     two_sided: []
   thresh: 3.5
   retrieval:

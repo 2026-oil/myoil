@@ -1,11 +1,11 @@
 aa_forecast:
   model: gru
-  tune_training: false
-  lowess_frac: 0.6
+  tune_training: true
+  lowess_frac: 0.35
   lowess_delta: 0.01
   uncertainty:
     enabled: true
-    sample_count: 5
+    sample_count: 50
   model_params: {}
   star_anomaly_tails:
     upward:
@@ -15,10 +15,5 @@ aa_forecast:
     two_sided: []
   thresh: 3.5
   retrieval:
-    enabled: false
-    top_k: 5
-    recency_gap_steps: 8
-    event_score_threshold: 1.0
-    min_similarity: 0.55
-    blend_max: 0.25
-    use_uncertainty_gate: true
+    enabled: true
+    config_path: ../retrieval/baseline_retrieval.yaml

@@ -1639,3 +1639,55 @@ def test_build_retrieval_signature_rejects_missing_star_payload_keys() -> None:
             transformed_window_df=pd.DataFrame({"target": [1.0, 2.0]}),
             target_col="target",
         )
+
+
+def test_split_runtime_overrides_moves_retrieval_keys_out_of_model_payload() -> None:
+    model_override, retrieval_override = aa_runtime._split_runtime_overrides(
+        {
+            "season_length": 4,
+            "top_k": 3,
+            "min_similarity": 0.8,
+            "use_shape_key": False,
+        }
+    )
+
+    assert model_override == {"season_length": 4}
+    assert retrieval_override == {
+        "top_k": 3,
+        "min_similarity": 0.8,
+        "use_shape_key": False,
+    }
+
+
+def test_apply_retrieval_overrides_updates_runtime_retrieval_config() -> None:
+    base = aa_runtime._cfg.AAForecastRetrievalConfig(enabled=True)
+    patched = aa_runtime._apply_retrieval_overrides(
+        base,
+        {
+            "top_k": 1,
+            "event_score_threshold": 400.0,
+            "recency_gap_steps": 8,
+            "min_similarity": 0.7,
+            "temperature": 0.1,
+            "blend_floor": 0.0,
+            "blend_max": 1.0,
+            "use_uncertainty_gate": True,
+            "use_shape_key": False,
+            "use_event_key": True,
+            "event_score_log_bonus_alpha": 0.15,
+            "event_score_log_bonus_cap": 0.1,
+        },
+    )
+
+    assert patched.top_k == 1
+    assert patched.event_score_threshold == pytest.approx(400.0)
+    assert patched.recency_gap_steps == 8
+    assert patched.min_similarity == pytest.approx(0.7)
+    assert patched.temperature == pytest.approx(0.1)
+    assert patched.blend_floor == pytest.approx(0.0)
+    assert patched.blend_max == pytest.approx(1.0)
+    assert patched.use_uncertainty_gate is True
+    assert patched.use_shape_key is False
+    assert patched.use_event_key is True
+    assert patched.event_score_log_bonus_alpha == pytest.approx(0.15)
+    assert patched.event_score_log_bonus_cap == pytest.approx(0.1)
