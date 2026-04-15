@@ -73,38 +73,49 @@ critical_t = \mathbb{1}(|residual_t| > threshold)
 
 ## 7. Toy sample setup
 
-target toy window:
+toy에서는 전체 10개 시점 시리즈의 마지막 4개를 query window로 사용합니다.
+
+target query window (인덱스 6~9):
 \[
-[100, 101, 102, 120]
+Q_{target} = [107, 110, 121, 132]
 \]
 
-toy trend를 단순화해서
+exogenous query windows:
 \[
-T = [100, 101, 102, 103]
+GPRD\_THREAT = [12, 14, 30, 35]
+\]
+\[
+BS\_Core\_Index\_A = [0.2, 0.3, 1.4, 1.6]
 \]
 
-라고 두면,
-\[
-residual = [0, 0, 0, 17]
-\]
+toy trend 단순화:
 
-즉 마지막 시점이 event처럼 보입니다.
+| 채널 | window | toy trend \(T\) | residual \(= window - T\) |
+|---|---|---|---|
+| target | \([107, 110, 121, 132]\) | \([107, 110, 113, 116]\) | \([0, 0, 8, 16]\) |
+| GPRD_THREAT | \([12, 14, 30, 35]\) | \([12, 14, 16, 18]\) | \([0, 0, 14, 17]\) |
+| BS_Core_Index_A | \([0.2, 0.3, 1.4, 1.6]\) | \([0.2, 0.3, 0.4, 0.5]\) | \([0.0, 0.0, 1.0, 1.1]\) |
 
-toy exogenous `GPRD_THREAT` 는
-\[
-[10, 12, 14, 35]
-\]
+toy threshold (각 채널):
 
-로 두고 마지막 시점 burst를 강조합니다.
+| 채널 | threshold (toy) |
+|---|---|
+| target | 10 |
+| GPRD_THREAT | 10 |
+| BS_Core_Index_A | 0.5 |
 
 ## 8. Step-by-step hand calculation
 
 ### Step 1 — target STAR block (literal)
 
-trend / residual toy 계산:
-- trend: `[100, 101, 102, 103]`
-- residual: `[0, 0, 0, 17]`
-- critical mask: `[0, 0, 0, 1]`
+target query window \([107, 110, 121, 132]\) 에 대한 toy trend/residual 계산:
+
+- **trend**: \(T = [107, 110, 113, 116]\) (linear, step=3)
+- **residual**: \(residual = [0, 0, 8, 16]\)
+- threshold = 10
+- **critical mask**: \([0, 0, 0, 1]\) (마지막 시점만 \(|16| > 10\) 이므로 critical)
+
+event burst: 마지막 시점의 residual 16은 trend를 크게 벗어나는 상승 사건입니다.
 
 ### Step 2 — exogenous STAR block (literal)
 
@@ -121,14 +132,27 @@ AA-GRU 입력은 개념적으로 아래 조각의 concat 입니다.
 
 즉 baseline보다 “event-aware feature block” 이 추가됩니다.
 
-### Step 4 — GRU learned layer (schematic)
+### Step 4 — event score 요약 (literal)
 
-그 다음부터는 GRU backbone이 learned recurrence로 미래 2-step을 만듭니다. teaching용으로 base output을
+위 STAR decomposition 결과로부터 event_score 를 구합니다:
+
+- count_active (마지막 시점): target(1) + GPRD(1) + BS(1) = 3
+- channel_activity 합산 (마지막 시점): |16| + |17| + |1.1| = 34.1
+
+\[
+event\_score \approx 3 + 34.1 = 37.1 \quad \text{(toy placeholder)}
+\]
+
+이 event_score 가 threshold를 넘으면 AA retrieval이 event_key 로 neighbor를 찾습니다 (retrieval이 on 일 때).
+
+### Step 5 — GRU learned layer (schematic)
+
+10채널 event-aware 텐서를 GRU가 받아 learned recurrence 로 미래 2-step을 만듭니다. teaching용 base output:
 \[
 \hat y^{AA-GRU}_{base} = [140, 146]
 \]
 
-라고 적을 수 있지만, 이 숫자 자체는 literal 재현값이 아니라 schematic placeholder 입니다.
+이 숫자 자체는 literal 재현값이 아니라 schematic placeholder 입니다. baseline GRU \([136, 138]\) 보다 높은 이유는 event-aware feature 덕분에 모델이 더 강한 상승 신호를 포착했기 때문이라고 직관적으로 이해합니다.
 
 ## 9. Interpretation
 

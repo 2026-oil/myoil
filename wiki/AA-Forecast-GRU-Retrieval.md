@@ -65,61 +65,97 @@ retrieval memory output을
 
 ## 7. Toy sample setup
 
-query:
+query window (인덱스 6~9):
 \[
-Q = [107, 110, 121, 132]
+Q = [107, 110, 121, 132], \quad y_T = 132
 \]
 
-retrieved return path:
-\[
-\bar r = [0.10, 0.20]
-\]
+**AA branch** (target STAR decomposition):
 
-memory prediction:
-\[
-\hat y^{mem} = [145.2, 158.4]
-\]
+| 채널 | window | toy trend | residual | critical mask |
+|---|---|---|---|---|
+| target | \([107,110,121,132]\) | \([107,110,113,116]\) | \([0,0,8,16]\) | \([0,0,0,1]\) |
+| GPRD_THREAT | \([12,14,30,35]\) | \([12,14,16,18]\) | \([0,0,14,17]\) | \([0,0,1,1]\) |
+
+**retrieval branch** (candidate B 선택됨, `top_k=1`):
+
+| 항목 | 값 |
+|---|---|
+| anchor \(a^{(B)}\) | 110 |
+| future | \([121, 132]\) |
+| \(r_1^{(B)}\) | \(11/110 = 0.10\) |
+| \(r_2^{(B)}\) | \(22/110 = 0.20\) |
+| \(y_T\) | 132 |
 
 AA-GRU schematic base output:
 \[
 \hat y^{AA-GRU, base} = [140, 146]
 \]
 
-uncertainty-gated blend weight:
-\[
-\lambda = [0.4435, 0.887]
-\]
+uncertainty gate:
+- mean_similarity = 0.887 (teaching placeholder)
+- uncertainty_scale = \([0.5, 1.0]\)
+- \(\lambda = [0.4435, 0.887]\)
 
 ## 8. Step-by-step hand calculation
 
-### Step 1 — AA decomposition (literal structure)
+### Step 1 — AA decomposition (literal)
 
-AA-GRU 페이지와 동일하게 target / star exog decomposition을 통해 event-aware feature block을 만듭니다.
+target: residual \([0, 0, 8, 16]\), threshold=10, critical mask \([0,0,0,1]\)
+
+GPRD_THREAT: residual \([0, 0, 14, 17]\), threshold=10, critical mask \([0,0,1,1]\)
+
+10채널 event-aware feature block → GRU encoder 입력.
 
 ### Step 2 — AA base prediction (schematic)
 
-teaching용으로
+GRU가 event-aware 10채널 텐서를 처리하여 base prediction을 만듭니다. teaching용 placeholder:
 \[
 \hat y^{AA-GRU, base} = [140, 146]
 \]
 
-라고 둡니다.
+(baseline GRU \([136,138]\) 보다 높은 이유: STAR event 신호가 상승 예측을 강화)
 
 ### Step 3 — retrieval memory prediction (literal)
 
+candidate B의 future return \(\bar r = [0.10, 0.20]\) 을 현재 scale에 입힙니다:
+
 \[
-\hat y^{mem} = [145.2, 158.4]
+\hat y_1^{mem} = 132 + |132| \times 0.10 = 132 + 13.2 = 145.2
+\]
+\[
+\hat y_2^{mem} = 132 + |132| \times 0.20 = 132 + 26.4 = 158.4
+\]
+\[
+\hat y^{mem} = [145.2,\ 158.4]
 \]
 
-### Step 4 — final blend (literal)
+### Step 4 — blend weight 계산 (literal)
 
 \[
-\hat y^{AA-GRU}_{final} = (1-\lambda) \hat y^{AA-GRU, base} + \lambda \hat y^{mem}
+\lambda_1 = \min(0.887 \times 0.5,\ 1.0) = 0.4435
+\]
+\[
+\lambda_2 = \min(0.887 \times 1.0,\ 1.0) = 0.887
 \]
 
-따라서
+### Step 5 — final blend 산술 (literal)
+
+h=1:
 \[
-\hat y^{AA-GRU}_{final} = [142.3062, 156.9988]
+\hat y_1^{final} = (1 - 0.4435) \times 140 + 0.4435 \times 145.2
+= 0.5565 \times 140 + 0.4435 \times 145.2
+= 77.91 + 64.3962 = 142.3062
+\]
+
+h=2:
+\[
+\hat y_2^{final} = (1 - 0.887) \times 146 + 0.887 \times 158.4
+= 0.113 \times 146 + 0.887 \times 158.4
+= 16.498 + 140.5008 = 156.9988
+\]
+\[
+\hat y^{AA-GRU}_{final} = [142.3062,\ 156.9988]
 \]
 
 ## 9. Interpretation

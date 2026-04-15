@@ -79,86 +79,138 @@ final blend:
 
 ## 7. Toy sample setup
 
-공통 toy target series:
+공통 toy target series (10개 시점):
+
 \[
-[100, 101, 102, 120, 132, 126, 107, 110, 121, 132]
+y = [100, 101, 102, 120, 132, 126, 107, 110, 121, 132]
 \]
 
-query:
+query (마지막 4개, 인덱스 6~9):
 \[
-Q = [107, 110, 121, 132]
+Q = [107, 110, 121, 132], \quad y_T = 132
 \]
 
-candidate B:
+**candidate bank** (두 개의 주요 후보):
+
+| candidate | anchor \(i\) | window \(y[i-3:i+1]\) | \(a^{(i)}\) | future \(y[i+1:i+3]\) |
+|---|---|---|---|---|
+| A | 3 | \([100, 101, 102, 120]\) | 120 | \([132, 126]\) |
+| B | 7 | \([132, 126, 107, 110]\) | 110 | \([121, 132]\) |
+
+candidate A의 future return:
 \[
-B = [132, 126, 107, 110]
+r_1^{(A)} = \frac{132-120}{120} = 0.10, \quad r_2^{(A)} = \frac{126-120}{120} = 0.05
 \]
 
 candidate B의 future return:
 \[
-[(121-110)/110, (132-110)/110] = [0.10, 0.20]
+r_1^{(B)} = \frac{121-110}{110} = 0.10, \quad r_2^{(B)} = \frac{132-110}{110} = 0.20
 \]
+
+`use_event_key=true` 기반 similarity 계산 결과, **candidate B가 top-1 neighbor** 로 선택됩니다 (\(sim \approx 0.887\), teaching placeholder).
+
+> [!NOTE]
+> Provenance: `toy simplification`
+>
+> `use_shape_key=false` 이므로 형태 유사도가 아니라 event signature 유사도로 neighbor를 뽑습니다. toy에서는 candidate B의 event_key 유사도가 더 높다고 가정합니다.
 
 ## 8. Step-by-step hand calculation
 
-### Step 1 — current last value (literal)
+### Step 1 — query window 및 candidate 확인 (literal)
 
+마지막 4개로 query window를 자릅니다:
 \[
-y_T = 132
+Q = [107, 110, 121, 132], \quad y_T = 132
 \]
 
-### Step 2 — retrieved return path (literal)
+candidate bank에서 event_key 기반 top-1 neighbor를 선택합니다. toy에서 **candidate B** 가 선택됩니다:
+- anchor: \(a^{(B)} = 110\)
+- future: \([121, 132]\)
 
-`top_k=1` 이므로 weighted return도 그대로:
+### Step 2 — future return 계산 (literal)
+
+candidate B의 anchor \(a^{(B)} = 110\) 과 future \([121, 132]\) 로부터:
+
+\[
+r_1^{(B)} = \frac{121 - 110}{\max(|110|, \epsilon)} = \frac{11}{110} = 0.10
+\]
+\[
+r_2^{(B)} = \frac{132 - 110}{\max(|110|, \epsilon)} = \frac{22}{110} = 0.20
+\]
+
+`top_k=1` 이므로 softmax weight = 1.0, 가중 평균 수익률 = return 그대로:
 \[
 \bar r = [0.10, 0.20]
 \]
 
 ### Step 3 — memory prediction (literal)
 
+현재 scale \(y_T = 132\) 에 수익률 경로를 입힙니다:
+
 \[
-\hat y^{mem} = 132 + 132 \times [0.10, 0.20] = [145.2, 158.4]
+\hat y_1^{mem} = 132 + |132| \times 0.10 = 132 + 13.2 = 145.2
+\]
+\[
+\hat y_2^{mem} = 132 + |132| \times 0.20 = 132 + 26.4 = 158.4
+\]
+\[
+\hat y^{mem} = [145.2,\ 158.4]
 \]
 
-### Step 4 — uncertainty gate (literal)
+### Step 4 — blend weight (uncertainty gate) 계산 (literal)
 
-toy에서 uncertainty scale을
+toy에서 다음 값을 가정합니다:
+- `mean_similarity` = 0.887 (neighbor similarity 평균, teaching placeholder)
+- `uncertainty_scale` = \([0.5, 1.0]\) (horizon별 불확실성 스케일, teaching placeholder)
+
+\(\lambda_h = \min(mean\_similarity \times uncertainty\_scale_h,\ blend\_max)\) 이므로:
+
 \[
-[0.5, 1.0]
+\lambda_1 = \min(0.887 \times 0.5,\ 1.0) = \min(0.4435,\ 1.0) = 0.4435
+\]
+\[
+\lambda_2 = \min(0.887 \times 1.0,\ 1.0) = \min(0.887,\ 1.0) = 0.887
+\]
+\[
+\lambda = [0.4435,\ 0.887]
 \]
 
-그리고 mean similarity를
-\[
-0.887
-\]
+### Step 5 — GRU subsection: blend 계산 (schematic base + literal blend)
 
-로 두면,
-\[
-\lambda = [0.4435, 0.887]
-\]
-
-### Step 5 — GRU subsection (schematic base + literal blend)
-
-baseline GRU base output을 teaching용으로
+baseline GRU base output (schematic placeholder):
 \[
 \hat y^{GRU}_{base} = [136, 138]
 \]
 
-라고 두면,
+최종 blend:
 \[
-\hat y^{GRU}_{final} = [140.0802, 156.0948]
+\hat y_1^{GRU, final} = (1 - 0.4435) \times 136 + 0.4435 \times 145.2 = 0.5565 \times 136 + 0.4435 \times 145.2
+= 75.684 + 64.3962 = 140.0802
+\]
+\[
+\hat y_2^{GRU, final} = (1 - 0.887) \times 138 + 0.887 \times 158.4 = 0.113 \times 138 + 0.887 \times 158.4
+= 15.594 + 140.5008 = 156.0948
+\]
+\[
+\hat y^{GRU}_{final} = [140.0802,\ 156.0948]
 \]
 
-### Step 6 — Informer subsection (schematic base + literal blend)
+### Step 6 — Informer subsection: blend 계산 (schematic base + literal blend)
 
-baseline Informer base output을 teaching용으로
+baseline Informer base output (schematic placeholder):
 \[
 \hat y^{Informer}_{base} = [135, 140]
 \]
 
-라고 두면,
+최종 blend:
 \[
-\hat y^{Informer}_{final} = [139.5237, 156.3208]
+\hat y_1^{Informer, final} = 0.5565 \times 135 + 0.4435 \times 145.2 = 75.1275 + 64.3962 = 139.5237
+\]
+\[
+\hat y_2^{Informer, final} = 0.113 \times 140 + 0.887 \times 158.4 = 15.82 + 140.5008 = 156.3208
+\]
+\[
+\hat y^{Informer}_{final} = [139.5237,\ 156.3208]
 \]
 
 ## 9. Interpretation

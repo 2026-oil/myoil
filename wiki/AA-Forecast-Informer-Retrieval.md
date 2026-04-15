@@ -49,44 +49,95 @@ AA-Informer 대비 새로 추가되는 단계는 retrieval memory branch 뿐입�
 
 ## 7. Toy sample setup
 
-- memory prediction:
+query window (인덱스 6~9):
 \[
-[145.2, 158.4]
-\]
-- AA-Informer schematic base output:
-\[
-[141, 149]
-\]
-- blend weight:
-\[
-[0.4435, 0.887]
+Q = [107, 110, 121, 132], \quad y_T = 132
 \]
 
-## 8. Step-by-step hand calculation
+**AA branch** (target STAR decomposition, AA-Informer 페이지와 동일):
 
-### Step 1 — AA base path (schematic)
+| 채널 | window | toy trend | residual | critical mask |
+|---|---|---|---|---|
+| target | \([107,110,121,132]\) | \([107,110,113,116]\) | \([0,0,8,16]\) | \([0,0,0,1]\) |
+| GPRD_THREAT | \([12,14,30,35]\) | \([12,14,16,18]\) | \([0,0,14,17]\) | \([0,0,1,1]\) |
+| BS_Core_Index_A | \([0.2,0.3,1.4,1.6]\) | \([0.2,0.3,0.4,0.5]\) | \([0,0,1.0,1.1]\) | \([0,0,1,1]\) |
 
-teaching용 AA-Informer base output:
+**retrieval branch** (AA-GRU+Retrieval 과 동일한 candidate B):
+
+| 항목 | 값 |
+|---|---|
+| anchor \(a^{(B)}\) | 110 |
+| \(r^{(B)}\) | \([0.10, 0.20]\) |
+| memory prediction | \([145.2, 158.4]\) |
+
+AA-Informer schematic base output:
 \[
 \hat y^{AA-Informer, base} = [141, 149]
 \]
 
+blend weight:
+\[
+\lambda = [0.4435, 0.887]
+\]
+
+## 8. Step-by-step hand calculation
+
+### Step 1 — AA decomposition + Informer base prediction (schematic)
+
+STAR decomposition: target critical mask \([0,0,0,1]\), GPRD critical mask \([0,0,1,1]\).
+
+10채널 event-aware 텐서 → Informer encoder (2 layers, ProbSparse attention) → decoder (season_length=4).
+
+Teaching용 AA-Informer base output:
+\[
+\hat y^{AA-Informer, base} = [141, 149]
+\]
+
+(AA-GRU의 \([140,146]\) 보다 h=2에서 더 높은 이유: Informer attention이 GPRD 두 시점 burst를 더 강하게 반영)
+
 ### Step 2 — retrieval memory path (literal)
 
-\[
-\hat y^{mem} = [145.2, 158.4]
-\]
-
-### Step 3 — final blend (literal)
+candidate B anchor \(a^{(B)}=110\), future \([121, 132]\):
 
 \[
-\hat y^{AA-Informer}_{final} = (1-\lambda) \hat y^{AA-Informer, base} + \lambda \hat y^{mem}
+\hat y_1^{mem} = 132 + 132 \times 0.10 = 145.2
+\]
+\[
+\hat y_2^{mem} = 132 + 132 \times 0.20 = 158.4
+\]
+\[
+\hat y^{mem} = [145.2,\ 158.4]
 \]
 
-즉
+### Step 3 — blend weight 계산 (literal)
+
 \[
-\hat y^{AA-Informer}_{final} = [142.8627, 157.3378]
+\lambda_1 = \min(0.887 \times 0.5,\ 1.0) = 0.4435
 \]
+\[
+\lambda_2 = \min(0.887 \times 1.0,\ 1.0) = 0.887
+\]
+
+### Step 4 — final blend 산술 (literal)
+
+h=1:
+\[
+\hat y_1^{final} = (1 - 0.4435) \times 141 + 0.4435 \times 145.2
+= 0.5565 \times 141 + 0.4435 \times 145.2
+= 78.4665 + 64.3962 = 142.8627
+\]
+
+h=2:
+\[
+\hat y_2^{final} = (1 - 0.887) \times 149 + 0.887 \times 158.4
+= 0.113 \times 149 + 0.887 \times 158.4
+= 16.837 + 140.5008 = 157.3378
+\]
+\[
+\hat y^{AA-Informer}_{final} = [142.8627,\ 157.3378]
+\]
+
+**비교**: GRU+Retrieval의 \([142.3062, 156.9988]\) 대비 h=1에서 0.5562, h=2에서 0.3390 더 높습니다. AA base prediction의 차이(141 vs 140, 149 vs 146)가 최종 blend에 그대로 반영됩니다.
 
 ## 9. Interpretation
 
