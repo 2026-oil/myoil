@@ -21,4 +21,4 @@ training_search:
   enabled: false
 aa_forecast:
   enabled: true
-  config_path: yaml/plugins/aa_forecast/aa_forecast_parity_gru.yaml
+  config_path: yaml/plugins/aa_forecast/aa_forecast_gru.yaml
