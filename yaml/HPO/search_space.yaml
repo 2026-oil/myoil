@@ -1496,11 +1496,11 @@ aa_forecast_training:
     input_size:
       type: categorical
       choices:
+      - 12
       - 24
       - 48
       - 64
       - 96
-      - 128
     batch_size:
       type: categorical
       choices:
@@ -1526,11 +1526,11 @@ aa_forecast_training:
       input_size:
         type: categorical
         choices:
+        - 12
         - 24
         - 48
         - 64
         - 96
-        - 128
       batch_size:
         type: categorical
         choices:
