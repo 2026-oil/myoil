@@ -3703,3 +3703,30 @@
 - experiment title: restore the exact active keep basis after recording the completed increment-bank init-scale regression
 - restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 exact active keep rerun 3 (new frontier)
+- timestamp: 2026-04-15T17:xx:00+09:00
+- git branch: informer_test
+- experiment title: bounded repeatability rerun on the exact active keep at `14c6c967` with no code changes
+- code/config basis:
+  - exact active keep commit `14c6c967`
+  - no model/YAML/test changes before the run; this iteration only re-ran the strict 3-way bundle to harvest variance on the current best-compliant basis
+- verification bundle:
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_sqrtconf_rerun3`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_sqrtconf_rerun3`
+- run/artifact path: runs/iter_20260415_proto_sqrtconf_rerun3
+- final-fold result:
+  - baseline (plain_informer) = `72.8921 / 73.1591`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `76.1977 / 80.1065`
+- previous active keep comparison:
+  - previous compliant keep AA-Informer = `76.1788 / 80.0079`
+  - rerun3 delta vs previous keep = `+0.0189 / +0.0986`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - this rerun improves both AA-Informer horizons over the prior active keep while preserving every current guardrail.
+- 핵심 진단:
+  - the current sqrt-confidence prototype keep still has meaningful upside in the stochastic tail; this rerun recovers a slightly stronger h2 without any code change.
+  - the code basis remains unchanged, but the best recorded compliant frontier moves upward to this run artifact.
+- 판단: NEW ACTIVE COMPLIANT KEEP (RERUN)
