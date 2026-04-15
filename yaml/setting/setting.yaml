@@ -9,7 +9,7 @@ training:
   windows_batch_size: 64
   inference_windows_batch_size: 64
   max_steps: 800
-  val_size: 16
+  val_size: 2
   scaler_type: robust
   val_check_steps: 4
   min_steps_before_early_stop: 200

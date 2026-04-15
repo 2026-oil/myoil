@@ -12,7 +12,6 @@ dataset:
   - BS_Core_Index_B
   - BS_Core_Index_C
   - Idx_OVX
-  - Com_Oil_Spread
   - Com_LMEX
   - Com_BloombergCommodity_BCOM
   futr_exog_cols: []
