@@ -3330,3 +3330,35 @@
 - experiment title: restore the exact active keep basis after recording the completed 0.11-scale regression
 - restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 prototype memory-signal scaling on the active keep
+- timestamp: 2026-04-15T16:xx:00+09:00
+- git branch: informer_test
+- experiment title: modulate the bounded prototype memory residual by a mild bounded `memory_signal` scale while keeping the new inner `sqrt(confidence)` damping and outer family-level top1 confidence unchanged on top of the exact active keep
+- hypothesis:
+  - after scalar-only amplitude lifts failed to help h2, the next narrow non-duplicate idea was to let the residual scale respond slightly to the existing retrieval-inspired `memory_signal` rather than raising it uniformly.
+  - the modulation stayed mild and bounded: `1 + 0.1 * tanh(memory_signal)`.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/baseline.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_memsignal_scale_restore_gru_bundle1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_memsignal_scale_restore_gru_bundle1`
+- run/artifact path: runs/iter_20260415_proto_memsignal_scale_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.1953 / 73.5914`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.8590 / 79.1411`
+- active keep comparison:
+  - current compliant keep AA-Informer = `76.1788 / 80.0079`
+  - memory-signal-scale delta vs keep = `-0.3198 / -0.8668`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - both horizons regress below the active keep.
+- 핵심 진단:
+  - lightly boosting the prototype memory residual by `memory_signal` is safer than a uniform scale increase, but it still weakens both horizons relative to the active keep.
+  - the current keep already captures the useful amount of retrieval-inspired amplitude through confidence placement; adding direct `memory_signal` scaling on this residual is redundant noise.
+- 판단: SAFE FAILURE / REJECT MEMORY-SIGNAL-SCALED PROTOTYPE MEMORY RESIDUAL
