@@ -3167,3 +3167,10 @@
   - the inner memory-residual damping was the piece that needed relaxation; relaxing the outer family-level confidence too broadens the prototype family too much and gives back most of the new keep's gain.
   - the best verified basis is still the inner-sqrt / outer-top1 structure from commit `14c6c967`.
 - 판단: SAFE FAILURE / REJECT OUTER SQRT-CONFIDENCE DAMPING
+
+## Iteration 2026-04-15 restore exact active keep after outer sqrt-confidence regression
+- timestamp: 2026-04-15T15:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed outer sqrt-confidence regression
+- restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
