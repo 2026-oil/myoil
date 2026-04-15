@@ -3517,3 +3517,10 @@
   - a partial family-gate relaxation is safer than fully bypassing the gate, but the active keep still benefits from keeping the prototype memory residual under the full family-gated compromise.
   - this suggests the gate pressure on the residual is not the main remaining h2 blocker.
 - 판단: SAFE FAILURE / REJECT SQRT-FAMILY-GATE PROTOTYPE MEMORY RESIDUAL
+
+## Iteration 2026-04-15 restore exact active keep after sqrt-family-gate regression
+- timestamp: 2026-04-15T16:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed sqrt-family-gate regression
+- restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
