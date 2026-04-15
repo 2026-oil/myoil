@@ -236,7 +236,7 @@ class Informer(BaseModel):
 
     # Class attributes
     EXOGENOUS_FUTR = True
-    EXOGENOUS_HIST = False
+    EXOGENOUS_HIST = True
     EXOGENOUS_STAT = False
     MULTIVARIATE = False
     RECURRENT = False
@@ -321,7 +321,10 @@ class Informer(BaseModel):
 
         self.c_out = self.loss.outputsize_multiplier
         self.output_attention = False
-        self.enc_in = 1
+
+        # Encoder-only historical exogenous support:
+        # encoder value channels = y(1) + historical exogenous channels.
+        self.enc_in = 1 + self.hist_exog_size
         self.dec_in = 1
 
         # Embedding
@@ -406,6 +409,7 @@ class Informer(BaseModel):
     def forward(self, windows_batch):
         # Parse windows_batch
         insample_y = windows_batch["insample_y"]
+        hist_exog = windows_batch["hist_exog"]
         futr_exog = windows_batch["futr_exog"]
 
         if self.futr_exog_size > 0:
@@ -418,7 +422,16 @@ class Informer(BaseModel):
         x_dec = torch.zeros(size=(len(insample_y), self.h, 1), device=insample_y.device)
         x_dec = torch.cat([insample_y[:, -self.label_len :, :], x_dec], dim=1)
 
-        enc_out = self.enc_embedding(insample_y, x_mark_enc)
+        if self.hist_exog_size > 0:
+            if hist_exog is None:
+                raise ValueError(
+                    "hist_exog_size > 0 but windows_batch['hist_exog'] is None"
+                )
+            x_enc = torch.cat([insample_y, hist_exog], dim=2)
+        else:
+            x_enc = insample_y
+
+        enc_out = self.enc_embedding(x_enc, x_mark_enc)
         enc_out, _ = self.encoder(enc_out, attn_mask=None)  # attns visualization
 
         dec_out = self.dec_embedding(x_dec, x_mark_dec)
