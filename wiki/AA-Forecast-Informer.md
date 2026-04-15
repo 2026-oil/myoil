@@ -63,44 +63,49 @@ critical_t = \mathbb{1}(|residual_t| > threshold)
 
 ## 7. Toy sample setup
 
-target toy window:
-\[
-[100, 101, 102, 120]
-\]
+AA-GRU 페이지와 동일한 query window를 사용합니다 (마지막 4개, 인덱스 6~9):
 
-toy trend:
-\[
-[100, 101, 102, 103]
-\]
+| 채널 | window | toy trend \(T\) | residual | toy threshold | critical mask |
+|---|---|---|---|---|---|
+| target | \([107,110,121,132]\) | \([107,110,113,116]\) | \([0,0,8,16]\) | 10 | \([0,0,0,1]\) |
+| GPRD_THREAT | \([12,14,30,35]\) | \([12,14,16,18]\) | \([0,0,14,17]\) | 10 | \([0,0,1,1]\) |
+| BS_Core_Index_A | \([0.2,0.3,1.4,1.6]\) | \([0.2,0.3,0.4,0.5]\) | \([0,0,1.0,1.1]\) | 0.5 | \([0,0,1,1]\) |
 
-residual:
-\[
-[0, 0, 0, 17]
-\]
-
-critical mask:
-\[
-[0, 0, 0, 1]
-\]
+decomposition 결과는 GRU 페이지와 동일하며, 달라지는 것은 이 feature block을 처리하는 backbone 입니다.
 
 ## 8. Step-by-step hand calculation
 
 ### Step 1 — decomposition (literal)
 
-AA-GRU 페이지와 동일하게 target / star exog 쪽 event burst를 잡습니다.
+target 채널:
+- residual 마지막 값 = 16, threshold=10 → critical=1
+- event burst 감지: 마지막 시점 target 급등
+
+GPRD_THREAT 채널:
+- residual 마지막 두 값 = [14, 17], threshold=10 → critical=[1,1]
+- geopolitical event burst 감지
+
+BS_Core_Index_A 채널:
+- residual 마지막 두 값 = [1.0, 1.1], threshold=0.5 → critical=[1,1]
+- 리스크 지수 급등 감지
 
 ### Step 2 — feature composition (literal structure)
 
 Informer도 baseline보다 더 많은 event-aware feature 조각을 입력받습니다. 즉 “무엇을 보고 예측하는가” 는 baseline Informer보다 richer 합니다.
 
-### Step 3 — Informer learned layer (schematic)
+### Step 3 — Informer encoder-decoder (schematic)
 
-이후에는 attention 기반 backbone이 future 2-step을 계산합니다. teaching용 schematic output을
+10채널 텐서가 Informer encoder를 통과합니다:
+
+1. **encoder** (2 layers): ProbSparse self-attention으로 전체 L=4 시점의 컨텍스트 벡터를 만듭니다
+2. **decoder**: `season_length=4` seasonal prior + encoder 컨텍스트로 H=2 예측 생성
+
+teaching용 base output:
 \[
 \hat y^{AA-Informer}_{base} = [141, 149]
 \]
 
-라고 둘 수 있습니다.
+GRU의 \([140, 146]\) 과 다소 다른 이유는 attention 기반 backbone이 long-range 패턴을 다르게 가중하기 때문입니다.
 
 > [!NOTE]
 > Provenance: `toy simplification`

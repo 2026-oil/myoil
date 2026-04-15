@@ -70,12 +70,25 @@ Q = [y_{T-L+1}, \dots, y_T]
 
 ## 7. Toy sample setup
 
-공통 toy target series:
-\[
-[100, 101, 102, 120, 132, 126, 107, 110, 121, 132]
-\]
+공통 toy target series (10개 시점, 0-기반 인덱스):
 
-toy에서는 `L=4`, `H=2` 로 둡니다.
+| 인덱스 \(t\) | \(y_t\) | \(GPRD\_THREAT_t\) | \(BS\_Core\_Index\_A_t\) |
+|---|---|---|---|
+| 0 | 100 | 10 | 0.1 |
+| 1 | 101 | 12 | 0.1 |
+| 2 | 102 | 13 | 0.2 |
+| 3 | 120 | 14 | 0.3 |
+| 4 | 132 | 15 | 0.4 |
+| 5 | 126 | 14 | 0.3 |
+| 6 | 107 | 12 | 0.2 |
+| 7 | 110 | 14 | 0.3 |
+| 8 | 121 | 30 | 1.4 |
+| 9 | 132 | 35 | 1.6 |
+
+\(T = 9\) (마지막 인덱스), `L=4`, `H=2` 이므로:
+- query 시작 인덱스 = \(T - L + 1 = 6\)
+- target query window = \(y[6:10] = [107, 110, 121, 132]\)
+- 예측 대상 시점 = \(y[10], y[11]\) (미관측)
 
 ## 8. Step-by-step hand calculation
 
@@ -84,10 +97,21 @@ toy에서는 `L=4`, `H=2` 로 둡니다.
 마지막 4개 값만 취하면:
 
 \[
-Q = [107, 110, 121, 132]
+Q = y[6:10] = [107, 110, 121, 132]
 \]
 
 이건 GRU와 Informer가 **공통으로 받는 baseline input window** 입니다.
+
+동시에 같은 기간의 exogenous window 도 잘립니다:
+
+\[
+X_{GPRD} = GPRD\_THREAT[6:10] = [12, 14, 30, 35]
+\]
+\[
+X_{BS} = BS\_Core\_Index\_A[6:10] = [0.2, 0.3, 1.4, 1.6]
+\]
+
+각 모델은 \((Q, X_{GPRD}, X_{BS})\) 세 채널을 묶은 입력 텐서를 받습니다.
 
 ### Step 2 — retrieval / AA branch 확인 (literal)
 
@@ -113,17 +137,32 @@ Q = [107, 110, 121, 132]
 
 ### Step 4 — Informer subsection (schematic)
 
-같은 query window를 Informer도 받지만, attention 기반 backbone이기 때문에 다른 learned output을 낼 수 있습니다.
+같은 \((Q, X)\) 를 Informer도 받지만, attention 기반 encoder-decoder 구조이기 때문에 다른 learned output을 낼 수 있습니다.
 
-예시적 표기:
+구조 (schematic):
+- encoder: \(E = Attention(Q, X)\) — 전체 입력 컨텍스트를 압축
+- decoder: \(D = CrossAttention(decoder\_query, E)\) — H-step 예측 생성
 
+teaching용 placeholder:
 \[
 \hat y^{Informer}_{base} = [135, 140]
 \]
 
-### Step 5 — 해석
+GRU와 Informer 출력이 다른 이유는 두 backbone의 归纳 bias(편향)가 다르기 때문입니다. GRU는 sequential memory를, Informer는 global attention 패턴을 포착합니다.
 
-이 baseline 페이지에서 literal로 손으로 다시 계산할 수 있는 부분은 **입력 window와 실행 분기** 까지입니다. 최종 forecast 숫자는 두 backbone의 learned function이 담당합니다.
+### Step 5 — fan-out 구조 확인 (literal)
+
+하나의 command에서 두 모델이 동일한 입력을 받아 각자 예측을 냅니다.
+
+\[
+\text{동일 입력:} \quad (Q, X_{GPRD}, X_{BS}) = ([107,110,121,132],\ [12,14,30,35],\ [0.2,0.3,1.4,1.6])
+\]
+
+\[
+\xrightarrow{fan\text{-}out} \begin{cases} GRU \to \hat y^{GRU}_{base} = [136, 138] \\ Informer \to \hat y^{Informer}_{base} = [135, 140] \end{cases}
+\]
+
+이 baseline 페이지에서 literal로 손으로 다시 계산할 수 있는 부분은 **입력 window 정의와 exogenous 슬라이싱** 까지입니다. 최종 forecast 숫자는 두 backbone의 learned function이 담당합니다.
 
 ## 9. Interpretation
 
