@@ -3245,3 +3245,10 @@
   - moving the inner damping stronger than `sqrt(confidence)` gives back part of the keep's gain, though not as badly as full top1 confidence.
   - this tightens the bracket further: the useful inner-confidence region is centered near `sqrt(confidence)`, with both 0.75 and 0.25 already worse.
 - 판단: SAFE FAILURE / REJECT 0.75-CONFIDENCE PROTOTYPE MEMORY-CURVE DAMPING
+
+## Iteration 2026-04-15 restore exact active keep after 0.75-confidence regression
+- timestamp: 2026-04-15T16:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed 0.75-confidence regression
+- restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
