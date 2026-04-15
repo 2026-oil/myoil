@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass, replace
-import fcntl
 import json
 import os
 from pathlib import Path
@@ -27,6 +26,8 @@ from app_config import (
 )
 from runtime_support.manifest import (
     build_manifest,
+    _atomic_write_text,
+    _manifest_lock,
     write_manifest,
 )
 from runtime_support.forecast_models import (
@@ -433,60 +434,61 @@ def _update_manifest_artifacts(
     training_study_summary_path: Path | None = None,
     training_range_source: str | None = None,
 ) -> None:
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    for job in manifest.get("jobs", []):
-        if job.get("model") == job_name:
-            if study_catalog_path is not None:
-                job["optuna_study_catalog_path"] = str(study_catalog_path)
-            if selected_study_index is not None:
-                job["selected_study_index"] = int(selected_study_index)
-            if canonical_projection_study_index is not None:
-                job["canonical_projection_study_index"] = int(
-                    canonical_projection_study_index
-                )
-            if model_best_params_path is not None:
-                job["model_best_params_path"] = str(model_best_params_path)
-            if model_study_summary_path is not None:
-                job["model_optuna_study_summary_path"] = str(model_study_summary_path)
-            if training_best_params_path is not None:
-                job["training_best_params_path"] = str(training_best_params_path)
-            if training_study_summary_path is not None:
-                job["training_optuna_study_summary_path"] = str(
-                    training_study_summary_path
-                )
-            if training_range_source is not None:
-                job["training_range_source"] = training_range_source
-            break
-    if study_catalog_path is not None:
-        manifest.setdefault("optuna", {})["study_catalog_path"] = str(
-            study_catalog_path
-        )
-    if selected_study_index is not None:
-        manifest.setdefault("optuna", {})["selected_study_index"] = int(
-            selected_study_index
-        )
-    if canonical_projection_study_index is not None:
-        manifest.setdefault("optuna", {})["canonical_projection_study_index"] = int(
-            canonical_projection_study_index
-        )
-    if training_best_params_path is not None:
-        manifest.setdefault("training_search", {})["best_params_path"] = str(
-            training_best_params_path
-        )
-    if training_study_summary_path is not None:
-        manifest.setdefault("training_search", {})["optuna_study_summary_path"] = str(
-            training_study_summary_path
-        )
-    if training_range_source is not None:
-        training_payload = manifest.setdefault("training_search", {})
-        training_payload.setdefault("training_range_source_by_job", {})[job_name] = (
-            training_range_source
-        )
-        if len(manifest.get("jobs", [])) == 1:
-            training_payload["training_range_source"] = training_range_source
-        else:
-            training_payload.pop("training_range_source", None)
-    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    with _manifest_lock(manifest_path):
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        for job in manifest.get("jobs", []):
+            if job.get("model") == job_name:
+                if study_catalog_path is not None:
+                    job["optuna_study_catalog_path"] = str(study_catalog_path)
+                if selected_study_index is not None:
+                    job["selected_study_index"] = int(selected_study_index)
+                if canonical_projection_study_index is not None:
+                    job["canonical_projection_study_index"] = int(
+                        canonical_projection_study_index
+                    )
+                if model_best_params_path is not None:
+                    job["model_best_params_path"] = str(model_best_params_path)
+                if model_study_summary_path is not None:
+                    job["model_optuna_study_summary_path"] = str(model_study_summary_path)
+                if training_best_params_path is not None:
+                    job["training_best_params_path"] = str(training_best_params_path)
+                if training_study_summary_path is not None:
+                    job["training_optuna_study_summary_path"] = str(
+                        training_study_summary_path
+                    )
+                if training_range_source is not None:
+                    job["training_range_source"] = training_range_source
+                break
+        if study_catalog_path is not None:
+            manifest.setdefault("optuna", {})["study_catalog_path"] = str(
+                study_catalog_path
+            )
+        if selected_study_index is not None:
+            manifest.setdefault("optuna", {})["selected_study_index"] = int(
+                selected_study_index
+            )
+        if canonical_projection_study_index is not None:
+            manifest.setdefault("optuna", {})["canonical_projection_study_index"] = int(
+                canonical_projection_study_index
+            )
+        if training_best_params_path is not None:
+            manifest.setdefault("training_search", {})["best_params_path"] = str(
+                training_best_params_path
+            )
+        if training_study_summary_path is not None:
+            manifest.setdefault("training_search", {})["optuna_study_summary_path"] = str(
+                training_study_summary_path
+            )
+        if training_range_source is not None:
+            training_payload = manifest.setdefault("training_search", {})
+            training_payload.setdefault("training_range_source_by_job", {})[job_name] = (
+                training_range_source
+            )
+            if len(manifest.get("jobs", [])) == 1:
+                training_payload["training_range_source"] = training_range_source
+            else:
+                training_payload.pop("training_range_source", None)
+        _atomic_write_text(manifest_path, json.dumps(manifest, indent=2))
 
 
 def _effective_config(
@@ -1174,6 +1176,10 @@ def _main_job_objective(
                 else loaded.search_space_payload["models"][job.model]
             ),
         )
+        candidate_params = _sanitize_aaforecast_trial_params(
+            model_name=job.model,
+            candidate_params=candidate_params,
+        )
         candidate_training_params = suggest_training_params(
             loaded.config.training_search.selected_search_params,
             trial,
@@ -1343,6 +1349,20 @@ def _main_job_objective(
     return objective
 
 
+def _sanitize_aaforecast_trial_params(
+    *, model_name: str, candidate_params: dict[str, Any]
+) -> dict[str, Any]:
+    if model_name != "AAForecast":
+        return candidate_params
+    use_shape_key = candidate_params.get("use_shape_key")
+    use_event_key = candidate_params.get("use_event_key")
+    if use_shape_key is False and use_event_key is False:
+        sanitized = dict(candidate_params)
+        sanitized["use_event_key"] = True
+        return sanitized
+    return candidate_params
+
+
 def _collect_main_tuning_result(
     study: optuna.Study,
     *,
@@ -1354,7 +1374,10 @@ def _collect_main_tuning_result(
     best_trial = _require_complete_best_trial(
         study, label=f"{job.model} main Optuna study"
     )
-    best_params = dict(best_trial.user_attrs["best_params"])
+    best_params = _normalize_legacy_best_params_for_replay(
+        job,
+        dict(best_trial.user_attrs["best_params"]),
+    )
     best_training_params = dict(best_trial.user_attrs["best_training_params"])
     summary = {
         **_trial_metrics_summary(study, objective_metric="mean_fold_mape"),
@@ -1376,6 +1399,17 @@ def _collect_main_tuning_result(
         "objective_stage": _objective_stage_label(loaded),
     }
     return best_params, best_training_params, summary
+
+
+def _normalize_legacy_best_params_for_replay(
+    job: JobConfig, best_params: dict[str, Any]
+) -> dict[str, Any]:
+    if job.model != "AAForecast" or "top_k" not in best_params:
+        return best_params
+    normalized = dict(best_params)
+    legacy_top_k = normalized.pop("top_k")
+    normalized.setdefault("thresh", legacy_top_k)
+    return normalized
 
 
 def _tune_main_job(

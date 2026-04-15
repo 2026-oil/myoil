@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
+import fcntl
 import json
+import os
 
 from app_config import (
     DEFAULT_ARTIFACT_SCHEMA_VERSION,
@@ -95,4 +98,27 @@ def build_manifest(
 
 def write_manifest(path: Path, manifest: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    payload = json.dumps(manifest, indent=2)
+    with _manifest_lock(path):
+        _atomic_write_text(path, payload)
+
+
+@contextmanager
+def _manifest_lock(path: Path) -> Iterator[None]:
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "w", encoding="utf-8") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+
+
+def _atomic_write_text(path: Path, payload: str) -> None:
+    temp_path = path.with_suffix(path.suffix + f".tmp.{os.getpid()}")
+    with open(temp_path, "w", encoding="utf-8") as handle:
+        handle.write(payload)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temp_path, path)
