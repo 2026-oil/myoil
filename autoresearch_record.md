@@ -3291,3 +3291,35 @@
 - experiment title: restore the exact active keep basis after recording the completed 0.12-scale regression
 - restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 prototype memory-curve 0.11 scale on the active keep
+- timestamp: 2026-04-15T16:xx:00+09:00
+- git branch: informer_test
+- experiment title: raise the bounded prototype memory residual scale from `0.10` to `0.11` while keeping the inner `sqrt(confidence)` damping and outer family-level top1 confidence unchanged on top of the exact active keep
+- hypothesis:
+  - the failed `0.12` scale probe suggested the lane might be near a local optimum rather than strictly under-scaled.
+  - the narrowest follow-up interpolation was therefore `0.11`, checking whether the best h2 point sits between the keep and the rejected 0.12 variant.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/baseline.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_memcurve011_restore_gru_bundle1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_memcurve011_restore_gru_bundle1`
+- run/artifact path: runs/iter_20260415_proto_memcurve011_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.2555 / 74.1468`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `76.2251 / 79.9680`
+- active keep comparison:
+  - current compliant keep AA-Informer = `76.1788 / 80.0079`
+  - 0.11-scale delta vs keep = `+0.0463 / -0.0399`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - h1 improves marginally, but the critical h2 still regresses below the active keep.
+- 핵심 진단:
+  - the active lane is very close to its local optimum on this scalar axis.
+  - moving from `0.10` to `0.11` is much less harmful than `0.12`, but it still does not beat the keep on the user-prioritized h2 target.
+- 판단: SAFE FAILURE / REJECT 0.11-SCALE PROTOTYPE MEMORY-CURVE
