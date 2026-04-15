@@ -3135,3 +3135,35 @@
   - `sqrt(confidence)` is the first narrow interpolation that improves the compliant keep rather than regressing below it.
   - h2 still misses the 15% band, so the next blocker remains absolute amplitude transport, but this becomes the strongest fully compliant keep so far.
 - 판단: NEW ACTIVE COMPLIANT KEEP
+
+## Iteration 2026-04-15 prototype outer sqrt-confidence damping on the active keep
+- timestamp: 2026-04-15T15:xx:00+09:00
+- git branch: informer_test
+- experiment title: extend the new sqrt-confidence keep by also replacing the prototype family's outer top1-confidence factor with `sqrt(confidence)` while keeping the inner residual on `sqrt(confidence)` as well
+- hypothesis:
+  - after the inner sqrt-confidence interpolation became the new keep, the next narrow question was whether the outer family-level confidence damping was also slightly over-strong.
+  - the smallest non-duplicate follow-up was to use the same `sqrt(confidence)` factor outside the family too, lowering the overall confidence exponent without changing selectors, gates, or bank contents.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/baseline.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_outersqrt_restore_gru_bundle1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_outersqrt_restore_gru_bundle1`
+- run/artifact path: runs/iter_20260415_proto_outersqrt_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.1691 / 77.9928`
+- active keep comparison:
+  - current compliant keep AA-Informer = `76.1788 / 80.0079`
+  - outer-sqrt delta vs keep = `-1.0097 / -2.0151`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - the bundle remains healthy, but both horizons regress below the new sqrt-confidence keep.
+- 핵심 진단:
+  - the inner memory-residual damping was the piece that needed relaxation; relaxing the outer family-level confidence too broadens the prototype family too much and gives back most of the new keep's gain.
+  - the best verified basis is still the inner-sqrt / outer-top1 structure from commit `14c6c967`.
+- 판단: SAFE FAILURE / REJECT OUTER SQRT-CONFIDENCE DAMPING
