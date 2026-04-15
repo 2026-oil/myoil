@@ -16,6 +16,18 @@ Source: `main.py:46-135`, `app_config.py:283-350`, `app_config.py:1619-1814`
 1. **[메인 실험 YAML 안전하게 작성하기](Authoring-a-Main-Experiment-YAML-Safely)**
 2. **[검증 절차와 주요 fail-fast 오류](Validation-Workflow-and-Common-Fail-Fast-Errors)**
 
+
+## AA-Forecast 손계산 패키지
+
+- **[AA-Forecast 손계산 패키지 허브](AA-Forecast-Hand-Calculation-Hub)**
+- **[AA-Forecast 공통 수식·표기·손계산 부록](AA-Forecast-Hand-Calculation-Appendix)**
+- **[AA-Forecast 베이스라인 (GRU / Informer)](AA-Forecast-Baseline-GRU-Informer)**
+- **[AA-Forecast 베이스라인 + Retrieval](AA-Forecast-Baseline-Retrieval)**
+- **[AA-Forecast + GRU](AA-Forecast-GRU)**
+- **[AA-Forecast + Informer](AA-Forecast-Informer)**
+- **[AA-Forecast + GRU + Retrieval](AA-Forecast-GRU-Retrieval)**
+- **[AA-Forecast + Informer + Retrieval](AA-Forecast-Informer-Retrieval)**
+
 ## 핵심 흐름 문서
 
 - **[main.py 실행 흐름](Execution-Flow-from-main.py)**

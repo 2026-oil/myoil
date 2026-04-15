@@ -12,3 +12,14 @@
 * [bs_preforcast plugin YAML 레퍼런스](YAML-Reference-bs_preforcast-plugin-YAML)
 * [jobs defaults 레퍼런스](YAML-Reference-jobs-defaults)
 * [HPO search space 레퍼런스](YAML-Reference-HPO-search-space)
+
+
+## AA-Forecast 손계산 패키지
+* [AA-Forecast 손계산 패키지 허브](AA-Forecast-Hand-Calculation-Hub)
+* [AA-Forecast 베이스라인 (GRU / Informer)](AA-Forecast-Baseline-GRU-Informer)
+* [AA-Forecast 베이스라인 + Retrieval](AA-Forecast-Baseline-Retrieval)
+* [AA-Forecast + GRU](AA-Forecast-GRU)
+* [AA-Forecast + Informer](AA-Forecast-Informer)
+* [AA-Forecast + GRU + Retrieval](AA-Forecast-GRU-Retrieval)
+* [AA-Forecast + Informer + Retrieval](AA-Forecast-Informer-Retrieval)
+* [AA-Forecast 공통 수식·표기·손계산 부록](AA-Forecast-Hand-Calculation-Appendix)
