@@ -2918,3 +2918,22 @@
 - git branch: informer_test
 - experiment title: restore the exact active keep basis after recording the completed prototype memory-curve gate rejection
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+
+## Iteration 2026-04-15 prototype memory-gain curve on the active keep
+- timestamp: 2026-04-15T12:xx:00+09:00
+- git branch: informer_test
+- experiment title: modulate the bounded prototype memory residual by prototype gain while keeping the soft selector unchanged on top of the exact active keep
+- run/artifact path: runs/iter_20260415_proto_memgaincurve_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `74.5028 / 76.3070`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - AA-GRU and AA-Informer keep `h2 > h1`, but the competing non-AA informer inside the bundle loses monotonicity and the AA-Informer lane regresses far below the active keep `75.9243 / 79.7528`
+  - target gates missed badly
+- 핵심 진단:
+  - reusing prototype gain on the new memory residual suppresses the useful post-selection transport instead of sharpening it.
+  - the additive residual works better when it stays decoupled from prototype gain scaling.
+- 판단: SAFE FAILURE / REJECT PROTOTYPE MEMORY-GAIN CURVE
