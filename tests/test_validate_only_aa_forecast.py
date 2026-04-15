@@ -1203,6 +1203,15 @@ def test_validate_only_aaforecast_multi_study_catalog_and_projection(
         / "visualizations"
         / "cross_study_dashboard.html"
     ).exists()
+    visual_root = output_root / "models" / "AAForecast" / "visualizations"
+    artifact_inventory = json.loads((visual_root / "artifact_inventory.json").read_text())
+    artifact_paths = {
+        Path(item["path"]).name for item in artifact_inventory["artifacts"] if "path" in item
+    }
+    assert "study_01_trial_metric_history.html" in artifact_paths
+    assert "study_02_trial_metric_history.html" in artifact_paths
+    assert (visual_root / "study_01_trial_metric_history.html").exists()
+    assert (visual_root / "study_02_trial_metric_history.html").exists()
 
     selected_output_root = tmp_path / "validate-only-aa-forecast-multi-selected"
     selected_code = runtime.main(
@@ -1243,6 +1252,17 @@ def test_validate_only_aaforecast_multi_study_catalog_and_projection(
         / "visualizations"
         / "cross_study_dashboard.html"
     ).exists()
+    selected_visual_root = selected_output_root / "models" / "AAForecast" / "visualizations"
+    selected_inventory = json.loads(
+        (selected_visual_root / "artifact_inventory.json").read_text()
+    )
+    selected_artifact_paths = {
+        Path(item["path"]).name for item in selected_inventory["artifacts"] if "path" in item
+    }
+    assert "study_01_trial_metric_history.html" in selected_artifact_paths
+    assert "study_02_trial_metric_history.html" in selected_artifact_paths
+    assert (selected_visual_root / "study_01_trial_metric_history.html").exists()
+    assert (selected_visual_root / "study_02_trial_metric_history.html").exists()
 
 
 def test_runtime_aaforecast_plugin_uncertainty_smoke(

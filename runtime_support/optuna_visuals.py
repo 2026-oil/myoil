@@ -5,6 +5,9 @@ from typing import Any, Mapping, Sequence
 import csv
 import json
 
+import optuna
+from optuna.trial import TrialState
+
 from runtime_support.optuna_studies import StudyContext, build_study_catalog_payload
 
 
@@ -47,6 +50,99 @@ def _write_figure_bundle(fig: Any, stem: Path) -> list[dict[str, str]]:
         {"kind": "html", "path": str(html_path.resolve())},
         {"kind": "png", "path": str(png_path.resolve())},
     ]
+
+
+def _load_optuna_study_from_summary(summary: Mapping[str, Any]) -> optuna.study.Study | None:
+    storage_path = summary.get("storage_path")
+    study_name = summary.get("study_name")
+    if not isinstance(storage_path, str) or not storage_path.strip():
+        return None
+    if not isinstance(study_name, str) or not study_name.strip():
+        return None
+    storage_file = Path(storage_path).expanduser()
+    if not storage_file.exists():
+        return None
+    storage = optuna.storages.JournalStorage(
+        optuna.storages.journal.JournalFileBackend(str(storage_file))
+    )
+    return optuna.load_study(study_name=study_name, storage=storage)
+
+
+def _build_trial_metric_history_figure(
+    *,
+    go: Any,
+    summary: Mapping[str, Any],
+    study_label: str,
+) -> Any:
+    fig = go.Figure()
+    study = _load_optuna_study_from_summary(summary)
+    if study is None:
+        fig.add_annotation(
+            text="Trial history unavailable: missing storage metadata or journal file",
+            showarrow=False,
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+        )
+        fig.update_xaxes(visible=False)
+        fig.update_yaxes(visible=False)
+        fig.update_layout(title=f"Trial metric history ({study_label})")
+        return fig
+
+    complete_trials = [
+        trial for trial in study.trials if trial.state == TrialState.COMPLETE and trial.value is not None
+    ]
+    if not complete_trials:
+        fig.add_annotation(
+            text="No complete trials found",
+            showarrow=False,
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+        )
+        fig.update_xaxes(visible=False)
+        fig.update_yaxes(visible=False)
+        fig.update_layout(title=f"Trial metric history ({study_label})")
+        return fig
+
+    trial_numbers = [int(trial.number) for trial in complete_trials]
+    objective_values = [float(trial.value) for trial in complete_trials]
+    best_so_far: list[float] = []
+    direction = study.direction
+    running_best: float | None = None
+    for value in objective_values:
+        if running_best is None:
+            running_best = value
+        elif direction == optuna.study.StudyDirection.MINIMIZE:
+            running_best = min(running_best, value)
+        else:
+            running_best = max(running_best, value)
+        best_so_far.append(running_best)
+
+    fig.add_trace(
+        go.Scatter(
+            x=trial_numbers,
+            y=objective_values,
+            mode="lines+markers",
+            name="objective_value",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=trial_numbers,
+            y=best_so_far,
+            mode="lines",
+            name="best_so_far",
+        )
+    )
+    fig.update_layout(
+        title=f"Trial metric history ({study_label})",
+        xaxis_title="trial_number",
+        yaxis_title="objective_value",
+    )
+    return fig
 
 
 def write_study_visualizations(
@@ -154,6 +250,21 @@ def write_cross_study_visualizations(
         finished_fig, visual_root / "finished_trials_by_study"
     )
 
+    trial_history_artifacts: list[dict[str, str]] = []
+    trial_history_links: list[str] = []
+    for row, entry in zip(leaderboard_rows, entries):
+        summary = entry.get("summary", {}) if isinstance(entry, Mapping) else {}
+        study_index = int(row["study_index"])
+        study_label = str(row.get("study_label") or f"study-{study_index:02d}")
+        trial_history_fig = _build_trial_metric_history_figure(
+            go=go,
+            summary=summary if isinstance(summary, Mapping) else {},
+            study_label=study_label,
+        )
+        stem = visual_root / f"study_{study_index:02d}_trial_metric_history"
+        trial_history_artifacts.extend(_write_figure_bundle(trial_history_fig, stem))
+        trial_history_links.append(stem.with_suffix(".html").name)
+
     dashboard_path = visual_root / "cross_study_dashboard.html"
     lines = [
         "<html><body><h1>Cross-study Optuna dashboard</h1>",
@@ -165,6 +276,13 @@ def write_cross_study_visualizations(
         lines.append(
             f"<li>{row['study_label']}: best_value={row['best_value']}, finished={row['finished_trial_count']}</li>"
         )
+    lines.append("</ul>")
+    lines.append("<h2>Study trial metric history</h2>")
+    lines.append("<ul>")
+    for row, link in zip(leaderboard_rows, trial_history_links):
+        lines.append(
+            f"<li><a href='{link}'>{row['study_label']} trial metric history</a></li>"
+        )
     lines.extend(["</ul>", "</body></html>"])
     dashboard_path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -174,6 +292,7 @@ def write_cross_study_visualizations(
             {"kind": "csv", "path": str(leaderboard_path.resolve())},
             *best_artifacts,
             *finished_artifacts,
+            *trial_history_artifacts,
             {"kind": "html", "path": str(dashboard_path.resolve())},
         ]
     }
