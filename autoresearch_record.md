@@ -3657,3 +3657,10 @@
   - the keep is not merely “close” to a larger bank optimum; even a one-slot expansion is materially harmful.
   - with 5/4-slot contractions and 7/8-slot expansions all rejected, the 6-slot bank is now strongly bracketed as the best verified capacity in this family.
 - 판단: SAFE FAILURE / REJECT 7-SLOT PROTOTYPE BANK
+
+## Iteration 2026-04-15 restore exact active keep after 7-slot bank regression
+- timestamp: 2026-04-15T17:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed 7-slot bank regression
+- restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
