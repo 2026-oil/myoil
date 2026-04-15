@@ -3447,3 +3447,34 @@
 - experiment title: restore the exact active keep basis after recording the completed dedicated prototype-memory-head regression
 - restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 prototype memory residual outside the family gate on the active keep
+- timestamp: 2026-04-15T16:xx:00+09:00
+- git branch: informer_test
+- experiment title: let the prototype memory residual bypass the prototype family gate while keeping the level-plus-curve path under the learned family gate and retaining the active keep's confidence damping
+- hypothesis:
+  - prior evidence suggested the prototype memory residual should stay a lightly additive transport term and should not be suppressed by the analogue transport gate.
+  - the next narrow non-duplicate check was therefore to leave the level-plus-curve family gated, but let the bounded prototype memory residual add outside that family gate while still respecting confidence damping.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/baseline.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_memcurve_nofamilygate_restore_gru_bundle1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_memcurve_nofamilygate_restore_gru_bundle1`
+- run/artifact path: runs/iter_20260415_proto_memcurve_nofamilygate_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `74.5039 / 76.2465`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.6805 / 79.4002`
+- active keep comparison:
+  - current compliant keep AA-Informer = `76.1788 / 80.0079`
+  - no-family-gate delta vs keep = `-0.4983 / -0.6077`
+- 목표 체크:
+  - AA-Informer keeps `h2 > h1`, but strict ordering fails because the baseline Informer beats AA-GRU.
+  - even aside from ordering, both AA-Informer horizons regress below the active keep.
+- 핵심 진단:
+  - the prototype memory residual does want to stay additive, but fully bypassing the family gate over-strengthens the non-AA baseline bundle path and still weakens the AA-Informer keep.
+  - the active keep's current coupling between the family gate and the residual remains the stronger verified compromise.
+- 판단: SAFE FAILURE / REJECT NO-FAMILY-GATE PROTOTYPE MEMORY RESIDUAL
