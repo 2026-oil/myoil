@@ -23,6 +23,7 @@ def _stage_root(run_root: Path) -> Path:
     (root / "uncertainty").mkdir(parents=True, exist_ok=True)
     (root / "context").mkdir(parents=True, exist_ok=True)
     (root / "retrieval").mkdir(parents=True, exist_ok=True)
+    (root / "encoding").mkdir(parents=True, exist_ok=True)
     return root
 
 
@@ -217,6 +218,214 @@ def _write_context_artifacts(
         },
     )
     return str(relative_csv_path)
+
+
+def _coerce_encoding_array(value: Any, *, field_name: str) -> np.ndarray:
+    if hasattr(value, "detach"):
+        value = value.detach().cpu().numpy()
+    array = np.asarray(value)
+    if array.ndim != 3:
+        raise ValueError(
+            f"aa_forecast encoding export requires {field_name} to be rank-3 [batch, time, hidden], got shape {array.shape!r}"
+        )
+    return array.astype(float, copy=False)
+
+
+def _build_encoding_time_frame(
+    *,
+    train_df: pd.DataFrame,
+    dt_col: str,
+    time_steps: int,
+) -> pd.DataFrame:
+    ds_values = pd.to_datetime(train_df[dt_col]).reset_index(drop=True)
+    if time_steps <= 0:
+        raise ValueError("aa_forecast encoding export requires positive time_steps")
+    if time_steps > len(ds_values):
+        raise ValueError(
+            "aa_forecast encoding export requires time_steps to fit inside the transformed training frame"
+        )
+    time_window = ds_values.iloc[-time_steps:].reset_index(drop=True)
+    return pd.DataFrame(
+        {
+            "time_index": np.arange(time_steps, dtype=int),
+            "ds": time_window,
+        }
+    )
+
+
+def _tensor_to_long_frame(
+    *,
+    tensor_name: str,
+    values: np.ndarray,
+    time_frame: pd.DataFrame,
+) -> pd.DataFrame:
+    batch_size, time_steps, hidden_size = values.shape
+    batch_index = np.repeat(np.arange(batch_size, dtype=int), time_steps * hidden_size)
+    time_index = np.tile(
+        np.repeat(np.arange(time_steps, dtype=int), hidden_size),
+        batch_size,
+    )
+    hidden_index = np.tile(np.arange(hidden_size, dtype=int), batch_size * time_steps)
+    ds_values = time_frame["ds"].to_numpy()[time_index]
+    return pd.DataFrame(
+        {
+            "tensor_name": tensor_name,
+            "batch_index": batch_index,
+            "time_index": time_index,
+            "hidden_index": hidden_index,
+            "ds": pd.to_datetime(ds_values),
+            "value": values.reshape(-1),
+        }
+    )
+
+
+def _summarize_tensor_frame(
+    frame: pd.DataFrame,
+    *,
+    batch_size: int,
+    hidden_size: int,
+) -> pd.DataFrame:
+    grouped = (
+        frame.groupby(["tensor_name", "time_index", "ds"], dropna=False)["value"]
+        .agg(["mean", "std", "min", "max"])
+        .reset_index()
+        .rename(
+            columns={
+                "mean": "value_mean",
+                "std": "value_std",
+                "min": "value_min",
+                "max": "value_max",
+            }
+        )
+    )
+    l2_norm = (
+        frame.assign(value_sq=lambda df: np.square(df["value"].to_numpy(dtype=float)))
+        .groupby(["tensor_name", "time_index", "ds"], dropna=False)["value_sq"]
+        .sum()
+        .reset_index(name="value_l2_sq")
+    )
+    grouped = grouped.merge(l2_norm, on=["tensor_name", "time_index", "ds"], how="left")
+    grouped["value_l2_norm"] = np.sqrt(grouped.pop("value_l2_sq"))
+    grouped["batch_size"] = int(batch_size)
+    grouped["hidden_size"] = int(hidden_size)
+    return grouped
+
+
+def _write_encoding_artifacts(
+    *,
+    run_root: Path,
+    train_end_ds: pd.Timestamp,
+    model: Any,
+    train_df: pd.DataFrame,
+    dt_col: str,
+) -> dict[str, str]:
+    _stage_root(run_root)
+    slug = _context_slug(train_end_ds)
+    export_root = Path("aa_forecast") / "encoding" / slug
+    (run_root / export_root).mkdir(parents=True, exist_ok=True)
+    latest_export = getattr(model, "_latest_encoding_export", None)
+    if not isinstance(latest_export, dict):
+        raise ValueError(
+            "aa_forecast encoding export requires model._latest_encoding_export after final inference"
+        )
+    required_keys = {"backbone_states", "hidden_states", "time_axis"}
+    missing_keys = sorted(required_keys.difference(latest_export))
+    if missing_keys:
+        raise ValueError(
+            "aa_forecast encoding export requires keys: "
+            + ", ".join(sorted(required_keys))
+            + f"; missing {', '.join(missing_keys)}"
+        )
+    time_axis = int(latest_export["time_axis"])
+    if time_axis != 1:
+        raise ValueError(
+            f"aa_forecast encoding export expected time_axis=1 for informer, got {time_axis}"
+        )
+
+    tensor_paths: dict[str, str] = {}
+    time_axis_rows: list[pd.DataFrame] = []
+    summary_frames: list[pd.DataFrame] = []
+    metadata_tensors: list[dict[str, Any]] = []
+    for tensor_name in ("backbone_states", "hidden_states"):
+        values = _coerce_encoding_array(
+            latest_export[tensor_name],
+            field_name=f"model._latest_encoding_export[{tensor_name!r}]",
+        )
+        time_frame = _build_encoding_time_frame(
+            train_df=train_df,
+            dt_col=dt_col,
+            time_steps=values.shape[time_axis],
+        )
+        long_frame = _tensor_to_long_frame(
+            tensor_name=tensor_name,
+            values=values,
+            time_frame=time_frame,
+        )
+        relative_tensor_path = export_root / f"{tensor_name}.parquet"
+        long_frame.to_parquet(run_root / relative_tensor_path, index=False)
+        tensor_paths[tensor_name] = str(relative_tensor_path)
+        summary_frames.append(
+            _summarize_tensor_frame(
+                long_frame,
+                batch_size=values.shape[0],
+                hidden_size=values.shape[2],
+            )
+        )
+        time_axis_rows.append(
+            time_frame.assign(
+                tensor_name=tensor_name,
+                time_axis_dim=time_axis,
+                axis_order="batch,time,hidden",
+            )
+        )
+        metadata_tensors.append(
+            {
+                "tensor_name": tensor_name,
+                "shape": list(values.shape),
+                "batch_axis_dim": 0,
+                "time_axis_dim": time_axis,
+                "hidden_axis_dim": 2,
+                "parquet_path": str(relative_tensor_path),
+                "time_start_ds": str(time_frame["ds"].iloc[0]),
+                "time_end_ds": str(time_frame["ds"].iloc[-1]),
+            }
+        )
+
+    relative_time_axis_path = export_root / "time_axis.parquet"
+    pd.concat(time_axis_rows, ignore_index=True).to_parquet(
+        run_root / relative_time_axis_path,
+        index=False,
+    )
+    relative_summary_path = export_root / "summary.parquet"
+    pd.concat(summary_frames, ignore_index=True).to_parquet(
+        run_root / relative_summary_path,
+        index=False,
+    )
+    relative_metadata_path = export_root / "metadata.json"
+    _write_json(
+        run_root / relative_metadata_path,
+        {
+            "train_end_ds": str(pd.Timestamp(train_end_ds)),
+            "source": "base_predict_before_uncertainty",
+            "model_backbone": getattr(model, "backbone", None),
+            "time_axis_contract": {
+                "axis_order": "batch,time,hidden",
+                "time_axis_dim": time_axis,
+                "time_index_column": "time_index",
+                "time_timestamp_column": "ds",
+                "time_reference": "tail of transformed training frame aligned to encoder window",
+            },
+            "tensors": metadata_tensors,
+            "time_axis_path": str(relative_time_axis_path),
+            "summary_path": str(relative_summary_path),
+        },
+    )
+    return {
+        "metadata": str(relative_metadata_path),
+        "time_axis": str(relative_time_axis_path),
+        "summary": str(relative_summary_path),
+        **tensor_paths,
+    }
 
 
 def _predict_with_adapter(
@@ -1182,11 +1391,17 @@ def predict_aa_forecast_fold(
         **_aa_params_override(effective_config),
         **(params_override or {}),
     }
+    stage_cfg = loaded.config.stage_plugin_config
     model = build_model(
         effective_config,
         job,
         n_series=adapter_inputs.metadata.get("n_series"),
         params_override=merged_params_override,
+    )
+    setattr(
+        model,
+        "_capture_encoding_export",
+        bool(stage_cfg.encoding_export.enabled),
     )
     if hasattr(model, "set_star_precompute_context"):
         model.set_star_precompute_context(
@@ -1217,7 +1432,6 @@ def predict_aa_forecast_fold(
         diff_context=diff_context,
         restore_target_predictions=_restore_target_predictions,
     )
-    stage_cfg = loaded.config.stage_plugin_config
     context_frame, context_active = _build_fold_context_frame(
         model=nf.models[0],
         train_df=transformed_train_df,
@@ -1242,6 +1456,34 @@ def predict_aa_forecast_fold(
     )
     if context_artifact is not None:
         target_predictions["aaforecast_context_artifact"] = context_artifact
+    encoding_artifacts: dict[str, str] | None = None
+    if stage_cfg.encoding_export.enabled:
+        if run_root is None:
+            raise ValueError(
+                "aa_forecast encoding export requires a run_root to write Parquet artifacts"
+            )
+        encoding_artifacts = _write_encoding_artifacts(
+            run_root=run_root,
+            train_end_ds=pd.to_datetime(train_df[dt_col].iloc[-1]),
+            model=nf.models[0],
+            train_df=transformed_train_df,
+            dt_col=dt_col,
+        )
+        target_predictions["aaforecast_encoding_metadata_artifact"] = encoding_artifacts[
+            "metadata"
+        ]
+        target_predictions["aaforecast_encoding_time_axis_artifact"] = encoding_artifacts[
+            "time_axis"
+        ]
+        target_predictions["aaforecast_encoding_summary_artifact"] = encoding_artifacts[
+            "summary"
+        ]
+        target_predictions["aaforecast_encoding_backbone_artifact"] = encoding_artifacts[
+            "backbone_states"
+        ]
+        target_predictions["aaforecast_encoding_hidden_artifact"] = encoding_artifacts[
+            "hidden_states"
+        ]
     uncertainty_summary: dict[str, Any] | None = None
     if stage_cfg.uncertainty.enabled:
         uncertainty_summary = _select_uncertainty_predictions(

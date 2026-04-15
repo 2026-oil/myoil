@@ -29,6 +29,7 @@ AA_FORECAST_MAIN_KEYS = {
     "lowess_delta",
     "uncertainty",
     "retrieval",
+    "encoding_export",
 }
 AA_FORECAST_LINKED_KEYS = {
     "model",
@@ -40,6 +41,7 @@ AA_FORECAST_LINKED_KEYS = {
     "lowess_delta",
     "uncertainty",
     "retrieval",
+    "encoding_export",
 }
 AA_FORECAST_UNCERTAINTY_KEYS = {"enabled", "sample_count", "dropout_candidates"}
 AA_FORECAST_STAR_ANOMALY_TAIL_KEYS = {"upward", "two_sided"}
@@ -56,6 +58,7 @@ AA_FORECAST_RETRIEVAL_KEYS = {
     "event_score_log_bonus_alpha",
     "event_score_log_bonus_cap",
 }
+AA_FORECAST_ENCODING_EXPORT_KEYS = {"enabled"}
 
 
 @dataclass(frozen=True)
@@ -104,6 +107,11 @@ class AAForecastRetrievalConfig:
     event_score_log_bonus_cap: float = 0.0
 
 
+@dataclass(frozen=True)
+class AAForecastEncodingExportConfig:
+    enabled: bool = False
+
+
 def _default_star_anomaly_tails() -> dict[str, tuple[str, ...]]:
     return {"upward": (), "two_sided": ()}
 
@@ -132,6 +140,9 @@ class AAForecastPluginConfig:
     )
     retrieval: AAForecastRetrievalConfig = field(
         default_factory=AAForecastRetrievalConfig
+    )
+    encoding_export: AAForecastEncodingExportConfig = field(
+        default_factory=AAForecastEncodingExportConfig
     )
 
 
@@ -184,6 +195,12 @@ def aa_forecast_retrieval_public_dict(
     }
 
 
+def aa_forecast_encoding_export_public_dict(
+    encoding_export: AAForecastEncodingExportConfig,
+) -> dict[str, Any]:
+    return {"enabled": encoding_export.enabled}
+
+
 def aa_forecast_plugin_tuning_public_dict(cfg: AAForecastPluginConfig) -> dict[str, Any]:
     return {
         "model": cfg.model,
@@ -204,6 +221,9 @@ def aa_forecast_plugin_tuning_public_dict(cfg: AAForecastPluginConfig) -> dict[s
         "lowess_delta": cfg.lowess_delta,
         "uncertainty": aa_forecast_uncertainty_public_dict(cfg.uncertainty),
         "retrieval": aa_forecast_retrieval_public_dict(cfg.retrieval),
+        "encoding_export": aa_forecast_encoding_export_public_dict(
+            cfg.encoding_export
+        ),
     }
 
 
@@ -542,6 +562,28 @@ def _normalize_retrieval_config(
     )
 
 
+def _normalize_encoding_export_config(
+    value: Any,
+    *,
+    section: str,
+    unknown_keys: Any,
+    coerce_bool: Any,
+) -> AAForecastEncodingExportConfig:
+    if value is None:
+        return AAForecastEncodingExportConfig()
+    if not isinstance(value, dict):
+        raise ValueError(f"{section} must be a mapping")
+    payload = dict(value)
+    unknown_keys(payload, allowed=AA_FORECAST_ENCODING_EXPORT_KEYS, section=section)
+    return AAForecastEncodingExportConfig(
+        enabled=coerce_bool(
+            payload.get("enabled"),
+            field_name=f"{section}.enabled",
+            default=False,
+        )
+    )
+
+
 def _normalize_star_anomaly_tails(
     value: Any,
     *,
@@ -657,6 +699,16 @@ def _normalize_canonical_fields(
         coerce_bool=coerce_bool,
         uncertainty=uncertainty,
     )
+    encoding_export = _normalize_encoding_export_config(
+        payload.get("encoding_export"),
+        section=f"{section}.encoding_export",
+        unknown_keys=unknown_keys,
+        coerce_bool=coerce_bool,
+    )
+    if encoding_export.enabled and model != "informer":
+        raise ValueError(
+            f"{section}.encoding_export.enabled=true currently supports only aa_forecast.model='informer'"
+        )
     return AAForecastPluginConfig(
         enabled=True,
         model=model,
@@ -668,6 +720,7 @@ def _normalize_canonical_fields(
         lowess_delta=lowess_delta,
         uncertainty=uncertainty,
         retrieval=retrieval,
+        encoding_export=encoding_export,
     )
 
 
@@ -713,6 +766,7 @@ def normalize_aa_forecast_config(
             "lowess_delta",
             "uncertainty",
             "retrieval",
+            "encoding_export",
         }
         if any(key in payload for key in inline_keys):
             raise ValueError(
@@ -731,6 +785,7 @@ def normalize_aa_forecast_config(
             "lowess_delta",
             "uncertainty",
             "retrieval",
+            "encoding_export",
         }
     ):
         raise ValueError(

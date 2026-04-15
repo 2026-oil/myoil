@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -257,6 +258,109 @@ def test_load_app_config_rejects_unknown_retrieval_key(tmp_path: Path) -> None:
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
     with pytest.raises(ValueError, match=r"unsupported key\(s\): unsupported"):
+        load_app_config(REPO_ROOT, config_path=config_path)
+
+
+def test_load_app_config_accepts_encoding_export_for_informer(tmp_path: Path) -> None:
+    (tmp_path / "data.csv").write_text(
+        "dt,target,event\n2020-01-01,1,0\n2020-01-08,2,1\n",
+        encoding="utf-8",
+    )
+    plugin_path = tmp_path / "aa_plugin.yaml"
+    plugin_path.write_text(
+        yaml.safe_dump(
+            {
+                "aa_forecast": {
+                    "model": "informer",
+                    "tune_training": False,
+                    "star_anomaly_tails": {"upward": ["event"], "two_sided": []},
+                    "uncertainty": {"enabled": False, "sample_count": 2},
+                    "encoding_export": {"enabled": True},
+                    "model_params": {
+                        "hidden_size": 8,
+                        "n_head": 2,
+                        "encoder_layers": 1,
+                        "dropout": 0.1,
+                        "linear_hidden_size": 16,
+                        "factor": 1,
+                    },
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    payload = {
+        "task": {"name": "accept_aaforecast_encoding_export"},
+        "dataset": {
+            "path": "data.csv",
+            "target_col": "target",
+            "dt_col": "dt",
+            "hist_exog_cols": ["event"],
+            "futr_exog_cols": [],
+            "static_exog_cols": [],
+        },
+        "training": {"loss": "mse"},
+        "cv": {"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0},
+        "scheduler": {"gpu_ids": [0], "max_concurrent_jobs": 1, "worker_devices": 1},
+        "aa_forecast": {"enabled": True, "config_path": str(plugin_path)},
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    loaded = load_app_config(REPO_ROOT, config_path=config_path)
+
+    assert loaded.config.stage_plugin_config.encoding_export.enabled is True
+    state_payload = aa_forecast_plugin_state_dict(
+        loaded.config.stage_plugin_config,
+        selected_config_path=str(plugin_path),
+    )
+    assert state_payload["encoding_export"]["enabled"] is True
+
+
+def test_load_app_config_rejects_encoding_export_for_non_informer(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "data.csv").write_text(
+        "dt,target,event\n2020-01-01,1,0\n2020-01-08,2,1\n",
+        encoding="utf-8",
+    )
+    plugin_path = tmp_path / "aa_plugin.yaml"
+    plugin_path.write_text(
+        yaml.safe_dump(
+            {
+                "aa_forecast": {
+                    "model": "gru",
+                    "tune_training": False,
+                    "star_anomaly_tails": {"upward": ["event"], "two_sided": []},
+                    "uncertainty": {"enabled": False, "sample_count": 2},
+                    "encoding_export": {"enabled": True},
+                    "model_params": {},
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    payload = {
+        "task": {"name": "reject_aaforecast_encoding_export"},
+        "dataset": {
+            "path": "data.csv",
+            "target_col": "target",
+            "dt_col": "dt",
+            "hist_exog_cols": ["event"],
+            "futr_exog_cols": [],
+            "static_exog_cols": [],
+        },
+        "training": {"loss": "mse"},
+        "cv": {"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0},
+        "scheduler": {"gpu_ids": [0], "max_concurrent_jobs": 1, "worker_devices": 1},
+        "aa_forecast": {"enabled": True, "config_path": str(plugin_path)},
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="encoding_export.enabled=true.*informer"):
         load_app_config(REPO_ROOT, config_path=config_path)
 
 
@@ -873,6 +977,155 @@ def test_predict_aa_forecast_fold_uses_trial_specific_overrides(
     assert actuals.tolist() == future_df[loaded.config.dataset.target_col].tolist()
     assert str(train_end_ds) == str(pd.Timestamp(train_df[loaded.config.dataset.dt_col].iloc[-1]))
     assert used_train_df.equals(train_df)
+
+
+def test_predict_aa_forecast_fold_writes_informer_encoding_export_artifacts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    loaded = load_app_config(
+        REPO_ROOT,
+        config_path=REPO_ROOT / PLUGIN_AUTO_MODEL_ONLY_MAIN_CONFIG,
+    )
+    loaded = replace(
+        loaded,
+        config=replace(
+            loaded.config,
+            stage_plugin_config=replace(
+                loaded.config.stage_plugin_config,
+                model="informer",
+                encoding_export=aa_runtime._cfg.AAForecastEncodingExportConfig(
+                    enabled=True
+                ),
+            ),
+        ),
+    )
+    job = loaded.config.jobs[0]
+    source_df = pd.read_csv(loaded.config.dataset.path)
+    train_df = source_df.iloc[:4].reset_index(drop=True)
+    future_df = source_df.iloc[4:5].reset_index(drop=True)
+
+    class _FakeModel:
+        backbone = "informer"
+
+        def set_star_precompute_context(self, *, enabled: bool, fold_key: str) -> None:
+            del enabled, fold_key
+
+    class _FakeNeuralForecast:
+        def __init__(self, *, models, freq):
+            self.models = models
+            self.freq = freq
+
+        def fit(self, *_args, **_kwargs):
+            return None
+
+    monkeypatch.setattr(
+        forecast_models,
+        "build_model",
+        lambda *_args, **_kwargs: _FakeModel(),
+    )
+    monkeypatch.setattr(runtime, "_resolve_freq", lambda _loaded, _source_df: "W-MON")
+    monkeypatch.setattr(runtime, "_build_fold_diff_context", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        runtime,
+        "_transform_training_frame",
+        lambda train_df_arg, _diff_context: train_df_arg,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_build_adapter_inputs",
+        lambda _loaded, transformed_train_df, futr_df, _job, _dt_col: SimpleNamespace(
+            metadata={"n_series": 1},
+            fit_df=transformed_train_df,
+            static_df=None,
+            futr_df=futr_df,
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_restore_target_predictions",
+        lambda target_predictions, prediction_col, diff_context: target_predictions,
+    )
+
+    def _fake_predict_with_adapter(nf, adapter_inputs, *, random_seed=None):
+        del adapter_inputs, random_seed
+        nf.models[0]._latest_encoding_export = {
+            "backbone_states": np.arange(12, dtype=float).reshape(1, 4, 3),
+            "hidden_states": np.arange(12, 24, dtype=float).reshape(1, 4, 3),
+            "time_axis": 1,
+        }
+        return pd.DataFrame(
+            {
+                "unique_id": [loaded.config.dataset.target_col] * len(future_df),
+                "ds": pd.to_datetime(future_df[loaded.config.dataset.dt_col]).reset_index(
+                    drop=True
+                ),
+                job.model: [1.1],
+            }
+        )
+
+    monkeypatch.setattr(aa_runtime, "_predict_with_adapter", _fake_predict_with_adapter)
+    monkeypatch.setattr(
+        aa_runtime,
+        "_build_fold_context_frame",
+        lambda **_kwargs: (
+            pd.DataFrame(
+                {
+                    "ds": pd.to_datetime(train_df[loaded.config.dataset.dt_col]),
+                    "context_active": [0] * len(train_df),
+                    "context_label": ["normal_context"] * len(train_df),
+                }
+            ),
+            False,
+        ),
+    )
+    monkeypatch.setattr(aa_runtime, "NeuralForecast", _FakeNeuralForecast)
+
+    predictions, *_rest = aa_runtime.predict_aa_forecast_fold(
+        loaded,
+        job,
+        train_df=train_df,
+        future_df=future_df,
+        run_root=tmp_path / "run",
+    )
+
+    metadata_rel = predictions["aaforecast_encoding_metadata_artifact"].iloc[0]
+    backbone_rel = predictions["aaforecast_encoding_backbone_artifact"].iloc[0]
+    hidden_rel = predictions["aaforecast_encoding_hidden_artifact"].iloc[0]
+    time_axis_rel = predictions["aaforecast_encoding_time_axis_artifact"].iloc[0]
+    summary_rel = predictions["aaforecast_encoding_summary_artifact"].iloc[0]
+
+    metadata = json.loads((tmp_path / "run" / metadata_rel).read_text(encoding="utf-8"))
+    backbone_frame = pd.read_parquet(tmp_path / "run" / backbone_rel)
+    hidden_frame = pd.read_parquet(tmp_path / "run" / hidden_rel)
+    time_axis_frame = pd.read_parquet(tmp_path / "run" / time_axis_rel)
+    summary_frame = pd.read_parquet(tmp_path / "run" / summary_rel)
+
+    assert metadata["source"] == "base_predict_before_uncertainty"
+    assert metadata["time_axis_contract"]["time_axis_dim"] == 1
+    assert [entry["tensor_name"] for entry in metadata["tensors"]] == [
+        "backbone_states",
+        "hidden_states",
+    ]
+    assert backbone_frame.columns.tolist() == [
+        "tensor_name",
+        "batch_index",
+        "time_index",
+        "hidden_index",
+        "ds",
+        "value",
+    ]
+    assert hidden_frame["tensor_name"].unique().tolist() == ["hidden_states"]
+    assert backbone_frame["time_index"].unique().tolist() == [0, 1, 2, 3]
+    assert pd.to_datetime(backbone_frame["ds"]).dt.strftime("%Y-%m-%d").unique().tolist() == [
+        "2024-01-01",
+        "2024-01-08",
+        "2024-01-15",
+        "2024-01-22",
+    ]
+    assert time_axis_frame["time_axis_dim"].unique().tolist() == [1]
+    assert summary_frame["hidden_size"].unique().tolist() == [3]
 
 
 def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(

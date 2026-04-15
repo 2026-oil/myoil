@@ -1966,9 +1966,7 @@ class AAForecast(BaseModel):
         )
 
         earlier_target_positive = target_positive[:, : seq_len - recent_steps, :]
-        recent_target_positive = target_positive[:, -recent_steps:, :]
         earlier_hist_positive = hist_positive[:, : seq_len - recent_steps, :]
-        recent_hist_positive = hist_positive[:, -recent_steps:, :]
         earlier_non_star_star = non_star_star_activity[:, : seq_len - recent_steps, :]
 
         recent_up_mass = torch.log1p(
@@ -2088,7 +2086,6 @@ class AAForecast(BaseModel):
             if not group_indices:
                 return values.new_zeros((batch_size, 4))
             group = values[:, :, list(group_indices)]
-            earlier = group[:, : seq_len - recent_steps, :]
             recent = group[:, -recent_steps:, :]
             baseline = group.mean(dim=1, keepdim=True)
             baseline_scale = group.std(dim=1, keepdim=True, unbiased=False).clamp_min(1e-4)
@@ -2596,6 +2593,7 @@ class AAForecast(BaseModel):
     def forward(self, windows_batch):
         insample_y = windows_batch["insample_y"]
         hist_exog = windows_batch["hist_exog"]
+        self._latest_encoding_export = None
         star_payload = windows_batch.get("star_precomputed")
         if star_payload is None:
             star_payload = self._compute_star_outputs(insample_y, hist_exog)
@@ -2685,6 +2683,14 @@ class AAForecast(BaseModel):
             )
 
         hidden_states = self.encoder.project_to_time_states(backbone_states)
+        if self.backbone == "informer" and bool(
+            getattr(self, "_capture_encoding_export", False)
+        ):
+            self._latest_encoding_export = {
+                "backbone_states": backbone_states.detach().cpu(),
+                "hidden_states": hidden_states.detach().cpu(),
+                "time_axis": 1,
+            }
         critical_mask = star_payload["critical_mask"].bool()
         count_active_channels = star_payload["count_active_channels"].to(
             device=hidden_states.device,

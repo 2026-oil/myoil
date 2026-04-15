@@ -6,7 +6,6 @@ aa_forecast:
   uncertainty:
     enabled: true
     dropout_candidates:
-    - 0.005
     - 0.01
     - 0.03
     - 0.05
@@ -33,11 +32,11 @@ aa_forecast:
     upward:
     - GPRD_THREAT
     - BS_Core_Index_A
-    - GPRD
+    - BS_Core_Index_C
     two_sided: []
   thresh: 3.5
   retrieval:
-    enabled: false
+    enabled: true
     top_k: 1
     event_score_threshold: 400.0
     min_similarity: 0.35
