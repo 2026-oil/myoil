@@ -3063,3 +3063,35 @@
 - experiment title: restore the exact active keep basis after recording the completed top2-mass confidence regression
 - restored anchor commit: `cf2060d8` (`Restore the exact active keep after the memory-gain rejection`)
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 prototype memory-curve single-confidence damping on the active keep
+- timestamp: 2026-04-15T15:xx:00+09:00
+- git branch: informer_test
+- experiment title: remove the inner confidence multiplier from the prototype memory-curve residual while keeping the outer family-level top1 confidence damping unchanged on top of the exact active keep
+- hypothesis:
+  - the active keep currently lets the new prototype memory residual pass through top1 confidence twice: once on the residual term itself and once on the full family output.
+  - the narrowest non-duplicate test is to keep family-level confidence damping but stop squaring that damping on the memory residual, which might lift h2 without reopening the broader damping-ablation branch.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/baseline.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_memcurve_nosquare_restore_gru_bundle1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_memcurve_nosquare_restore_gru_bundle1`
+- run/artifact path: runs/iter_20260415_proto_memcurve_nosquare_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.3865 / 74.2768`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.1030 / 77.9687`
+- active keep comparison:
+  - current compliant keep AA-Informer = `75.9243 / 79.7528`
+  - single-confidence delta vs keep = `-0.8213 / -1.7841`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - the bundle stays healthy, but both AA-Informer horizons remain below the active keep.
+- 핵심 진단:
+  - the active keep does appear sensitive to confidence placement, but removing the inner damping alone still weakens the prototype family's amplitude transport relative to the keep.
+  - this suggests the keep's double confidence structure is not merely over-damping noise; it is helping stabilize the useful prototype memory residual.
+- 판단: SAFE FAILURE / REJECT SINGLE-CONFIDENCE PROTOTYPE MEMORY-CURVE DAMPING
