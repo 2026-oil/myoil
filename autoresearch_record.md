@@ -3583,3 +3583,10 @@
   - the active lane still wants broader prototype support than a 4-slot bank allows.
   - capacity contraction is much more harmful than the recent micro-adjustments, so the current 6-slot bank remains the better compromise.
 - 판단: SAFE FAILURE / REJECT 4-SLOT PROTOTYPE BANK
+
+## Iteration 2026-04-15 restore exact active keep after 4-slot bank regression
+- timestamp: 2026-04-15T16:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed 4-slot bank regression
+- restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
