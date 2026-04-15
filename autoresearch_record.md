@@ -3174,3 +3174,35 @@
 - experiment title: restore the exact active keep basis after recording the completed outer sqrt-confidence regression
 - restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 prototype memory-curve quarter-confidence damping on the active keep
+- timestamp: 2026-04-15T16:xx:00+09:00
+- git branch: informer_test
+- experiment title: reduce the prototype memory residual's inner confidence factor further from `sqrt(confidence)` to `confidence^0.25` while keeping the outer family-level top1 confidence damping unchanged on top of the exact active keep
+- hypothesis:
+  - the new keep showed that the inner residual confidence wanted some relaxation, so the next narrow interpolation was to move halfway again toward zero inner damping without touching the outer family factor.
+  - if the inner residual was still slightly over-damped after `sqrt(confidence)`, `confidence^0.25` could have lifted h2 further while preserving the same family-level selection discipline.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/baseline.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_memcurve_quarterconf_restore_gru_bundle1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_memcurve_quarterconf_restore_gru_bundle1`
+- run/artifact path: runs/iter_20260415_proto_memcurve_quarterconf_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.1165 / 77.9281`
+- active keep comparison:
+  - current compliant keep AA-Informer = `76.1788 / 80.0079`
+  - quarter-confidence delta vs keep = `-1.0623 / -2.0798`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - both horizons regress below the active keep.
+- 핵심 진단:
+  - relaxing the inner residual damping past `sqrt(confidence)` weakens the prototype memory residual again.
+  - this brackets the useful region more tightly: full top1 confidence was too strong, `sqrt(confidence)` improved the keep, and `confidence^0.25` is already too weak.
+- 판단: SAFE FAILURE / REJECT QUARTER-CONFIDENCE PROTOTYPE MEMORY-CURVE DAMPING
