@@ -32,7 +32,6 @@ aa_forecast:
   star_anomaly_tails:
     upward:
     - GPRD_THREAT
-    - BS_Core_Index_A
     two_sided: []
   thresh: 3.5
   retrieval:

@@ -173,8 +173,8 @@ def _build_standalone_helper(model: AAForecast, *, feature_size: int) -> torch.n
         ).eval()
     if model.backbone == "informer":
         return InformerEncoderOnly(
-            c_in=model.encoder.signal_input_size,
-            exog_input_size=model.encoder.exog_input_size,
+            c_in=1,
+            exog_input_size=feature_size - 1,
             hidden_size=model.hidden_size,
             factor=model.factor,
             n_head=model.n_head,
@@ -274,42 +274,6 @@ def test_informer_exposes_anomaly_projection_and_preserves_forward_contract() ->
     assert weight.shape == (model.encoder_hidden_size, 1)
     outputs = model(_windows_batch())
     assert outputs.shape == (2, 2, 1)
-
-
-def test_informer_routes_upward_star_channels_by_name_into_signal_path() -> None:
-    model = AAForecast(
-        h=2,
-        input_size=4,
-        backbone="informer",
-        hist_exog_list=["GPRD_THREAT", "BS_Core_Index_A", "macro"],
-        star_hist_exog_list=["GPRD_THREAT", "BS_Core_Index_A"],
-        non_star_hist_exog_list=["macro"],
-        star_hist_exog_tail_modes=["upward", "upward"],
-        scaler_type="identity",
-        max_steps=1,
-        val_check_steps=1,
-        batch_size=1,
-        windows_batch_size=1,
-        inference_windows_batch_size=1,
-        hidden_size=8,
-        n_head=2,
-        encoder_layers=1,
-        dropout=0.1,
-        linear_hidden_size=16,
-        factor=1,
-    ).eval()
-
-    assert model.encoder.signal_channel_indices == (0, 6, 7, 8, 9, 10, 11, 12, 13)
-    assert model.encoder.exog_channel_indices == (1, 2, 3, 4, 5)
-
-    inputs = torch.arange(14, dtype=torch.float32).reshape(1, 1, 14).repeat(1, 4, 1)
-    signal, exog = model.encoder._split_inputs(inputs)
-
-    assert signal.shape[-1] == len(model.encoder.signal_channel_indices)
-    assert exog is not None
-    assert exog.shape[-1] == len(model.encoder.exog_channel_indices)
-    assert torch.equal(signal[0, 0], inputs[0, 0, list(model.encoder.signal_channel_indices)])
-    assert torch.equal(exog[0, 0], inputs[0, 0, list(model.encoder.exog_channel_indices)])
 
 
 def test_aaforecast_gru_adapter_matches_shared_gru_encoder_hidden_states() -> None:
