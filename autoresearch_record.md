@@ -3102,3 +3102,36 @@
 - experiment title: restore the exact active keep basis after recording the completed single-confidence damping regression
 - restored anchor commit: `cf2060d8` (`Restore the exact active keep after the memory-gain rejection`)
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 prototype memory-curve sqrt-confidence damping on the active keep
+- timestamp: 2026-04-15T15:xx:00+09:00
+- git branch: informer_test
+- experiment title: replace the prototype memory residual's inner top1-confidence factor with `sqrt(confidence)` while keeping the outer family-level top1 confidence damping unchanged on top of the exact active keep
+- hypothesis:
+  - the active keep's double top1-confidence damping may be directionally correct, but the inner residual term may be slightly over-damped.
+  - the narrowest non-duplicate interpolation is therefore `sqrt(confidence)` on the inner prototype memory residual: stronger than the rejected single-confidence variant, weaker than the current squared-confidence keep.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/baseline.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_memcurve_sqrtconf_restore_gru_bundle1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_memcurve_sqrtconf_restore_gru_bundle1`
+- run/artifact path: runs/iter_20260415_proto_memcurve_sqrtconf_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `76.1788 / 80.0079`
+- previous active keep comparison:
+  - previous compliant keep AA-Informer = `75.9243 / 79.7528`
+  - sqrt-confidence delta vs previous keep = `+0.2545 / +0.2551`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - AA-Informer improves on both horizons over the prior active keep while preserving every current guardrail.
+- 핵심 진단:
+  - the current prototype lane still wants confidence damping, but the inner memory-residual term was indeed slightly over-damped at full top1 confidence.
+  - `sqrt(confidence)` is the first narrow interpolation that improves the compliant keep rather than regressing below it.
+  - h2 still misses the 15% band, so the next blocker remains absolute amplitude transport, but this becomes the strongest fully compliant keep so far.
+- 판단: NEW ACTIVE COMPLIANT KEEP
