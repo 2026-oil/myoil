@@ -3024,3 +3024,35 @@
 - experiment title: restore the exact active keep basis after recording the completed P1+P2 thin bridge regression
 - restored anchor commit: `cf2060d8` (`Restore the exact active keep after the memory-gain rejection`)
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 prototype top2-mass confidence on the active keep
+- timestamp: 2026-04-15T15:xx:00+09:00
+- git branch: informer_test
+- experiment title: replace the prototype keep's top1 memory-confidence scalar with the soft top2 mass while keeping the full prototype bank mix and bounded memory-curve residual unchanged
+- hypothesis:
+  - the active keep may be under-crediting good mixed-bank states when confidence is measured only by the single largest prototype weight.
+  - summing the top2 softmax mass is the narrowest way to acknowledge broader-but-still-concentrated prototype agreement without repeating the rejected hard top-2 masking branch.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/baseline.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_top2mass_restore_gru_bundle1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_top2mass_restore_gru_bundle1`
+- run/artifact path: runs/iter_20260415_proto_top2mass_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.1948 / 77.8519`
+- active keep comparison:
+  - current compliant keep AA-Informer = `75.9243 / 79.7528`
+  - top2-mass delta vs keep = `-0.7295 / -1.9009`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - despite the clean bundle, both horizons regress below the active keep.
+- 핵심 진단:
+  - broadening confidence from top1 to top2 mass is much safer than hard top-2 masking and keeps the prototype lane healthy, but it still over-rewards softer bank mixtures enough to dilute the active keep's stronger amplitude transport.
+  - the keep still benefits from the sharper top1 confidence scalar even while retaining a soft full-bank mix for the prototype curve itself.
+- 판단: SAFE FAILURE / REJECT PROTOTYPE TOP2-MASS CONFIDENCE
