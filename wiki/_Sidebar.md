@@ -23,3 +23,4 @@
 * [AA-Forecast + GRU + Retrieval](AA-Forecast-GRU-Retrieval)
 * [AA-Forecast + Informer + Retrieval](AA-Forecast-Informer-Retrieval)
 * [AA-Forecast 공통 수식·표기·손계산 부록](AA-Forecast-Hand-Calculation-Appendix)
+* [Retrieval 손계산 완전 해설](Retrieval-Deep-Dive-Hand-Calculation)
