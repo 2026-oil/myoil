@@ -3478,3 +3478,10 @@
   - the prototype memory residual does want to stay additive, but fully bypassing the family gate over-strengthens the non-AA baseline bundle path and still weakens the AA-Informer keep.
   - the active keep's current coupling between the family gate and the residual remains the stronger verified compromise.
 - 판단: SAFE FAILURE / REJECT NO-FAMILY-GATE PROTOTYPE MEMORY RESIDUAL
+
+## Iteration 2026-04-15 restore exact active keep after no-family-gate regression
+- timestamp: 2026-04-15T16:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed no-family-gate regression
+- restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
