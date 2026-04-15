@@ -29,6 +29,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_AUTO_MODEL_ONLY_MAIN_CONFIG = Path(
     "tests/fixtures/aa_forecast_runtime_plugin_auto_model_only_main.yaml"
 )
+AA_FORECAST_GRU_RET_EXPERIMENT_CONFIG = Path(
+    "yaml/experiment/feature_set_aaforecast/aaforecast-gru-ret.yaml"
+)
 SUPPORTED_AA_BACKBONES = [
     "gru",
     "informer",
@@ -704,6 +707,20 @@ def test_load_app_config_accepts_supported_aa_forecast_backbones(
     assert loaded.config.stage_plugin_config.config_path == str(plugin_path)
 
 
+def test_feature_set_gru_ret_route_resolves_to_learned_auto() -> None:
+    loaded = load_app_config(
+        REPO_ROOT,
+        config_path=REPO_ROOT / AA_FORECAST_GRU_RET_EXPERIMENT_CONFIG,
+    )
+
+    assert len(loaded.config.jobs) == 1
+    job = loaded.config.jobs[0]
+    assert job.model == "AAForecast"
+    assert job.requested_mode == "learned_auto_requested"
+    assert job.validated_mode == "learned_auto"
+    assert job.selected_search_params
+
+
 def test_load_app_config_rejects_backbone_specific_unknown_model_param(
     tmp_path: Path,
 ) -> None:
@@ -1057,6 +1074,118 @@ def test_predict_aa_forecast_fold_uses_trial_specific_overrides(
         pd.Timestamp(train_df[loaded.config.dataset.dt_col].iloc[-1])
     )
     assert used_train_df.equals(train_df)
+
+
+def test_run_single_job_replay_routes_plugin_tuned_params_as_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    loaded = load_app_config(
+        REPO_ROOT,
+        config_path=REPO_ROOT / PLUGIN_AUTO_MODEL_ONLY_MAIN_CONFIG,
+    )
+    auto_job = replace(
+        loaded.config.jobs[0],
+        validated_mode="learned_auto",
+        selected_search_params=("encoder_hidden_size",),
+    )
+    loaded = replace(loaded, config=replace(loaded.config, jobs=(auto_job,)))
+    selection = runtime.StudySelection(
+        study_count=1,
+        configured_selected_study_index=None,
+        cli_selected_study_index=None,
+        selected_study_index=None,
+        canonical_projection_study_index=1,
+        execute_study_indices=(1,),
+    )
+    study_root = tmp_path / "run" / "models" / auto_job.model / "studies" / "study-01"
+
+    monkeypatch.setattr(runtime, "resolve_study_selection", lambda _loaded: selection)
+    monkeypatch.setattr(
+        runtime,
+        "build_study_context",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            study_root=study_root,
+            study_index=1,
+            selection=selection,
+        ),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_load_main_tuning_result",
+        lambda *_args, **_kwargs: (
+            {"encoder_hidden_size": 64, "recency_gap_steps": 4},
+            {},
+            {"best_value": 0.1, "trial_count": 1, "finished_trial_count": 1},
+        ),
+    )
+    monkeypatch.setattr(runtime, "_resolve_freq", lambda *_args, **_kwargs: "W-MON")
+    monkeypatch.setattr(
+        runtime, "_build_tscv_splits", lambda *_args, **_kwargs: [([0, 1, 2], [3])]
+    )
+    monkeypatch.setattr(
+        runtime,
+        "build_study_visualizations",
+        lambda *_args, **_kwargs: {"artifact_inventory_path": "noop"},
+    )
+    monkeypatch.setattr(
+        runtime,
+        "build_cross_study_visualizations",
+        lambda *_args, **_kwargs: {"artifact_inventory_path": "noop"},
+    )
+    monkeypatch.setattr(runtime, "_write_stage_study_catalog", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(runtime, "_update_manifest_artifacts", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(runtime, "_write_loss_curve_artifact", lambda *_args, **_kwargs: None)
+
+    captured: dict[str, Any] = {}
+
+    class _FakePlugin:
+        def predict_fold(
+            self,
+            loaded_arg,
+            job_arg,
+            *,
+            train_df,
+            future_df,
+            run_root,
+            params_override=None,
+            training_override=None,
+        ):
+            del loaded_arg, job_arg, run_root, training_override
+            captured["params_override"] = params_override
+            return (
+                pd.DataFrame(
+                    {
+                        "unique_id": [loaded.config.dataset.target_col],
+                        "ds": pd.to_datetime(
+                            future_df[loaded.config.dataset.dt_col]
+                        ).reset_index(drop=True),
+                        auto_job.model: [1.0],
+                    }
+                ),
+                future_df[loaded.config.dataset.target_col].reset_index(drop=True),
+                pd.Timestamp(train_df[loaded.config.dataset.dt_col].iloc[-1]),
+                train_df,
+                None,
+            )
+
+    monkeypatch.setattr(
+        runtime,
+        "_plugin_owned_top_level_job",
+        lambda _loaded, model_name: _FakePlugin() if model_name == "AAForecast" else None,
+    )
+
+    run_root = tmp_path / "run"
+    runtime._run_single_job(
+        loaded,
+        auto_job,
+        run_root,
+        manifest_path=run_root / "manifest" / "run_manifest.json",
+        main_stage="replay-only",
+    )
+
+    assert captured["params_override"]["encoder_hidden_size"] == 64
+    assert captured["params_override"]["recency_gap_steps"] == 4
 
 
 def test_predict_aa_forecast_fold_writes_informer_encoding_export_artifacts(
@@ -1657,6 +1786,33 @@ def test_split_runtime_overrides_moves_retrieval_keys_out_of_model_payload() -> 
         "min_similarity": 0.8,
         "use_shape_key": False,
     }
+
+
+def test_normalize_legacy_best_params_for_replay_maps_aaforecast_top_k() -> None:
+    job = SimpleNamespace(model="AAForecast")
+    normalized = runtime._normalize_legacy_best_params_for_replay(
+        job,
+        {"top_k": 0.2, "season_length": 4},
+    )
+
+    assert "top_k" not in normalized
+    assert normalized["thresh"] == pytest.approx(0.2)
+    assert normalized["season_length"] == 4
+
+
+def test_sanitize_aaforecast_trial_params_enforces_similarity_key() -> None:
+    sanitized = runtime._sanitize_aaforecast_trial_params(
+        model_name="AAForecast",
+        candidate_params={
+            "use_shape_key": False,
+            "use_event_key": False,
+            "season_length": 4,
+        },
+    )
+
+    assert sanitized["use_shape_key"] is False
+    assert sanitized["use_event_key"] is True
+    assert sanitized["season_length"] == 4
 
 
 def test_apply_retrieval_overrides_updates_runtime_retrieval_config() -> None:

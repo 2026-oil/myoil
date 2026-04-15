@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass, replace
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -2841,6 +2842,7 @@ def _run_single_job(
     metrics_rows: list[dict[str, object]] = []
     effective_job = job
     effective_training_params: dict[str, Any] = {}
+    replay_params_override: dict[str, Any] | None = None
     models_dir = run_root / "models" / job.model
     models_dir.mkdir(parents=True, exist_ok=True)
     total_steps = len(splits)
@@ -2992,7 +2994,14 @@ def _run_single_job(
                 search_space_payload=loaded.search_space_payload,
             ),
         )
-        effective_job = replace(job, params=best_params)
+        if _plugin_owned_top_level_job(loaded, job.model) is not None:
+            # Plugin-owned models may tune stage-specific keys that are invalid
+            # as base model constructor kwargs. Keep base params untouched and
+            # forward tuned values through per-fold trial overrides instead.
+            effective_job = replace(job, params=dict(job.params))
+            replay_params_override = dict(best_params)
+        else:
+            effective_job = replace(job, params=best_params)
         effective_training_params = best_training_params
 
     if effective_job.model in BASELINE_MODEL_NAMES:
@@ -3025,6 +3034,7 @@ def _run_single_job(
                     "freq": freq,
                     "train_idx": train_idx,
                     "test_idx": test_idx,
+                    "params_override": replay_params_override,
                     "training_override": effective_training_params,
                 }
                 if get_active_stage_plugin(loaded.config) is not None:
