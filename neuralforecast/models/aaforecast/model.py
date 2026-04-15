@@ -940,18 +940,23 @@ class InformerHorizonAwareHead(nn.Module):
             need_weights=False,
         )
         prototype_memory_curve = 0.1 * torch.tanh(self.local_head(memory_transport_states)) * anchor_scale
+        prototype_memory_gate = torch.sigmoid(
+            self.memory_transport_gate_head(trajectory_context)
+        ).unsqueeze(1)
         prototype_component = (
             prototype_level
             + prototype_curve
-            + (prototype_memory_curve * memory_confidence.unsqueeze(1))
+            + (
+                prototype_memory_curve
+                * prototype_memory_gate
+                * memory_confidence.unsqueeze(1)
+            )
         ) * family_gate * memory_confidence.unsqueeze(1)
         memory_transport = torch.cumsum(
             F.softplus(self.local_head(memory_transport_states)),
             dim=1,
         )
-        memory_transport_gate = (
-            1.0 + torch.sigmoid(self.memory_transport_gate_head(trajectory_context))
-        ).unsqueeze(1)
+        memory_transport_gate = 1.0 + prototype_memory_gate
         analogue_component = trajectory_component + (
             memory_transport * memory_transport_gate * anchor_scale
         )

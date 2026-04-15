@@ -2892,3 +2892,22 @@
   - the soft prototype selector works better when decoder memory is injected as a bounded post-selection transport residual than when the selector itself is hardened or query-hinted.
   - this is a decoder-side memory-bank refinement that preserves the anti-leakage guardrails and currently becomes the strongest compliant keep.
 - 판단: NEW ACTIVE COMPLIANT KEEP
+
+
+## Iteration 2026-04-15 prototype memory-curve gate on the active keep
+- timestamp: 2026-04-15T11:xx:00+09:00
+- git branch: informer_test
+- experiment title: gate the bounded prototype memory residual with the learned memory-transport gate while keeping the soft prototype selector unchanged on top of the exact active keep
+- run/artifact path: runs/iter_20260415_proto_memgatedcurve_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `74.4557 / 76.2160`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - AA-GRU and AA-Informer keep `h2 > h1`, but the competing non-AA informer inside the bundle loses monotonicity and the AA-Informer lane regresses well below the active keep `75.9243 / 79.7528`
+  - target gates missed badly
+- 핵심 진단:
+  - the learned memory-transport gate is too suppressive when moved onto the new prototype memory residual.
+  - post-selection memory transport should stay additive and lightly bounded rather than being re-gated by the analogue transport head.
+- 판단: SAFE FAILURE / REJECT PROTOTYPE MEMORY-CURVE GATE
