@@ -3664,3 +3664,35 @@
 - experiment title: restore the exact active keep basis after recording the completed 7-slot bank regression
 - restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 prototype increment-bank init scale 0.07 on the active keep
+- timestamp: 2026-04-15T17:xx:00+09:00
+- git branch: informer_test
+- experiment title: raise the prototype increment-bank initialization scale from `0.05` to `0.07` while keeping the active keep's selector, confidence placement, and 6-slot bank size unchanged
+- hypothesis:
+  - after bank-size and gating micro-probes regressed, the next narrow transport-side question was whether the prototype bank simply wanted slightly larger learned increments at initialization without changing routing or confidence structure.
+  - this probe only lifted the increment-bank init scale and left the key-bank scale untouched.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/baseline.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_incscale007_restore_gru_bundle1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_incscale007_restore_gru_bundle1`
+- run/artifact path: runs/iter_20260415_proto_incscale007_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.2059 / 73.6524`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.2672 / 77.9713`
+- active keep comparison:
+  - current compliant keep AA-Informer = `76.1788 / 80.0079`
+  - increment-scale delta vs keep = `-0.9116 / -2.0366`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - both horizons regress below the active keep.
+- 핵심 진단:
+  - simply making the prototype increment bank start larger does not improve the active keep and instead weakens both horizons.
+  - this suggests the remaining bottleneck is not an under-scaled increment-bank initialization.
+- 판단: SAFE FAILURE / REJECT 0.07 PROTOTYPE INCREMENT-BANK INIT SCALE

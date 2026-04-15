@@ -341,7 +341,7 @@ class InformerHorizonAwareHead(nn.Module):
             0.05 * torch.randn(6, hidden_size)
         )
         self.prototype_increment_bank = nn.Parameter(
-            0.05 * torch.randn(6, self.h, out_features)
+            0.07 * torch.randn(6, self.h, out_features)
         )
         self.memory_transport_gate_head = MLP(
             in_features=trajectory_context_features,
