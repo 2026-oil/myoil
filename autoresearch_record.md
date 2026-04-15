@@ -3206,3 +3206,10 @@
   - relaxing the inner residual damping past `sqrt(confidence)` weakens the prototype memory residual again.
   - this brackets the useful region more tightly: full top1 confidence was too strong, `sqrt(confidence)` improved the keep, and `confidence^0.25` is already too weak.
 - 판단: SAFE FAILURE / REJECT QUARTER-CONFIDENCE PROTOTYPE MEMORY-CURVE DAMPING
+
+## Iteration 2026-04-15 restore exact active keep after quarter-confidence regression
+- timestamp: 2026-04-15T16:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed quarter-confidence regression
+- restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
