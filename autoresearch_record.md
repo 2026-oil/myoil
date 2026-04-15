@@ -3323,3 +3323,10 @@
   - the active lane is very close to its local optimum on this scalar axis.
   - moving from `0.10` to `0.11` is much less harmful than `0.12`, but it still does not beat the keep on the user-prioritized h2 target.
 - 판단: SAFE FAILURE / REJECT 0.11-SCALE PROTOTYPE MEMORY-CURVE
+
+## Iteration 2026-04-15 restore exact active keep after 0.11-scale regression
+- timestamp: 2026-04-15T16:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed 0.11-scale regression
+- restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
