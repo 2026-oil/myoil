@@ -3620,3 +3620,10 @@
   - the keep's prototype family clearly needs the full 6-slot bank; even a one-slot contraction is materially destructive.
   - this removes remaining ambiguity around bank-size tuning on the smaller side.
 - 판단: SAFE FAILURE / REJECT 5-SLOT PROTOTYPE BANK
+
+## Iteration 2026-04-15 restore exact active keep after 5-slot bank regression
+- timestamp: 2026-04-15T17:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed 5-slot bank regression
+- restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
