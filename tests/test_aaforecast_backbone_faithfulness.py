@@ -504,7 +504,7 @@ def test_itransformer_adapter_keeps_sparse_attention_and_decode_in_token_space()
     assert model.itransformer_decoder.in_features == 2 * model.hidden_size
 
 
-def test_informer_event_projection_paths_keep_decoder_width_stable() -> None:
+def test_informer_shared_decoder_path_keeps_decoder_width_stable() -> None:
     model = _make_model(
         "informer",
         hidden_size=8,
@@ -516,27 +516,10 @@ def test_informer_event_projection_paths_keep_decoder_width_stable() -> None:
     )
     hidden_states = torch.randn(2, model.input_size, model.hidden_size)
     attended_states = torch.randn(2, model.input_size, model.hidden_size)
-    event_summary = torch.tensor(
-        [
-            [0.1] * model.EVENT_SUMMARY_SIZE,
-            [0.8] * model.EVENT_SUMMARY_SIZE,
-        ],
-        dtype=hidden_states.dtype,
-    )
-    event_trajectory = torch.tensor(
-        [
-            [0.1] * model.EVENT_TRAJECTORY_SIZE,
-            [0.8] * model.EVENT_TRAJECTORY_SIZE,
-        ],
-        dtype=hidden_states.dtype,
-    )
-
     hidden_aligned, attended_aligned = model._build_time_decoder_features(
         hidden_states=hidden_states,
         attended_states=attended_states,
     )
-    event_latent = model._project_event_summary(event_summary)
-    event_path = model._project_event_trajectory(event_trajectory)
     decoder_input = model._build_time_decoder_input(
         hidden_states=hidden_states,
         attended_states=attended_states,
@@ -544,8 +527,7 @@ def test_informer_event_projection_paths_keep_decoder_width_stable() -> None:
 
     assert hidden_aligned.shape == (2, model.h, model.hidden_size)
     assert attended_aligned.shape == hidden_aligned.shape
-    assert event_latent.shape == (2, model.hidden_size)
-    assert event_path.shape == (2, model.hidden_size)
     assert decoder_input.shape == (2, model.h, 2 * model.hidden_size)
-    assert not torch.allclose(event_latent[0], event_latent[1])
-    assert not torch.allclose(event_path[0], event_path[1])
+    assert model.decoder is not None
+    decoded = model.decoder(decoder_input)
+    assert decoded.shape == (2, model.h, model.loss.outputsize_multiplier)

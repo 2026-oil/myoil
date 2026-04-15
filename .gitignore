@@ -62,3 +62,7 @@ CLAUDE.md
 /runs/
 /runs.zip
 .omx/
+
+# generated sweep configs
+yaml/plugins/aa_forecast/sweep/
+yaml/experiment/sweep_retrieval/

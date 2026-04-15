@@ -2,17 +2,15 @@ runtime:
   random_seed: 1
   opt_study_count: 2
   opt_n_trial: 2
-  transformations_target: diff
-  transformations_exog: diff
 training:
   input_size: 64
   batch_size: 32
   valid_batch_size: 2
   windows_batch_size: 64
   inference_windows_batch_size: 64
-  max_steps: 800
+  max_steps: 500
   val_size: 2
-  scaler_type: null
+  scaler_type: robust
   val_check_steps: 4
   min_steps_before_early_stop: 200
   model_step_size: 1
@@ -36,7 +34,7 @@ cv:
   gap: 0
   horizon: 2
   step_size: 4
-  n_windows: 1
+  n_windows: 6
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean
 scheduler:

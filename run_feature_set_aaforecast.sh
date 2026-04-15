@@ -9,8 +9,12 @@ configs=(
   "yaml/experiment/feature_set_aaforecast/baseline-ret.yaml"
   "yaml/experiment/feature_set_aaforecast/aaforecast-informer-ret.yaml"
   "yaml/experiment/feature_set_aaforecast/aaforecast-gru-ret.yaml"
+  "yaml/experiment/feature_set_aaforecast/aaforecast-patchtst-ret.yaml"
+  "yaml/experiment/feature_set_aaforecast/aaforecast-timexer-ret.yaml"
   "yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml"
   "yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml"
+  "yaml/experiment/feature_set_aaforecast/aaforecast-patchtst.yaml"
+  "yaml/experiment/feature_set_aaforecast/aaforecast-timexer.yaml"
 )
 
 printf -v nf_case_configs '%s\n' "${configs[@]}"

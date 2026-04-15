@@ -738,61 +738,95 @@ def _trace_current_replay(bundle: ReplayBundle, trace: TraceBuilder) -> tuple[li
         non_star_regime = star_payload["non_star_regime"].to(device=hidden_states.device, dtype=hidden_states.dtype)
         regime_intensity = star_payload["regime_intensity"].to(device=hidden_states.device, dtype=hidden_states.dtype)
         regime_density = star_payload["regime_density"].to(device=hidden_states.device, dtype=hidden_states.dtype)
-        attention_hidden_states = hidden_states + model._project_regime_time_context(regime_intensity, regime_density)
         critical_mask = star_payload["critical_mask"].bool()
         count_active_channels = star_payload["count_active_channels"].to(device=hidden_states.device, dtype=hidden_states.dtype)
         channel_activity = star_payload["channel_activity"].to(device=hidden_states.device, dtype=hidden_states.dtype)
         attended_states, attention_weights = model.attention(
-            attention_hidden_states,
+            hidden_states,
             critical_mask,
             count_active_channels,
             channel_activity,
         )
-        hidden_aligned, attended_aligned = model._build_time_decoder_features(
-            hidden_states=attention_hidden_states,
-            attended_states=attended_states,
-        )
-        regime_time_latent = model._project_regime_time_context(regime_intensity, regime_density)
-        regime_time_aligned = _align_horizon(
-            regime_time_latent,
-            h=model.h,
-            input_size=model.input_size,
-            sequence_adapter=model.sequence_adapter,
-        )
-        event_context = model._project_event_summary(event_summary)
-        event_path = model._project_event_trajectory(event_trajectory)
-        pooled_context = model._build_memory_pooled_context(
-            hidden_states=attention_hidden_states,
-            attended_states=attended_states,
-            event_context=event_context,
-            event_path=event_path,
-            non_star_regime=non_star_regime,
-            regime_intensity=regime_intensity,
-            regime_density=regime_density,
-        )
-        memory_token = getattr(model, "_latest_memory_token", None)
-        if memory_token is None:
-            memory_token = pooled_context
-        memory_bank = getattr(model, "_latest_memory_bank", None)
-        memory_signal = getattr(model, "_latest_memory_signal", None)
-        decoder_input = torch.cat(
-            [hidden_aligned + regime_time_aligned, attended_aligned + regime_time_aligned],
-            dim=-1,
-        )
-        delta_forecast = _trace_informer_head(
-            model.informer_decoder,
-            decoder_input=decoder_input,
-            event_summary=event_context,
-            event_path=event_path,
-            raw_regime=non_star_regime,
-            pooled_context=pooled_context,
-            memory_signal=memory_signal,
-            anchor_value=insample_y[:, -1, :],
-            memory_token=memory_token,
-            memory_bank=memory_bank,
-            trace=trace,
-        )
-        final_diff = insample_y[:, -1:, :].to(dtype=delta_forecast.dtype) + delta_forecast
+        if model.informer_decoder is None:
+            decoder_input = model._build_time_decoder_input(
+                hidden_states=hidden_states,
+                attended_states=attended_states,
+            )
+            delta_forecast = model.decoder(decoder_input)
+            final_diff = delta_forecast[:, -model.h :]
+            trace.add(
+                "decoder",
+                "head.decoder_input",
+                decoder_input,
+                "Shared decoder input passed into the GRU-style AAForecast decoder path.",
+            )
+            trace.add(
+                "forecast",
+                "forecast.delta_forecast_diff",
+                final_diff,
+                "Shared decoder output on the diff scale.",
+            )
+        else:
+            attention_hidden_states = hidden_states + model._project_regime_time_context(regime_intensity, regime_density)
+            hidden_aligned, attended_aligned = model._build_time_decoder_features(
+                hidden_states=attention_hidden_states,
+                attended_states=attended_states,
+            )
+            regime_time_latent = model._project_regime_time_context(regime_intensity, regime_density)
+            regime_time_aligned = _align_horizon(
+                regime_time_latent,
+                h=model.h,
+                input_size=model.input_size,
+                sequence_adapter=model.sequence_adapter,
+            )
+            event_context = model._project_event_summary(event_summary)
+            event_path = model._project_event_trajectory(event_trajectory)
+            pooled_context = model._build_memory_pooled_context(
+                hidden_states=attention_hidden_states,
+                attended_states=attended_states,
+                event_context=event_context,
+                event_path=event_path,
+                non_star_regime=non_star_regime,
+                regime_intensity=regime_intensity,
+                regime_density=regime_density,
+            )
+            memory_token = getattr(model, "_latest_memory_token", None)
+            if memory_token is None:
+                memory_token = pooled_context
+            memory_bank = getattr(model, "_latest_memory_bank", None)
+            memory_signal = getattr(model, "_latest_memory_signal", None)
+            decoder_input = torch.cat(
+                [hidden_aligned + regime_time_aligned, attended_aligned + regime_time_aligned],
+                dim=-1,
+            )
+            delta_forecast = _trace_informer_head(
+                model.informer_decoder,
+                decoder_input=decoder_input,
+                event_summary=event_context,
+                event_path=event_path,
+                raw_regime=non_star_regime,
+                pooled_context=pooled_context,
+                memory_signal=memory_signal,
+                anchor_value=insample_y[:, -1, :],
+                memory_token=memory_token,
+                memory_bank=memory_bank,
+                trace=trace,
+            )
+            final_diff = insample_y[:, -1:, :].to(dtype=delta_forecast.dtype) + delta_forecast
+            trace.add("attention", "attention.attention_hidden_states", attention_hidden_states, "Hidden states after adding regime-time conditioning before sparse attention.")
+            trace.add("attention", "attention.hidden_aligned", hidden_aligned, "Hidden states aligned from input_size=64 down to horizon=2.")
+            trace.add("attention", "attention.attended_aligned", attended_aligned, "Sparse-attended states aligned to the horizon dimension.")
+            trace.add("attention", "attention.regime_time_latent", regime_time_latent, "Regime-time context projected into hidden space before horizon alignment.")
+            trace.add("attention", "attention.regime_time_aligned", regime_time_aligned, "Regime-time context aligned to the horizon dimension.")
+            trace.add("attention", "attention.event_context", event_context, "Projected event summary used by the decoder head.")
+            trace.add("attention", "attention.event_path", event_path, "Projected event trajectory used by the decoder head.")
+            trace.add("attention", "attention.pooled_context", pooled_context, "Memory-pooled context vector built from hidden states, attended states, and regime signals.")
+            if memory_token is not None:
+                trace.add("attention", "attention.memory_token", memory_token, "Top memory token selected by the pooled-context builder.")
+            if memory_bank is not None:
+                trace.add("attention", "attention.memory_bank", memory_bank, "Top-k memory bank gathered by the pooled-context builder.")
+            if memory_signal is not None:
+                trace.add("attention", "attention.memory_signal", memory_signal, "Mean top-k memory signal used by the decoder gates.")
         final_level = _restore_prediction_series(
             pd.Series(final_diff.detach().cpu().numpy().reshape(-1)),
             bundle.diff_context,
@@ -805,25 +839,10 @@ def _trace_current_replay(bundle: ReplayBundle, trace: TraceBuilder) -> tuple[li
         trace.add("attention", "attention.non_star_regime", non_star_regime, "Raw non-STAR regime descriptor vector entering the Informer attention/decode path.")
         trace.add("attention", "attention.regime_intensity", regime_intensity, "Per-timestep regime intensity used for attention-time conditioning.")
         trace.add("attention", "attention.regime_density", regime_density, "Per-timestep regime density used for attention-time conditioning.")
-        trace.add("attention", "attention.attention_hidden_states", attention_hidden_states, "Hidden states after adding regime-time conditioning before sparse attention.")
         trace.add("attention", "attention.attention_weights", attention_weights, "Sparse-attention weights returned by the AAForecast CriticalSparseAttention module.")
         trace.add("attention", "attention.attended_states", attended_states, "Sparse-attention output states.")
-        trace.add("attention", "attention.hidden_aligned", hidden_aligned, "Hidden states aligned from input_size=64 down to horizon=2.")
-        trace.add("attention", "attention.attended_aligned", attended_aligned, "Sparse-attended states aligned to the horizon dimension.")
-        trace.add("attention", "attention.regime_time_latent", regime_time_latent, "Regime-time context projected into hidden space before horizon alignment.")
-        trace.add("attention", "attention.regime_time_aligned", regime_time_aligned, "Regime-time context aligned to the horizon dimension.")
-        trace.add("attention", "attention.event_context", event_context, "Projected event summary used by the decoder head.")
-        trace.add("attention", "attention.event_path", event_path, "Projected event trajectory used by the decoder head.")
-        trace.add("attention", "attention.pooled_context", pooled_context, "Memory-pooled context vector built from hidden states, attended states, and regime signals.")
-        if memory_token is not None:
-            trace.add("attention", "attention.memory_token", memory_token, "Top memory token selected by the pooled-context builder.")
-        if memory_bank is not None:
-            trace.add("attention", "attention.memory_bank", memory_bank, "Top-k memory bank gathered by the pooled-context builder.")
-        if memory_signal is not None:
-            trace.add("attention", "attention.memory_signal", memory_signal, "Mean top-k memory signal used by the decoder gates.")
-        trace.add("forecast", "forecast.delta_forecast_diff", delta_forecast, "Decoder-head output on the diff scale before the outer anchor is added.")
-        trace.add("forecast", "forecast.anchor_diff", insample_y[:, -1:, :], "Last diff-scale input value used as the model-level anchor in `_decode_informer_forecast`.")
-        trace.add("forecast", "forecast.final_prediction_diff", final_diff, "Current-code replay final model prediction on the diff scale after adding the diff anchor.")
+        trace.add("forecast", "forecast.anchor_diff", insample_y[:, -1:, :], "Last diff-scale input value for the current replay window.")
+        trace.add("forecast", "forecast.final_prediction_diff", final_diff, "Current-code replay final model prediction on the diff scale.")
         trace.add("forecast", "forecast.final_prediction_level", final_level, "Current-code replay final model prediction restored back to the raw level scale.")
         return final_diff.detach().cpu().numpy().reshape(-1).tolist(), final_level
 

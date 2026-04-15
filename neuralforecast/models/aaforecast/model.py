@@ -1277,79 +1277,6 @@ class AAForecast(BaseModel):
             self.memory_token_shock_head = None
             self.memory_token_shock_gate = None
             self.event_trajectory_projector = None
-        elif self.backbone == "informer":
-            self.event_summary_projector = MLP(
-                in_features=self.EVENT_SUMMARY_SIZE,
-                out_features=self.encoder_hidden_size,
-                hidden_size=max(self.encoder_hidden_size, decoder_hidden_size),
-                num_layers=2,
-                activation="ReLU",
-                dropout=self.encoder_dropout,
-            )
-            self.regime_time_projector = MLP(
-                in_features=2,
-                out_features=self.encoder_hidden_size,
-                hidden_size=max(self.encoder_hidden_size, decoder_hidden_size),
-                num_layers=2,
-                activation="ReLU",
-                dropout=self.encoder_dropout,
-            )
-            self.memory_query_projector = MLP(
-                in_features=(2 * self.encoder_hidden_size) + self.NON_STAR_REGIME_SIZE,
-                out_features=self.encoder_hidden_size,
-                hidden_size=max(self.encoder_hidden_size, decoder_hidden_size),
-                num_layers=2,
-                activation="ReLU",
-                dropout=self.encoder_dropout,
-            )
-            self.memory_key_projector = nn.Linear(
-                self.encoder_hidden_size,
-                self.encoder_hidden_size,
-            )
-            self.memory_value_projector = nn.Linear(
-                self.encoder_hidden_size,
-                self.encoder_hidden_size,
-            )
-            memory_token_in_features = 3 * self.encoder_hidden_size
-            self.memory_token_shock_head = MLP(
-                in_features=memory_token_in_features,
-                out_features=self.h * self.loss.outputsize_multiplier,
-                hidden_size=max(memory_token_in_features, decoder_hidden_size),
-                num_layers=max(2, decoder_layers),
-                activation="ReLU",
-                dropout=self.encoder_dropout,
-            )
-            self.memory_token_shock_gate = MLP(
-                in_features=memory_token_in_features,
-                out_features=self.loss.outputsize_multiplier,
-                hidden_size=max(memory_token_in_features, decoder_hidden_size),
-                num_layers=2,
-                activation="ReLU",
-                dropout=self.encoder_dropout,
-            )
-            self.event_trajectory_projector = MLP(
-                in_features=self.EVENT_TRAJECTORY_SIZE,
-                out_features=self.encoder_hidden_size,
-                hidden_size=max(self.encoder_hidden_size, decoder_hidden_size),
-                num_layers=2,
-                activation="ReLU",
-                dropout=self.encoder_dropout,
-            )
-            self.informer_decoder = InformerHorizonAwareHead(
-                h=self.h,
-                in_features=2 * self.encoder_hidden_size,
-                event_features=self.encoder_hidden_size,
-                path_features=self.encoder_hidden_size,
-                regime_features=self.NON_STAR_REGIME_SIZE,
-                pooled_features=self.encoder_hidden_size,
-                hidden_size=decoder_hidden_size,
-                out_features=self.loss.outputsize_multiplier,
-                num_layers=decoder_layers,
-                dropout=self.encoder_dropout,
-            )
-            self.decoder = None
-            self.timexer_decoder = None
-            self.itransformer_decoder = None
         else:
             self.decoder = MLP(
                 in_features=2 * self.encoder_hidden_size,
@@ -1371,11 +1298,7 @@ class AAForecast(BaseModel):
             self.memory_token_shock_gate = None
             self.event_trajectory_projector = None
 
-        self.transformer_anomaly_projection = (
-            nn.Linear(1, self.encoder_hidden_size)
-            if self.backbone == "informer"
-            else None
-        )
+        self.transformer_anomaly_projection = None
 
     def configure_stochastic_inference(
         self,
@@ -2807,30 +2730,12 @@ class AAForecast(BaseModel):
                 device=hidden_states.device,
                 dtype=hidden_states.dtype,
             )
-        attention_hidden_states = hidden_states
-        if self.backbone == "informer":
-            attention_hidden_states = hidden_states + self._project_regime_time_context(
-                regime_intensity,
-                regime_density,
-            )
         attended_states, _ = self.attention(
-            attention_hidden_states,
+            hidden_states,
             critical_mask,
             count_active_channels,
             channel_activity,
         )
-        if self.backbone == "informer":
-            return self._decode_informer_forecast(
-                hidden_states=attention_hidden_states,
-                attended_states=attended_states,
-                event_summary=event_summary,
-                event_trajectory=event_trajectory,
-                non_star_regime=non_star_regime,
-                anchor_level=insample_y,
-                regime_intensity=regime_intensity,
-                regime_density=regime_density,
-                count_active_channels=count_active_channels,
-            )
         if self.decoder is None:
             raise ValueError("Shared decoder is not initialized")
         decoder_input = self._build_time_decoder_input(
