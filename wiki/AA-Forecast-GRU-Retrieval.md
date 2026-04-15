@@ -46,49 +46,49 @@ AA-GRU 대비 추가되는 단계는 retrieval memory branch입니다.
 ## 6. Core formulas used in this variant
 
 AA-GRU base output을
-$$
+```math
 \hat y_h^{AA-GRU, base}
-$$
+```
 
 retrieval memory output을
-$$
+```math
 \hat y_h^{mem}
-$$
+```
 
 라 두면,
 
-$$
+```math
 \hat y_h^{final} = (1-\lambda_h) \hat y_h^{AA-GRU, base} + \lambda_h \hat y_h^{mem}
-$$
+```
 
 즉 full pipeline의 핵심은 “AA가 만든 base prediction” 을 retrieval이 posthoc으로 다시 끌어당긴다는 점입니다.
 
 ## 7. Toy sample setup
 
 query:
-$$
+```math
 Q = [107, 110, 121, 132]
-$$
+```
 
 retrieved return path:
-$$
+```math
 \bar r = [0.10, 0.20]
-$$
+```
 
 memory prediction:
-$$
+```math
 \hat y^{mem} = [145.2, 158.4]
-$$
+```
 
 AA-GRU schematic base output:
-$$
+```math
 \hat y^{AA-GRU, base} = [140, 146]
-$$
+```
 
 uncertainty-gated blend weight:
-$$
+```math
 \lambda = [0.4435, 0.887]
-$$
+```
 
 ## 8. Step-by-step hand calculation
 
@@ -99,28 +99,28 @@ AA-GRU 페이지와 동일하게 target / star exog decomposition을 통해 even
 ### Step 2 — AA base prediction (schematic)
 
 teaching용으로
-$$
+```math
 \hat y^{AA-GRU, base} = [140, 146]
-$$
+```
 
 라고 둡니다.
 
 ### Step 3 — retrieval memory prediction (literal)
 
-$$
+```math
 \hat y^{mem} = [145.2, 158.4]
-$$
+```
 
 ### Step 4 — final blend (literal)
 
-$$
+```math
 \hat y^{AA-GRU}_{final} = (1-\lambda) \hat y^{AA-GRU, base} + \lambda \hat y^{mem}
-$$
+```
 
 따라서
-$$
+```math
 \hat y^{AA-GRU}_{final} = [142.3062, 156.9988]
-$$
+```
 
 ## 9. Interpretation
 

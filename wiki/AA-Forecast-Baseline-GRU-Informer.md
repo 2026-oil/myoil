@@ -41,27 +41,27 @@ uv run python main.py --config yaml/experiment/feature_set_aaforecast/baseline.y
 ### schematic
 - GRU 내부 hidden state update
 - Informer 내부 attention score 계산
-- base forecast $\hat y^{base}$ 를 학습된 모델이 어떻게 만드는지의 세부 weight 계산
+- base forecast $`\hat y^{base}`$ 를 학습된 모델이 어떻게 만드는지의 세부 weight 계산
 
 ## 6. Core formulas used in this variant
 
 baseline에는 retrieval이 없으므로 literal 수식은 주로 window 정의입니다.
 
-$$
+```math
 Q = [y_{T-L+1}, \dots, y_T]
-$$
+```
 
-그리고 각 model은 같은 $Q$ 를 받아 서로 다른 learned function을 적용합니다.
+그리고 각 model은 같은 $`Q`$ 를 받아 서로 다른 learned function을 적용합니다.
 
-$$
+```math
 \hat y_h^{GRU} = f_{GRU}(Q, X)
-$$
+```
 
-$$
+```math
 \hat y_h^{Informer} = f_{Informer}(Q, X)
-$$
+```
 
-여기서 $X$ 는 같은 기간의 hist exogenous window 입니다.
+여기서 $`X`$ 는 같은 기간의 hist exogenous window 입니다.
 
 > [!NOTE]
 > Provenance: `toy simplification`
@@ -71,9 +71,9 @@ $$
 ## 7. Toy sample setup
 
 공통 toy target series:
-$$
+```math
 [100, 101, 102, 120, 132, 126, 107, 110, 121, 132]
-$$
+```
 
 toy에서는 `L=4`, `H=2` 로 둡니다.
 
@@ -83,9 +83,9 @@ toy에서는 `L=4`, `H=2` 로 둡니다.
 
 마지막 4개 값만 취하면:
 
-$$
+```math
 Q = [107, 110, 121, 132]
-$$
+```
 
 이건 GRU와 Informer가 **공통으로 받는 baseline input window** 입니다.
 
@@ -102,9 +102,9 @@ $$
 
 예시적 표기:
 
-$$
+```math
 \hat y^{GRU}_{base} = [136, 138]
-$$
+```
 
 이 숫자 자체는 **손으로 재현한 repo output이 아니라**, “baseline learned layer가 이렇게 두 값을 낸다”는 teaching용 placeholder 입니다.
 
@@ -117,9 +117,9 @@ $$
 
 예시적 표기:
 
-$$
+```math
 \hat y^{Informer}_{base} = [135, 140]
-$$
+```
 
 ### Step 5 — 해석
 
@@ -141,7 +141,7 @@ $$
 ## 11. Provenance tags summary
 
 - `repo default`: baseline config shape, retrieval off, jobs fan-out
-- `toy simplification`: $[136, 138]$, $[135, 140]$ 같은 schematic base outputs
+- `toy simplification`: $`[136, 138]`$, $`[135, 140]`$ 같은 schematic base outputs
 - `variant-specific override`: 없음 (기준점 페이지)
 
 ## 관련 페이지

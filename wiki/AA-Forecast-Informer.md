@@ -47,41 +47,41 @@ AA-GRU 대비 바뀌는 것은 backbone입니다.
 
 Informer 페이지도 literal 핵심은 decomposition 쪽입니다.
 
-$$
+```math
 T_t = LOWESS(y_t)
-$$
+```
 
-$$
+```math
 residual_t = y_t - T_t
-$$
+```
 
-$$
+```math
 critical_t = \mathbb{1}(|residual_t| > threshold)
-$$
+```
 
 그리고 그 결과가 event-aware feature block으로 encoder/decoder conditioning 에 들어갑니다.
 
 ## 7. Toy sample setup
 
 target toy window:
-$$
+```math
 [100, 101, 102, 120]
-$$
+```
 
 toy trend:
-$$
+```math
 [100, 101, 102, 103]
-$$
+```
 
 residual:
-$$
+```math
 [0, 0, 0, 17]
-$$
+```
 
 critical mask:
-$$
+```math
 [0, 0, 0, 1]
-$$
+```
 
 ## 8. Step-by-step hand calculation
 
@@ -96,9 +96,9 @@ Informer도 baseline보다 더 많은 event-aware feature 조각을 입력받습
 ### Step 3 — Informer learned layer (schematic)
 
 이후에는 attention 기반 backbone이 future 2-step을 계산합니다. teaching용 schematic output을
-$$
+```math
 \hat y^{AA-Informer}_{base} = [141, 149]
-$$
+```
 
 라고 둘 수 있습니다.
 
