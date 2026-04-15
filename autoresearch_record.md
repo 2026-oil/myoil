@@ -3590,3 +3590,33 @@
 - experiment title: restore the exact active keep basis after recording the completed 4-slot bank regression
 - restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 5-slot prototype bank on the active keep
+- timestamp: 2026-04-15T17:xx:00+09:00
+- git branch: informer_test
+- experiment title: contract the prototype bank from 6 slots to 5 while keeping the active keep's confidence placement and residual scaling unchanged
+- hypothesis:
+  - after the 4-slot contraction regressed badly and the 6-slot bank remained the keep, the next narrow interpolation was a 5-slot bank to check whether the capacity optimum sat just below the current bank size.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/baseline.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_bank5_restore_gru_bundle1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_bank5_restore_gru_bundle1`
+- run/artifact path: runs/iter_20260415_proto_bank5_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_informer) = `73.2762 / 74.1847`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `73.8678 / 75.0865`
+- active keep comparison:
+  - current compliant keep AA-Informer = `76.1788 / 80.0079`
+  - 5-slot delta vs keep = `-2.3110 / -4.9214`
+- 목표 체크:
+  - strict ordering technically holds, but AA-Informer nearly collapses back into the baseline/AA-GRU band.
+  - both horizons regress sharply below the active keep.
+- 핵심 진단:
+  - the keep's prototype family clearly needs the full 6-slot bank; even a one-slot contraction is materially destructive.
+  - this removes remaining ambiguity around bank-size tuning on the smaller side.
+- 판단: SAFE FAILURE / REJECT 5-SLOT PROTOTYPE BANK
