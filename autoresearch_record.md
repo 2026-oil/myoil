@@ -3056,3 +3056,10 @@
   - broadening confidence from top1 to top2 mass is much safer than hard top-2 masking and keeps the prototype lane healthy, but it still over-rewards softer bank mixtures enough to dilute the active keep's stronger amplitude transport.
   - the keep still benefits from the sharper top1 confidence scalar even while retaining a soft full-bank mix for the prototype curve itself.
 - 판단: SAFE FAILURE / REJECT PROTOTYPE TOP2-MASS CONFIDENCE
+
+## Iteration 2026-04-15 restore exact active keep after top2-mass confidence regression
+- timestamp: 2026-04-15T15:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed top2-mass confidence regression
+- restored anchor commit: `cf2060d8` (`Restore the exact active keep after the memory-gain rejection`)
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS

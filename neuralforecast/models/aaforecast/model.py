@@ -2508,7 +2508,6 @@ class AAForecast(BaseModel):
             "top_indices": top_indices.detach().cpu(),
             "top_values": top_values.detach().cpu(),
             "weight_mass_top1": weights.detach().amax(dim=1).mean().cpu(),
-            "weight_mass_top2": weights.detach().topk(k=min(2, weights.shape[1]), dim=1).values.sum(dim=1).mean().cpu(),
             "pooled_norm": pooled.detach().norm(dim=-1).mean().cpu(),
         }
         batch_idx = torch.arange(values.shape[0], device=values.device)
@@ -2516,10 +2515,7 @@ class AAForecast(BaseModel):
         gather_index = top_indices.unsqueeze(-1).expand(-1, -1, values.shape[-1])
         self._latest_memory_bank = values.gather(1, gather_index)
         self._latest_memory_signal = torch.log1p(top_values.mean(dim=1, keepdim=True).clamp_min(0.0))
-        self._latest_memory_confidence = weights.detach().topk(
-            k=min(2, weights.shape[1]),
-            dim=1,
-        ).values.sum(dim=1)
+        self._latest_memory_confidence = weights.detach().amax(dim=1)
         return _apply_stochastic_dropout(
             pooled,
             training=self.training,
