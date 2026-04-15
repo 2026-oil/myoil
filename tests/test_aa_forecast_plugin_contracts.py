@@ -153,6 +153,11 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
             {
                 "retrieval": {
                     "enabled": True,
+                    "star": {
+                        "season_length": 4,
+                        "thresh": 3.5,
+                        "anomaly_tails": {"upward": ["event"], "two_sided": []},
+                    },
                     "top_k": 3,
                     "recency_gap_steps": 2,
                     "event_score_threshold": 10.0,

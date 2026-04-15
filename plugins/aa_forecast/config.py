@@ -540,7 +540,12 @@ def _normalize_retrieval_config(
                 f"{section}.config_path must contain a top-level 'retrieval' mapping"
             )
         payload = dict(retrieval_section)
-        _unknown_keys(payload, allowed=AA_FORECAST_RETRIEVAL_KEYS, section=section)
+        _unknown_keys(
+            payload,
+            allowed=AA_FORECAST_RETRIEVAL_KEYS | {"star"},
+            section=section,
+        )
+        payload.pop("star", None)
 
     top_k = _coerce_positive_int(
         payload.get("top_k", AAForecastRetrievalConfig().top_k),
