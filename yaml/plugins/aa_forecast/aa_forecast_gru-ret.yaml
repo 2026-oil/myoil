@@ -29,4 +29,21 @@ aa_forecast:
     two_sided: []
   thresh: 3.5
   retrieval:
-    enabled: false
+    enabled: true
+    mode: posthoc_blend
+    top_k: 1
+    recency_gap_steps: 8
+    trigger_quantile: 0.9
+    event_score_threshold: 1.0
+    neighbor_min_event_ratio: 0.8
+    min_similarity: 0.35
+    similarity: cosine
+    temperature: 0.1
+    memory_value_mode: future_level
+    blend_floor: 0.3
+    blend_max: 0.3
+    use_uncertainty_gate: false
+    use_shape_key: false
+    use_event_key: true
+    event_score_log_bonus_alpha: 0.15
+    event_score_log_bonus_cap: 0.1

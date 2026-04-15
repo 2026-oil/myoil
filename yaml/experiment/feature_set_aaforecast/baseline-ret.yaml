@@ -1,0 +1,52 @@
+task:
+  name: brentoil_baseline-ret
+dataset:
+  path: data/df.csv
+  target_col: Com_BrentCrudeOil
+  dt_col: dt
+  hist_exog_cols:
+  - GPRD_THREAT
+  - BS_Core_Index_A
+  - GPRD
+  - GPRD_ACT
+  - BS_Core_Index_B
+  - BS_Core_Index_C
+  - Idx_OVX
+  - Com_Oil_Spread
+  - Com_LMEX
+  - Com_BloombergCommodity_BCOM
+  futr_exog_cols: []
+  static_exog_cols: []
+retrieval:
+  enabled: true
+  star:
+    season_length: 4
+    lowess_frac: 0.35
+    lowess_delta: 0.01
+    thresh: 3.5
+    anomaly_tails:
+      upward:
+      - GPRD_THREAT
+      - BS_Core_Index_A
+      - BS_Core_Index_C
+      - Idx_OVX
+      two_sided: []
+  mode: posthoc_blend
+  top_k: 1
+  recency_gap_steps: 8
+  trigger_quantile: 0.9
+  event_score_threshold: 1.0
+  neighbor_min_event_ratio: 0.8
+  min_similarity: 0.35
+  similarity: cosine
+  temperature: 0.1
+  memory_value_mode: future_level
+  blend_floor: 0.3
+  blend_max: 0.3
+  use_uncertainty_gate: false
+  use_shape_key: false
+  use_event_key: true
+  event_score_log_bonus_alpha: 0.15
+  event_score_log_bonus_cap: 0.1
+jobs:
+- yaml/jobs/main/gru_informer.yaml

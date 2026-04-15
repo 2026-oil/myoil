@@ -53,9 +53,7 @@ def materialize_aa_forecast_stage(
     )
     _write_json(
         stage_root / "config" / "stage_config.json",
-        _cfg.aa_forecast_plugin_state_dict(
-            stage_cfg, selected_config_path=selected
-        ),
+        _cfg.aa_forecast_plugin_state_dict(stage_cfg, selected_config_path=selected),
     )
     _write_json(
         stage_root / "manifest" / "stage_manifest.json",
@@ -560,7 +558,9 @@ def _select_uncertainty_predictions(
             if spike_support is not None and direction_mean is not None:
                 semantic_score = float(spike_support) * max(float(direction_mean), 0.0)
                 if baseline_drag is not None:
-                    semantic_score = semantic_score / (1.0 + max(float(baseline_drag), 0.0))
+                    semantic_score = semantic_score / (
+                        1.0 + max(float(baseline_drag), 0.0)
+                    )
             sample_semantic_scores.append(float(semantic_score))
         stacked = np.vstack(samples)
         candidate_means.append(stacked.mean(axis=0))
@@ -594,7 +594,9 @@ def _select_uncertainty_predictions(
         )
         min_dispersion = float(np.nanmin(dispersion_scores))
         semantic_tolerance = 0.15
-        eligible_mask = dispersion_scores <= (min_dispersion * (1.0 + semantic_tolerance))
+        eligible_mask = dispersion_scores <= (
+            min_dispersion * (1.0 + semantic_tolerance)
+        )
         if not np.any(eligible_mask):
             eligible_mask = np.ones_like(dispersion_scores, dtype=bool)
         eligible_semantic = np.where(eligible_mask, semantic_scores, -np.inf)
@@ -653,7 +655,9 @@ def _write_uncertainty_artifacts(
     summary_path = stage_root / "uncertainty" / f"{slug}.json"
     csv_path = stage_root / "uncertainty" / f"{slug}.csv"
     candidate_stats_path = stage_root / "uncertainty" / f"{slug}.candidate_stats.csv"
-    candidate_samples_path = stage_root / "uncertainty" / f"{slug}.candidate_samples.csv"
+    candidate_samples_path = (
+        stage_root / "uncertainty" / f"{slug}.candidate_samples.csv"
+    )
     candidate_plot_path = stage_root / "uncertainty" / f"{slug}.dropout_mae_sd.png"
     distribution_summary_path = (
         stage_root / "uncertainty" / f"{slug}.prediction_distribution_by_dropout.csv"
@@ -671,7 +675,9 @@ def _write_uncertainty_artifacts(
         {
             "train_end_ds": str(pd.Timestamp(train_end_ds)),
             "thresh": stage_cfg.thresh,
-            "star_hist_exog_cols_resolved": list(stage_cfg.star_hist_exog_cols_resolved),
+            "star_hist_exog_cols_resolved": list(
+                stage_cfg.star_hist_exog_cols_resolved
+            ),
             "non_star_hist_exog_cols_resolved": list(
                 stage_cfg.non_star_hist_exog_cols_resolved
             ),
@@ -964,8 +970,9 @@ def _write_uncertainty_prediction_distribution_plot(
         horizon_frame = plot_frame[plot_frame["horizon_step"] == horizon_step]
         dropout_values = sorted(horizon_frame["dropout_p"].unique().tolist())
         boxplot_values = [
-            horizon_frame.loc[horizon_frame["dropout_p"] == dropout_p, "prediction"]
-            .to_numpy(dtype=float)
+            horizon_frame.loc[
+                horizon_frame["dropout_p"] == dropout_p, "prediction"
+            ].to_numpy(dtype=float)
             for dropout_p in dropout_values
         ]
         tick_labels = [f"{dropout_p:.2f}" for dropout_p in dropout_values]
@@ -1000,8 +1007,7 @@ def _write_uncertainty_prediction_distribution_plot(
             label="median",
         )
         axis.set_title(
-            "AAForecast MC dropout prediction distribution "
-            f"(horizon {horizon_step})"
+            f"AAForecast MC dropout prediction distribution (horizon {horizon_step})"
         )
         axis.set_ylabel("prediction")
         axis.grid(axis="y", alpha=0.25)
@@ -1023,7 +1029,9 @@ def _normalize_signature(values: np.ndarray) -> np.ndarray:
     return vector / norm
 
 
-def _require_star_payload(payload: dict[str, Any]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _require_star_payload(
+    payload: dict[str, Any],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     required = ("critical_mask", "count_active_channels", "channel_activity")
     missing = [key for key in required if key not in payload]
     if missing:
@@ -1036,15 +1044,20 @@ def _require_star_payload(payload: dict[str, Any]) -> tuple[np.ndarray, np.ndarr
         payload["critical_mask"].detach().cpu().numpy().astype(float).reshape(-1)
     )
     count_active_channels = (
-        payload["count_active_channels"].detach().cpu().numpy().astype(float).reshape(-1)
+        payload["count_active_channels"]
+        .detach()
+        .cpu()
+        .numpy()
+        .astype(float)
+        .reshape(-1)
     )
-    channel_activity = (
-        payload["channel_activity"].detach().cpu().numpy().astype(float)
-    )
+    channel_activity = payload["channel_activity"].detach().cpu().numpy().astype(float)
     if channel_activity.ndim != 3:
         raise ValueError("aa_forecast retrieval requires 3D channel_activity payload")
-    return critical_mask, count_active_channels, channel_activity.reshape(
-        channel_activity.shape[1], channel_activity.shape[2]
+    return (
+        critical_mask,
+        count_active_channels,
+        channel_activity.reshape(channel_activity.shape[1], channel_activity.shape[2]),
     )
 
 
@@ -1065,7 +1078,9 @@ def _build_retrieval_signature(
     hist_exog = None
     if getattr(model, "hist_exog_list", ()):
         hist_exog = torch.as_tensor(
-            transformed_window_df[list(model.hist_exog_list)].to_numpy(dtype=np.float32),
+            transformed_window_df[list(model.hist_exog_list)].to_numpy(
+                dtype=np.float32
+            ),
             dtype=torch.float32,
         ).reshape(1, len(transformed_window_df), -1)
     with torch.no_grad():
@@ -1085,9 +1100,7 @@ def _build_retrieval_signature(
         ]
     )
     shape_vector = transformed_window_df[target_col].to_numpy(dtype=float)
-    event_score = float(
-        count_active_channels.sum() + np.abs(channel_activity).sum()
-    )
+    event_score = float(count_active_channels.sum() + np.abs(channel_activity).sum())
     return {
         "shape_vector": _normalize_signature(shape_vector),
         "event_vector": _normalize_signature(event_vector),
@@ -1124,27 +1137,32 @@ def _build_event_memory_bank(
     bank: list[dict[str, Any]] = []
     for end_idx in range(input_size - 1, max_end_idx + 1):
         start_idx = end_idx - input_size + 1
-        transformed_window = transformed_train_df.iloc[start_idx : end_idx + 1].reset_index(
-            drop=True
-        )
+        transformed_window = transformed_train_df.iloc[
+            start_idx : end_idx + 1
+        ].reset_index(drop=True)
         signature = _build_retrieval_signature(
             model=model,
             transformed_window_df=transformed_window,
             target_col=target_col,
         )
-        if signature["event_score"] < retrieval_cfg.event_score_threshold:
+        if (
+            retrieval_cfg.trigger_quantile is None
+            and signature["event_score"] < retrieval_cfg.event_score_threshold
+        ):
             continue
         anchor_value = float(raw_train_df[target_col].iloc[end_idx])
-        future_values = raw_train_df[target_col].iloc[end_idx + 1 : end_idx + 1 + horizon]
+        future_values = raw_train_df[target_col].iloc[
+            end_idx + 1 : end_idx + 1 + horizon
+        ]
         if len(future_values) != horizon:
             continue
         scale = max(abs(anchor_value), 1e-8)
-        future_returns = (
-            future_values.to_numpy(dtype=float) - anchor_value
-        ) / scale
+        future_returns = (future_values.to_numpy(dtype=float) - anchor_value) / scale
         bank.append(
             {
-                "candidate_end_ds": str(pd.Timestamp(raw_train_df[dt_col].iloc[end_idx])),
+                "candidate_end_ds": str(
+                    pd.Timestamp(raw_train_df[dt_col].iloc[end_idx])
+                ),
                 "candidate_future_end_ds": str(
                     pd.Timestamp(raw_train_df[dt_col].iloc[end_idx + horizon])
                 ),
@@ -1178,8 +1196,9 @@ def _retrieve_event_neighbors(
     query: dict[str, Any],
     bank: list[dict[str, Any]],
     retrieval_cfg: _cfg.AAForecastRetrievalConfig,
+    effective_event_threshold: float,
 ) -> dict[str, Any]:
-    if query["event_score"] < retrieval_cfg.event_score_threshold:
+    if query["event_score"] < effective_event_threshold:
         return {
             "retrieval_attempted": True,
             "retrieval_applied": False,
@@ -1198,7 +1217,13 @@ def _retrieve_event_neighbors(
             "max_similarity": 0.0,
         }
     scored_neighbors: list[dict[str, Any]] = []
+    candidate_min_event_score = max(
+        effective_event_threshold,
+        retrieval_cfg.neighbor_min_event_ratio * float(query["event_score"]),
+    )
     for entry in bank:
+        if float(entry["event_score"]) < candidate_min_event_score:
+            continue
         shape_similarity = _cosine_similarity(
             query["shape_vector"], entry["shape_vector"]
         )
@@ -1206,7 +1231,10 @@ def _retrieve_event_neighbors(
             query["event_vector"], entry["event_vector"]
         )
         event_component = event_similarity
-        if retrieval_cfg.use_event_key and retrieval_cfg.event_score_log_bonus_alpha > 0.0:
+        if (
+            retrieval_cfg.use_event_key
+            and retrieval_cfg.event_score_log_bonus_alpha > 0.0
+        ):
             query_event_score = max(float(query["event_score"]), 1e-8)
             candidate_event_score = max(float(entry["event_score"]), 1e-8)
             event_score_log_bonus = min(
@@ -1250,10 +1278,13 @@ def _retrieve_event_neighbors(
         }
     scored_neighbors.sort(key=lambda item: item["similarity"], reverse=True)
     top_neighbors = scored_neighbors[: retrieval_cfg.top_k]
-    logits = np.asarray(
-        [neighbor["similarity"] for neighbor in top_neighbors],
-        dtype=float,
-    ) / retrieval_cfg.temperature
+    logits = (
+        np.asarray(
+            [neighbor["similarity"] for neighbor in top_neighbors],
+            dtype=float,
+        )
+        / retrieval_cfg.temperature
+    )
     logits = logits - logits.max()
     weights = np.exp(logits)
     weights = weights / weights.sum()
@@ -1291,14 +1322,18 @@ def _blend_event_memory_prediction(
             uncertainty_scale = np.ones_like(std_values)
     else:
         uncertainty_scale = np.ones_like(base_prediction, dtype=float)
-    blend_weight = retrieval_cfg.blend_floor + (
-        retrieval_cfg.blend_max - retrieval_cfg.blend_floor
-    ) * similarity_scale * uncertainty_scale
-    blend_weight = np.clip(blend_weight, retrieval_cfg.blend_floor, retrieval_cfg.blend_max)
-    final_prediction = (
-        (1.0 - blend_weight) * np.asarray(base_prediction, dtype=float)
-        + blend_weight * np.asarray(memory_prediction, dtype=float)
+    blend_weight = (
+        retrieval_cfg.blend_floor
+        + (retrieval_cfg.blend_max - retrieval_cfg.blend_floor)
+        * similarity_scale
+        * uncertainty_scale
     )
+    blend_weight = np.clip(
+        blend_weight, retrieval_cfg.blend_floor, retrieval_cfg.blend_max
+    )
+    final_prediction = (1.0 - blend_weight) * np.asarray(
+        base_prediction, dtype=float
+    ) + blend_weight * np.asarray(memory_prediction, dtype=float)
     return final_prediction, np.asarray(blend_weight, dtype=float)
 
 
@@ -1311,7 +1346,9 @@ def _write_retrieval_artifacts(
     _stage_root(run_root)
     slug = pd.Timestamp(train_end_ds).strftime("%Y%m%dT%H%M%S")
     relative_json_path = Path("aa_forecast") / "retrieval" / f"{slug}.json"
-    relative_neighbors_path = Path("aa_forecast") / "retrieval" / f"{slug}.neighbors.csv"
+    relative_neighbors_path = (
+        Path("aa_forecast") / "retrieval" / f"{slug}.neighbors.csv"
+    )
     json_payload = dict(retrieval_summary)
     json_payload["neighbors"] = [
         {
@@ -1323,7 +1360,12 @@ def _write_retrieval_artifacts(
             "softmax_weight": neighbor["softmax_weight"],
             "event_score": neighbor["event_score"],
             "anchor_target_value": neighbor["anchor_target_value"],
-            "future_returns": np.asarray(neighbor["future_returns"], dtype=float).tolist(),
+            "future_returns": np.asarray(
+                neighbor["future_returns"], dtype=float
+            ).tolist(),
+            "future_levels": np.asarray(
+                neighbor.get("future_levels", []), dtype=float
+            ).tolist(),
         }
         for neighbor in retrieval_summary["neighbors"]
     ]
@@ -1346,10 +1388,12 @@ def _write_retrieval_artifacts(
             row[f"future_return_step_{horizon_idx + 1}"] = neighbor["future_returns"][
                 horizon_idx
             ]
+            future_levels = neighbor.get("future_levels")
+            row[f"future_level_step_{horizon_idx + 1}"] = (
+                future_levels[horizon_idx] if future_levels is not None else np.nan
+            )
         neighbor_rows.append(row)
-    pd.DataFrame(neighbor_rows).to_csv(
-        run_root / relative_neighbors_path, index=False
-    )
+    pd.DataFrame(neighbor_rows).to_csv(run_root / relative_neighbors_path, index=False)
     return str(relative_json_path)
 
 
@@ -1469,18 +1513,18 @@ def predict_aa_forecast_fold(
             train_df=transformed_train_df,
             dt_col=dt_col,
         )
-        target_predictions["aaforecast_encoding_metadata_artifact"] = encoding_artifacts[
-            "metadata"
-        ]
-        target_predictions["aaforecast_encoding_time_axis_artifact"] = encoding_artifacts[
-            "time_axis"
-        ]
+        target_predictions["aaforecast_encoding_metadata_artifact"] = (
+            encoding_artifacts["metadata"]
+        )
+        target_predictions["aaforecast_encoding_time_axis_artifact"] = (
+            encoding_artifacts["time_axis"]
+        )
         target_predictions["aaforecast_encoding_summary_artifact"] = encoding_artifacts[
             "summary"
         ]
-        target_predictions["aaforecast_encoding_backbone_artifact"] = encoding_artifacts[
-            "backbone_states"
-        ]
+        target_predictions["aaforecast_encoding_backbone_artifact"] = (
+            encoding_artifacts["backbone_states"]
+        )
         target_predictions["aaforecast_encoding_hidden_artifact"] = encoding_artifacts[
             "hidden_states"
         ]
@@ -1546,6 +1590,7 @@ def predict_aa_forecast_fold(
             query=query,
             bank=bank,
             retrieval_cfg=retrieval_cfg,
+            effective_event_threshold=effective_event_threshold,
         )
         base_prediction = np.asarray(target_predictions[job.model], dtype=float)
         current_last_y = float(train_df[target_col].iloc[-1])

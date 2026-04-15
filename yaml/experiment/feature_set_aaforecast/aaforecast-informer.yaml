@@ -1,5 +1,5 @@
 task:
-  name: brentoil_case1_parity_aaforecast_informer
+  name: aaforecast_informer
 dataset:
   path: data/df.csv
   target_col: Com_BrentCrudeOil
@@ -14,7 +14,7 @@ dataset:
   - Idx_OVX
   - Com_LMEX
   - Com_BloombergCommodity_BCOM
-  - Idx_DxyUSD
+  - Com_Oil_Spread
   futr_exog_cols: []
   static_exog_cols: []
 training_search:

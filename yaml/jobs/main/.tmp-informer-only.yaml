@@ -1,0 +1,8 @@
+- model: Informer
+  params:
+    hidden_size: 128
+    n_head: 8
+    encoder_layers: 2
+    dropout: 0.1
+    factor: 3
+    decoder_layers: 4

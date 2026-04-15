@@ -1,5 +1,5 @@
 task:
-  name: aaforecast_gru
+  name: aaforecast_informer-ret
 dataset:
   path: data/df.csv
   target_col: Com_BrentCrudeOil
@@ -21,4 +21,4 @@ training_search:
   enabled: false
 aa_forecast:
   enabled: true
-  config_path: yaml/plugins/aa_forecast/aa_forecast_gru.yaml
+  config_path: yaml/plugins/aa_forecast/aa_forecast_informer-ret.yaml

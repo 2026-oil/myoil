@@ -19,7 +19,9 @@ from runtime_support.forecast_models import build_model
 
 FIXED_CONFIG = Path("tests/fixtures/aa_forecast_runtime_smoke.yaml")
 AUTO_CONFIG = Path("tests/fixtures/aa_forecast_runtime_auto_smoke.yaml")
-AUTO_MODEL_ONLY_CONFIG = Path("tests/fixtures/aa_forecast_runtime_auto_model_only_smoke.yaml")
+AUTO_MODEL_ONLY_CONFIG = Path(
+    "tests/fixtures/aa_forecast_runtime_auto_model_only_smoke.yaml"
+)
 PLUGIN_AUTO_MODEL_ONLY_MAIN_CONFIG = Path(
     "tests/fixtures/aa_forecast_runtime_plugin_auto_model_only_main.yaml"
 )
@@ -179,7 +181,9 @@ FEATURE_SET_AAFORECAST_VARIANTS = {
     },
 }
 EXPECTED_AA_DROPOUT_CANDIDATES = [round(step * 0.05, 2) for step in range(1, 20)]
-DIRECT_TARGET_CONFIG = Path("yaml/experiment/feature_set_aaforecast/brentoil-case1.yaml")
+DIRECT_TARGET_CONFIG = Path(
+    "yaml/experiment/feature_set_aaforecast/brentoil-case1.yaml"
+)
 
 
 def _assert_no_event_column(payload: dict[str, object]) -> None:
@@ -212,7 +216,10 @@ def _assert_retrieval_payload(
     top_k: int,
     recency_gap_steps: int,
     event_score_threshold: float,
+    trigger_quantile: float | None,
+    neighbor_min_event_ratio: float,
     min_similarity: float,
+    blend_floor: float,
     blend_max: float,
     use_uncertainty_gate: bool,
 ) -> None:
@@ -220,12 +227,18 @@ def _assert_retrieval_payload(
     assert payload["top_k"] == top_k
     assert payload["recency_gap_steps"] == recency_gap_steps
     assert payload["event_score_threshold"] == pytest.approx(event_score_threshold)
+    assert payload["trigger_quantile"] == trigger_quantile
+    assert payload["neighbor_min_event_ratio"] == pytest.approx(
+        neighbor_min_event_ratio
+    )
     assert payload["min_similarity"] == pytest.approx(min_similarity)
+    assert payload["blend_floor"] == pytest.approx(blend_floor)
     assert payload["blend_max"] == pytest.approx(blend_max)
     assert payload["use_uncertainty_gate"] is use_uncertainty_gate
     assert payload["mode"] == "posthoc_blend"
     assert payload["similarity"] == "cosine"
     assert payload["temperature"] == pytest.approx(0.1)
+    assert payload["memory_value_mode"] == "future_return"
     assert payload["use_shape_key"] is True
     assert payload["use_event_key"] is True
 
@@ -384,7 +397,9 @@ def test_runtime_validate_only_accepts_aaforecast_auto_path(
     assert manifest["jobs"][0]["model"] == "AAForecast"
     assert manifest["jobs"][0]["requested_mode"] == "learned_auto_requested"
     assert manifest["jobs"][0]["validated_mode"] == "learned_auto"
-    assert manifest["jobs"][0]["selected_search_params"] == PARITY_SHARED_MODEL_SELECTORS
+    assert (
+        manifest["jobs"][0]["selected_search_params"] == PARITY_SHARED_MODEL_SELECTORS
+    )
 
 
 def test_runtime_validate_only_accepts_aaforecast_auto_model_only_path(
@@ -410,7 +425,9 @@ def test_runtime_validate_only_accepts_aaforecast_auto_model_only_path(
     assert manifest["jobs"][0]["model"] == "AAForecast"
     assert manifest["jobs"][0]["requested_mode"] == "learned_auto_requested"
     assert manifest["jobs"][0]["validated_mode"] == "learned_auto"
-    assert manifest["jobs"][0]["selected_search_params"] == PARITY_SHARED_MODEL_SELECTORS
+    assert (
+        manifest["jobs"][0]["selected_search_params"] == PARITY_SHARED_MODEL_SELECTORS
+    )
     assert manifest["training_search"] == {
         "requested_mode": "training_fixed",
         "validated_mode": "training_fixed",
@@ -438,7 +455,9 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_auto_model_only_path(
     assert manifest["jobs"][0]["model"] == "AAForecast"
     assert manifest["jobs"][0]["requested_mode"] == "learned_auto_requested"
     assert manifest["jobs"][0]["validated_mode"] == "learned_auto"
-    assert manifest["jobs"][0]["selected_search_params"] == PARITY_SHARED_MODEL_SELECTORS
+    assert (
+        manifest["jobs"][0]["selected_search_params"] == PARITY_SHARED_MODEL_SELECTORS
+    )
     assert manifest["training_search"] == {
         "requested_mode": "training_fixed",
         "validated_mode": "training_fixed",
@@ -535,7 +554,10 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_uncertainty_retrieval_p
         top_k=2,
         recency_gap_steps=1,
         event_score_threshold=100.0,
+        trigger_quantile=None,
+        neighbor_min_event_ratio=0.0,
         min_similarity=0.55,
+        blend_floor=0.0,
         blend_max=0.2,
         use_uncertainty_gate=True,
     )
@@ -549,7 +571,10 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_uncertainty_retrieval_p
         top_k=2,
         recency_gap_steps=1,
         event_score_threshold=100.0,
+        trigger_quantile=None,
+        neighbor_min_event_ratio=0.0,
         min_similarity=0.55,
+        blend_floor=0.0,
         blend_max=0.2,
         use_uncertainty_gate=True,
     )
@@ -575,7 +600,9 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_timexer_auto_model_only
     assert manifest["jobs"][0]["model"] == "AAForecast"
     assert manifest["jobs"][0]["requested_mode"] == "learned_auto_requested"
     assert manifest["jobs"][0]["validated_mode"] == "learned_auto"
-    assert manifest["jobs"][0]["selected_search_params"] == TIMEXER_AA_BACKBONE_SELECTORS
+    assert (
+        manifest["jobs"][0]["selected_search_params"] == TIMEXER_AA_BACKBONE_SELECTORS
+    )
     assert manifest["training_search"] == {
         "requested_mode": "training_auto_requested",
         "validated_mode": "training_auto",
@@ -640,7 +667,9 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_timexer_fixed_path(
 def test_runtime_validate_only_accepts_aaforecast_plugin_itransformer_auto_model_only_path(
     tmp_path: Path,
 ) -> None:
-    output_root = tmp_path / "validate-only-aa-forecast-plugin-itransformer-auto-model-only"
+    output_root = (
+        tmp_path / "validate-only-aa-forecast-plugin-itransformer-auto-model-only"
+    )
     code = runtime.main(
         [
             "--config",
@@ -657,7 +686,10 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_itransformer_auto_model
     assert manifest["jobs"][0]["model"] == "AAForecast"
     assert manifest["jobs"][0]["requested_mode"] == "learned_auto_requested"
     assert manifest["jobs"][0]["validated_mode"] == "learned_auto"
-    assert manifest["jobs"][0]["selected_search_params"] == ITRANSFORMER_AA_BACKBONE_SELECTORS
+    assert (
+        manifest["jobs"][0]["selected_search_params"]
+        == ITRANSFORMER_AA_BACKBONE_SELECTORS
+    )
     assert manifest["training_search"] == {
         "requested_mode": "training_auto_requested",
         "validated_mode": "training_auto",
@@ -761,7 +793,9 @@ def test_feature_set_aaforecast_best_variants_validate_only(
 def test_feature_set_aaforecast_best_validate_only(
     tmp_path: Path,
 ) -> None:
-    config_path = Path("yaml/experiment/feature_set_aaforecast/brentoil-case1-best.yaml")
+    config_path = Path(
+        "yaml/experiment/feature_set_aaforecast/brentoil-case1-best.yaml"
+    )
     output_root = tmp_path / "validate-only-aa-forecast-best"
     code = runtime.main(
         [
@@ -879,14 +913,16 @@ def test_validate_only_aaforecast_legacy_plugin_top_k_fails_fast(
         (PLUGIN_BEST_MAIN_CONFIG.parent / payload["dataset"]["path"]).resolve()
     )
     plugin_payload = yaml.safe_load(
-        (PLUGIN_BEST_MAIN_CONFIG.parent / "aa_forecast_runtime_plugin_best.yaml").read_text(
-            encoding="utf-8"
-        )
+        (
+            PLUGIN_BEST_MAIN_CONFIG.parent / "aa_forecast_runtime_plugin_best.yaml"
+        ).read_text(encoding="utf-8")
     )
     plugin_payload["aa_forecast"]["top_k"] = 0.1
     plugin_payload["aa_forecast"].pop("thresh", None)
     plugin_path = tmp_path / "legacy-top-k-plugin.yaml"
-    plugin_path.write_text(yaml.safe_dump(plugin_payload, sort_keys=False), encoding="utf-8")
+    plugin_path.write_text(
+        yaml.safe_dump(plugin_payload, sort_keys=False), encoding="utf-8"
+    )
     payload["aa_forecast"] = {
         "enabled": True,
         "config_path": str(plugin_path),
@@ -910,19 +946,23 @@ def test_validate_only_aaforecast_grouped_tail_missing_dataset_var_fails_fast(
     tmp_path: Path,
 ) -> None:
     payload = yaml.safe_load(AUTO_CONFIG.read_text(encoding="utf-8"))
-    payload["dataset"]["path"] = str((AUTO_CONFIG.parent / payload["dataset"]["path"]).resolve())
+    payload["dataset"]["path"] = str(
+        (AUTO_CONFIG.parent / payload["dataset"]["path"]).resolve()
+    )
     payload["dataset"]["hist_exog_cols"] = []
     plugin_payload = yaml.safe_load(
-        (AUTO_CONFIG.parent / "aa_forecast_runtime_plugin_auto_model_only.yaml").read_text(
-            encoding="utf-8"
-        )
+        (
+            AUTO_CONFIG.parent / "aa_forecast_runtime_plugin_auto_model_only.yaml"
+        ).read_text(encoding="utf-8")
     )
     plugin_payload["aa_forecast"]["star_anomaly_tails"] = {
         "upward": ["event"],
         "two_sided": [],
     }
     plugin_path = tmp_path / "missing-grouped-var-plugin.yaml"
-    plugin_path.write_text(yaml.safe_dump(plugin_payload, sort_keys=False), encoding="utf-8")
+    plugin_path.write_text(
+        yaml.safe_dump(plugin_payload, sort_keys=False), encoding="utf-8"
+    )
     payload["aa_forecast"]["config_path"] = str(plugin_path)
     config_path = tmp_path / "missing-grouped-var.yaml"
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
@@ -945,7 +985,9 @@ def test_validate_only_aaforecast_legacy_inline_without_star_grouping_fails_fast
     payload = {
         "task": {"name": "validate_only_aa_forecast_legacy_inline_fail_fast"},
         "dataset": {
-            "path": str((AUTO_CONFIG.parent / "aa_forecast_runtime_smoke.csv").resolve()),
+            "path": str(
+                (AUTO_CONFIG.parent / "aa_forecast_runtime_smoke.csv").resolve()
+            ),
             "target_col": "target",
             "dt_col": "dt",
             "hist_exog_cols": ["event"],
@@ -1022,12 +1064,14 @@ def test_runtime_smoke_emits_aaforecast_uncertainty_artifacts(
     config_path = tmp_path / "aa_forecast_runtime_plugin_best_smoke.yaml"
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     output_root = tmp_path / "aa-forecast-runtime-smoke"
-    code = runtime.main([
-        "--config",
-        str(config_path),
-        "--output-root",
-        str(output_root),
-    ])
+    code = runtime.main(
+        [
+            "--config",
+            str(config_path),
+            "--output-root",
+            str(output_root),
+        ]
+    )
 
     assert code == 0
     uncertainty_dir = output_root / "aa_forecast" / "uncertainty"
@@ -1087,7 +1131,9 @@ def test_runtime_smoke_emits_aaforecast_uncertainty_artifacts(
         "q95",
         "max",
     }.issubset(distribution_combined_frame.columns)
-    assert distribution_frame["dropout_p"].nunique() == len(summary["dropout_candidates"])
+    assert distribution_frame["dropout_p"].nunique() == len(
+        summary["dropout_candidates"]
+    )
     assert distribution_combined_frame["dropout_p"].tolist() == pytest.approx(
         summary["dropout_candidates"]
     )
@@ -1104,19 +1150,23 @@ def test_validate_only_aaforecast_multi_study_catalog_and_projection(
         (AUTO_CONFIG.parent / payload["dataset"]["path"]).resolve()
     )
     plugin_payload = yaml.safe_load(
-        (AUTO_CONFIG.parent / "aa_forecast_runtime_plugin_auto_model_only.yaml").read_text(
-            encoding="utf-8"
-        )
+        (
+            AUTO_CONFIG.parent / "aa_forecast_runtime_plugin_auto_model_only.yaml"
+        ).read_text(encoding="utf-8")
     )
     plugin_path = tmp_path / "aaforecast_multi_plugin.yaml"
-    plugin_path.write_text(yaml.safe_dump(plugin_payload, sort_keys=False), encoding="utf-8")
+    plugin_path.write_text(
+        yaml.safe_dump(plugin_payload, sort_keys=False), encoding="utf-8"
+    )
     payload["jobs"] = []
     payload["aa_forecast"] = {
         "enabled": True,
         "config_path": str(plugin_path),
     }
     payload.setdefault("runtime", {})["opt_study_count"] = 2
-    payload["dataset"]["path"] = str((AUTO_CONFIG.parent / payload["dataset"]["path"]).resolve())
+    payload["dataset"]["path"] = str(
+        (AUTO_CONFIG.parent / payload["dataset"]["path"]).resolve()
+    )
     config_path = tmp_path / "aaforecast_multi.yaml"
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
@@ -1141,7 +1191,13 @@ def test_validate_only_aaforecast_multi_study_catalog_and_projection(
     assert manifest["optuna"]["canonical_projection_study_index"] == 1
     assert study_catalog["study_count"] == 2
     assert study_catalog["canonical_projection_study_index"] == 1
-    assert (output_root / "models" / "AAForecast" / "visualizations" / "cross_study_dashboard.html").exists()
+    assert (
+        output_root
+        / "models"
+        / "AAForecast"
+        / "visualizations"
+        / "cross_study_dashboard.html"
+    ).exists()
 
     selected_output_root = tmp_path / "validate-only-aa-forecast-multi-selected"
     selected_code = runtime.main(
@@ -1161,7 +1217,9 @@ def test_validate_only_aaforecast_multi_study_catalog_and_projection(
         (selected_output_root / "manifest" / "run_manifest.json").read_text()
     )
     selected_catalog = json.loads(
-        (selected_output_root / "models" / "AAForecast" / "study_catalog.json").read_text()
+        (
+            selected_output_root / "models" / "AAForecast" / "study_catalog.json"
+        ).read_text()
     )
     assert selected_manifest["optuna"]["selected_study_index"] == 2
     assert selected_manifest["optuna"]["canonical_projection_study_index"] == 2
@@ -1173,7 +1231,13 @@ def test_validate_only_aaforecast_multi_study_catalog_and_projection(
         star_anomaly_tails={"upward": ["event"], "two_sided": []},
         non_star_hist_exog_cols=[],
     )
-    assert (selected_output_root / "models" / "AAForecast" / "visualizations" / "cross_study_dashboard.html").exists()
+    assert (
+        selected_output_root
+        / "models"
+        / "AAForecast"
+        / "visualizations"
+        / "cross_study_dashboard.html"
+    ).exists()
 
 
 def test_runtime_aaforecast_plugin_uncertainty_smoke(
@@ -1317,7 +1381,9 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
-    monkeypatch.setattr(runtime, "_should_parallelize_single_job_tuning", lambda *_args: False)
+    monkeypatch.setattr(
+        runtime, "_should_parallelize_single_job_tuning", lambda *_args: False
+    )
     monkeypatch.setattr(runtime, "_should_build_summary_artifacts", lambda: False)
 
     payload = yaml.safe_load(PLUGIN_UNCERTAINTY_MAIN_CONFIG.read_text(encoding="utf-8"))
@@ -1337,13 +1403,16 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     payload.setdefault("runtime", {})["opt_n_trial"] = 1
 
     plugin_payload = yaml.safe_load(
-        (PLUGIN_UNCERTAINTY_MAIN_CONFIG.parent / "aa_forecast_runtime_plugin_uncertainty.yaml").read_text(
-            encoding="utf-8"
-        )
+        (
+            PLUGIN_UNCERTAINTY_MAIN_CONFIG.parent
+            / "aa_forecast_runtime_plugin_uncertainty.yaml"
+        ).read_text(encoding="utf-8")
     )
     plugin_payload["aa_forecast"]["model_params"] = {}
     plugin_path = tmp_path / "aa_forecast_trial_uncertainty.yaml"
-    plugin_path.write_text(yaml.safe_dump(plugin_payload, sort_keys=False), encoding="utf-8")
+    plugin_path.write_text(
+        yaml.safe_dump(plugin_payload, sort_keys=False), encoding="utf-8"
+    )
     payload["aa_forecast"]["config_path"] = str(plugin_path)
 
     config_path = tmp_path / "aa_forecast_trial_uncertainty_main.yaml"
@@ -1371,7 +1440,9 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     prediction_frame = pd.read_csv(trial_root / "predictions.csv")
     common_fold_root = trial_root / "folds" / "fold_000"
     fold_root = trial_root / "folds" / "fold_000" / "aa_forecast" / "uncertainty"
-    retrieval_fold_root = trial_root / "folds" / "fold_000" / "aa_forecast" / "retrieval"
+    retrieval_fold_root = (
+        trial_root / "folds" / "fold_000" / "aa_forecast" / "retrieval"
+    )
     candidate_stats_files = sorted(fold_root.glob("*.candidate_stats.csv"))
     candidate_sample_files = sorted(fold_root.glob("*.candidate_samples.csv"))
     candidate_plot_files = sorted(fold_root.glob("*.dropout_mae_sd.png"))
@@ -1386,7 +1457,9 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     )
     retrieval_summary_files = sorted(retrieval_fold_root.glob("*.json"))
     retrieval_neighbor_files = sorted(retrieval_fold_root.glob("*.neighbors.csv"))
-    metrics_payload = json.loads((common_fold_root / "metrics.json").read_text(encoding="utf-8"))
+    metrics_payload = json.loads(
+        (common_fold_root / "metrics.json").read_text(encoding="utf-8")
+    )
 
     assert code == 0
     assert {"y", "y_hat", "y_hat_uncertainty_std", "y_hat_selected_dropout"}.issubset(
@@ -1475,7 +1548,9 @@ def test_build_uncertainty_error_summary_aggregates_dropout_mae_and_sd() -> None
     assert summary.loc[1, "mae_sd"] == pytest.approx(0.5)
 
 
-def test_build_uncertainty_prediction_distribution_summary_aggregates_quantiles() -> None:
+def test_build_uncertainty_prediction_distribution_summary_aggregates_quantiles() -> (
+    None
+):
     candidate_sample_frame = pd.DataFrame(
         {
             "horizon_step": [1, 1, 1, 2, 2, 2],
@@ -1504,12 +1579,16 @@ def test_build_uncertainty_prediction_distribution_summary_aggregates_quantiles(
     assert combined["median"].tolist() == pytest.approx([6.5])
 
 
-def test_select_uncertainty_predictions_uses_distinct_prediction_seeds(monkeypatch) -> None:
+def test_select_uncertainty_predictions_uses_distinct_prediction_seeds(
+    monkeypatch,
+) -> None:
     seen_seeds: list[int] = []
 
     def fake_predict_with_adapter(_nf, _adapter_inputs, *, random_seed=None):
         seen_seeds.append(int(random_seed))
-        return pd.DataFrame({"unique_id": ["series"], "AAForecast": [float(random_seed)]})
+        return pd.DataFrame(
+            {"unique_id": ["series"], "AAForecast": [float(random_seed)]}
+        )
 
     def fake_extract_target_prediction_frame(
         predictions,
@@ -1714,15 +1793,19 @@ def test_validate_only_rejects_yaml_managed_aaforecast_dropout_candidates(
     tmp_path: Path,
 ) -> None:
     payload = yaml.safe_load(AUTO_CONFIG.read_text(encoding="utf-8"))
-    payload["dataset"]["path"] = str((AUTO_CONFIG.parent / payload["dataset"]["path"]).resolve())
+    payload["dataset"]["path"] = str(
+        (AUTO_CONFIG.parent / payload["dataset"]["path"]).resolve()
+    )
     plugin_payload = yaml.safe_load(
-        (AUTO_CONFIG.parent / "aa_forecast_runtime_plugin_auto_model_only.yaml").read_text(
-            encoding="utf-8"
-        )
+        (
+            AUTO_CONFIG.parent / "aa_forecast_runtime_plugin_auto_model_only.yaml"
+        ).read_text(encoding="utf-8")
     )
     plugin_payload["aa_forecast"]["uncertainty"]["dropout_candidates"] = [0.1, 0.2, 0.3]
     plugin_path = tmp_path / "aaforecast-invalid-dropout-plugin.yaml"
-    plugin_path.write_text(yaml.safe_dump(plugin_payload, sort_keys=False), encoding="utf-8")
+    plugin_path.write_text(
+        yaml.safe_dump(plugin_payload, sort_keys=False), encoding="utf-8"
+    )
     payload["aa_forecast"]["config_path"] = str(plugin_path)
     config_path = tmp_path / "aaforecast-invalid-dropout-candidates.yaml"
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
@@ -1772,13 +1855,18 @@ def test_runtime_validate_only_plugin_target_preserves_grouped_tails(
         "Com_LMEX",
         "Com_BloombergCommodity_BCOM",
     ]
-    for payload in (resolved["aa_forecast"], manifest["aa_forecast"], capability["aa_forecast"]):
+    for payload in (
+        resolved["aa_forecast"],
+        manifest["aa_forecast"],
+        capability["aa_forecast"],
+    ):
         _assert_grouping_payload(
             payload,
             config_path="yaml/plugins/aa_forecast.yaml",
             star_anomaly_tails=expected_tails,
             non_star_hist_exog_cols=expected_non_star,
         )
+
 
 PLUGIN_PATCHTST_FIXED_MAIN_CONFIG = Path(
     "tests/fixtures/aa_forecast_runtime_plugin_patchtst_fixed_main.yaml"

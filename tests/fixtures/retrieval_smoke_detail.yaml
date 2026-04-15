@@ -1,0 +1,28 @@
+retrieval:
+  enabled: true
+  star:
+    season_length: 2
+    lowess_frac: 0.5
+    lowess_delta: 0.01
+    thresh: 3.0
+    anomaly_tails:
+      upward:
+      - event
+      two_sided: []
+  mode: posthoc_blend
+  top_k: 1
+  recency_gap_steps: 1
+  trigger_quantile: 0.5
+  event_score_threshold: 0.0
+  neighbor_min_event_ratio: 0.0
+  min_similarity: 0.0
+  similarity: cosine
+  temperature: 0.1
+  memory_value_mode: future_return
+  blend_floor: 0.2
+  blend_max: 0.3
+  use_uncertainty_gate: false
+  use_shape_key: true
+  use_event_key: true
+  event_score_log_bonus_alpha: 0.0
+  event_score_log_bonus_cap: 0.0

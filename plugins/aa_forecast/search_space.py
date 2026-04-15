@@ -32,7 +32,10 @@ def _probability() -> dict[str, Any]:
 _AA_COMMON_PARAM_REGISTRY = {
     "decoder_hidden_size": _positive_int(low=1, high=4096),
     "decoder_layers": _positive_int(low=1, high=16),
-    "attention_hidden_size": {"type": "categorical", "choices": [None, 32, 64, 128, 256]},
+    "attention_hidden_size": {
+        "type": "categorical",
+        "choices": [None, 32, 64, 128, 256],
+    },
     "season_length": _positive_int(low=1, high=1024),
     "trend_kernel_size": {"type": "categorical", "choices": [None, 3, 5, 7, 9, 11]},
     "start_padding_enabled": {"type": "categorical", "choices": [True, False]},
@@ -61,6 +64,7 @@ AA_FORECAST_STAGE_ONLY_PARAM_REGISTRY = {
         "dropout": _probability(),
         "linear_hidden_size": _positive_int(low=1, high=8192),
         "factor": _positive_int(low=1, high=64),
+        "semantic_negative_scale": {"type": "float", "low": 0.0, "high": 2.0},
     },
     "itransformer": {
         **_AA_COMMON_PARAM_REGISTRY,

@@ -55,20 +55,16 @@ def test_load_linked_config_path_resolves_detail() -> None:
     assert cfg.stage_plugin_config.retrieval.blend_floor == 0.2
 
 
-def test_load_baseline_with_retrieval() -> None:
-    """Load the baseline experiment config that includes the retrieval section."""
+def test_load_baseline_without_stage_plugin_uses_shared_scaler() -> None:
+    """Baseline remains retrieval-free and inherits the shared robust scaler."""
     baseline_path = Path("yaml/experiment/feature_set_aaforecast/baseline.yaml")
     if not (REPO_ROOT / baseline_path).exists():
         pytest.skip("baseline.yaml not found")
     loaded = load_app_config(REPO_ROOT, config_path=baseline_path)
     cfg = loaded.config
-    assert isinstance(cfg.stage_plugin_config, RetrievalPluginConfig)
-    assert cfg.stage_plugin_config.enabled is True
-    assert cfg.stage_plugin_config.retrieval.top_k == 1
-    assert cfg.stage_plugin_config.retrieval.trigger_quantile is None
-    assert cfg.stage_plugin_config.retrieval.neighbor_min_event_ratio == 0.0
-    assert cfg.stage_plugin_config.retrieval.min_similarity == pytest.approx(0.05)
-    assert cfg.stage_plugin_config.retrieval.use_shape_key is True
+    assert cfg.stage_plugin_config is None
+    assert cfg.training.scaler_type == "robust"
+    assert "Idx_DxyUSD" in cfg.dataset.hist_exog_cols
 
 
 def test_baseline_hist_exog_columns_exist_in_df() -> None:

@@ -189,6 +189,29 @@ class StagePlugin(Protocol):
         """Run a plugin-owned top-level fold prediction path."""
         ...
 
+    def post_predict_fold(
+        self,
+        loaded: LoadedConfig,
+        job: Any,
+        *,
+        target_predictions: pd.DataFrame,
+        train_df: pd.DataFrame,
+        transformed_train_df: pd.DataFrame,
+        future_df: pd.DataFrame,
+        fitted_model: Any | None,
+        run_root: Path | None,
+    ) -> pd.DataFrame:
+        """Optional post-prediction hook applied after standard fold prediction.
+
+        Plugins that do *not* own top-level jobs can implement this to modify
+        ``target_predictions`` (e.g. retrieval blending).  The runner checks
+        for this method via ``getattr`` — plugins that do not need it can
+        leave it unimplemented.
+
+        Return the (possibly modified) ``target_predictions`` DataFrame.
+        """
+        ...
+
     def materialize_stage(
         self,
         loaded: LoadedConfig,

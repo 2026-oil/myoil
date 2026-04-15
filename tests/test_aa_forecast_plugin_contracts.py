@@ -107,17 +107,13 @@ def test_fanout_stage_payload_none_when_disabled_or_missing() -> None:
     plugin = AAForecastStagePlugin()
     loaded = SimpleNamespace(normalized_payload={})
     assert plugin.fanout_stage_payload(loaded) is None
-    loaded2 = SimpleNamespace(
-        normalized_payload={"aa_forecast": {"enabled": False}}
-    )
+    loaded2 = SimpleNamespace(normalized_payload={"aa_forecast": {"enabled": False}})
     assert plugin.fanout_stage_payload(loaded2) is None
 
 
 def test_fanout_stage_payload_raises_when_enabled_without_stage1() -> None:
     plugin = AAForecastStagePlugin()
-    loaded = SimpleNamespace(
-        normalized_payload={"aa_forecast": {"enabled": True}}
-    )
+    loaded = SimpleNamespace(normalized_payload={"aa_forecast": {"enabled": True}})
     with pytest.raises(ValueError, match="stage1"):
         plugin.fanout_stage_payload(loaded)
 
@@ -164,8 +160,15 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
                         "top_k": 3,
                         "recency_gap_steps": 2,
                         "event_score_threshold": 10.0,
+                        "trigger_quantile": 0.9,
+                        "neighbor_min_event_ratio": 0.8,
                         "min_similarity": 0.8,
+                        "blend_floor": 0.1,
                         "blend_max": 0.2,
+                        "mode": "posthoc_blend",
+                        "similarity": "cosine",
+                        "temperature": 0.1,
+                        "memory_value_mode": "future_level",
                         "use_uncertainty_gate": True,
                     },
                     "model_params": {},
@@ -200,8 +203,15 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
     assert retrieval.top_k == 3
     assert retrieval.recency_gap_steps == 2
     assert retrieval.event_score_threshold == pytest.approx(10.0)
+    assert retrieval.trigger_quantile == pytest.approx(0.9)
+    assert retrieval.neighbor_min_event_ratio == pytest.approx(0.8)
     assert retrieval.min_similarity == pytest.approx(0.8)
+    assert retrieval.blend_floor == pytest.approx(0.1)
     assert retrieval.blend_max == pytest.approx(0.2)
+    assert retrieval.mode == "posthoc_blend"
+    assert retrieval.similarity == "cosine"
+    assert retrieval.temperature == pytest.approx(0.1)
+    assert retrieval.memory_value_mode == "future_level"
     assert retrieval.use_uncertainty_gate is True
 
     payload = aa_forecast_plugin_state_dict(
@@ -213,6 +223,7 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
     assert payload["retrieval"]["similarity"] == "cosine"
     assert payload["retrieval"]["top_k"] == 3
     assert payload["retrieval"]["temperature"] == pytest.approx(0.1)
+    assert payload["retrieval"]["memory_value_mode"] == "future_level"
     assert payload["retrieval"]["use_shape_key"] is True
     assert payload["retrieval"]["use_event_key"] is True
 
@@ -421,7 +432,9 @@ def test_load_app_config_rejects_retrieval_without_uncertainty_enabled(
         load_app_config(REPO_ROOT, config_path=config_path)
 
 
-def test_load_app_config_rejects_direct_top_level_aaforecast_jobs(tmp_path: Path) -> None:
+def test_load_app_config_rejects_direct_top_level_aaforecast_jobs(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "data.csv").write_text(
         "dt,target,event\n2020-01-01,1,0\n2020-01-08,2,1\n",
         encoding="utf-8",
@@ -799,9 +812,7 @@ def test_fit_and_predict_fold_passes_trial_overrides_to_aa_plugin(
         )
     )
     job = SimpleNamespace(model="AAForecast")
-    source_df = pd.DataFrame(
-        {"dt": ["2020-01-01", "2020-01-08"], "target": [1.0, 2.0]}
-    )
+    source_df = pd.DataFrame({"dt": ["2020-01-01", "2020-01-08"], "target": [1.0, 2.0]})
     captured: dict[str, object] = {}
 
     class _FakePlugin:
@@ -975,7 +986,9 @@ def test_predict_aa_forecast_fold_uses_trial_specific_overrides(
     assert captured["star_fold_key"]["training_override"]["model_step_size"] == 4
     assert predictions[job.model].tolist() == [1.23]
     assert actuals.tolist() == future_df[loaded.config.dataset.target_col].tolist()
-    assert str(train_end_ds) == str(pd.Timestamp(train_df[loaded.config.dataset.dt_col].iloc[-1]))
+    assert str(train_end_ds) == str(
+        pd.Timestamp(train_df[loaded.config.dataset.dt_col].iloc[-1])
+    )
     assert used_train_df.equals(train_df)
 
 
@@ -1025,7 +1038,9 @@ def test_predict_aa_forecast_fold_writes_informer_encoding_export_artifacts(
         lambda *_args, **_kwargs: _FakeModel(),
     )
     monkeypatch.setattr(runtime, "_resolve_freq", lambda _loaded, _source_df: "W-MON")
-    monkeypatch.setattr(runtime, "_build_fold_diff_context", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        runtime, "_build_fold_diff_context", lambda *_args, **_kwargs: object()
+    )
     monkeypatch.setattr(
         runtime,
         "_transform_training_frame",
@@ -1058,9 +1073,9 @@ def test_predict_aa_forecast_fold_writes_informer_encoding_export_artifacts(
         return pd.DataFrame(
             {
                 "unique_id": [loaded.config.dataset.target_col] * len(future_df),
-                "ds": pd.to_datetime(future_df[loaded.config.dataset.dt_col]).reset_index(
-                    drop=True
-                ),
+                "ds": pd.to_datetime(
+                    future_df[loaded.config.dataset.dt_col]
+                ).reset_index(drop=True),
                 job.model: [1.1],
             }
         )
@@ -1118,7 +1133,9 @@ def test_predict_aa_forecast_fold_writes_informer_encoding_export_artifacts(
     ]
     assert hidden_frame["tensor_name"].unique().tolist() == ["hidden_states"]
     assert backbone_frame["time_index"].unique().tolist() == [0, 1, 2, 3]
-    assert pd.to_datetime(backbone_frame["ds"]).dt.strftime("%Y-%m-%d").unique().tolist() == [
+    assert pd.to_datetime(backbone_frame["ds"]).dt.strftime(
+        "%Y-%m-%d"
+    ).unique().tolist() == [
         "2024-01-01",
         "2024-01-08",
         "2024-01-15",
@@ -1133,7 +1150,8 @@ def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(
 ) -> None:
     loaded = load_app_config(
         REPO_ROOT,
-        config_path=REPO_ROOT / "tests/fixtures/aa_forecast_runtime_plugin_uncertainty_main.yaml",
+        config_path=REPO_ROOT
+        / "tests/fixtures/aa_forecast_runtime_plugin_uncertainty_main.yaml",
     )
     job = loaded.config.jobs[0]
     source_df = pd.read_csv(loaded.config.dataset.path)
@@ -1163,7 +1181,9 @@ def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(
         lambda *_args, **_kwargs: _FakeModel(),
     )
     monkeypatch.setattr(runtime, "_resolve_freq", lambda _loaded, _source_df: "W-MON")
-    monkeypatch.setattr(runtime, "_build_fold_diff_context", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        runtime, "_build_fold_diff_context", lambda *_args, **_kwargs: object()
+    )
     monkeypatch.setattr(
         runtime,
         "_transform_training_frame",
@@ -1304,7 +1324,9 @@ def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(
     )
 
     assert captured["base_prediction"] == [10.0]
-    assert captured["memory_prediction"] == [train_df["target"].iloc[-1] + max(abs(train_df["target"].iloc[-1]), 1e-8) * 0.1]
+    assert captured["memory_prediction"] == [
+        train_df["target"].iloc[-1] + max(abs(train_df["target"].iloc[-1]), 1e-8) * 0.1
+    ]
     assert captured["uncertainty_std"] == [0.5]
     assert captured["retrieval_cfg_enabled"] is True
     assert captured["mean_similarity"] == pytest.approx(0.86)
@@ -1364,7 +1386,8 @@ def test_predict_aa_forecast_fold_records_retrieval_skip_without_error(
 ) -> None:
     loaded = load_app_config(
         REPO_ROOT,
-        config_path=REPO_ROOT / "tests/fixtures/aa_forecast_runtime_plugin_uncertainty_main.yaml",
+        config_path=REPO_ROOT
+        / "tests/fixtures/aa_forecast_runtime_plugin_uncertainty_main.yaml",
     )
     job = loaded.config.jobs[0]
     source_df = pd.read_csv(loaded.config.dataset.path)
@@ -1393,7 +1416,9 @@ def test_predict_aa_forecast_fold_records_retrieval_skip_without_error(
         lambda *_args, **_kwargs: _FakeModel(),
     )
     monkeypatch.setattr(runtime, "_resolve_freq", lambda _loaded, _source_df: "W-MON")
-    monkeypatch.setattr(runtime, "_build_fold_diff_context", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        runtime, "_build_fold_diff_context", lambda *_args, **_kwargs: object()
+    )
     monkeypatch.setattr(
         runtime,
         "_transform_training_frame",
@@ -1455,7 +1480,9 @@ def test_predict_aa_forecast_fold_records_retrieval_skip_without_error(
             "candidate_samples": {"0.10": [[10.0]]},
         },
     )
-    monkeypatch.setattr(aa_runtime, "_build_event_memory_bank", lambda **_kwargs: ([], 0))
+    monkeypatch.setattr(
+        aa_runtime, "_build_event_memory_bank", lambda **_kwargs: ([], 0)
+    )
     monkeypatch.setattr(
         aa_runtime,
         "_build_event_query",
