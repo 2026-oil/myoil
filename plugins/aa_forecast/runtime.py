@@ -11,7 +11,6 @@ from neuralforecast import NeuralForecast
 
 from plugins.retrieval.runtime import (
     _blend_prediction as _shared_blend_prediction,
-    _effective_event_threshold as _shared_effective_event_threshold,
     _retrieve_neighbors as _shared_retrieve_neighbors,
 )
 
@@ -1188,13 +1187,11 @@ def _retrieve_event_neighbors(
     query: dict[str, Any],
     bank: list[dict[str, Any]],
     retrieval_cfg: _cfg.AAForecastRetrievalConfig,
-    effective_event_threshold: float,
 ) -> dict[str, Any]:
     return _shared_retrieve_neighbors(
         query=query,
         bank=bank,
         retrieval_cfg=retrieval_cfg,
-        effective_event_threshold=effective_event_threshold,
     )
 
 
@@ -1241,9 +1238,6 @@ def _write_retrieval_artifacts(
             "future_returns": np.asarray(
                 neighbor["future_returns"], dtype=float
             ).tolist(),
-            "future_levels": np.asarray(
-                neighbor.get("future_levels", []), dtype=float
-            ).tolist(),
         }
         for neighbor in retrieval_summary["neighbors"]
     ]
@@ -1266,10 +1260,6 @@ def _write_retrieval_artifacts(
             row[f"future_return_step_{horizon_idx + 1}"] = neighbor["future_returns"][
                 horizon_idx
             ]
-            future_levels = neighbor.get("future_levels")
-            row[f"future_level_step_{horizon_idx + 1}"] = (
-                future_levels[horizon_idx] if future_levels is not None else np.nan
-            )
         neighbor_rows.append(row)
     pd.DataFrame(neighbor_rows).to_csv(run_root / relative_neighbors_path, index=False)
     return str(relative_json_path)
@@ -1464,15 +1454,10 @@ def predict_aa_forecast_fold(
             target_col=target_col,
             input_size=input_size,
         )
-        effective_event_threshold = _shared_effective_event_threshold(
-            bank=bank,
-            retrieval_cfg=retrieval_cfg,
-        )
         retrieval_result = _retrieve_event_neighbors(
             query=query,
             bank=bank,
             retrieval_cfg=retrieval_cfg,
-            effective_event_threshold=effective_event_threshold,
         )
         base_prediction = np.asarray(target_predictions[job.model], dtype=float)
         current_last_y = float(train_df[target_col].iloc[-1])
@@ -1487,7 +1472,7 @@ def predict_aa_forecast_fold(
             "top_k_used": len(retrieval_result["top_neighbors"]),
             "candidate_count": candidate_count,
             "eligible_candidate_count": len(bank),
-            "event_score_threshold": effective_event_threshold,
+            "event_score_threshold": retrieval_cfg.event_score_threshold,
             "recency_gap_steps": retrieval_cfg.recency_gap_steps,
             "min_similarity": retrieval_cfg.min_similarity,
             "mean_similarity": retrieval_result["mean_similarity"],

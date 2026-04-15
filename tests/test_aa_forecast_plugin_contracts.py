@@ -217,15 +217,15 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
     assert retrieval.top_k == 3
     assert retrieval.recency_gap_steps == 2
     assert retrieval.event_score_threshold == pytest.approx(10.0)
-    assert retrieval.trigger_quantile == pytest.approx(0.9)
-    assert retrieval.neighbor_min_event_ratio == pytest.approx(0.8)
+    assert retrieval.trigger_quantile is None
+    assert retrieval.neighbor_min_event_ratio == pytest.approx(0.0)
     assert retrieval.min_similarity == pytest.approx(0.8)
     assert retrieval.blend_floor == pytest.approx(0.1)
     assert retrieval.blend_max == pytest.approx(0.2)
     assert retrieval.mode == "posthoc_blend"
     assert retrieval.similarity == "cosine"
     assert retrieval.temperature == pytest.approx(0.1)
-    assert retrieval.memory_value_mode == "future_level"
+    assert retrieval.memory_value_mode == "future_return"
     assert retrieval.use_uncertainty_gate is True
 
     payload = aa_forecast_plugin_state_dict(
@@ -238,7 +238,9 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
     assert payload["retrieval"]["similarity"] == "cosine"
     assert payload["retrieval"]["top_k"] == 3
     assert payload["retrieval"]["temperature"] == pytest.approx(0.1)
-    assert payload["retrieval"]["memory_value_mode"] == "future_level"
+    assert payload["retrieval"]["trigger_quantile"] is None
+    assert payload["retrieval"]["neighbor_min_event_ratio"] == pytest.approx(0.0)
+    assert payload["retrieval"]["memory_value_mode"] == "future_return"
     assert payload["retrieval"]["use_shape_key"] is True
     assert payload["retrieval"]["use_event_key"] is True
 
@@ -1439,6 +1441,45 @@ def test_retrieve_event_neighbors_event_score_bonus_can_flip_top1() -> None:
 
     assert result["retrieval_applied"] is True
     assert result["top_neighbors"][0]["candidate_end_ds"] == "spike-analogue"
+
+
+def test_retrieve_event_neighbors_ignores_neighbor_min_event_ratio() -> None:
+    retrieval_cfg = SimpleNamespace(
+        top_k=1,
+        event_score_threshold=1.0,
+        min_similarity=0.0,
+        temperature=0.1,
+        use_shape_key=False,
+        use_event_key=True,
+        event_score_log_bonus_alpha=0.0,
+        event_score_log_bonus_cap=0.0,
+        neighbor_min_event_ratio=10.0,
+    )
+    query = {
+        "event_score": 5.0,
+        "shape_vector": np.array([1.0, 0.0], dtype=float),
+        "event_vector": np.array([1.0, 0.0], dtype=float),
+    }
+    bank = [
+        {
+            "candidate_end_ds": "anchor-like",
+            "candidate_future_end_ds": "anchor-like+1",
+            "shape_vector": np.array([1.0, 0.0], dtype=float),
+            "event_vector": np.array([1.0, 0.0], dtype=float),
+            "event_score": 2.0,
+            "anchor_target_value": 1.0,
+            "future_returns": np.array([0.05], dtype=float),
+        }
+    ]
+
+    result = aa_runtime._retrieve_event_neighbors(
+        query=query,
+        bank=bank,
+        retrieval_cfg=retrieval_cfg,
+    )
+
+    assert result["retrieval_applied"] is True
+    assert result["top_neighbors"][0]["candidate_end_ds"] == "anchor-like"
 
 
 def test_predict_aa_forecast_fold_records_retrieval_skip_without_error(

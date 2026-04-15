@@ -77,10 +77,7 @@ def _build_memory_bank(
             hist_exog_cols=hist_exog_cols,
             hist_exog_tail_modes=hist_exog_tail_modes,
         )
-        if (
-            retrieval_cfg.trigger_quantile is None
-            and signature["event_score"] < retrieval_cfg.event_score_threshold
-        ):
+        if signature["event_score"] < retrieval_cfg.event_score_threshold:
             continue
         anchor_value = float(raw_train_df[target_col].iloc[end_idx])
         future_values = raw_train_df[target_col].iloc[
@@ -137,9 +134,14 @@ def _retrieve_neighbors(
     query: dict[str, Any],
     bank: list[dict[str, Any]],
     retrieval_cfg: _cfg.RetrievalConfig,
-    effective_event_threshold: float,
+    effective_event_threshold: float | None = None,
 ) -> dict[str, Any]:
-    if query["event_score"] < effective_event_threshold:
+    threshold = (
+        retrieval_cfg.event_score_threshold
+        if effective_event_threshold is None
+        else effective_event_threshold
+    )
+    if query["event_score"] < threshold:
         return {
             "retrieval_attempted": True,
             "retrieval_applied": False,
@@ -158,12 +160,8 @@ def _retrieve_neighbors(
             "max_similarity": 0.0,
         }
     scored_neighbors: list[dict[str, Any]] = []
-    candidate_min_event_score = max(
-        effective_event_threshold,
-        retrieval_cfg.neighbor_min_event_ratio * float(query["event_score"]),
-    )
     for entry in bank:
-        if float(entry["event_score"]) < candidate_min_event_score:
+        if float(entry["event_score"]) < threshold:
             continue
         shape_similarity = _cosine_similarity(
             query["shape_vector"], entry["shape_vector"]
@@ -250,9 +248,7 @@ def _effective_event_threshold(
     bank: list[dict[str, Any]],
     retrieval_cfg: _cfg.RetrievalConfig,
 ) -> float:
-    if retrieval_cfg.trigger_quantile is not None and bank:
-        scores = np.asarray([entry["event_score"] for entry in bank], dtype=float)
-        return float(np.quantile(scores, retrieval_cfg.trigger_quantile))
+    del bank
     return retrieval_cfg.event_score_threshold
 
 

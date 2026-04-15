@@ -107,7 +107,7 @@ class AAForecastRetrievalConfig:
     neighbor_min_event_ratio: float = 0.0
     min_similarity: float = 0.55
     blend_max: float = 0.25
-    use_uncertainty_gate: bool = False
+    use_uncertainty_gate: bool = True
     mode: str = "posthoc_blend"
     similarity: str = "cosine"
     temperature: float = 0.10
@@ -482,29 +482,32 @@ def _normalize_retrieval_config(
     repo_root: Path | None = None,
     source_path: Path | None = None,
 ) -> AAForecastRetrievalConfig:
-    from plugins.retrieval import config as _retrieval_cfg
-
     if value is None:
         return AAForecastRetrievalConfig()
     if not isinstance(value, dict):
         raise ValueError(f"{section} must be a mapping")
-    shared_cfg = _retrieval_cfg.normalize_retrieval_plugin_config(
-        value,
-        unknown_keys=unknown_keys,
-        coerce_bool=coerce_bool,
-        coerce_optional_path_string=coerce_optional_path_string,
+    payload = dict(value)
+    unknown_keys(payload, allowed=AA_FORECAST_RETRIEVAL_KEYS, section=section)
+    enabled = coerce_bool(
+        payload.get("enabled"),
+        field_name=f"{section}.enabled",
+        default=False,
     )
-    if not shared_cfg.enabled:
+    if not enabled:
         return AAForecastRetrievalConfig()
 
-    shared_config_path = shared_cfg.config_path
-    if shared_config_path is not None:
+    config_path = None
+    if coerce_optional_path_string is not None:
+        config_path = coerce_optional_path_string(
+            payload.get("config_path"),
+            field_name=f"{section}.config_path",
+        )
+    if config_path is not None:
         if repo_root is None or source_path is None:
             raise ValueError(
                 f"{section}.config_path requires linked aa_forecast route context"
             )
         from app_config import (
-            _coerce_bool,
             _load_document,
             _resolve_relative_config_reference,
             _unknown_keys,
@@ -513,7 +516,7 @@ def _normalize_retrieval_config(
         resolved_path = _resolve_relative_config_reference(
             repo_root,
             source_path,
-            shared_config_path,
+            config_path,
         )
         if not resolved_path.exists():
             raise FileNotFoundError(
@@ -529,42 +532,150 @@ def _normalize_retrieval_config(
                 f"{section}.config_path must be .yaml/.yml/.toml, got {suffix!r}"
             )
         detail_payload = _load_document(resolved_path, detail_source_type)
-        shared_cfg = _retrieval_cfg.normalize_retrieval_detail_payload(
-            detail_payload,
-            unknown_keys=_unknown_keys,
-            coerce_bool=_coerce_bool,
-        )
+        if not isinstance(detail_payload, dict):
+            raise ValueError(f"{section}.config_path must resolve to a mapping")
+        retrieval_section = detail_payload.get("retrieval")
+        if not isinstance(retrieval_section, dict):
+            raise ValueError(
+                f"{section}.config_path must contain a top-level 'retrieval' mapping"
+            )
+        payload = dict(retrieval_section)
+        _unknown_keys(payload, allowed=AA_FORECAST_RETRIEVAL_KEYS, section=section)
 
-    retrieval = shared_cfg.retrieval
-    if retrieval.enabled and not uncertainty.enabled:
+    top_k = _coerce_positive_int(
+        payload.get("top_k", AAForecastRetrievalConfig().top_k),
+        field_name=f"{section}.top_k",
+    )
+    recency_gap_steps = _coerce_non_negative_float(
+        payload.get(
+            "recency_gap_steps", AAForecastRetrievalConfig().recency_gap_steps
+        ),
+        field_name=f"{section}.recency_gap_steps",
+    )
+    recency_gap_steps_int = int(recency_gap_steps)
+    if recency_gap_steps != recency_gap_steps_int:
+        raise ValueError(f"{section}.recency_gap_steps must be an integer")
+    event_score_threshold = _coerce_non_negative_float(
+        payload.get(
+            "event_score_threshold",
+            AAForecastRetrievalConfig().event_score_threshold,
+        )
+,
+        field_name=f"{section}.event_score_threshold",
+    )
+    trigger_quantile_raw = payload.get("trigger_quantile")
+    if trigger_quantile_raw is not None:
+        parsed_trigger_quantile = float(trigger_quantile_raw)
+        if not (0.0 < parsed_trigger_quantile < 1.0):
+            raise ValueError(
+                f"{section}.trigger_quantile must satisfy 0 < value < 1"
+            )
+    _coerce_non_negative_float(
+        payload.get("neighbor_min_event_ratio", 0.0),
+        field_name=f"{section}.neighbor_min_event_ratio",
+    )
+    min_similarity = _coerce_non_negative_float(
+        payload.get("min_similarity", AAForecastRetrievalConfig().min_similarity),
+        field_name=f"{section}.min_similarity",
+    )
+    if min_similarity > 1:
+        raise ValueError(f"{section}.min_similarity must satisfy 0 <= value <= 1")
+    blend_floor = _coerce_non_negative_float(
+        payload.get("blend_floor", AAForecastRetrievalConfig().blend_floor),
+        field_name=f"{section}.blend_floor",
+    )
+    if blend_floor > 1:
+        raise ValueError(f"{section}.blend_floor must satisfy 0 <= value <= 1")
+    blend_max = _coerce_non_negative_float(
+        payload.get("blend_max", AAForecastRetrievalConfig().blend_max),
+        field_name=f"{section}.blend_max",
+    )
+    if blend_max > 1:
+        raise ValueError(f"{section}.blend_max must satisfy 0 <= value <= 1")
+    if blend_floor > blend_max:
+        raise ValueError(f"{section}.blend_floor must be <= {section}.blend_max")
+    mode = str(payload.get("mode", AAForecastRetrievalConfig().mode)).strip().lower()
+    if mode != "posthoc_blend":
+        raise ValueError(f"{section}.mode currently only supports 'posthoc_blend'")
+    similarity = str(
+        payload.get("similarity", AAForecastRetrievalConfig().similarity)
+    ).strip().lower()
+    if similarity != "cosine":
+        raise ValueError(f"{section}.similarity currently only supports 'cosine'")
+    temperature = _coerce_non_negative_float(
+        payload.get("temperature", AAForecastRetrievalConfig().temperature),
+        field_name=f"{section}.temperature",
+    )
+    if temperature <= 0:
+        raise ValueError(f"{section}.temperature must be > 0")
+    memory_value_mode = str(
+        payload.get("memory_value_mode", AAForecastRetrievalConfig().memory_value_mode)
+    ).strip().lower()
+    if memory_value_mode not in {"future_return", "future_level"}:
+        raise ValueError(
+            f"{section}.memory_value_mode must be one of: 'future_return', 'future_level'"
+        )
+    use_uncertainty_gate = coerce_bool(
+        payload.get(
+            "use_uncertainty_gate",
+            AAForecastRetrievalConfig().use_uncertainty_gate,
+        ),
+        field_name=f"{section}.use_uncertainty_gate",
+        default=AAForecastRetrievalConfig().use_uncertainty_gate,
+    )
+    use_shape_key = coerce_bool(
+        payload.get("use_shape_key", AAForecastRetrievalConfig().use_shape_key),
+        field_name=f"{section}.use_shape_key",
+        default=AAForecastRetrievalConfig().use_shape_key,
+    )
+    use_event_key = coerce_bool(
+        payload.get("use_event_key", AAForecastRetrievalConfig().use_event_key),
+        field_name=f"{section}.use_event_key",
+        default=AAForecastRetrievalConfig().use_event_key,
+    )
+    event_score_log_bonus_alpha = _coerce_non_negative_float(
+        payload.get(
+            "event_score_log_bonus_alpha",
+            AAForecastRetrievalConfig().event_score_log_bonus_alpha,
+        ),
+        field_name=f"{section}.event_score_log_bonus_alpha",
+    )
+    event_score_log_bonus_cap = _coerce_non_negative_float(
+        payload.get(
+            "event_score_log_bonus_cap",
+            AAForecastRetrievalConfig().event_score_log_bonus_cap,
+        ),
+        field_name=f"{section}.event_score_log_bonus_cap",
+    )
+    if enabled and not uncertainty.enabled:
         raise ValueError(
             f"{section}.enabled=true requires aa_forecast.uncertainty.enabled=true"
         )
-    if retrieval.enabled and not (retrieval.use_shape_key or retrieval.use_event_key):
+    if enabled and not (use_shape_key or use_event_key):
         raise ValueError(
             f"{section}.enabled=true requires at least one of "
             f"{section}.use_shape_key or {section}.use_event_key to be true"
         )
     return AAForecastRetrievalConfig(
-        enabled=retrieval.enabled,
-        config_path=shared_config_path,
-        top_k=retrieval.top_k,
-        recency_gap_steps=retrieval.recency_gap_steps,
-        event_score_threshold=retrieval.event_score_threshold,
-        trigger_quantile=retrieval.trigger_quantile,
-        neighbor_min_event_ratio=retrieval.neighbor_min_event_ratio,
-        min_similarity=retrieval.min_similarity,
-        blend_floor=retrieval.blend_floor,
-        blend_max=retrieval.blend_max,
-        use_uncertainty_gate=retrieval.use_uncertainty_gate,
-        mode=retrieval.mode,
-        similarity=retrieval.similarity,
-        temperature=retrieval.temperature,
-        memory_value_mode=retrieval.memory_value_mode,
-        use_shape_key=retrieval.use_shape_key,
-        use_event_key=retrieval.use_event_key,
-        event_score_log_bonus_alpha=retrieval.event_score_log_bonus_alpha,
-        event_score_log_bonus_cap=retrieval.event_score_log_bonus_cap,
+        enabled=enabled,
+        config_path=config_path,
+        top_k=top_k,
+        recency_gap_steps=recency_gap_steps_int,
+        event_score_threshold=event_score_threshold,
+        trigger_quantile=None,
+        neighbor_min_event_ratio=0.0,
+        min_similarity=min_similarity,
+        blend_floor=blend_floor,
+        blend_max=blend_max,
+        use_uncertainty_gate=use_uncertainty_gate,
+        mode=AAForecastRetrievalConfig().mode,
+        similarity=AAForecastRetrievalConfig().similarity,
+        temperature=AAForecastRetrievalConfig().temperature,
+        memory_value_mode=AAForecastRetrievalConfig().memory_value_mode,
+        use_shape_key=use_shape_key,
+        use_event_key=use_event_key,
+        event_score_log_bonus_alpha=event_score_log_bonus_alpha,
+        event_score_log_bonus_cap=event_score_log_bonus_cap,
     )
 
 

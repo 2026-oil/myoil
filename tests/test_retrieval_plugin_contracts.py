@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from plugin_contracts.stage_plugin import StagePlugin
@@ -15,6 +16,7 @@ from plugins.retrieval.config import (
     retrieval_config_to_dict,
 )
 from plugins.retrieval.plugin import RetrievalStagePlugin
+import plugins.retrieval.runtime as retrieval_runtime
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -264,6 +266,60 @@ def test_config_to_dict_round_trip() -> None:
     assert serialized["enabled"] is True
     assert serialized["star"]["thresh"] == 3.0
     assert serialized["top_k"] == 2
+
+
+def test_effective_event_threshold_ignores_trigger_quantile() -> None:
+    retrieval_cfg = RetrievalConfig(
+        enabled=True,
+        event_score_threshold=3.5,
+        trigger_quantile=0.9,
+    )
+    bank = [{"event_score": 1.0}, {"event_score": 5.0}, {"event_score": 9.0}]
+
+    threshold = retrieval_runtime._effective_event_threshold(
+        bank=bank,
+        retrieval_cfg=retrieval_cfg,
+    )
+
+    assert threshold == pytest.approx(3.5)
+
+
+def test_retrieve_neighbors_ignores_neighbor_min_event_ratio() -> None:
+    retrieval_cfg = RetrievalConfig(
+        enabled=True,
+        top_k=1,
+        event_score_threshold=1.0,
+        min_similarity=0.0,
+        temperature=0.1,
+        use_shape_key=False,
+        use_event_key=True,
+        neighbor_min_event_ratio=10.0,
+    )
+    query = {
+        "event_score": 5.0,
+        "shape_vector": np.array([1.0, 0.0], dtype=float),
+        "event_vector": np.array([1.0, 0.0], dtype=float),
+    }
+    bank = [
+        {
+            "candidate_end_ds": "anchor-like",
+            "candidate_future_end_ds": "anchor-like+1",
+            "shape_vector": np.array([1.0, 0.0], dtype=float),
+            "event_vector": np.array([1.0, 0.0], dtype=float),
+            "event_score": 2.0,
+            "anchor_target_value": 1.0,
+            "future_returns": np.array([0.05], dtype=float),
+        }
+    ]
+
+    result = retrieval_runtime._retrieve_neighbors(
+        query=query,
+        bank=bank,
+        retrieval_cfg=retrieval_cfg,
+    )
+
+    assert result["retrieval_applied"] is True
+    assert result["top_neighbors"][0]["candidate_end_ds"] == "anchor-like"
 
 
 # ------------------------------------------------------------------
