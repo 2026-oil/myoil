@@ -3524,3 +3524,30 @@
 - experiment title: restore the exact active keep basis after recording the completed sqrt-family-gate regression
 - restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 exact active keep rerun (prototype sqrt-confidence basis)
+- timestamp: 2026-04-15T17:xx:00+09:00
+- git branch: informer_test
+- experiment title: bounded repeatability rerun on the exact active keep at `14c6c967` with no code changes
+- code/config basis:
+  - exact active keep commit `14c6c967`
+  - no model/YAML/test changes before the run; this iteration only re-ran the strict 3-way bundle to measure stochastic upside/downside on the current best-compliant basis
+- verification bundle:
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_sqrtconf_rerun1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_sqrtconf_rerun1`
+- run/artifact path: runs/iter_20260415_proto_sqrtconf_rerun1
+- final-fold result:
+  - baseline (plain_informer) = `73.3826 / 73.9076`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.6164 / 78.7323`
+- active keep comparison:
+  - current compliant keep AA-Informer = `76.1788 / 80.0079`
+  - rerun delta vs keep = `-0.5624 / -1.2756`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - the exact keep rerun does not beat the recorded keep on either horizon.
+- 핵심 진단:
+  - the current compliant keep remains the best recorded run on this code basis; a fresh rerun stayed inside the same family but landed materially lower on h2.
+  - this confirms there is still non-trivial stochastic spread around the current keep, but this particular rerun did not produce a new frontier.
+- 판단: REPEATABILITY EVIDENCE ONLY / KEEP UNCHANGED
