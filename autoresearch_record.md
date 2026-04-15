@@ -3551,3 +3551,35 @@
   - the current compliant keep remains the best recorded run on this code basis; a fresh rerun stayed inside the same family but landed materially lower on h2.
   - this confirms there is still non-trivial stochastic spread around the current keep, but this particular rerun did not produce a new frontier.
 - 판단: REPEATABILITY EVIDENCE ONLY / KEEP UNCHANGED
+
+## Iteration 2026-04-15 4-slot prototype bank on the active keep
+- timestamp: 2026-04-15T16:xx:00+09:00
+- git branch: informer_test
+- experiment title: contract the prototype bank from 6 slots to 4 while keeping the active keep's confidence placement and residual scaling unchanged
+- hypothesis:
+  - after both 8-slot expansion and top-2 masking failed, the next narrow structural question was whether the active keep wanted a slightly smaller prototype bank without hard masking.
+  - a 4-slot bank is a simple capacity contraction that still preserves soft mixing across multiple prototypes.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/baseline.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_bank4_restore_gru_bundle1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_bank4_restore_gru_bundle1`
+- run/artifact path: runs/iter_20260415_proto_bank4_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `74.1730 / 75.6948`
+- active keep comparison:
+  - current compliant keep AA-Informer = `76.1788 / 80.0079`
+  - 4-slot delta vs keep = `-2.0058 / -4.3131`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - both horizons regress sharply below the active keep.
+- 핵심 진단:
+  - the active lane still wants broader prototype support than a 4-slot bank allows.
+  - capacity contraction is much more harmful than the recent micro-adjustments, so the current 6-slot bank remains the better compromise.
+- 판단: SAFE FAILURE / REJECT 4-SLOT PROTOTYPE BANK
