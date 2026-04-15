@@ -939,7 +939,7 @@ class InformerHorizonAwareHead(nn.Module):
             memory_bank,
             need_weights=False,
         )
-        prototype_memory_curve = 0.12 * torch.tanh(self.local_head(memory_transport_states)) * anchor_scale
+        prototype_memory_curve = 0.1 * torch.tanh(self.local_head(memory_transport_states)) * anchor_scale
         prototype_memory_confidence = torch.sqrt(memory_confidence.clamp_min(0.0)).unsqueeze(1)
         prototype_component = (
             prototype_level

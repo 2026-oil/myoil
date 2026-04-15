@@ -3284,3 +3284,10 @@
   - the current lane is no longer simply coefficient-limited: a small extra amplitude lift can help h1, but it already overshoots the balance that was helping h2.
   - because the user asked to preserve final-fold horizon-2 focus, this must be treated as a regression despite the mild h1 gain.
 - 판단: SAFE FAILURE / REJECT 0.12-SCALE PROTOTYPE MEMORY-CURVE
+
+## Iteration 2026-04-15 restore exact active keep after 0.12-scale regression
+- timestamp: 2026-04-15T16:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed 0.12-scale regression
+- restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
