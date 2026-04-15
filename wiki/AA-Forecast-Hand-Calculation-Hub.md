@@ -27,6 +27,10 @@
 6. [AA-Forecast + GRU + Retrieval](AA-Forecast-GRU-Retrieval)
 7. [AA-Forecast + Informer + Retrieval](AA-Forecast-Informer-Retrieval)
 
+Retrieval 메커니즘 자체를 STAR signature부터 blend까지 완전히 파고들려면:
+
+8. [Retrieval 손계산 완전 해설](Retrieval-Deep-Dive-Hand-Calculation)
+
 ## 비교표
 
 | 페이지 | command / config | Base model | Retrieval | AA-Forecast | 손계산 중심 포인트 |
