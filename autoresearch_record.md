@@ -2137,3 +2137,38 @@
   - gck reaches 82.0834 and again revives the upper secondary tier just below dh, while gcj/gcl drop into the weaker tail and gci stays near the center-high band.
   - even with another strong upper-secondary replay, the frontier still does not move and the aggregate center/spread remain essentially unchanged, reinforcing the same saturation diagnosis.
 - 판단: KEEP AS TERMINAL SATURATION EVIDENCE
+
+## Iteration 2026-04-15 main revalidation of the 14c6c967 AA-Informer keep basis
+- timestamp: 2026-04-15T14:03:50+09:00
+- git branch: main
+- experiment title: restore the informer_test keep basis onto main and rerun the strict 3-way Brent bundle without changing the underlying 14c6c967 hypothesis
+- code/config basis:
+  - main code restores the behavioral informer basis from `14c6c967` on top of current main
+  - main config route now matches the active informer_test artifact basis (`aaforecast-informer.yaml` -> `aa_forecast_parity_informer_stability_dh.yaml`)
+  - this revalidation is about main compatibility and measurement parity, not about inventing a new AA-Informer patch
+- verification bundle:
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python -m py_compile neuralforecast/models/aaforecast/model.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/baseline.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_sqrtconf_maincheck_rerun1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_sqrtconf_maincheck_rerun1`
+- run/artifact path: runs/iter_20260415_proto_sqrtconf_maincheck_rerun1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `76.1336 / 79.8499`
+- target checks:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - runtime completes on main for the same keep family after restoring the informer_test route/config drift
+- active artifact comparison:
+  - informer_test rerun4 keep = `76.2956 / 80.1195`
+  - informer_test rerun6 keep = `76.4522 / 80.5426`
+  - main rerun delta vs rerun6 = `-0.3186 / -0.6927`
+- 핵심 진단:
+  - main now runs the recovered keep basis end-to-end, so the portability goal is satisfied.
+  - this main measurement does not beat the best informer_test artifact, so the active compliant keep should stay attached to rerun6 rather than being re-promoted from the main rerun.
+  - the improvement story remains measurement-only: the best strict artifact moved, but the underlying code idea is still the same 14c6c967 keep basis.
+- 판단: MAIN COMPATIBILITY CONFIRMED / ACTIVE ARTIFACT STAYS INFORMER_TEST RERUN6
