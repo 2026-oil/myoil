@@ -943,11 +943,7 @@ class InformerHorizonAwareHead(nn.Module):
         prototype_component = (
             prototype_level
             + prototype_curve
-            + (
-                prototype_memory_curve
-                * prototype_gain
-                * memory_confidence.unsqueeze(1)
-            )
+            + (prototype_memory_curve * memory_confidence.unsqueeze(1))
         ) * family_gate * memory_confidence.unsqueeze(1)
         memory_transport = torch.cumsum(
             F.softplus(self.local_head(memory_transport_states)),
