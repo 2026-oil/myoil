@@ -72,9 +72,7 @@ def materialize_aa_forecast_stage(
 def _aa_params_override(loaded: Any) -> dict[str, Any]:
     config = getattr(loaded, "config", loaded)
     stage_cfg = config.stage_plugin_config
-    scaler_type = config.training.scaler_type
-    if scaler_type == "robust":
-        scaler_type = None
+    scaler_type = None
     return {
         "backbone": stage_cfg.model,
         "thresh": stage_cfg.thresh,

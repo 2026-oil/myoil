@@ -281,11 +281,11 @@ def test_aaforecast_plugin_ignores_shared_robust_scaler() -> None:
     assert model.hparams.scaler_type is None
 
 
-def test_aaforecast_plugin_preserves_non_robust_shared_scaler() -> None:
+def test_aaforecast_plugin_forces_null_scaler_for_any_shared_scaler() -> None:
     loaded, model = _build_aaforecast_plugin_model(training_scaler_type="standard")
 
     assert loaded.config.training.scaler_type == "standard"
-    assert model.hparams.scaler_type == "standard"
+    assert model.hparams.scaler_type is None
 
 
 def test_aaforecast_plugin_uses_shared_setting_adamw_optimizer() -> None:
