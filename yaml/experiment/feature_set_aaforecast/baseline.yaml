@@ -17,5 +17,7 @@ dataset:
   - Idx_DxyUSD
   futr_exog_cols: []
   static_exog_cols: []
+retrieval:
+  enabled: false
 jobs:
 - yaml/jobs/main/gru_informer.yaml

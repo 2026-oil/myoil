@@ -136,7 +136,13 @@ class RetrievalStagePlugin:
     def apply_stage_to_config(self, config: AppConfig, stage_loaded: Any) -> AppConfig:
         if not isinstance(stage_loaded, _cfg.RetrievalPluginConfig):
             return config
-        return replace(config, stage_plugin_config=stage_loaded)
+        configured_path = getattr(config.stage_plugin_config, "config_path", None)
+        if configured_path is None:
+            return replace(config, stage_plugin_config=stage_loaded)
+        return replace(
+            config,
+            stage_plugin_config=replace(stage_loaded, config_path=configured_path),
+        )
 
     def stage_normalized_payload(
         self,

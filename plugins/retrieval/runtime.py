@@ -18,7 +18,6 @@ import pandas as pd
 from . import config as _cfg
 from .signatures import (
     _build_star_extractor,
-    _normalize_signature,
     _resolve_tail_modes,
     compute_star_signature,
 )
@@ -246,6 +245,17 @@ def _retrieve_neighbors(
     }
 
 
+def _effective_event_threshold(
+    *,
+    bank: list[dict[str, Any]],
+    retrieval_cfg: _cfg.RetrievalConfig,
+) -> float:
+    if retrieval_cfg.trigger_quantile is not None and bank:
+        scores = np.asarray([entry["event_score"] for entry in bank], dtype=float)
+        return float(np.quantile(scores, retrieval_cfg.trigger_quantile))
+    return retrieval_cfg.event_score_threshold
+
+
 # ---------------------------------------------------------------------------
 # Blending
 # ---------------------------------------------------------------------------
@@ -390,16 +400,10 @@ def post_predict_retrieval(
         input_size=input_size,
     )
 
-    # Compute effective event threshold.
-    # When trigger_quantile is set, derive the threshold from the bank's
-    # event-score distribution; otherwise fall back to the fixed threshold.
-    if retrieval_cfg.trigger_quantile is not None and bank:
-        scores = np.asarray([entry["event_score"] for entry in bank], dtype=float)
-        effective_event_threshold = float(
-            np.quantile(scores, retrieval_cfg.trigger_quantile)
-        )
-    else:
-        effective_event_threshold = retrieval_cfg.event_score_threshold
+    effective_event_threshold = _effective_event_threshold(
+        bank=bank,
+        retrieval_cfg=retrieval_cfg,
+    )
 
     retrieval_result = _retrieve_neighbors(
         query=query,

@@ -47,12 +47,20 @@ AA_FORECAST_UNCERTAINTY_KEYS = {"enabled", "sample_count", "dropout_candidates"}
 AA_FORECAST_STAR_ANOMALY_TAIL_KEYS = {"upward", "two_sided"}
 AA_FORECAST_RETRIEVAL_KEYS = {
     "enabled",
+    "config_path",
     "top_k",
     "recency_gap_steps",
     "event_score_threshold",
+    "trigger_quantile",
+    "neighbor_min_event_ratio",
     "min_similarity",
+    "blend_floor",
     "blend_max",
     "use_uncertainty_gate",
+    "mode",
+    "similarity",
+    "temperature",
+    "memory_value_mode",
     "use_shape_key",
     "use_event_key",
     "event_score_log_bonus_alpha",
@@ -91,15 +99,19 @@ class AAForecastUncertaintyConfig:
 @dataclass(frozen=True)
 class AAForecastRetrievalConfig:
     enabled: bool = False
+    config_path: str | None = None
     top_k: int = 5
     recency_gap_steps: int = 8
     event_score_threshold: float = 1.0
+    trigger_quantile: float | None = None
+    neighbor_min_event_ratio: float = 0.0
     min_similarity: float = 0.55
     blend_max: float = 0.25
-    use_uncertainty_gate: bool = True
+    use_uncertainty_gate: bool = False
     mode: str = "posthoc_blend"
     similarity: str = "cosine"
     temperature: float = 0.10
+    memory_value_mode: str = "future_return"
     use_shape_key: bool = True
     use_event_key: bool = True
     blend_floor: float = 0.0
@@ -178,18 +190,22 @@ def aa_forecast_retrieval_public_dict(
 ) -> dict[str, Any]:
     return {
         "enabled": retrieval.enabled,
+        "config_path": retrieval.config_path,
         "top_k": retrieval.top_k,
         "recency_gap_steps": retrieval.recency_gap_steps,
         "event_score_threshold": retrieval.event_score_threshold,
+        "trigger_quantile": retrieval.trigger_quantile,
+        "neighbor_min_event_ratio": retrieval.neighbor_min_event_ratio,
         "min_similarity": retrieval.min_similarity,
+        "blend_floor": retrieval.blend_floor,
         "blend_max": retrieval.blend_max,
         "use_uncertainty_gate": retrieval.use_uncertainty_gate,
         "mode": retrieval.mode,
         "similarity": retrieval.similarity,
         "temperature": retrieval.temperature,
+        "memory_value_mode": retrieval.memory_value_mode,
         "use_shape_key": retrieval.use_shape_key,
         "use_event_key": retrieval.use_event_key,
-        "blend_floor": retrieval.blend_floor,
         "event_score_log_bonus_alpha": retrieval.event_score_log_bonus_alpha,
         "event_score_log_bonus_cap": retrieval.event_score_log_bonus_cap,
     }
@@ -461,104 +477,94 @@ def _normalize_retrieval_config(
     section: str,
     unknown_keys: Any,
     coerce_bool: Any,
+    coerce_optional_path_string: Any | None = None,
     uncertainty: AAForecastUncertaintyConfig,
+    repo_root: Path | None = None,
+    source_path: Path | None = None,
 ) -> AAForecastRetrievalConfig:
+    from plugins.retrieval import config as _retrieval_cfg
+
     if value is None:
         return AAForecastRetrievalConfig()
     if not isinstance(value, dict):
         raise ValueError(f"{section} must be a mapping")
-    payload = dict(value)
-    unknown_keys(payload, allowed=AA_FORECAST_RETRIEVAL_KEYS, section=section)
-    enabled = coerce_bool(
-        payload.get("enabled"),
-        field_name=f"{section}.enabled",
-        default=False,
+    shared_cfg = _retrieval_cfg.normalize_retrieval_plugin_config(
+        value,
+        unknown_keys=unknown_keys,
+        coerce_bool=coerce_bool,
+        coerce_optional_path_string=coerce_optional_path_string,
     )
-    top_k = _coerce_positive_int(
-        payload.get("top_k", AAForecastRetrievalConfig().top_k),
-        field_name=f"{section}.top_k",
-    )
-    recency_gap_steps = _coerce_non_negative_float(
-        payload.get(
-            "recency_gap_steps", AAForecastRetrievalConfig().recency_gap_steps
-        ),
-        field_name=f"{section}.recency_gap_steps",
-    )
-    recency_gap_steps_int = int(recency_gap_steps)
-    if recency_gap_steps != recency_gap_steps_int:
-        raise ValueError(f"{section}.recency_gap_steps must be an integer")
-    event_score_threshold = _coerce_non_negative_float(
-        payload.get(
-            "event_score_threshold",
-            AAForecastRetrievalConfig().event_score_threshold,
-        ),
-        field_name=f"{section}.event_score_threshold",
-    )
-    min_similarity = _coerce_non_negative_float(
-        payload.get("min_similarity", AAForecastRetrievalConfig().min_similarity),
-        field_name=f"{section}.min_similarity",
-    )
-    if min_similarity > 1:
-        raise ValueError(f"{section}.min_similarity must satisfy 0 <= value <= 1")
-    blend_max = _coerce_non_negative_float(
-        payload.get("blend_max", AAForecastRetrievalConfig().blend_max),
-        field_name=f"{section}.blend_max",
-    )
-    if blend_max > 1:
-        raise ValueError(f"{section}.blend_max must satisfy 0 <= value <= 1")
-    use_uncertainty_gate = coerce_bool(
-        payload.get(
-            "use_uncertainty_gate",
-            AAForecastRetrievalConfig().use_uncertainty_gate,
-        ),
-        field_name=f"{section}.use_uncertainty_gate",
-        default=AAForecastRetrievalConfig().use_uncertainty_gate,
-    )
-    use_shape_key = coerce_bool(
-        payload.get("use_shape_key", AAForecastRetrievalConfig().use_shape_key),
-        field_name=f"{section}.use_shape_key",
-        default=AAForecastRetrievalConfig().use_shape_key,
-    )
-    use_event_key = coerce_bool(
-        payload.get("use_event_key", AAForecastRetrievalConfig().use_event_key),
-        field_name=f"{section}.use_event_key",
-        default=AAForecastRetrievalConfig().use_event_key,
-    )
-    event_score_log_bonus_alpha = _coerce_non_negative_float(
-        payload.get(
-            "event_score_log_bonus_alpha",
-            AAForecastRetrievalConfig().event_score_log_bonus_alpha,
-        ),
-        field_name=f"{section}.event_score_log_bonus_alpha",
-    )
-    event_score_log_bonus_cap = _coerce_non_negative_float(
-        payload.get(
-            "event_score_log_bonus_cap",
-            AAForecastRetrievalConfig().event_score_log_bonus_cap,
-        ),
-        field_name=f"{section}.event_score_log_bonus_cap",
-    )
-    if enabled and not uncertainty.enabled:
+    if not shared_cfg.enabled:
+        return AAForecastRetrievalConfig()
+
+    shared_config_path = shared_cfg.config_path
+    if shared_config_path is not None:
+        if repo_root is None or source_path is None:
+            raise ValueError(
+                f"{section}.config_path requires linked aa_forecast route context"
+            )
+        from app_config import (
+            _coerce_bool,
+            _load_document,
+            _resolve_relative_config_reference,
+            _unknown_keys,
+        )
+
+        resolved_path = _resolve_relative_config_reference(
+            repo_root,
+            source_path,
+            shared_config_path,
+        )
+        if not resolved_path.exists():
+            raise FileNotFoundError(
+                f"{section}.config_path does not exist: {resolved_path}"
+            )
+        suffix = resolved_path.suffix.lower()
+        if suffix in {".yaml", ".yml"}:
+            detail_source_type = "yaml"
+        elif suffix == ".toml":
+            detail_source_type = "toml"
+        else:
+            raise ValueError(
+                f"{section}.config_path must be .yaml/.yml/.toml, got {suffix!r}"
+            )
+        detail_payload = _load_document(resolved_path, detail_source_type)
+        shared_cfg = _retrieval_cfg.normalize_retrieval_detail_payload(
+            detail_payload,
+            unknown_keys=_unknown_keys,
+            coerce_bool=_coerce_bool,
+        )
+
+    retrieval = shared_cfg.retrieval
+    if retrieval.enabled and not uncertainty.enabled:
         raise ValueError(
             f"{section}.enabled=true requires aa_forecast.uncertainty.enabled=true"
         )
-    if enabled and not (use_shape_key or use_event_key):
+    if retrieval.enabled and not (retrieval.use_shape_key or retrieval.use_event_key):
         raise ValueError(
             f"{section}.enabled=true requires at least one of "
             f"{section}.use_shape_key or {section}.use_event_key to be true"
         )
     return AAForecastRetrievalConfig(
-        enabled=enabled,
-        top_k=top_k,
-        recency_gap_steps=recency_gap_steps_int,
-        event_score_threshold=event_score_threshold,
-        min_similarity=min_similarity,
-        blend_max=blend_max,
-        use_uncertainty_gate=use_uncertainty_gate,
-        use_shape_key=use_shape_key,
-        use_event_key=use_event_key,
-        event_score_log_bonus_alpha=event_score_log_bonus_alpha,
-        event_score_log_bonus_cap=event_score_log_bonus_cap,
+        enabled=retrieval.enabled,
+        config_path=shared_config_path,
+        top_k=retrieval.top_k,
+        recency_gap_steps=retrieval.recency_gap_steps,
+        event_score_threshold=retrieval.event_score_threshold,
+        trigger_quantile=retrieval.trigger_quantile,
+        neighbor_min_event_ratio=retrieval.neighbor_min_event_ratio,
+        min_similarity=retrieval.min_similarity,
+        blend_floor=retrieval.blend_floor,
+        blend_max=retrieval.blend_max,
+        use_uncertainty_gate=retrieval.use_uncertainty_gate,
+        mode=retrieval.mode,
+        similarity=retrieval.similarity,
+        temperature=retrieval.temperature,
+        memory_value_mode=retrieval.memory_value_mode,
+        use_shape_key=retrieval.use_shape_key,
+        use_event_key=retrieval.use_event_key,
+        event_score_log_bonus_alpha=retrieval.event_score_log_bonus_alpha,
+        event_score_log_bonus_cap=retrieval.event_score_log_bonus_cap,
     )
 
 
@@ -627,6 +633,9 @@ def _normalize_canonical_fields(
     section: str,
     unknown_keys: Any,
     coerce_bool: Any,
+    coerce_optional_path_string: Any | None = None,
+    repo_root: Path | None = None,
+    source_path: Path | None = None,
 ) -> AAForecastPluginConfig:
     if "p_value" in payload:
         raise ValueError(
@@ -697,7 +706,10 @@ def _normalize_canonical_fields(
         section=f"{section}.retrieval",
         unknown_keys=unknown_keys,
         coerce_bool=coerce_bool,
+        coerce_optional_path_string=coerce_optional_path_string,
         uncertainty=uncertainty,
+        repo_root=repo_root,
+        source_path=source_path,
     )
     encoding_export = _normalize_encoding_export_config(
         payload.get("encoding_export"),
@@ -801,6 +813,9 @@ def normalize_linked_aa_forecast_config(
     *,
     unknown_keys: Any,
     coerce_bool: Any,
+    coerce_optional_path_string: Any | None = None,
+    repo_root: Path | None = None,
+    source_path: Path | None = None,
 ) -> AAForecastPluginConfig:
     if value is None:
         raise ValueError("aa_forecast routed YAML must define a top-level aa_forecast block")
@@ -817,6 +832,9 @@ def normalize_linked_aa_forecast_config(
         section="aa_forecast",
         unknown_keys=unknown_keys,
         coerce_bool=coerce_bool,
+        coerce_optional_path_string=coerce_optional_path_string,
+        repo_root=repo_root,
+        source_path=source_path,
     )
 
 
@@ -936,6 +954,7 @@ def load_aa_forecast_stage1(
 ) -> AAForecastStageLoadedConfig:
     from app_config import (
         _coerce_bool,
+        _coerce_optional_path_string,
         _load_document,
         _resolve_relative_config_reference,
         _unknown_keys,
@@ -963,6 +982,9 @@ def load_aa_forecast_stage1(
         payload.get("aa_forecast"),
         unknown_keys=_unknown_keys,
         coerce_bool=_coerce_bool,
+        coerce_optional_path_string=_coerce_optional_path_string,
+        repo_root=repo_root,
+        source_path=stage_source_path,
     )
     config = replace(
         linked,

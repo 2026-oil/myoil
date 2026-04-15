@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import math
 from pathlib import Path
 from typing import Any
 
@@ -10,10 +9,13 @@ import pandas as pd
 import torch
 from neuralforecast import NeuralForecast
 
-from . import config as _cfg
+from plugins.retrieval.runtime import (
+    _blend_prediction as _shared_blend_prediction,
+    _effective_event_threshold as _shared_effective_event_threshold,
+    _retrieve_neighbors as _shared_retrieve_neighbors,
+)
 
-RETRIEVAL_SHAPE_WEIGHT = 0.20
-RETRIEVAL_EVENT_WEIGHT = 0.80
+from . import config as _cfg
 
 
 def _stage_root(run_root: Path) -> Path:
@@ -1108,16 +1110,6 @@ def _build_retrieval_signature(
     }
 
 
-def _cosine_similarity(left: np.ndarray, right: np.ndarray) -> float:
-    if left.shape != right.shape:
-        raise ValueError("retrieval cosine similarity requires matching vector shapes")
-    left_norm = np.linalg.norm(left)
-    right_norm = np.linalg.norm(right)
-    if left_norm <= 1e-12 or right_norm <= 1e-12:
-        return 0.0
-    return float(np.dot(left, right) / (left_norm * right_norm))
-
-
 def _build_event_memory_bank(
     *,
     model: Any,
@@ -1198,110 +1190,12 @@ def _retrieve_event_neighbors(
     retrieval_cfg: _cfg.AAForecastRetrievalConfig,
     effective_event_threshold: float,
 ) -> dict[str, Any]:
-    if query["event_score"] < effective_event_threshold:
-        return {
-            "retrieval_attempted": True,
-            "retrieval_applied": False,
-            "skip_reason": "below_event_threshold",
-            "top_neighbors": [],
-            "mean_similarity": 0.0,
-            "max_similarity": 0.0,
-        }
-    if not bank:
-        return {
-            "retrieval_attempted": True,
-            "retrieval_applied": False,
-            "skip_reason": "empty_bank",
-            "top_neighbors": [],
-            "mean_similarity": 0.0,
-            "max_similarity": 0.0,
-        }
-    scored_neighbors: list[dict[str, Any]] = []
-    candidate_min_event_score = max(
-        effective_event_threshold,
-        retrieval_cfg.neighbor_min_event_ratio * float(query["event_score"]),
+    return _shared_retrieve_neighbors(
+        query=query,
+        bank=bank,
+        retrieval_cfg=retrieval_cfg,
+        effective_event_threshold=effective_event_threshold,
     )
-    for entry in bank:
-        if float(entry["event_score"]) < candidate_min_event_score:
-            continue
-        shape_similarity = _cosine_similarity(
-            query["shape_vector"], entry["shape_vector"]
-        )
-        event_similarity = _cosine_similarity(
-            query["event_vector"], entry["event_vector"]
-        )
-        event_component = event_similarity
-        if (
-            retrieval_cfg.use_event_key
-            and retrieval_cfg.event_score_log_bonus_alpha > 0.0
-        ):
-            query_event_score = max(float(query["event_score"]), 1e-8)
-            candidate_event_score = max(float(entry["event_score"]), 1e-8)
-            event_score_log_bonus = min(
-                max(math.log(candidate_event_score / query_event_score), 0.0),
-                retrieval_cfg.event_score_log_bonus_cap,
-            )
-            event_component = event_component + (
-                retrieval_cfg.event_score_log_bonus_alpha * event_score_log_bonus
-            )
-        if retrieval_cfg.use_shape_key and retrieval_cfg.use_event_key:
-            similarity = (
-                RETRIEVAL_SHAPE_WEIGHT * shape_similarity
-                + RETRIEVAL_EVENT_WEIGHT * event_component
-            )
-        elif retrieval_cfg.use_event_key:
-            similarity = event_component
-        elif retrieval_cfg.use_shape_key:
-            similarity = shape_similarity
-        else:
-            raise ValueError(
-                "aa_forecast retrieval requires at least one similarity key enabled"
-            )
-        if similarity < retrieval_cfg.min_similarity:
-            continue
-        scored_neighbors.append(
-            {
-                **entry,
-                "shape_similarity": shape_similarity,
-                "event_similarity": event_similarity,
-                "similarity": similarity,
-            }
-        )
-    if not scored_neighbors:
-        return {
-            "retrieval_attempted": True,
-            "retrieval_applied": False,
-            "skip_reason": "min_similarity",
-            "top_neighbors": [],
-            "mean_similarity": 0.0,
-            "max_similarity": 0.0,
-        }
-    scored_neighbors.sort(key=lambda item: item["similarity"], reverse=True)
-    top_neighbors = scored_neighbors[: retrieval_cfg.top_k]
-    logits = (
-        np.asarray(
-            [neighbor["similarity"] for neighbor in top_neighbors],
-            dtype=float,
-        )
-        / retrieval_cfg.temperature
-    )
-    logits = logits - logits.max()
-    weights = np.exp(logits)
-    weights = weights / weights.sum()
-    for neighbor, weight in zip(top_neighbors, weights, strict=True):
-        neighbor["softmax_weight"] = float(weight)
-    similarities = np.asarray(
-        [neighbor["similarity"] for neighbor in top_neighbors],
-        dtype=float,
-    )
-    return {
-        "retrieval_attempted": True,
-        "retrieval_applied": True,
-        "skip_reason": None,
-        "top_neighbors": top_neighbors,
-        "mean_similarity": float(similarities.mean()),
-        "max_similarity": float(similarities.max()),
-    }
 
 
 def _blend_event_memory_prediction(
@@ -1312,29 +1206,13 @@ def _blend_event_memory_prediction(
     retrieval_cfg: _cfg.AAForecastRetrievalConfig,
     mean_similarity: float,
 ) -> tuple[np.ndarray, np.ndarray]:
-    similarity_scale = float(np.clip(mean_similarity, 0.0, 1.0))
-    if retrieval_cfg.use_uncertainty_gate and uncertainty_std is not None:
-        std_values = np.asarray(uncertainty_std, dtype=float)
-        max_std = float(np.max(std_values))
-        if max_std > 1e-12:
-            uncertainty_scale = std_values / max_std
-        else:
-            uncertainty_scale = np.ones_like(std_values)
-    else:
-        uncertainty_scale = np.ones_like(base_prediction, dtype=float)
-    blend_weight = (
-        retrieval_cfg.blend_floor
-        + (retrieval_cfg.blend_max - retrieval_cfg.blend_floor)
-        * similarity_scale
-        * uncertainty_scale
+    return _shared_blend_prediction(
+        base_prediction=base_prediction,
+        memory_prediction=memory_prediction,
+        uncertainty_std=uncertainty_std,
+        retrieval_cfg=retrieval_cfg,
+        mean_similarity=mean_similarity,
     )
-    blend_weight = np.clip(
-        blend_weight, retrieval_cfg.blend_floor, retrieval_cfg.blend_max
-    )
-    final_prediction = (1.0 - blend_weight) * np.asarray(
-        base_prediction, dtype=float
-    ) + blend_weight * np.asarray(memory_prediction, dtype=float)
-    return final_prediction, np.asarray(blend_weight, dtype=float)
 
 
 def _write_retrieval_artifacts(
@@ -1586,6 +1464,10 @@ def predict_aa_forecast_fold(
             target_col=target_col,
             input_size=input_size,
         )
+        effective_event_threshold = _shared_effective_event_threshold(
+            bank=bank,
+            retrieval_cfg=retrieval_cfg,
+        )
         retrieval_result = _retrieve_event_neighbors(
             query=query,
             bank=bank,
@@ -1605,7 +1487,7 @@ def predict_aa_forecast_fold(
             "top_k_used": len(retrieval_result["top_neighbors"]),
             "candidate_count": candidate_count,
             "eligible_candidate_count": len(bank),
-            "event_score_threshold": retrieval_cfg.event_score_threshold,
+            "event_score_threshold": effective_event_threshold,
             "recency_gap_steps": retrieval_cfg.recency_gap_steps,
             "min_similarity": retrieval_cfg.min_similarity,
             "mean_similarity": retrieval_result["mean_similarity"],

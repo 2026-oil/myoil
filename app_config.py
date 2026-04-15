@@ -631,6 +631,9 @@ def _reject_direct_linked_aa_forecast_config(
             payload.get("aa_forecast"),
             unknown_keys=_unknown_keys,
             coerce_bool=_coerce_bool,
+            coerce_optional_path_string=_coerce_optional_path_string,
+            repo_root=repo_root,
+            source_path=source_path,
         )
     except ValueError:
         return

@@ -62,9 +62,26 @@ def test_load_baseline_without_stage_plugin_uses_shared_scaler() -> None:
         pytest.skip("baseline.yaml not found")
     loaded = load_app_config(REPO_ROOT, config_path=baseline_path)
     cfg = loaded.config
-    assert cfg.stage_plugin_config is None
+    assert isinstance(cfg.stage_plugin_config, RetrievalPluginConfig)
+    assert cfg.stage_plugin_config.enabled is False
     assert cfg.training.scaler_type == "robust"
     assert "Idx_DxyUSD" in cfg.dataset.hist_exog_cols
+
+
+def test_load_baseline_ret_linked_config_path() -> None:
+    baseline_ret_path = Path("yaml/experiment/feature_set_aaforecast/baseline-ret.yaml")
+    if not (REPO_ROOT / baseline_ret_path).exists():
+        pytest.skip("baseline-ret.yaml not found")
+    loaded = load_app_config(REPO_ROOT, config_path=baseline_ret_path)
+    cfg = loaded.config
+    assert isinstance(cfg.stage_plugin_config, RetrievalPluginConfig)
+    assert cfg.stage_plugin_config.enabled is True
+    assert (
+        cfg.stage_plugin_config.config_path
+        == "yaml/plugins/retrieval/baseline_retrieval.yaml"
+    )
+    assert cfg.stage_plugin_config.retrieval.top_k == 1
+    assert cfg.stage_plugin_config.retrieval.trigger_quantile == pytest.approx(0.9)
 
 
 def test_baseline_hist_exog_columns_exist_in_df() -> None:

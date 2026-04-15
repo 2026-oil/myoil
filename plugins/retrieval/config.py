@@ -480,12 +480,10 @@ def normalize_retrieval_detail_payload(
 def retrieval_config_to_dict(cfg: RetrievalPluginConfig) -> dict[str, Any]:
     if not cfg.enabled:
         return {"enabled": False}
-    if cfg.config_path is not None and cfg.retrieval == RetrievalConfig():
+    if cfg.config_path is not None:
         return {"enabled": True, "config_path": cfg.config_path}
     r = cfg.retrieval
     result: dict[str, Any] = {"enabled": True}
-    if cfg.config_path is not None:
-        result["config_path"] = cfg.config_path
     result.update({
         "star": {
             "season_length": cfg.star.season_length,

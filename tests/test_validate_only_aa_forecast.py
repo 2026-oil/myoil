@@ -548,6 +548,10 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_uncertainty_retrieval_p
         non_star_hist_exog_cols=[],
     )
     assert manifest["aa_forecast"]["uncertainty"]["enabled"] is True
+    assert (
+        manifest["aa_forecast"]["retrieval"]["config_path"]
+        == "aa_forecast_retrieval_detail.yaml"
+    )
     _assert_retrieval_payload(
         manifest["aa_forecast"]["retrieval"],
         enabled=True,
@@ -565,6 +569,7 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_uncertainty_retrieval_p
     stage_config = json.loads(
         (output_root / "aa_forecast" / "config" / "stage_config.json").read_text()
     )
+    assert stage_config["retrieval"]["config_path"] == "aa_forecast_retrieval_detail.yaml"
     _assert_retrieval_payload(
         stage_config["retrieval"],
         enabled=True,

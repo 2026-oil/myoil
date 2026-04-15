@@ -147,6 +147,31 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
         encoding="utf-8",
     )
     plugin_path = tmp_path / "aa_plugin.yaml"
+    retrieval_path = tmp_path / "retrieval_detail.yaml"
+    retrieval_path.write_text(
+        yaml.safe_dump(
+            {
+                "retrieval": {
+                    "enabled": True,
+                    "top_k": 3,
+                    "recency_gap_steps": 2,
+                    "event_score_threshold": 10.0,
+                    "trigger_quantile": 0.9,
+                    "neighbor_min_event_ratio": 0.8,
+                    "min_similarity": 0.8,
+                    "blend_floor": 0.1,
+                    "blend_max": 0.2,
+                    "mode": "posthoc_blend",
+                    "similarity": "cosine",
+                    "temperature": 0.1,
+                    "memory_value_mode": "future_level",
+                    "use_uncertainty_gate": True,
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
     plugin_path.write_text(
         yaml.safe_dump(
             {
@@ -157,19 +182,7 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
                     "uncertainty": {"enabled": True, "sample_count": 2},
                     "retrieval": {
                         "enabled": True,
-                        "top_k": 3,
-                        "recency_gap_steps": 2,
-                        "event_score_threshold": 10.0,
-                        "trigger_quantile": 0.9,
-                        "neighbor_min_event_ratio": 0.8,
-                        "min_similarity": 0.8,
-                        "blend_floor": 0.1,
-                        "blend_max": 0.2,
-                        "mode": "posthoc_blend",
-                        "similarity": "cosine",
-                        "temperature": 0.1,
-                        "memory_value_mode": "future_level",
-                        "use_uncertainty_gate": True,
+                        "config_path": retrieval_path.name,
                     },
                     "model_params": {},
                 }
@@ -200,6 +213,7 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
 
     retrieval = loaded.config.stage_plugin_config.retrieval
     assert retrieval.enabled is True
+    assert retrieval.config_path == retrieval_path.name
     assert retrieval.top_k == 3
     assert retrieval.recency_gap_steps == 2
     assert retrieval.event_score_threshold == pytest.approx(10.0)
@@ -219,6 +233,7 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
         selected_config_path=str(plugin_path),
     )
     assert payload["retrieval"]["enabled"] is True
+    assert payload["retrieval"]["config_path"] == retrieval_path.name
     assert payload["retrieval"]["mode"] == "posthoc_blend"
     assert payload["retrieval"]["similarity"] == "cosine"
     assert payload["retrieval"]["top_k"] == 3
