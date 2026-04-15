@@ -7,7 +7,7 @@ runtime:
 training:
   input_size: 64
   batch_size: 32
-  valid_batch_size: 8
+  valid_batch_size: 2
   windows_batch_size: 64
   inference_windows_batch_size: 64
   max_steps: 800
