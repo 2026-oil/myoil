@@ -3408,3 +3408,35 @@
 - experiment title: restore the exact active keep basis after recording the completed softsign regression
 - restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
 - 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
+
+## Iteration 2026-04-15 dedicated prototype-memory head on the active keep
+- timestamp: 2026-04-15T16:xx:00+09:00
+- git branch: informer_test
+- experiment title: split the prototype memory residual onto its own linear head while keeping the active keep's inner `sqrt(confidence)` damping and outer family-level top1 confidence unchanged
+- hypothesis:
+  - the active keep reuses `local_head` for both the analogue transport path and the prototype memory residual even though only the prototype branch currently contributes to the final output.
+  - the next narrow non-duplicate step was therefore to decouple that residual with a dedicated linear head, letting the prototype memory curve learn its own projection without changing the rest of the family.
+- verification bundle:
+  - `python3 -m py_compile neuralforecast/models/aaforecast/model.py scripts/run_aaforesearch_3way_iter.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest --no-cov tests/test_aaforecast_adapter_contract.py tests/test_aaforecast_backbone_faithfulness.py`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-informer.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python main.py --validate-only --config yaml/experiment/feature_set_aaforecast/baseline.yaml`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --dry-run --iter-tag iter_20260415_proto_memhead_restore_gru_bundle1`
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/run_aaforesearch_3way_iter.py --iter-tag iter_20260415_proto_memhead_restore_gru_bundle1`
+- run/artifact path: runs/iter_20260415_proto_memhead_restore_gru_bundle1
+- final-fold result:
+  - baseline (plain_gru) = `72.9569 / 72.9965`
+  - AA-GRU = `74.0791 / 74.6659`
+  - AA-Informer = `75.7085 / 78.9795`
+- active keep comparison:
+  - current compliant keep AA-Informer = `76.1788 / 80.0079`
+  - dedicated-head delta vs keep = `-0.4703 / -1.0284`
+- 목표 체크:
+  - strict ordering holds: `baseline < AA-GRU < AA-Informer`
+  - all three keep `h2 > h1`
+  - both horizons regress below the active keep.
+- 핵심 진단:
+  - simply decoupling the prototype memory residual projection from `local_head` is not enough; the shared projection was not the main bottleneck.
+  - the active keep benefits more from the current jointly shaped residual than from a newly isolated memory-residual head.
+- 판단: SAFE FAILURE / REJECT DEDICATED PROTOTYPE-MEMORY HEAD

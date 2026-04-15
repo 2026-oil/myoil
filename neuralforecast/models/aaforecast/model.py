@@ -136,6 +136,7 @@ class InformerHorizonAwareHead(nn.Module):
         )
         self.memory_transport_projector = nn.Linear(self.pooled_features, hidden_size)
         self.local_head = nn.Linear(hidden_size, out_features)
+        self.prototype_memory_head = nn.Linear(hidden_size, out_features)
         joint_hidden_size = max(hidden_size, self.h * hidden_size)
         self.level_head = MLP(
             in_features=(
@@ -939,7 +940,11 @@ class InformerHorizonAwareHead(nn.Module):
             memory_bank,
             need_weights=False,
         )
-        prototype_memory_curve = 0.1 * torch.tanh(self.local_head(memory_transport_states)) * anchor_scale
+        prototype_memory_curve = (
+            0.1
+            * torch.tanh(self.prototype_memory_head(memory_transport_states))
+            * anchor_scale
+        )
         prototype_memory_confidence = torch.sqrt(memory_confidence.clamp_min(0.0)).unsqueeze(1)
         prototype_component = (
             prototype_level
