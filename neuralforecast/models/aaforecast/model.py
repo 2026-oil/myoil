@@ -1174,6 +1174,7 @@ class AAForecast(BaseModel):
             self.non_star_policy_regime_indices,
         ) = self._resolve_non_star_regime_groups()
         self.target_token_indices = self._resolve_target_token_indices()
+        self.informer_signal_channel_indices = self._resolve_informer_signal_channel_indices()
 
         feature_size = (
             (0 if exclude_insample_y else 1)
@@ -1207,6 +1208,7 @@ class AAForecast(BaseModel):
             e_layers=e_layers,
             d_ff=d_ff,
             use_norm=use_norm,
+            signal_channel_indices=self.informer_signal_channel_indices,
         )
         if self.backbone == "timexer":
             self.attention = TimeXerTokenSparseAttention(
@@ -1759,6 +1761,28 @@ class AAForecast(BaseModel):
         )
         target_indices.extend(range(target_star_offset, target_star_offset + 4))
         return tuple(target_indices)
+
+    def _resolve_informer_signal_channel_indices(self) -> tuple[int, ...]:
+        if self.backbone != "informer":
+            return ()
+        signal_indices: list[int] = []
+        if not self.exclude_insample_y:
+            signal_indices.append(0)
+        upward_star_indices = [
+            idx
+            for idx, mode in enumerate(self.star_hist_exog_tail_modes)
+            if mode == "upward"
+        ]
+        if not upward_star_indices:
+            return tuple(signal_indices)
+        star_base = (0 if self.exclude_insample_y else 1) + len(self.non_star_hist_exog_list) + 4
+        star_count = len(self.star_hist_exog_list)
+        for offset in range(4):
+            signal_indices.extend(
+                star_base + (offset * star_count) + star_idx
+                for star_idx in upward_star_indices
+            )
+        return tuple(signal_indices)
 
     @staticmethod
     def _select_hist_exog(hist_exog: torch.Tensor, indices: tuple[int, ...]) -> torch.Tensor | None:
