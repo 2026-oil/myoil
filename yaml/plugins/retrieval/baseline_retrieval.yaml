@@ -13,16 +13,16 @@ retrieval:
       - Idx_OVX
       two_sided: []
   mode: posthoc_blend
-  top_k: 5
+  top_k: 1
   recency_gap_steps: 8
-  event_score_threshold: 1.0
-  min_similarity: 0.55
+  event_score_threshold: 400.0
+  min_similarity: 0.35
   similarity: cosine
   temperature: 0.1
   blend_floor: 0.0
-  blend_max: 0.25
-  use_uncertainty_gate: true
-  use_shape_key: true
+  blend_max: 1.0
+  use_uncertainty_gate: false
+  use_shape_key: false
   use_event_key: true
-  event_score_log_bonus_alpha: 0.0
-  event_score_log_bonus_cap: 0.0
+  event_score_log_bonus_alpha: 0.15
+  event_score_log_bonus_cap: 0.1

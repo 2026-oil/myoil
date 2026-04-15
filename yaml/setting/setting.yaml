@@ -34,7 +34,7 @@ cv:
   gap: 0
   horizon: 2
   step_size: 4
-  n_windows: 4
+  n_windows: 2
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean
 scheduler:
