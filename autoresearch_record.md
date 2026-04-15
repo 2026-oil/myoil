@@ -3362,3 +3362,10 @@
   - lightly boosting the prototype memory residual by `memory_signal` is safer than a uniform scale increase, but it still weakens both horizons relative to the active keep.
   - the current keep already captures the useful amount of retrieval-inspired amplitude through confidence placement; adding direct `memory_signal` scaling on this residual is redundant noise.
 - 판단: SAFE FAILURE / REJECT MEMORY-SIGNAL-SCALED PROTOTYPE MEMORY RESIDUAL
+
+## Iteration 2026-04-15 restore exact active keep after memory-signal scaling regression
+- timestamp: 2026-04-15T16:xx:00+09:00
+- git branch: informer_test
+- experiment title: restore the exact active keep basis after recording the completed memory-signal scaling regression
+- restored anchor commit: `14c6c967` (`Relax the prototype memory residual damping just enough to improve the keep`)
+- 판단: RESTORE TO EXACT ACTIVE KEEP BASIS
