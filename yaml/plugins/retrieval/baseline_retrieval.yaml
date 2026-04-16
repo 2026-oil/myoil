@@ -10,7 +10,7 @@ retrieval:
       - GPRD_THREAT
       two_sided: []
   mode: posthoc_blend
-  top_k: 3
+  top_k: 1
   recency_gap_steps: 8
   trigger_quantile: 0.2
   min_similarity: 0.0
