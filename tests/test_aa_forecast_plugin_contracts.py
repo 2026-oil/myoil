@@ -1594,6 +1594,34 @@ def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(
     assert predictions["aaforecast_retrieval_applied"].tolist() == [True]
 
 
+def test_build_retrieval_window_artifacts_short_train_left_pads_query() -> None:
+    dt_col = "ds"
+    target_col = "y"
+    dates = pd.date_range("2024-01-01", periods=5, freq="D")
+    train_df = pd.DataFrame({dt_col: dates, target_col: [1.0, 2.0, 3.0, 4.0, 5.0]})
+    transformed_train_df = train_df.copy()
+    input_size = 12
+    horizon = 2
+    windows_payload, _plot_specs, long_rows = aa_runtime._build_retrieval_window_artifacts(
+        train_df=train_df.reset_index(drop=True),
+        transformed_train_df=transformed_train_df.reset_index(drop=True),
+        dt_col=dt_col,
+        target_col=target_col,
+        input_size=input_size,
+        horizon=horizon,
+        neighbors=[],
+        train_end_ds=pd.Timestamp(dates[-1]),
+        fold_idx=0,
+    )
+    pad = input_size - 5
+    assert len(windows_payload["query"]["ds"]) == input_size
+    assert windows_payload["query"]["ds"][:pad] == [""] * pad
+    assert windows_payload["query"]["y_raw"][-5:] == [1.0, 2.0, 3.0, 4.0, 5.0]
+    assert all(np.isnan(v) for v in windows_payload["query"]["y_raw"][:pad])
+    query_rows = [r for r in long_rows if r["role"] == "query"]
+    assert len(query_rows) == input_size
+
+
 def test_retrieve_event_neighbors_event_score_bonus_can_flip_top1() -> None:
     retrieval_cfg = SimpleNamespace(
         top_k=1,

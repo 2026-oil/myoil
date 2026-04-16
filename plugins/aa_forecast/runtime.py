@@ -1330,6 +1330,38 @@ def _window_series_slice(
     return {"ds": ds, "y_raw": y_raw, "y_transformed": y_tf}
 
 
+def _normalize_retrieval_series_window(
+    window: dict[str, Any], *, input_size: int
+) -> dict[str, Any]:
+    """Force ``ds`` / ``y_raw`` / ``y_transformed`` to length ``input_size``.
+
+    Training folds can be shorter than the model ``input_size``. Retrieval
+    artifacts index ``0 .. input_size - 1``, so we left-pad missing history with
+    empty ``ds`` strings and NaN targets, or (if too long) keep the trailing
+    ``input_size`` points.
+    """
+    ds = list(window["ds"])
+    y_raw = list(window["y_raw"])
+    y_tf = list(window["y_transformed"])
+    n_w = len(ds)
+    if n_w == input_size:
+        return {"ds": ds, "y_raw": y_raw, "y_transformed": y_tf}
+    if n_w > input_size:
+        drop = n_w - input_size
+        return {
+            "ds": ds[drop:],
+            "y_raw": y_raw[drop:],
+            "y_transformed": y_tf[drop:],
+        }
+    pad = input_size - n_w
+    nan = float("nan")
+    return {
+        "ds": [""] * pad + ds,
+        "y_raw": [nan] * pad + y_raw,
+        "y_transformed": [nan] * pad + y_tf,
+    }
+
+
 def _build_retrieval_window_artifacts(
     *,
     train_df: pd.DataFrame,
@@ -1343,7 +1375,7 @@ def _build_retrieval_window_artifacts(
     fold_idx: int | None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     n = len(train_df)
-    q_start = n - input_size
+    q_start = max(0, n - input_size)
     query_w = _window_series_slice(
         train_df,
         transformed_train_df,
@@ -1352,6 +1384,17 @@ def _build_retrieval_window_artifacts(
         target_col,
         dt_col,
     )
+    raw_query_len = len(query_w["ds"])
+    if raw_query_len < input_size:
+        logger.warning(
+            "retrieval query window shorter than input_size "
+            "(len(train_df)=%s raw_query_len=%s input_size=%s); "
+            "left-padding retrieval query artifacts",
+            n,
+            raw_query_len,
+            input_size,
+        )
+    query_w = _normalize_retrieval_series_window(query_w, input_size=input_size)
     long_rows: list[dict[str, Any]] = []
     for step_ix in range(input_size):
         long_rows.append(
