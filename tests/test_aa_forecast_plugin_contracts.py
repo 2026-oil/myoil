@@ -20,6 +20,7 @@ from plugins.aa_forecast.config import (
     aa_forecast_stage_document_type,
 )
 from plugins.aa_forecast.plugin import AAForecastStagePlugin
+from plugins.aa_forecast.search_space import AA_FORECAST_STAGE_ONLY_PARAM_REGISTRY
 import plugins.aa_forecast.runtime as aa_runtime
 import runtime_support.forecast_models as forecast_models
 import runtime_support.runner as runtime
@@ -86,6 +87,19 @@ FIXED_BACKBONE_PARAMS = {
         "use_norm": True,
     },
 }
+
+
+@pytest.mark.parametrize("backbone", SUPPORTED_AA_BACKBONES)
+def test_aaforecast_search_space_registry_includes_lowess_params(backbone: str) -> None:
+    registry = AA_FORECAST_STAGE_ONLY_PARAM_REGISTRY[backbone]
+
+    assert "lowess_frac" in registry
+    assert "lowess_delta" in registry
+
+    lowess_frac = registry["lowess_frac"]
+    lowess_delta = registry["lowess_delta"]
+    assert lowess_frac == {"type": "float", "low": 0.0, "high": 1.0}
+    assert lowess_delta == {"type": "float", "low": 0.0, "high": 1.0}
 
 
 def test_aa_forecast_stage_document_type_accepts_yaml_and_toml() -> None:
@@ -251,6 +265,36 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
     assert payload["retrieval"]["memory_value_mode"] == "future_return"
     assert payload["retrieval"]["use_shape_key"] is True
     assert payload["retrieval"]["use_event_key"] is True
+
+
+def test_load_app_config_defaults_to_robust_scaler_when_aa_forecast_not_enabled(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "data.csv").write_text(
+        "dt,target\n2020-01-01,1\n2020-01-08,2\n",
+        encoding="utf-8",
+    )
+    payload = {
+        "task": {"name": "default_robust_scaler_without_aa_forecast"},
+        "dataset": {
+            "path": "data.csv",
+            "target_col": "target",
+            "dt_col": "dt",
+            "hist_exog_cols": [],
+            "futr_exog_cols": [],
+            "static_exog_cols": [],
+        },
+        "training": {"loss": "mse"},
+        "cv": {"horizon": 1, "step_size": 1, "n_windows": 1, "gap": 0},
+        "scheduler": {"gpu_ids": [0], "max_concurrent_jobs": 1, "worker_devices": 1},
+        "jobs": [{"model": "Naive", "params": {}}],
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    assert loaded.config.training.scaler_type == "robust"
 
 
 def test_load_app_config_rejects_unknown_retrieval_key(tmp_path: Path) -> None:

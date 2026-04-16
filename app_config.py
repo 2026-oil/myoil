@@ -396,9 +396,14 @@ def _resolve_aa_forecast_stage_plugin_config(config: AppConfig) -> AppConfig:
         stage_config,
         hist_exog_cols=config.dataset.hist_exog_cols,
     )
-    if resolved == stage_config:
+    next_training = config.training
+    if next_training.scaler_type is not None:
+        # AAForecast always owns scaler semantics internally.
+        next_training = replace(next_training, scaler_type=None)
+
+    if resolved == stage_config and next_training == config.training:
         return config
-    return replace(config, stage_plugin_config=resolved)
+    return replace(config, stage_plugin_config=resolved, training=next_training)
 
 
 @dataclass(frozen=True)

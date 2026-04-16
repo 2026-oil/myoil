@@ -885,6 +885,19 @@ aa_forecast_models:
       - 2
       - 3
       - 4
+    lowess_frac:
+      type: categorical
+      choices:
+      - 0.1
+      - 0.2
+      - 0.35
+      - 0.5
+    lowess_delta:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.01
+      - 0.02
     top_k:
       type: categorical
       choices:
@@ -892,6 +905,20 @@ aa_forecast_models:
       - 3
       - 5
       - 8
+    thresh:
+      type: categorical
+      choices:
+      - 3.3
+      - 3.35
+      - 3.4
+      - 3.45
+      - 3.5
+      - 3.55
+      - 3.6
+      - 3.65
+      - 3.7
+      - 3.75
+      - 3.8
     recency_gap_steps:
       type: categorical
       choices:
@@ -1007,6 +1034,19 @@ aa_forecast_models:
       - 1
       - 2
       - 4
+    lowess_frac:
+      type: categorical
+      choices:
+      - 0.1
+      - 0.2
+      - 0.35
+      - 0.5
+    lowess_delta:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.01
+      - 0.02
   informer:
     hidden_size:
       type: categorical
@@ -1065,6 +1105,19 @@ aa_forecast_models:
       - 2
       - 3
       - 4
+    lowess_frac:
+      type: categorical
+      choices:
+      - 0.1
+      - 0.2
+      - 0.35
+      - 0.5
+    lowess_delta:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.01
+      - 0.02
     top_k:
       type: categorical
       choices:
@@ -1072,6 +1125,20 @@ aa_forecast_models:
       - 3
       - 5
       - 8
+    thresh:
+      type: categorical
+      choices:
+      - 3.3
+      - 3.35
+      - 3.4
+      - 3.45
+      - 3.5
+      - 3.55
+      - 3.6
+      - 3.65
+      - 3.7
+      - 3.75
+      - 3.8
     recency_gap_steps:
       type: categorical
       choices:
@@ -1198,6 +1265,19 @@ aa_forecast_models:
       - 1
       - 2
       - 4
+    lowess_frac:
+      type: categorical
+      choices:
+      - 0.1
+      - 0.2
+      - 0.35
+      - 0.5
+    lowess_delta:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.01
+      - 0.02
   patchtst:
     hidden_size:
       type: categorical
@@ -1268,6 +1348,19 @@ aa_forecast_models:
       - 2
       - 3
       - 4
+    lowess_frac:
+      type: categorical
+      choices:
+      - 0.1
+      - 0.2
+      - 0.35
+      - 0.5
+    lowess_delta:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.01
+      - 0.02
     top_k:
       type: categorical
       choices:
@@ -1275,6 +1368,20 @@ aa_forecast_models:
       - 3
       - 5
       - 8
+    thresh:
+      type: categorical
+      choices:
+      - 3.3
+      - 3.35
+      - 3.4
+      - 3.45
+      - 3.5
+      - 3.55
+      - 3.6
+      - 3.65
+      - 3.7
+      - 3.75
+      - 3.8
     recency_gap_steps:
       type: categorical
       choices:
@@ -1411,6 +1518,19 @@ aa_forecast_models:
       - 2
       - 3
       - 4
+    lowess_frac:
+      type: categorical
+      choices:
+      - 0.1
+      - 0.2
+      - 0.35
+      - 0.5
+    lowess_delta:
+      type: categorical
+      choices:
+      - 0.0
+      - 0.01
+      - 0.02
     top_k:
       type: categorical
       choices:
@@ -1418,6 +1538,20 @@ aa_forecast_models:
       - 3
       - 5
       - 8
+    thresh:
+      type: categorical
+      choices:
+      - 3.3
+      - 3.35
+      - 3.4
+      - 3.45
+      - 3.5
+      - 3.55
+      - 3.6
+      - 3.65
+      - 3.7
+      - 3.75
+      - 3.8
     recency_gap_steps:
       type: categorical
       choices:
@@ -1496,7 +1630,6 @@ aa_forecast_training:
     input_size:
       type: categorical
       choices:
-      - 12
       - 24
       - 48
       - 64
@@ -1526,7 +1659,6 @@ aa_forecast_training:
       input_size:
         type: categorical
         choices:
-        - 12
         - 24
         - 48
         - 64

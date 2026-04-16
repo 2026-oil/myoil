@@ -36,6 +36,8 @@ _AA_COMMON_PARAM_REGISTRY = {
         "type": "categorical",
         "choices": [None, 32, 64, 128, 256],
     },
+    "lowess_frac": {"type": "float", "low": 0.0, "high": 1.0},
+    "lowess_delta": {"type": "float", "low": 0.0, "high": 1.0},
     "season_length": _positive_int(low=1, high=1024),
     "trend_kernel_size": {"type": "categorical", "choices": [None, 3, 5, 7, 9, 11]},
     "start_padding_enabled": {"type": "categorical", "choices": [True, False]},

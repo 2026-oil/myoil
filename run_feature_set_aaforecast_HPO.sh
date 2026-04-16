@@ -5,8 +5,6 @@ repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$repo_root"
 
 requested_configs=(
-  "yaml/experiment/feature_set_aaforecast/baseline_HPO.yaml"
-  "yaml/experiment/feature_set_aaforecast/baseline-ret_HPO.yaml"
   "yaml/experiment/feature_set_aaforecast/aaforecast-informer-ret_HPO.yaml"
   "yaml/experiment/feature_set_aaforecast/aaforecast-gru-ret_HPO.yaml"
   "yaml/experiment/feature_set_aaforecast/aaforecast-patchtst-ret_HPO.yaml"
@@ -15,6 +13,8 @@ requested_configs=(
   "yaml/experiment/feature_set_aaforecast/aaforecast-gru_HPO.yaml"
   "yaml/experiment/feature_set_aaforecast/aaforecast-patchtst_HPO.yaml"
   "yaml/experiment/feature_set_aaforecast/aaforecast-timexer_HPO.yaml"
+  "yaml/experiment/feature_set_aaforecast/baseline_HPO.yaml"
+  "yaml/experiment/feature_set_aaforecast/baseline-ret_HPO.yaml"
 )
 
 configs=()

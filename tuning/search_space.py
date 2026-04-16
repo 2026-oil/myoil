@@ -82,7 +82,7 @@ DEFAULT_TRAINING_PARAMS = {
     "valid_batch_size": 64,
     "windows_batch_size": 1024,
     "inference_windows_batch_size": 1024,
-    "scaler_type": None,
+    "scaler_type": "robust",
     "model_step_size": 1,
     "max_steps": 1000,
     "val_size": 8,
