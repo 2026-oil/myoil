@@ -77,11 +77,6 @@ def _build_memory_bank(
             hist_exog_cols=hist_exog_cols,
             hist_exog_tail_modes=hist_exog_tail_modes,
         )
-        if (
-            retrieval_cfg.trigger_quantile is None
-            and signature["event_score"] < retrieval_cfg.event_score_threshold
-        ):
-            continue
         anchor_value = float(raw_train_df[target_col].iloc[end_idx])
         future_values = raw_train_df[target_col].iloc[
             end_idx + 1 : end_idx + 1 + horizon
@@ -137,13 +132,9 @@ def _retrieve_neighbors(
     query: dict[str, Any],
     bank: list[dict[str, Any]],
     retrieval_cfg: _cfg.RetrievalConfig,
-    effective_event_threshold: float | None = None,
+    effective_event_threshold: float,
 ) -> dict[str, Any]:
-    threshold = (
-        retrieval_cfg.event_score_threshold
-        if effective_event_threshold is None
-        else effective_event_threshold
-    )
+    threshold = effective_event_threshold
     if query["event_score"] < threshold:
         return {
             "retrieval_attempted": True,
@@ -251,14 +242,15 @@ def _effective_event_threshold(
     bank: list[dict[str, Any]],
     retrieval_cfg: _cfg.RetrievalConfig,
 ) -> float:
-    if retrieval_cfg.trigger_quantile is None:
-        return retrieval_cfg.event_score_threshold
     if not bank:
         # Prefer 0.0 so query gating doesn't hide the more-informative
         # "empty_bank" skip_reason downstream.
         return 0.0
+    q = retrieval_cfg.trigger_quantile
+    if q is None:
+        raise ValueError("retrieval.trigger_quantile is required")
     scores = np.asarray([float(item["event_score"]) for item in bank], dtype=float)
-    return float(np.quantile(scores, float(retrieval_cfg.trigger_quantile)))
+    return float(np.quantile(scores, float(q)))
 
 
 # ---------------------------------------------------------------------------
@@ -437,7 +429,7 @@ def post_predict_retrieval(
         "top_k_used": len(retrieval_result["top_neighbors"]),
         "candidate_count": candidate_count,
         "eligible_candidate_count": len(eligible_bank),
-        "event_score_threshold": effective_event_threshold,
+        "effective_event_threshold": effective_event_threshold,
         "trigger_quantile": retrieval_cfg.trigger_quantile,
         "recency_gap_steps": retrieval_cfg.recency_gap_steps,
         "min_similarity": retrieval_cfg.min_similarity,

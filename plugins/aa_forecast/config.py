@@ -50,7 +50,6 @@ AA_FORECAST_RETRIEVAL_KEYS = {
     "config_path",
     "top_k",
     "recency_gap_steps",
-    "event_score_threshold",
     "trigger_quantile",
     "neighbor_min_event_ratio",
     "min_similarity",
@@ -102,7 +101,6 @@ class AAForecastRetrievalConfig:
     config_path: str | None = None
     top_k: int = 5
     recency_gap_steps: int = 8
-    event_score_threshold: float = 1.0
     trigger_quantile: float | None = None
     neighbor_min_event_ratio: float = 0.0
     min_similarity: float = 0.55
@@ -193,7 +191,6 @@ def aa_forecast_retrieval_public_dict(
         "config_path": retrieval.config_path,
         "top_k": retrieval.top_k,
         "recency_gap_steps": retrieval.recency_gap_steps,
-        "event_score_threshold": retrieval.event_score_threshold,
         "trigger_quantile": retrieval.trigger_quantile,
         "neighbor_min_event_ratio": retrieval.neighbor_min_event_ratio,
         "min_similarity": retrieval.min_similarity,
@@ -542,14 +539,6 @@ def _normalize_retrieval_config(
         )
         payload.pop("star", None)
 
-    # Explicit mutual exclusion: quantile gating vs fixed threshold gating.
-    # Use key presence (not default values) to avoid accidental conflicts.
-    if "trigger_quantile" in payload and "event_score_threshold" in payload:
-        raise ValueError(
-            f"{section}: trigger_quantile and event_score_threshold are mutually exclusive; "
-            "set only one"
-        )
-
     top_k = _coerce_positive_int(
         payload.get("top_k", AAForecastRetrievalConfig().top_k),
         field_name=f"{section}.top_k",
@@ -563,23 +552,14 @@ def _normalize_retrieval_config(
     recency_gap_steps_int = int(recency_gap_steps)
     if recency_gap_steps != recency_gap_steps_int:
         raise ValueError(f"{section}.recency_gap_steps must be an integer")
-    event_score_threshold = _coerce_non_negative_float(
-        payload.get(
-            "event_score_threshold",
-            AAForecastRetrievalConfig().event_score_threshold,
-        )
-,
-        field_name=f"{section}.event_score_threshold",
-    )
     trigger_quantile_raw = payload.get("trigger_quantile")
-    trigger_quantile: float | None = None
-    if trigger_quantile_raw is not None:
-        parsed_trigger_quantile = float(trigger_quantile_raw)
-        if not (0.0 < parsed_trigger_quantile < 1.0):
-            raise ValueError(
-                f"{section}.trigger_quantile must satisfy 0 < value < 1"
-            )
-        trigger_quantile = parsed_trigger_quantile
+    if trigger_quantile_raw is None:
+        raise ValueError(f"{section}.trigger_quantile is required")
+    trigger_quantile = float(trigger_quantile_raw)
+    if not (0.0 < trigger_quantile < 1.0):
+        raise ValueError(
+            f"{section}.trigger_quantile must satisfy 0 < value < 1"
+        )
     _coerce_non_negative_float(
         payload.get("neighbor_min_event_ratio", 0.0),
         field_name=f"{section}.neighbor_min_event_ratio",
@@ -671,7 +651,6 @@ def _normalize_retrieval_config(
         config_path=config_path,
         top_k=top_k,
         recency_gap_steps=recency_gap_steps_int,
-        event_score_threshold=event_score_threshold,
         trigger_quantile=trigger_quantile,
         neighbor_min_event_ratio=0.0,
         min_similarity=min_similarity,

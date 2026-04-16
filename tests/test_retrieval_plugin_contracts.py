@@ -126,7 +126,7 @@ def test_normalize_disabled_explicit() -> None:
 
 def test_normalize_enabled_minimal() -> None:
     cfg = normalize_retrieval_plugin_config(
-        {"enabled": True},
+        {"enabled": True, "trigger_quantile": 0.8},
         unknown_keys=_unknown_keys,
         coerce_bool=_coerce_bool,
         coerce_optional_path_string=_coerce_optional_path_string,
@@ -154,6 +154,7 @@ def test_normalize_full_config() -> None:
             "mode": "posthoc_blend",
             "top_k": 3,
             "recency_gap_steps": 4,
+            "trigger_quantile": 0.85,
             "min_similarity": 0.4,
             "blend_floor": 0.1,
             "blend_max": 0.5,
@@ -170,6 +171,7 @@ def test_normalize_full_config() -> None:
     assert cfg.star.thresh == 4.0
     assert cfg.star.anomaly_tails["upward"] == ("ColA", "ColB")
     assert cfg.retrieval.top_k == 3
+    assert cfg.retrieval.trigger_quantile == pytest.approx(0.85)
     assert cfg.retrieval.blend_floor == 0.1
     assert cfg.retrieval.blend_max == 0.5
 
@@ -197,7 +199,12 @@ def test_normalize_rejects_unknown_star_key() -> None:
 def test_normalize_rejects_blend_floor_gt_blend_max() -> None:
     with pytest.raises(ValueError, match="blend_floor must be"):
         normalize_retrieval_plugin_config(
-            {"enabled": True, "blend_floor": 0.5, "blend_max": 0.1},
+            {
+                "enabled": True,
+                "trigger_quantile": 0.8,
+                "blend_floor": 0.5,
+                "blend_max": 0.1,
+            },
             unknown_keys=_unknown_keys,
             coerce_bool=_coerce_bool,
             coerce_optional_path_string=_coerce_optional_path_string,
@@ -209,6 +216,7 @@ def test_normalize_rejects_both_keys_false() -> None:
         normalize_retrieval_plugin_config(
             {
                 "enabled": True,
+                "trigger_quantile": 0.8,
                 "use_shape_key": False,
                 "use_event_key": False,
             },
@@ -221,7 +229,7 @@ def test_normalize_rejects_both_keys_false() -> None:
 def test_normalize_rejects_unsupported_mode() -> None:
     with pytest.raises(ValueError, match="posthoc_blend"):
         normalize_retrieval_plugin_config(
-            {"enabled": True, "mode": "attention"},
+            {"enabled": True, "trigger_quantile": 0.8, "mode": "attention"},
             unknown_keys=_unknown_keys,
             coerce_bool=_coerce_bool,
             coerce_optional_path_string=_coerce_optional_path_string,
@@ -233,6 +241,7 @@ def test_normalize_rejects_overlapping_tails() -> None:
         normalize_retrieval_plugin_config(
             {
                 "enabled": True,
+                "trigger_quantile": 0.8,
                 "star": {
                     "anomaly_tails": {
                         "upward": ["ColX"],
@@ -257,6 +266,7 @@ def test_config_to_dict_round_trip() -> None:
             "enabled": True,
             "star": {"thresh": 3.0, "anomaly_tails": {"upward": ["A"]}},
             "top_k": 2,
+            "trigger_quantile": 0.75,
         },
         unknown_keys=_unknown_keys,
         coerce_bool=_coerce_bool,
@@ -266,12 +276,36 @@ def test_config_to_dict_round_trip() -> None:
     assert serialized["enabled"] is True
     assert serialized["star"]["thresh"] == 3.0
     assert serialized["top_k"] == 2
+    assert serialized["trigger_quantile"] == pytest.approx(0.75)
+
+
+def test_normalize_requires_trigger_quantile_when_enabled() -> None:
+    with pytest.raises(ValueError, match="trigger_quantile is required"):
+        normalize_retrieval_plugin_config(
+            {"enabled": True, "top_k": 2},
+            unknown_keys=_unknown_keys,
+            coerce_bool=_coerce_bool,
+            coerce_optional_path_string=_coerce_optional_path_string,
+        )
+
+
+def test_normalize_rejects_unknown_event_score_threshold_key() -> None:
+    with pytest.raises(ValueError, match="unsupported key"):
+        normalize_retrieval_plugin_config(
+            {
+                "enabled": True,
+                "trigger_quantile": 0.9,
+                "event_score_threshold": 10.0,
+            },
+            unknown_keys=_unknown_keys,
+            coerce_bool=_coerce_bool,
+            coerce_optional_path_string=_coerce_optional_path_string,
+        )
 
 
 def test_effective_event_threshold_respects_trigger_quantile() -> None:
     retrieval_cfg = RetrievalConfig(
         enabled=True,
-        event_score_threshold=3.5,
         trigger_quantile=0.9,
     )
     bank = [{"event_score": 1.0}, {"event_score": 5.0}, {"event_score": 9.0}]
@@ -287,7 +321,6 @@ def test_effective_event_threshold_respects_trigger_quantile() -> None:
 def test_effective_event_threshold_quantile_empty_bank_returns_zero() -> None:
     retrieval_cfg = RetrievalConfig(
         enabled=True,
-        event_score_threshold=3.5,
         trigger_quantile=0.9,
     )
     threshold = retrieval_runtime._effective_event_threshold(
@@ -297,25 +330,11 @@ def test_effective_event_threshold_quantile_empty_bank_returns_zero() -> None:
     assert threshold == pytest.approx(0.0)
 
 
-def test_normalize_rejects_trigger_quantile_and_threshold_together() -> None:
-    with pytest.raises(ValueError, match="mutually exclusive"):
-        normalize_retrieval_plugin_config(
-            {
-                "enabled": True,
-                "trigger_quantile": 0.9,
-                "event_score_threshold": 10.0,
-            },
-            unknown_keys=_unknown_keys,
-            coerce_bool=_coerce_bool,
-            coerce_optional_path_string=_coerce_optional_path_string,
-        )
-
-
 def test_retrieve_neighbors_ignores_neighbor_min_event_ratio() -> None:
     retrieval_cfg = RetrievalConfig(
         enabled=True,
         top_k=1,
-        event_score_threshold=1.0,
+        trigger_quantile=0.9,
         min_similarity=0.0,
         temperature=0.1,
         use_shape_key=False,
@@ -343,6 +362,7 @@ def test_retrieve_neighbors_ignores_neighbor_min_event_ratio() -> None:
         query=query,
         bank=bank,
         retrieval_cfg=retrieval_cfg,
+        effective_event_threshold=1.0,
     )
 
     assert result["retrieval_applied"] is True

@@ -21,7 +21,7 @@ from . import config as _cfg
 _RETRIEVAL_OVERRIDE_KEYS = {
     "top_k",
     "recency_gap_steps",
-    "event_score_threshold",
+    "trigger_quantile",
     "min_similarity",
     "temperature",
     "blend_floor",
@@ -112,6 +112,11 @@ def _split_runtime_overrides(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     if not params_override:
         return {}, {}
+    if "event_score_threshold" in params_override:
+        raise ValueError(
+            "aa_forecast params_override key 'event_score_threshold' is no longer "
+            "supported; use 'trigger_quantile' with 0 < q < 1 for retrieval event gating."
+        )
     model_override = dict(params_override)
     retrieval_override = {
         key: model_override.pop(key)
@@ -132,10 +137,12 @@ def _apply_retrieval_overrides(
         raise ValueError("aa_forecast retrieval top_k override must be positive")
     if patched.recency_gap_steps < 0:
         raise ValueError("aa_forecast retrieval recency_gap_steps override must be >= 0")
-    if patched.event_score_threshold < 0:
-        raise ValueError(
-            "aa_forecast retrieval event_score_threshold override must be >= 0"
-        )
+    if "trigger_quantile" in retrieval_override:
+        tq = patched.trigger_quantile
+        if tq is None or not (0.0 < float(tq) < 1.0):
+            raise ValueError(
+                "aa_forecast retrieval trigger_quantile override must satisfy 0 < value < 1"
+            )
     if not (0.0 <= patched.min_similarity <= 1.0):
         raise ValueError(
             "aa_forecast retrieval min_similarity override must satisfy 0 <= value <= 1"
@@ -1205,11 +1212,6 @@ def _build_event_memory_bank(
             transformed_window_df=transformed_window,
             target_col=target_col,
         )
-        if (
-            retrieval_cfg.trigger_quantile is None
-            and signature["event_score"] < retrieval_cfg.event_score_threshold
-        ):
-            continue
         anchor_value = float(raw_train_df[target_col].iloc[end_idx])
         future_values = raw_train_df[target_col].iloc[
             end_idx + 1 : end_idx + 1 + horizon
@@ -1256,7 +1258,7 @@ def _retrieve_event_neighbors(
     query: dict[str, Any],
     bank: list[dict[str, Any]],
     retrieval_cfg: _cfg.AAForecastRetrievalConfig,
-    effective_event_threshold: float | None = None,
+    effective_event_threshold: float,
 ) -> dict[str, Any]:
     return _shared_retrieve_neighbors(
         query=query,
@@ -1558,7 +1560,7 @@ def predict_aa_forecast_fold(
             "top_k_used": len(retrieval_result["top_neighbors"]),
             "candidate_count": candidate_count,
             "eligible_candidate_count": len(eligible_bank),
-            "event_score_threshold": effective_event_threshold,
+            "effective_event_threshold": effective_event_threshold,
             "trigger_quantile": retrieval_cfg.trigger_quantile,
             "recency_gap_steps": retrieval_cfg.recency_gap_steps,
             "min_similarity": retrieval_cfg.min_similarity,

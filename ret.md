@@ -51,7 +51,7 @@ retrieval:
 | backbone | `gru` |
 | top_k | `5` |
 | recency_gap_steps | `8` |
-| event_score_threshold | `1.0` |
+| trigger_quantile | `0.8` |
 | min_similarity | `0.55` |
 | blend_floor | `0.0` |
 | blend_max | `0.25` |
@@ -150,8 +150,8 @@ future_returns = (future_values - anchor_value) / max(abs(anchor_value), 1e-8)
 즉 retrieval은 과거 absolute price를 복사하지 않고,
 **candidate 끝점(anchor) 이후의 상대 수익률 경로**를 저장한다.
 
-현재 설정은 `event_score_threshold=1.0`라서 threshold는 매우 낮다.
-그래서 실제 artifact를 보면 candidate 대부분이 bank에 남는다.
+현재 설정은 `trigger_quantile=0.8`이므로, bank `event_score` 분포의 80% quantile이 effective threshold가 된다.
+quantile에 따라 artifact의 `eligible_candidate_count`는 달라질 수 있다.
 
 예: `2025-12-01` cutoff
 

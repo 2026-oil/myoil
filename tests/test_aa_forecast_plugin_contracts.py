@@ -237,7 +237,6 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
     assert retrieval.config_path == retrieval_path.name
     assert retrieval.top_k == 3
     assert retrieval.recency_gap_steps == 2
-    assert retrieval.event_score_threshold == pytest.approx(1.0)
     assert retrieval.trigger_quantile == pytest.approx(0.9)
     assert retrieval.neighbor_min_event_ratio == pytest.approx(0.0)
     assert retrieval.min_similarity == pytest.approx(0.8)
@@ -463,7 +462,7 @@ def test_load_app_config_rejects_retrieval_without_uncertainty_enabled(
                         "enabled": True,
                         "top_k": 3,
                         "recency_gap_steps": 2,
-                        "event_score_threshold": 10.0,
+                        "trigger_quantile": 0.85,
                         "min_similarity": 0.8,
                         "blend_max": 0.2,
                         "use_uncertainty_gate": True,
@@ -1576,7 +1575,7 @@ def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(
 def test_retrieve_event_neighbors_event_score_bonus_can_flip_top1() -> None:
     retrieval_cfg = SimpleNamespace(
         top_k=1,
-        event_score_threshold=0.1,
+        trigger_quantile=0.9,
         min_similarity=0.0,
         temperature=0.1,
         use_shape_key=False,
@@ -1614,6 +1613,7 @@ def test_retrieve_event_neighbors_event_score_bonus_can_flip_top1() -> None:
         query=query,
         bank=bank,
         retrieval_cfg=retrieval_cfg,
+        effective_event_threshold=0.1,
     )
 
     assert result["retrieval_applied"] is True
@@ -1623,7 +1623,7 @@ def test_retrieve_event_neighbors_event_score_bonus_can_flip_top1() -> None:
 def test_retrieve_event_neighbors_ignores_neighbor_min_event_ratio() -> None:
     retrieval_cfg = SimpleNamespace(
         top_k=1,
-        event_score_threshold=1.0,
+        trigger_quantile=0.9,
         min_similarity=0.0,
         temperature=0.1,
         use_shape_key=False,
@@ -1653,6 +1653,7 @@ def test_retrieve_event_neighbors_ignores_neighbor_min_event_ratio() -> None:
         query=query,
         bank=bank,
         retrieval_cfg=retrieval_cfg,
+        effective_event_threshold=1.0,
     )
 
     assert result["retrieval_applied"] is True
@@ -1831,6 +1832,13 @@ def test_split_runtime_overrides_moves_retrieval_keys_out_of_model_payload() -> 
     }
 
 
+def test_split_runtime_overrides_rejects_legacy_event_score_threshold() -> None:
+    with pytest.raises(ValueError, match="event_score_threshold.*no longer"):
+        aa_runtime._split_runtime_overrides(
+            {"season_length": 4, "event_score_threshold": 1.0},
+        )
+
+
 def test_normalize_legacy_best_params_for_replay_maps_aaforecast_top_k() -> None:
     job = SimpleNamespace(model="AAForecast")
     normalized = runtime._normalize_legacy_best_params_for_replay(
@@ -1859,12 +1867,15 @@ def test_sanitize_aaforecast_trial_params_enforces_similarity_key() -> None:
 
 
 def test_apply_retrieval_overrides_updates_runtime_retrieval_config() -> None:
-    base = aa_runtime._cfg.AAForecastRetrievalConfig(enabled=True)
+    base = aa_runtime._cfg.AAForecastRetrievalConfig(
+        enabled=True,
+        trigger_quantile=0.8,
+    )
     patched = aa_runtime._apply_retrieval_overrides(
         base,
         {
             "top_k": 1,
-            "event_score_threshold": 400.0,
+            "trigger_quantile": 0.9,
             "recency_gap_steps": 8,
             "min_similarity": 0.7,
             "temperature": 0.1,
@@ -1879,7 +1890,7 @@ def test_apply_retrieval_overrides_updates_runtime_retrieval_config() -> None:
     )
 
     assert patched.top_k == 1
-    assert patched.event_score_threshold == pytest.approx(400.0)
+    assert patched.trigger_quantile == pytest.approx(0.9)
     assert patched.recency_gap_steps == 8
     assert patched.min_similarity == pytest.approx(0.7)
     assert patched.temperature == pytest.approx(0.1)

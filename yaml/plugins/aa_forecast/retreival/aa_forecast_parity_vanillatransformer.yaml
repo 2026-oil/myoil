@@ -26,7 +26,7 @@ aa_forecast:
     enabled: false
     top_k: 5
     recency_gap_steps: 8
-    event_score_threshold: 1.0
+    trigger_quantile: 0.8
     min_similarity: 0.55
     blend_max: 0.25
     use_uncertainty_gate: true

@@ -215,8 +215,7 @@ def _assert_retrieval_payload(
     enabled: bool,
     top_k: int,
     recency_gap_steps: int,
-    event_score_threshold: float,
-    trigger_quantile: float | None,
+    trigger_quantile: float,
     neighbor_min_event_ratio: float,
     min_similarity: float,
     blend_floor: float,
@@ -226,8 +225,7 @@ def _assert_retrieval_payload(
     assert payload["enabled"] is enabled
     assert payload["top_k"] == top_k
     assert payload["recency_gap_steps"] == recency_gap_steps
-    assert payload["event_score_threshold"] == pytest.approx(event_score_threshold)
-    assert payload["trigger_quantile"] == trigger_quantile
+    assert payload["trigger_quantile"] == pytest.approx(trigger_quantile)
     assert payload["neighbor_min_event_ratio"] == pytest.approx(
         neighbor_min_event_ratio
     )
@@ -557,8 +555,7 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_uncertainty_retrieval_p
         enabled=True,
         top_k=2,
         recency_gap_steps=1,
-        event_score_threshold=100.0,
-        trigger_quantile=None,
+        trigger_quantile=0.9,
         neighbor_min_event_ratio=0.0,
         min_similarity=0.55,
         blend_floor=0.0,
@@ -575,8 +572,7 @@ def test_runtime_validate_only_accepts_aaforecast_plugin_uncertainty_retrieval_p
         enabled=True,
         top_k=2,
         recency_gap_steps=1,
-        event_score_threshold=100.0,
-        trigger_quantile=None,
+        trigger_quantile=0.9,
         neighbor_min_event_ratio=0.0,
         min_similarity=0.55,
         blend_floor=0.0,

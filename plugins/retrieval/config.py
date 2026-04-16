@@ -20,7 +20,6 @@ RETRIEVAL_PLUGIN_DETAIL_KEYS = {
     "memory_value_mode",
     "top_k",
     "recency_gap_steps",
-    "event_score_threshold",
     "trigger_quantile",
     "neighbor_min_event_ratio",
     "min_similarity",
@@ -66,7 +65,6 @@ class RetrievalConfig:
     enabled: bool = False
     top_k: int = 5
     recency_gap_steps: int = 8
-    event_score_threshold: float = 1.0
     trigger_quantile: float | None = None
     neighbor_min_event_ratio: float = 0.0
     min_similarity: float = 0.55
@@ -230,14 +228,6 @@ def _normalize_retrieval_config(
 ) -> RetrievalConfig:
     defaults = RetrievalConfig()
 
-    # Explicit mutual exclusion: quantile gating vs fixed threshold gating.
-    # Use key presence (not default values) to avoid accidental conflicts.
-    if "trigger_quantile" in payload and "event_score_threshold" in payload:
-        raise ValueError(
-            f"{section}: trigger_quantile and event_score_threshold are mutually exclusive; "
-            "set only one"
-        )
-
     top_k = _coerce_positive_int(
         payload.get("top_k", defaults.top_k),
         field_name=f"{section}.top_k",
@@ -252,18 +242,12 @@ def _normalize_retrieval_config(
 
     trigger_quantile_raw = payload.get("trigger_quantile", defaults.trigger_quantile)
     if trigger_quantile_raw is None:
-        trigger_quantile = None
-    else:
-        trigger_quantile = float(trigger_quantile_raw)
-        if not (0.0 < trigger_quantile < 1.0):
-            raise ValueError(
-                f"{section}.trigger_quantile must satisfy 0 < value < 1"
-            )
-
-    event_score_threshold = _coerce_non_negative_float(
-        payload.get("event_score_threshold", defaults.event_score_threshold),
-        field_name=f"{section}.event_score_threshold",
-    )
+        raise ValueError(f"{section}.trigger_quantile is required")
+    trigger_quantile = float(trigger_quantile_raw)
+    if not (0.0 < trigger_quantile < 1.0):
+        raise ValueError(
+            f"{section}.trigger_quantile must satisfy 0 < value < 1"
+        )
 
     neighbor_min_event_ratio = _coerce_non_negative_float(
         payload.get("neighbor_min_event_ratio", defaults.neighbor_min_event_ratio),
@@ -349,7 +333,6 @@ def _normalize_retrieval_config(
         enabled=True,
         top_k=top_k,
         recency_gap_steps=recency_gap_steps_int,
-        event_score_threshold=event_score_threshold,
         trigger_quantile=trigger_quantile,
         neighbor_min_event_ratio=neighbor_min_event_ratio,
         min_similarity=min_similarity,
@@ -510,7 +493,6 @@ def retrieval_config_to_dict(cfg: RetrievalPluginConfig) -> dict[str, Any]:
         "memory_value_mode": r.memory_value_mode,
         "top_k": r.top_k,
         "recency_gap_steps": r.recency_gap_steps,
-        "event_score_threshold": r.event_score_threshold,
         "trigger_quantile": r.trigger_quantile,
         "neighbor_min_event_ratio": r.neighbor_min_event_ratio,
         "min_similarity": r.min_similarity,
