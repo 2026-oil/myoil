@@ -1287,18 +1287,295 @@ def _blend_event_memory_prediction(
     )
 
 
+def _retrieval_relative_base(*, fold_idx: int | None) -> Path:
+    base = Path("aa_forecast") / "retrieval"
+    if fold_idx is None:
+        return base
+    return base / f"fold_{int(fold_idx):03d}"
+
+
+def _train_end_index_for_candidate(
+    train_df: pd.DataFrame,
+    dt_col: str,
+    candidate_end_ds: str,
+) -> int | None:
+    cand = pd.Timestamp(candidate_end_ds)
+    series = pd.to_datetime(train_df[dt_col])
+    for i in range(len(series)):
+        if pd.Timestamp(series.iloc[i]) == cand:
+            return i
+    cand_norm = cand.normalize()
+    for i in range(len(series)):
+        if pd.Timestamp(series.iloc[i]).normalize() == cand_norm:
+            return i
+    return None
+
+
+def _window_series_slice(
+    train_df: pd.DataFrame,
+    transformed_train_df: pd.DataFrame,
+    start_idx: int,
+    end_idx: int,
+    target_col: str,
+    dt_col: str,
+) -> dict[str, Any]:
+    sl_train = train_df.iloc[start_idx : end_idx + 1].reset_index(drop=True)
+    sl_tf = transformed_train_df.iloc[start_idx : end_idx + 1].reset_index(drop=True)
+    y_raw = sl_train[target_col].astype(float).tolist()
+    ds = pd.to_datetime(sl_train[dt_col]).astype(str).tolist()
+    if target_col in sl_tf.columns:
+        y_tf = sl_tf[target_col].astype(float).tolist()
+    else:
+        y_tf = [float("nan")] * len(ds)
+    return {"ds": ds, "y_raw": y_raw, "y_transformed": y_tf}
+
+
+def _build_retrieval_window_artifacts(
+    *,
+    train_df: pd.DataFrame,
+    transformed_train_df: pd.DataFrame,
+    dt_col: str,
+    target_col: str,
+    input_size: int,
+    horizon: int,
+    neighbors: list[dict[str, Any]],
+    train_end_ds: pd.Timestamp,
+    fold_idx: int | None,
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+    n = len(train_df)
+    q_start = n - input_size
+    query_w = _window_series_slice(
+        train_df,
+        transformed_train_df,
+        q_start,
+        n - 1,
+        target_col,
+        dt_col,
+    )
+    long_rows: list[dict[str, Any]] = []
+    for step_ix in range(input_size):
+        long_rows.append(
+            {
+                "role": "query",
+                "rank": "",
+                "step_ix": step_ix,
+                "ds": query_w["ds"][step_ix],
+                "y_raw": query_w["y_raw"][step_ix],
+                "y_transformed": query_w["y_transformed"][step_ix],
+                "similarity": float("nan"),
+                "softmax_weight": float("nan"),
+                "candidate_end_ds": "",
+            }
+        )
+    windows_payload: dict[str, Any] = {
+        "train_end_ds": str(pd.Timestamp(train_end_ds)),
+        "fold_idx": fold_idx,
+        "input_size": input_size,
+        "horizon": horizon,
+        "target_col": target_col,
+        "query": query_w,
+        "neighbors": [],
+    }
+    neighbor_plot_specs: list[dict[str, Any]] = []
+    for rank, neighbor in enumerate(neighbors, start=1):
+        end_idx = _train_end_index_for_candidate(
+            train_df, dt_col, str(neighbor["candidate_end_ds"])
+        )
+        if end_idx is None:
+            logger.warning(
+                "retrieval neighbor anchor not matched in train_df: rank=%s candidate_end_ds=%s",
+                rank,
+                neighbor.get("candidate_end_ds"),
+            )
+            windows_payload["neighbors"].append(
+                {
+                    "rank": rank,
+                    "candidate_end_ds": neighbor["candidate_end_ds"],
+                    "similarity": neighbor.get("similarity"),
+                    "softmax_weight": neighbor.get("softmax_weight"),
+                    "ds": [],
+                    "y_raw": [],
+                    "y_transformed": [],
+                    "future_ds": [],
+                    "future_y_raw": [],
+                    "match_error": "anchor_not_found",
+                }
+            )
+            continue
+        start_idx = end_idx - input_size + 1
+        if start_idx < 0:
+            logger.warning(
+                "retrieval neighbor window start_idx < 0: rank=%s end_idx=%s",
+                rank,
+                end_idx,
+            )
+            windows_payload["neighbors"].append(
+                {
+                    "rank": rank,
+                    "candidate_end_ds": neighbor["candidate_end_ds"],
+                    "similarity": neighbor.get("similarity"),
+                    "softmax_weight": neighbor.get("softmax_weight"),
+                    "ds": [],
+                    "y_raw": [],
+                    "y_transformed": [],
+                    "future_ds": [],
+                    "future_y_raw": [],
+                    "match_error": "window_underflow",
+                }
+            )
+            continue
+        win = _window_series_slice(
+            train_df,
+            transformed_train_df,
+            start_idx,
+            end_idx,
+            target_col,
+            dt_col,
+        )
+        fut_slice = train_df.iloc[end_idx + 1 : end_idx + 1 + horizon]
+        fut_ds = pd.to_datetime(fut_slice[dt_col]).astype(str).tolist()
+        fut_y = fut_slice[target_col].astype(float).tolist()
+        sim_v = float(neighbor["similarity"])
+        w_v = float(neighbor["softmax_weight"])
+        for step_ix in range(input_size):
+            long_rows.append(
+                {
+                    "role": "neighbor",
+                    "rank": rank,
+                    "step_ix": step_ix,
+                    "ds": win["ds"][step_ix],
+                    "y_raw": win["y_raw"][step_ix],
+                    "y_transformed": win["y_transformed"][step_ix],
+                    "similarity": sim_v,
+                    "softmax_weight": w_v,
+                    "candidate_end_ds": str(neighbor["candidate_end_ds"]),
+                }
+            )
+        for j, (fds, fy) in enumerate(zip(fut_ds, fut_y)):
+            long_rows.append(
+                {
+                    "role": "neighbor_future",
+                    "rank": rank,
+                    "step_ix": input_size + j,
+                    "ds": fds,
+                    "y_raw": fy,
+                    "y_transformed": float("nan"),
+                    "similarity": sim_v,
+                    "softmax_weight": w_v,
+                    "candidate_end_ds": str(neighbor["candidate_end_ds"]),
+                }
+            )
+        windows_payload["neighbors"].append(
+            {
+                "rank": rank,
+                "candidate_end_ds": neighbor["candidate_end_ds"],
+                "similarity": neighbor.get("similarity"),
+                "softmax_weight": neighbor.get("softmax_weight"),
+                "ds": win["ds"],
+                "y_raw": win["y_raw"],
+                "y_transformed": win["y_transformed"],
+                "future_ds": fut_ds,
+                "future_y_raw": fut_y,
+            }
+        )
+        neighbor_plot_specs.append(
+            {
+                "rank": rank,
+                "candidate_end_ds": str(neighbor["candidate_end_ds"]),
+                "similarity": float(neighbor["similarity"]),
+                "softmax_weight": float(neighbor["softmax_weight"]),
+                "ds": win["ds"],
+                "y_raw": win["y_raw"],
+                "y_transformed": win["y_transformed"],
+                "future_ds": fut_ds,
+                "future_y_raw": fut_y,
+            }
+        )
+    return windows_payload, neighbor_plot_specs, long_rows
+
+
+def _write_retrieval_neighbor_comparison_png(
+    path: Path,
+    *,
+    query: dict[str, Any],
+    neighbors: list[dict[str, Any]],
+    input_size: int,
+    target_col: str,
+) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    valid_neighbors = [
+        n
+        for n in neighbors
+        if isinstance(n.get("y_raw"), list) and len(n["y_raw"]) == input_size
+    ]
+    nplots = 1 + len(valid_neighbors)
+    _fig, axes = plt.subplots(
+        nplots,
+        1,
+        figsize=(10, 2.8 * nplots),
+        sharex=False,
+        squeeze=False,
+    )
+    ax_list = axes.ravel()
+    x_in = np.arange(input_size)
+    ax_list[0].plot(x_in, query["y_raw"], color="C0", linewidth=1.6, label="y_raw")
+    ax_list[0].set_title("Query window (end = train cutoff)")
+    ax_list[0].set_ylabel(target_col)
+    ax_list[0].grid(True, alpha=0.3)
+    for idx, nb in enumerate(valid_neighbors):
+        ax = ax_list[1 + idx]
+        ax.plot(x_in, nb["y_raw"], color="C1", linewidth=1.6, label="y_raw")
+        fy = nb.get("future_y_raw") or []
+        if fy:
+            xf = np.arange(input_size, input_size + len(fy))
+            ax.plot(
+                xf,
+                fy,
+                color="C1",
+                linestyle="--",
+                linewidth=1.2,
+                alpha=0.85,
+                label="realized future",
+            )
+        ax.set_title(
+            f"Neighbor rank={nb['rank']} sim={nb['similarity']:.4f} "
+            f"w={nb['softmax_weight']:.4f} end={nb['candidate_end_ds']}"
+        )
+        ax.set_ylabel(target_col)
+        ax.grid(True, alpha=0.3)
+    ax_list[-1].set_xlabel("step (insample 0..L-1; dashed = post-anchor)")
+    _fig.tight_layout()
+    _fig.savefig(path, dpi=150)
+    plt.close(_fig)
+
+
 def _write_retrieval_artifacts(
     *,
     run_root: Path,
     train_end_ds: pd.Timestamp,
     retrieval_summary: dict[str, Any],
+    train_df: pd.DataFrame,
+    transformed_train_df: pd.DataFrame,
+    dt_col: str,
+    target_col: str,
+    input_size: int,
+    horizon: int,
+    fold_idx: int | None = None,
 ) -> str:
     _stage_root(run_root)
+    rel_base = _retrieval_relative_base(fold_idx=fold_idx)
+    retrieval_disk = run_root / rel_base
+    retrieval_disk.mkdir(parents=True, exist_ok=True)
     slug = pd.Timestamp(train_end_ds).strftime("%Y%m%dT%H%M%S")
-    relative_json_path = Path("aa_forecast") / "retrieval" / f"{slug}.json"
-    relative_neighbors_path = (
-        Path("aa_forecast") / "retrieval" / f"{slug}.neighbors.csv"
-    )
+    relative_json_path = rel_base / f"{slug}.json"
+    relative_neighbors_path = rel_base / f"{slug}.neighbors.csv"
+    relative_windows_json = rel_base / f"{slug}_windows.json"
+    relative_windows_long_csv = rel_base / f"{slug}_windows_long.csv"
+    relative_comparison_png = rel_base / f"{slug}_neighbor_comparison.png"
     json_payload = dict(retrieval_summary)
     json_payload["neighbors"] = [
         {
@@ -1317,7 +1594,7 @@ def _write_retrieval_artifacts(
     ]
     _write_json(run_root / relative_json_path, json_payload)
     neighbor_rows: list[dict[str, Any]] = []
-    horizon = len(retrieval_summary["base_prediction"])
+    horizon_pred = len(retrieval_summary["base_prediction"])
     for rank, neighbor in enumerate(retrieval_summary["neighbors"], start=1):
         row = {
             "rank": rank,
@@ -1329,16 +1606,82 @@ def _write_retrieval_artifacts(
             "event_score": neighbor["event_score"],
             "anchor_target_value": neighbor["anchor_target_value"],
         }
-        for horizon_idx in range(horizon):
+        for horizon_idx in range(horizon_pred):
             row[f"future_return_step_{horizon_idx + 1}"] = neighbor["future_returns"][
                 horizon_idx
             ]
         neighbor_rows.append(row)
-    pd.DataFrame(neighbor_rows).to_csv(run_root / relative_neighbors_path, index=False)
+    pd.DataFrame(neighbor_rows).to_csv(
+        run_root / relative_neighbors_path, index=False
+    )
     plot_path = run_root / relative_json_path.with_name(
         f"{relative_json_path.stem}_event_score_dist.png"
     )
     write_event_score_distribution_plot(json_payload, out_path=plot_path)
+
+    windows_payload, neighbor_plot_specs, long_rows = _build_retrieval_window_artifacts(
+        train_df=train_df.reset_index(drop=True),
+        transformed_train_df=transformed_train_df.reset_index(drop=True),
+        dt_col=dt_col,
+        target_col=target_col,
+        input_size=input_size,
+        horizon=horizon,
+        neighbors=list(retrieval_summary["neighbors"]),
+        train_end_ds=train_end_ds,
+        fold_idx=fold_idx,
+    )
+    _write_json(run_root / relative_windows_json, windows_payload)
+    pd.DataFrame(long_rows).to_csv(
+        run_root / relative_windows_long_csv, index=False
+    )
+    query_for_plot = windows_payload["query"]
+    _write_retrieval_neighbor_comparison_png(
+        run_root / relative_comparison_png,
+        query=query_for_plot,
+        neighbors=neighbor_plot_specs,
+        input_size=input_size,
+        target_col=target_col,
+    )
+
+    rel_run = run_root.resolve()
+
+    def _rel_under_run(path: Path) -> str:
+        try:
+            return str(path.resolve().relative_to(rel_run))
+        except ValueError:
+            return str(path)
+
+    logged_paths = [
+        _rel_under_run(p)
+        for p in (
+            run_root / relative_json_path,
+            run_root / relative_neighbors_path,
+            run_root / relative_windows_json,
+            run_root / relative_windows_long_csv,
+            run_root / relative_comparison_png,
+            plot_path,
+        )
+    ]
+    logger.info(
+        "aa_forecast retrieval artifacts train_end_ds=%s fold_idx=%s applied=%s "
+        "top_k_used=%s skip_reason=%s",
+        train_end_ds,
+        fold_idx,
+        retrieval_summary["retrieval_applied"],
+        retrieval_summary["top_k_used"],
+        retrieval_summary["skip_reason"],
+    )
+    logger.info("aa_forecast retrieval artifact paths: %s", " | ".join(logged_paths))
+    for rank, nb in enumerate(retrieval_summary["neighbors"], start=1):
+        logger.info(
+            "aa_forecast retrieval neighbor rank=%s candidate_end_ds=%s similarity=%s "
+            "softmax_weight=%s",
+            rank,
+            nb.get("candidate_end_ds"),
+            nb.get("similarity"),
+            nb.get("softmax_weight"),
+        )
+
     return str(relative_json_path)
 
 
@@ -1351,6 +1694,7 @@ def predict_aa_forecast_fold(
     run_root: Path | None,
     params_override: dict[str, Any] | None = None,
     training_override: dict[str, Any] | None = None,
+    fold_idx: int | None = None,
 ) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, Any | None]:
     from runtime_support.forecast_models import build_model
     from runtime_support.runner import (
@@ -1608,6 +1952,13 @@ def predict_aa_forecast_fold(
                 run_root=run_root,
                 train_end_ds=pd.to_datetime(train_df[dt_col].iloc[-1]),
                 retrieval_summary=retrieval_summary,
+                train_df=train_df,
+                transformed_train_df=transformed_train_df,
+                dt_col=dt_col,
+                target_col=target_col,
+                input_size=input_size,
+                horizon=horizon,
+                fold_idx=fold_idx,
             )
         target_predictions["aaforecast_retrieval_enabled"] = pd.Series(
             [True] * len(target_predictions),

@@ -951,12 +951,14 @@ def test_fit_and_predict_fold_passes_trial_overrides_to_aa_plugin(
             run_root,
             params_override=None,
             training_override=None,
+            fold_idx=None,
         ):
             captured["loaded"] = loaded_arg
             captured["job"] = job_arg
             captured["train_rows"] = len(train_df)
             captured["future_rows"] = len(future_df)
             captured["run_root"] = run_root
+            captured["fold_idx"] = fold_idx
             captured["params_override"] = params_override
             captured["training_override"] = training_override
             return (
@@ -989,8 +991,10 @@ def test_fit_and_predict_fold_passes_trial_overrides_to_aa_plugin(
         test_idx=[1],
         params_override={"season_length": 4, "thresh": 3.5},
         training_override={"model_step_size": 4, "scaler_type": "standard"},
+        fold_idx=2,
     )
 
+    assert captured["fold_idx"] == 2
     assert captured["train_rows"] == 1
     assert captured["future_rows"] == 1
     assert captured["params_override"] == {"season_length": 4, "thresh": 3.5}
@@ -1191,9 +1195,11 @@ def test_run_single_job_replay_routes_plugin_tuned_params_as_overrides(
             run_root,
             params_override=None,
             training_override=None,
+            fold_idx=None,
         ):
             del loaded_arg, job_arg, run_root, training_override
             captured["params_override"] = params_override
+            captured["fold_idx"] = fold_idx
             return (
                 pd.DataFrame(
                     {
@@ -1227,6 +1233,7 @@ def test_run_single_job_replay_routes_plugin_tuned_params_as_overrides(
 
     assert captured["params_override"]["encoder_hidden_size"] == 64
     assert captured["params_override"]["recency_gap_steps"] == 4
+    assert captured["fold_idx"] == 0
 
 
 def test_predict_aa_forecast_fold_writes_informer_encoding_export_artifacts(
@@ -1384,6 +1391,7 @@ def test_predict_aa_forecast_fold_writes_informer_encoding_export_artifacts(
 
 def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     loaded = load_app_config(
         REPO_ROOT,
@@ -1488,8 +1496,8 @@ def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(
         lambda **_kwargs: (
             [
                 {
-                    "candidate_end_ds": "2020-01-15 00:00:00",
-                    "candidate_future_end_ds": "2020-01-22 00:00:00",
+                    "candidate_end_ds": "2024-01-15 00:00:00",
+                    "candidate_future_end_ds": "2024-01-22 00:00:00",
                     "future_returns": np.asarray([0.1]),
                     "event_score": 3.0,
                     "anchor_target_value": 5.0,
@@ -1516,8 +1524,8 @@ def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(
             "skip_reason": None,
             "top_neighbors": [
                 {
-                    "candidate_end_ds": "2020-01-15 00:00:00",
-                    "candidate_future_end_ds": "2020-01-22 00:00:00",
+                    "candidate_end_ds": "2024-01-15 00:00:00",
+                    "candidate_future_end_ds": "2024-01-22 00:00:00",
                     "future_returns": np.asarray([0.1]),
                     "event_score": 3.0,
                     "anchor_target_value": 5.0,
@@ -1549,13 +1557,31 @@ def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(
     monkeypatch.setattr(aa_runtime, "_blend_event_memory_prediction", _fake_blend)
     monkeypatch.setattr(aa_runtime, "NeuralForecast", _FakeNeuralForecast)
 
+    run_root = tmp_path / "run"
     predictions, *_rest = aa_runtime.predict_aa_forecast_fold(
         loaded,
         job,
         train_df=train_df,
         future_df=future_df,
-        run_root=None,
+        run_root=run_root,
+        fold_idx=0,
     )
+
+    fold_retrieval = run_root / "aa_forecast" / "retrieval" / "fold_000"
+    assert fold_retrieval.is_dir()
+    long_csvs = list(fold_retrieval.glob("*_windows_long.csv"))
+    pngs = list(fold_retrieval.glob("*_neighbor_comparison.png"))
+    windows_jsons = list(fold_retrieval.glob("*_windows.json"))
+    assert len(long_csvs) == 1
+    assert len(pngs) == 1
+    assert len(windows_jsons) == 1
+    windows_payload = json.loads(windows_jsons[0].read_text(encoding="utf-8"))
+    assert windows_payload["fold_idx"] == 0
+    assert len(windows_payload["query"]["y_raw"]) == 2
+    assert len(windows_payload["neighbors"]) == 1
+    assert windows_payload["neighbors"][0]["y_raw"] == [2.0, 3.0]
+    long_frame = pd.read_csv(long_csvs[0])
+    assert set(long_frame["role"].unique()) >= {"query", "neighbor", "neighbor_future"}
 
     assert captured["base_prediction"] == [10.0]
     assert captured["memory_prediction"] == [
