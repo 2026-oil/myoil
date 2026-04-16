@@ -1,0 +1,3 @@
+#!/bin/bash
+echo "CODEX ARGS: $@" >> /home/sonet/codex_args.log
+/home/sonet/.nvm/versions/node/v22.22.0/bin/codex "$@"

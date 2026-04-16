@@ -22,7 +22,7 @@ export NF_CASE_CONFIGS="$nf_case_configs"
 export NF_CASE_LOG_ROOT="${NF_CASE_LOG_ROOT:-runs/_batch_logs/feature_set_aaforecast_matrix}"
 export NF_CASE_TIMESTAMP="${NF_CASE_TIMESTAMP:-$(date -u +%Y%m%dT%H%M%SZ)}"
 export NF_FEATURE_SET_RAW_ROOT="${NF_FEATURE_SET_RAW_ROOT:-runs/raw_feature_set_aaforecast}"
-export NF_FEATURE_SET_GRAPH_X_START="${NF_FEATURE_SET_GRAPH_X_START:-2025-08-15}"
+export NF_FEATURE_SET_GRAPH_X_START="${NF_FEATURE_SET_GRAPH_X_START:-2025-01-01}"
 export NF_FEATURE_SET_GRAPH_X_END="${NF_FEATURE_SET_GRAPH_X_END:-2026-03-09}"
 
 batch_id="$NF_CASE_TIMESTAMP"

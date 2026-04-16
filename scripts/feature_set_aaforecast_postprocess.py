@@ -29,7 +29,9 @@ def _group_for_config(config_path: str) -> str:
     return "ret" if "-ret" in Path(config_path).stem else "nonret"
 
 
-def _iter_passed_run_entries(repo_root: Path, summary_payload: dict[str, Any]) -> list[dict[str, Any]]:
+def _iter_passed_run_entries(
+    repo_root: Path, summary_payload: dict[str, Any]
+) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     for row in summary_payload["results"]:
         if row.get("status") != "passed":
@@ -141,7 +143,9 @@ def _build_combined_frame(run_roots: list[Path]) -> pd.DataFrame:
     return combined
 
 
-def _unique_existing_run_roots(entries: list[dict[str, Any]], *, group: str) -> list[Path]:
+def _unique_existing_run_roots(
+    entries: list[dict[str, Any]], *, group: str
+) -> list[Path]:
     ordered: list[Path] = []
     seen: set[str] = set()
     for entry in entries:
@@ -163,13 +167,15 @@ def _write_group_plot(
     group: str,
     x_start: str | None,
     x_end: str | None,
-) -> Path | None:
+) -> tuple[Path | None, Path | None]:
     run_roots = _unique_existing_run_roots(entries, group=group)
     if not run_roots:
-        return None
+        return None, None
     combined = _build_combined_frame(run_roots)
     if combined.empty:
-        return None
+        return None, None
+
+    # 1. Continuous overlay
     plot_dir = raw_batch_root / "plots" / group
     output_path = plot_dir / "all_folds_continuous_overlay.png"
     overlay.plot_continuous_series(
@@ -181,7 +187,137 @@ def _write_group_plot(
         x_start=x_start,
         x_end=x_end,
     )
-    return output_path
+
+    # 2. Fold overlay plots (regular + window_16)
+    fold_dir = plot_dir / "folds"
+    fold_dir.mkdir(parents=True, exist_ok=True)
+    regular_dir = fold_dir / "regular"
+    window_dir = fold_dir / "window_16"
+    regular_dir.mkdir(exist_ok=True)
+    window_dir.mkdir(exist_ok=True)
+
+    fold_paths = overlay.plot_folds(
+        combined,
+        fold_dir,
+        show_mean_band=False,
+        alpha_per_run=0.9,
+        window_history_steps=16,
+    )
+
+    # Separate window_16 and regular plots
+    for fp in fold_paths:
+        if "window_16" in fp.name:
+            fp.rename(window_dir / fp.name)
+        else:
+            fp.rename(regular_dir / fp.name)
+
+    # 3. Create GIFs
+    _create_gif(regular_dir, fold_dir / "regular.gif")
+    _create_gif(window_dir, fold_dir / "window_16.gif")
+
+    # 4. Create combined MP4
+    _create_combined_mp4(regular_dir, window_dir, fold_dir / "regular_window16.mp4")
+
+    return output_path, fold_dir
+
+
+def _create_gif(source_dir: Path, output_path: Path) -> None:
+    """Create GIF from PNG files in directory."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return
+
+    images = []
+    png_files = sorted(source_dir.glob("fold_*.png"))
+    for fp in png_files:
+        images.append(Image.open(fp))
+
+    if images:
+        images[0].save(
+            output_path, save_all=True, append_images=images[1:], duration=500, loop=0
+        )
+
+
+def _create_combined_mp4(
+    regular_dir: Path, window_dir: Path, output_path: Path
+) -> None:
+    """Create MP4 with regular and window_16 plots side by side."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return
+
+    import subprocess
+    import tempfile
+    import shutil
+
+    temp_dir = Path(tempfile.mkdtemp())
+    try:
+        # Get list of fold indices
+        regular_files = sorted(regular_dir.glob("fold_*.png"))
+        if not regular_files:
+            return
+
+        for i, reg_fp in enumerate(regular_files):
+            # Extract fold index
+            stem = reg_fp.stem  # fold_000_predictions_overlay
+            # Find corresponding window_16 file
+            win_fp = window_dir / f"{stem}_window_16.png"
+
+            if not win_fp.exists():
+                continue
+
+            # Open images
+            regular_img = Image.open(reg_fp)
+            window_img = Image.open(win_fp)
+
+            # Get dimensions
+            w1, h1 = regular_img.size
+            w2, h2 = window_img.size
+
+            # Resize to same height
+            target_height = max(h1, h2)
+            scale1 = target_height / h1
+            scale2 = target_height / h2
+
+            regular_resized = regular_img.resize((int(w1 * scale1), target_height))
+            window_resized = window_img.resize((int(w2 * scale2), target_height))
+
+            # Concatenate horizontally
+            combined = Image.new("RGB", (w1 + w2, target_height))
+            combined.paste(regular_resized, (0, 0))
+            combined.paste(window_resized, (w1, 0))
+
+            combined.save(temp_dir / f"frame_{i:03d}.png")
+
+        # Check if frames were created
+        frames = sorted(temp_dir.glob("frame_*.png"))
+        if not frames:
+            return
+
+        # Create MP4 with ffmpeg
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-framerate",
+                "2",
+                "-i",
+                str(temp_dir / "frame_%03d.png"),
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                str(output_path),
+            ],
+            check=True,
+            capture_output=True,
+        )
+    except Exception:
+        pass
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -214,14 +350,14 @@ def main(argv: list[str] | None = None) -> int:
         summary_payload=summary_payload,
         entries=entries,
     )
-    ret_plot = _write_group_plot(
+    ret_plot, ret_folds_dir = _write_group_plot(
         raw_batch_root=raw_batch_root,
         entries=entries,
         group="ret",
         x_start=args.x_start,
         x_end=args.x_end,
     )
-    nonret_plot = _write_group_plot(
+    nonret_plot, nonret_folds_dir = _write_group_plot(
         raw_batch_root=raw_batch_root,
         entries=entries,
         group="nonret",
@@ -230,8 +366,10 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     print(f"batch_manifest={manifest_path}")
-    print(f"ret_plot={ret_plot}")
-    print(f"nonret_plot={nonret_plot}")
+    print(f"ret_continuous_plot={ret_plot}")
+    print(f"ret_folds_dir={ret_folds_dir}")
+    print(f"nonret_continuous_plot={nonret_plot}")
+    print(f"nonret_folds_dir={nonret_folds_dir}")
     return 0
 
 

@@ -7,7 +7,7 @@ runtime:
 training:
   input_size: 64
   batch_size: 32
-  valid_batch_size: 2
+  valid_batch_size: 8
   windows_batch_size: 64
   inference_windows_batch_size: 64
   max_steps: 600
@@ -36,7 +36,7 @@ cv:
   gap: 0
   horizon: 2
   step_size: 1
-  n_windows: 24
+  n_windows: 4
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean
 scheduler:

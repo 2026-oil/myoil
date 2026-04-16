@@ -28,9 +28,10 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Mapping, Sequence
 
 import pandas as pd
 
@@ -39,6 +40,17 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 import runtime_support.runner as runtime  # noqa: E402
+
+
+_DEFAULT_OUTPUT_DIR = Path("runs/_fold_overlay_plots")
+_HPO_STUDY_COLORS = {
+    "study-01": "#1f77b4",
+    "study-02": "#ff7f0e",
+    "study-03": "#2ca02c",
+    "study-04": "#d62728",
+    "study-05": "#9467bd",
+    "study-06": "#8c564b",
+}
 
 
 def _forecast_job_roots(run_root: Path) -> list[Path]:
@@ -135,6 +147,172 @@ def load_forecasts_from_run(run_root: Path) -> pd.DataFrame:
     if not frames:
         return pd.DataFrame()
     return pd.concat(frames, ignore_index=True)
+
+
+def _parse_study_index(study_root: Path) -> int:
+    name = study_root.name
+    if not name.startswith("study-"):
+        raise ValueError(f"Unexpected study directory name: {name!r} ({study_root})")
+    return int(name.removeprefix("study-"))
+
+
+def _parse_trial_number(trial_root: Path) -> int:
+    name = trial_root.name
+    if not name.startswith("trial-"):
+        raise ValueError(f"Unexpected trial directory name: {name!r} ({trial_root})")
+    return int(name.removeprefix("trial-"))
+
+
+def _trial_result_payload(trial_root: Path) -> dict[str, object]:
+    result_path = trial_root / "trial_result.json"
+    if not result_path.is_file():
+        return {}
+    return json.loads(result_path.read_text(encoding="utf-8"))
+
+
+def _load_trial_fold_predictions(
+    trial_root: Path,
+    *,
+    actual_run_root: Path,
+    study_label: str,
+    study_index: int,
+    status: str,
+    model_filter: str | None,
+) -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
+    trial_number = _parse_trial_number(trial_root)
+    run_id = f"{study_label}/trial-{trial_number:04d}"
+    for path in sorted(trial_root.glob("folds/fold_*/predictions.csv")):
+        fold_idx = _parse_fold_idx_from_path(path)
+        frame = pd.read_csv(path)
+        frame = _filter_model(frame, model_filter)
+        if frame.empty:
+            continue
+        normalized = frame.copy()
+        if "fold_idx" not in normalized.columns:
+            normalized["fold_idx"] = fold_idx
+        normalized["run_id"] = run_id
+        normalized["run_root"] = str(actual_run_root.resolve())
+        normalized["trial_root"] = str(trial_root.resolve())
+        normalized["study_label"] = study_label
+        normalized["study_index"] = study_index
+        normalized["trial_number"] = trial_number
+        normalized["trial_status"] = status
+        normalized["series_id"] = run_id
+        normalized["display_label"] = run_id
+        frames.append(normalized)
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
+
+
+def _collect_hpo_trial_forecasts(
+    hpo_run_root: Path,
+    *,
+    model_name: str,
+) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, object]]:
+    hpo_run_root = hpo_run_root.resolve()
+    studies_root = hpo_run_root / "models" / model_name / "studies"
+    study_roots = sorted(path for path in studies_root.glob("study-*") if path.is_dir())
+    if not study_roots:
+        raise ValueError(f"No study directories found under {studies_root}")
+
+    combined_frames: list[pd.DataFrame] = []
+    coverage_rows: list[dict[str, object]] = []
+    all_fold_indices: set[int] = set()
+    status_counts: dict[str, int] = {}
+    plotted_trial_count = 0
+
+    for study_root in study_roots:
+        study_index = _parse_study_index(study_root)
+        study_label = study_root.name
+        trial_roots = sorted(
+            path for path in (study_root / "trials").glob("trial-*") if path.is_dir()
+        )
+        for trial_root in trial_roots:
+            payload = _trial_result_payload(trial_root)
+            status = str(payload.get("status", "unknown"))
+            status_counts[status] = status_counts.get(status, 0) + 1
+            available_fold_indices = sorted(
+                _parse_fold_idx_from_path(path)
+                for path in trial_root.glob("folds/fold_*/predictions.csv")
+            )
+            all_fold_indices.update(available_fold_indices)
+            coverage_rows.append(
+                {
+                    "study_label": study_label,
+                    "study_index": study_index,
+                    "trial_number": _parse_trial_number(trial_root),
+                    "trial_id": trial_root.name,
+                    "status": status,
+                    "available_fold_count": len(available_fold_indices),
+                    "trial_root": str(trial_root.resolve()),
+                    "objective_value": payload.get("objective_value"),
+                }
+            )
+            frame = _load_trial_fold_predictions(
+                trial_root,
+                actual_run_root=hpo_run_root,
+                study_label=study_label,
+                study_index=study_index,
+                status=status,
+                model_filter=model_name,
+            )
+            if frame.empty:
+                continue
+            plotted_trial_count += 1
+            combined_frames.append(frame)
+
+    if not coverage_rows:
+        raise ValueError(f"No trials found under {studies_root}")
+
+    sorted_fold_indices = sorted(all_fold_indices)
+    coverage_frame = pd.DataFrame(coverage_rows)
+    for fold_idx in sorted_fold_indices:
+        column = f"has_fold_{fold_idx:03d}"
+        trial_roots = coverage_frame["trial_root"].map(Path)
+        coverage_frame[column] = trial_roots.map(
+            lambda root, idx=fold_idx: (root / "folds" / f"fold_{idx:03d}" / "predictions.csv").is_file()
+        )
+
+    if combined_frames:
+        combined = pd.concat(combined_frames, ignore_index=True)
+    else:
+        combined = pd.DataFrame()
+
+    summary_payload: dict[str, object] = {
+        "hpo_run_root": str(hpo_run_root),
+        "model_name": model_name,
+        "study_count": len(study_roots),
+        "trial_count": int(len(coverage_frame)),
+        "plotted_trial_count": plotted_trial_count,
+        "fold_indices": sorted_fold_indices,
+        "status_counts": status_counts,
+        "folds": {},
+    }
+    for fold_idx in sorted_fold_indices:
+        plotted_count = int(coverage_frame[f"has_fold_{fold_idx:03d}"].sum())
+        summary_payload["folds"][f"fold_{fold_idx:03d}"] = {
+            "plotted_trial_count": plotted_count,
+            "skipped_trial_count": int(len(coverage_frame) - plotted_count),
+        }
+    return combined, coverage_frame, summary_payload
+
+
+def _write_hpo_coverage_artifacts(
+    *,
+    coverage_frame: pd.DataFrame,
+    summary_payload: Mapping[str, object],
+    output_dir: Path,
+) -> tuple[Path, Path]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    coverage_path = output_dir / "trial_fold_coverage.csv"
+    summary_path = output_dir / "trial_fold_summary.json"
+    coverage_frame.sort_values(
+        ["study_index", "trial_number"], kind="stable"
+    ).to_csv(coverage_path, index=False)
+    summary_path.write_text(json.dumps(summary_payload, indent=2), encoding="utf-8")
+    return coverage_path, summary_path
 
 
 def discover_run_dirs(repo_root: Path, pattern: str) -> list[Path]:
@@ -383,11 +561,16 @@ def _plot_single_fold_overlay(
     title: str,
     show_mean_band: bool,
     alpha_per_run: float,
+    color_by_col: str | None = None,
+    color_map: Mapping[str, str] | None = None,
+    show_series_legend: bool = True,
+    group_legend_entries: Sequence[tuple[str, str]] | None = None,
 ) -> Path:
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
 
     fig, ax = plt.subplots(figsize=(12, 6))
     actual_anchor_frame = (
@@ -444,15 +627,20 @@ def _plot_single_fold_overlay(
         if connected_model_frame.empty:
             continue
         prediction_point_indices = list(range(1, len(connected_model_frame)))
+        line_color = None
+        if color_by_col is not None and color_map is not None and color_by_col in part.columns:
+            color_value = str(part[color_by_col].iloc[0])
+            line_color = color_map.get(color_value)
         ax.plot(
             connected_model_frame["ds"],
             connected_model_frame["y_hat"],
-            label=str(part["display_label"].iloc[0]),
+            label=str(part["display_label"].iloc[0]) if show_series_legend else "_nolegend_",
             linewidth=1.6,
             alpha=alpha_per_run,
             marker="o",
             markersize=4,
             markevery=prediction_point_indices if prediction_point_indices else None,
+            color=line_color,
         )
 
     if show_mean_band and len(series_ids) > 1:
@@ -489,7 +677,27 @@ def _plot_single_fold_overlay(
     ax.set_xlabel("ds")
     ax.set_ylabel("y")
     ax.grid(True, alpha=0.3)
-    ax.legend(loc="best", fontsize=8)
+    if group_legend_entries:
+        handles = [
+            Line2D([0], [0], color="black", linewidth=2.0, label="actual (input)"),
+            Line2D(
+                [0],
+                [0],
+                color="dimgray",
+                linewidth=1.8,
+                linestyle="--",
+                label="actual (output)",
+            ),
+        ]
+        if show_mean_band and len(series_ids) > 1:
+            handles.append(
+                Line2D([0], [0], color="darkred", linewidth=2.0, label="mean y_hat")
+            )
+        for label, color in group_legend_entries:
+            handles.append(Line2D([0], [0], color=color, linewidth=1.6, label=label))
+        ax.legend(handles=handles, loc="best", fontsize=8)
+    else:
+        ax.legend(loc="best", fontsize=8)
     fig.tight_layout()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=150)
@@ -686,6 +894,69 @@ def plot_folds(
     return written
 
 
+def plot_hpo_trial_folds(
+    hpo_run_root: Path,
+    output_dir: Path,
+    *,
+    model_name: str,
+    show_mean_band: bool,
+    alpha_per_run: float,
+) -> tuple[list[Path], Path, Path]:
+    combined, coverage_frame, summary_payload = _collect_hpo_trial_forecasts(
+        hpo_run_root,
+        model_name=model_name,
+    )
+    if combined.empty:
+        raise ValueError(
+            f"No fold prediction artifacts found under {Path(hpo_run_root).resolve()}"
+        )
+
+    output_dir = output_dir.resolve()
+    coverage_path, summary_path = _write_hpo_coverage_artifacts(
+        coverage_frame=coverage_frame,
+        summary_payload=summary_payload,
+        output_dir=output_dir,
+    )
+    written: list[Path] = []
+    legend_entries = [
+        (study_label, _HPO_STUDY_COLORS[study_label])
+        for study_label in sorted(combined["study_label"].dropna().astype(str).unique())
+        if study_label in _HPO_STUDY_COLORS
+    ]
+    trial_count = int(summary_payload["trial_count"])
+    study_count = int(summary_payload["study_count"])
+    for fold_idx in sorted(combined["fold_idx"].dropna().astype(int).unique()):
+        fold_key = f"fold_{int(fold_idx):03d}"
+        sub = combined[combined["fold_idx"] == fold_idx].copy()
+        if sub.empty:
+            continue
+        input_actual_frame, output_actual_frame = _resolve_actual_frames_for_fold(
+            sub,
+            fold_idx=int(fold_idx),
+            history_steps_override=None,
+        )
+        plotted_count = int(summary_payload["folds"][fold_key]["plotted_trial_count"])
+        written.append(
+            _plot_single_fold_overlay(
+                sub,
+                input_actual_frame=input_actual_frame,
+                output_actual_frame=output_actual_frame,
+                output_path=output_dir / f"{fold_key}_all_trials_overlay.png",
+                title=(
+                    f"Fold {int(fold_idx):03d} — plotted {plotted_count}/{trial_count} trials "
+                    f"across {study_count} studies"
+                ),
+                show_mean_band=show_mean_band,
+                alpha_per_run=alpha_per_run,
+                color_by_col="study_label",
+                color_map=_HPO_STUDY_COLORS,
+                show_series_legend=False,
+                group_legend_entries=legend_entries,
+            )
+        )
+    return written, coverage_path, summary_path
+
+
 def plot_continuous_series(
     combined: pd.DataFrame,
     *,
@@ -734,6 +1005,12 @@ def main() -> None:
         help="Text file: one run root path per line (relative to repo root ok).",
     )
     parser.add_argument(
+        "--hpo-run-root",
+        type=Path,
+        default=None,
+        help="HPO run root whose study-*/trial-* fold predictions should be overlaid.",
+    )
+    parser.add_argument(
         "--model",
         default="AAForecast",
         help="Filter to this model name when column exists (default: AAForecast).",
@@ -746,7 +1023,7 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("runs/_fold_overlay_plots"),
+        default=_DEFAULT_OUTPUT_DIR,
         help="Directory for fold_###_predictions_overlay.png files.",
     )
     parser.add_argument(
@@ -782,6 +1059,40 @@ def main() -> None:
         help="Optional right x-axis bound for continuous plots, e.g. 2026-03-09.",
     )
     args = parser.parse_args()
+
+    if args.hpo_run_root is not None:
+        if args.continuous:
+            raise SystemExit("--continuous is not supported together with --hpo-run-root")
+        hpo_run_root = (
+            (REPO_ROOT / args.hpo_run_root).resolve()
+            if not args.hpo_run_root.is_absolute()
+            else args.hpo_run_root.resolve()
+        )
+        default_hpo_dir = (
+            hpo_run_root / "models" / args.model / "visualizations" / "trial_fold_overlays"
+        )
+        out_dir = (
+            default_hpo_dir
+            if args.output_dir == _DEFAULT_OUTPUT_DIR
+            else (
+                args.output_dir
+                if args.output_dir.is_absolute()
+                else (REPO_ROOT / args.output_dir).resolve()
+            )
+        )
+        paths, coverage_path, summary_path = plot_hpo_trial_folds(
+            hpo_run_root,
+            out_dir,
+            model_name=args.model,
+            show_mean_band=args.mean_band,
+            alpha_per_run=args.alpha,
+        )
+        print(f"Wrote {len(paths)} figure(s) under {out_dir}")
+        for path in paths:
+            print(f"  {path}")
+        print(f"coverage_csv={coverage_path}")
+        print(f"summary_json={summary_path}")
+        return
 
     run_roots = collect_run_roots(
         REPO_ROOT,

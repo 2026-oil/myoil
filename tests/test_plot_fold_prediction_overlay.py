@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -351,3 +352,242 @@ def test_annotate_series_identity_splits_multi_model_baseline_run() -> None:
         "Baseline Informer RET",
         "Baseline GRU RET",
     ]
+
+
+def test_collect_hpo_trial_forecasts_builds_combined_and_coverage(tmp_path: Path) -> None:
+    hpo_run_root = tmp_path / "feature_set_aaforecast_aaforecast_timexer-ret_HPO"
+
+    def write_trial(
+        *,
+        study_label: str,
+        trial_id: str,
+        status: str,
+        fold_predictions: dict[int, list[float]],
+    ) -> None:
+        trial_root = hpo_run_root / "models" / "AAForecast" / "studies" / study_label / "trials" / trial_id
+        trial_root.mkdir(parents=True, exist_ok=True)
+        (trial_root / "trial_result.json").write_text(
+            json.dumps(
+                {
+                    "status": status,
+                    "trial_number": int(trial_id.removeprefix("trial-")),
+                    "objective_value": 0.123,
+                }
+            ),
+            encoding="utf-8",
+        )
+        for fold_idx, y_hats in fold_predictions.items():
+            fold_root = trial_root / "folds" / f"fold_{fold_idx:03d}"
+            fold_root.mkdir(parents=True, exist_ok=True)
+            pd.DataFrame(
+                {
+                    "model": ["AAForecast"] * len(y_hats),
+                    "fold_idx": [fold_idx] * len(y_hats),
+                    "train_end_ds": ["2024-02-18"] * len(y_hats),
+                    "ds": ["2024-02-25", "2024-03-03"][: len(y_hats)],
+                    "horizon_step": [1, 2][: len(y_hats)],
+                    "y": [12.0, 13.0][: len(y_hats)],
+                    "y_hat": y_hats,
+                }
+            ).to_csv(fold_root / "predictions.csv", index=False)
+
+    write_trial(
+        study_label="study-01",
+        trial_id="trial-0000",
+        status="complete",
+        fold_predictions={0: [12.5, 13.5], 1: [14.5, 15.5]},
+    )
+    write_trial(
+        study_label="study-01",
+        trial_id="trial-0001",
+        status="failed",
+        fold_predictions={0: [11.5, 12.5]},
+    )
+    write_trial(
+        study_label="study-02",
+        trial_id="trial-0000",
+        status="pruned",
+        fold_predictions={1: [10.5, 11.5]},
+    )
+
+    combined, coverage, summary = overlay._collect_hpo_trial_forecasts(
+        hpo_run_root,
+        model_name="AAForecast",
+    )
+
+    assert sorted(combined["run_id"].unique().tolist()) == [
+        "study-01/trial-0000",
+        "study-01/trial-0001",
+        "study-02/trial-0000",
+    ]
+    assert combined["run_root"].drop_duplicates().tolist() == [str(hpo_run_root.resolve())]
+    assert summary["study_count"] == 2
+    assert summary["trial_count"] == 3
+    assert summary["fold_indices"] == [0, 1]
+    assert summary["status_counts"] == {"complete": 1, "failed": 1, "pruned": 1}
+    assert summary["folds"]["fold_000"] == {
+        "plotted_trial_count": 2,
+        "skipped_trial_count": 1,
+    }
+    assert summary["folds"]["fold_001"] == {
+        "plotted_trial_count": 2,
+        "skipped_trial_count": 1,
+    }
+    assert coverage[["study_label", "trial_id", "status", "available_fold_count"]].to_dict(
+        orient="records"
+    ) == [
+        {
+            "study_label": "study-01",
+            "trial_id": "trial-0000",
+            "status": "complete",
+            "available_fold_count": 2,
+        },
+        {
+            "study_label": "study-01",
+            "trial_id": "trial-0001",
+            "status": "failed",
+            "available_fold_count": 1,
+        },
+        {
+            "study_label": "study-02",
+            "trial_id": "trial-0000",
+            "status": "pruned",
+            "available_fold_count": 1,
+        },
+    ]
+    assert coverage["has_fold_000"].tolist() == [True, True, False]
+    assert coverage["has_fold_001"].tolist() == [True, False, True]
+
+
+def test_plot_hpo_trial_folds_writes_one_png_per_fold_and_sidecars(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    combined = pd.DataFrame(
+        {
+            "fold_idx": [0, 0, 1, 1],
+            "run_id": [
+                "study-01/trial-0000",
+                "study-02/trial-0001",
+                "study-01/trial-0000",
+                "study-02/trial-0001",
+            ],
+            "run_root": ["/tmp/hpo"] * 4,
+            "study_label": ["study-01", "study-02", "study-01", "study-02"],
+            "ds": ["2024-02-25", "2024-02-25", "2024-03-03", "2024-03-03"],
+            "horizon_step": [1, 1, 1, 1],
+            "y": [12.0, 12.0, 13.0, 13.0],
+            "y_hat": [12.5, 12.4, 13.5, 13.4],
+            "train_end_ds": ["2024-02-18", "2024-02-18", "2024-02-25", "2024-02-25"],
+        }
+    )
+    coverage = pd.DataFrame(
+        {
+            "study_label": ["study-01", "study-02"],
+            "study_index": [1, 2],
+            "trial_number": [0, 1],
+            "trial_id": ["trial-0000", "trial-0001"],
+            "status": ["complete", "failed"],
+            "available_fold_count": [2, 2],
+            "trial_root": ["/tmp/a", "/tmp/b"],
+            "objective_value": [0.1, 0.2],
+            "has_fold_000": [True, True],
+            "has_fold_001": [True, True],
+        }
+    )
+    summary = {
+        "study_count": 2,
+        "trial_count": 2,
+        "plotted_trial_count": 2,
+        "fold_indices": [0, 1],
+        "status_counts": {"complete": 1, "failed": 1},
+        "folds": {
+            "fold_000": {"plotted_trial_count": 2, "skipped_trial_count": 0},
+            "fold_001": {"plotted_trial_count": 2, "skipped_trial_count": 0},
+        },
+    }
+    resolve_calls: list[int] = []
+    plot_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        overlay,
+        "_collect_hpo_trial_forecasts",
+        lambda *_args, **_kwargs: (combined, coverage, summary),
+    )
+
+    def fake_resolve_actual_frames(fold_frame, *, fold_idx, history_steps_override):
+        resolve_calls.append(fold_idx)
+        return (
+            pd.DataFrame({"ds": pd.to_datetime(["2024-02-18"]), "y": [11.0]}),
+            pd.DataFrame({"ds": pd.to_datetime(["2024-02-25"]), "y": [12.0]}),
+        )
+
+    def fake_plot_single_fold_overlay(
+        fold_frame,
+        *,
+        input_actual_frame,
+        output_actual_frame,
+        output_path,
+        title,
+        show_mean_band,
+        alpha_per_run,
+        color_by_col,
+        color_map,
+        show_series_legend,
+        group_legend_entries,
+    ):
+        plot_calls.append(
+            {
+                "name": Path(output_path).name,
+                "title": title,
+                "color_by_col": color_by_col,
+                "show_series_legend": show_series_legend,
+                "group_legend_entries": list(group_legend_entries),
+            }
+        )
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(output_path).write_text(title, encoding="utf-8")
+        return Path(output_path)
+
+    monkeypatch.setattr(overlay, "_resolve_actual_frames_for_fold", fake_resolve_actual_frames)
+    monkeypatch.setattr(overlay, "_plot_single_fold_overlay", fake_plot_single_fold_overlay)
+
+    paths, coverage_path, summary_path = overlay.plot_hpo_trial_folds(
+        Path("/tmp/hpo"),
+        tmp_path,
+        model_name="AAForecast",
+        show_mean_band=False,
+        alpha_per_run=0.9,
+    )
+
+    assert [path.name for path in paths] == [
+        "fold_000_all_trials_overlay.png",
+        "fold_001_all_trials_overlay.png",
+    ]
+    assert resolve_calls == [0, 1]
+    assert plot_calls == [
+        {
+            "name": "fold_000_all_trials_overlay.png",
+            "title": "Fold 000 — plotted 2/2 trials across 2 studies",
+            "color_by_col": "study_label",
+            "show_series_legend": False,
+            "group_legend_entries": [
+                ("study-01", overlay._HPO_STUDY_COLORS["study-01"]),
+                ("study-02", overlay._HPO_STUDY_COLORS["study-02"]),
+            ],
+        },
+        {
+            "name": "fold_001_all_trials_overlay.png",
+            "title": "Fold 001 — plotted 2/2 trials across 2 studies",
+            "color_by_col": "study_label",
+            "show_series_legend": False,
+            "group_legend_entries": [
+                ("study-01", overlay._HPO_STUDY_COLORS["study-01"]),
+                ("study-02", overlay._HPO_STUDY_COLORS["study-02"]),
+            ],
+        },
+    ]
+    assert coverage_path.exists()
+    assert summary_path.exists()
+    written_summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert written_summary["folds"]["fold_000"]["plotted_trial_count"] == 2
