@@ -10,6 +10,9 @@ import pandas as pd
 import torch
 from neuralforecast import NeuralForecast
 
+from plugins.retrieval.event_score_distribution_plot import (
+    write_event_score_distribution_plot,
+)
 from plugins.retrieval.runtime import (
     _blend_prediction as _shared_blend_prediction,
     _effective_event_threshold as _shared_effective_event_threshold,
@@ -1335,6 +1338,10 @@ def _write_retrieval_artifacts(
             ]
         neighbor_rows.append(row)
     pd.DataFrame(neighbor_rows).to_csv(run_root / relative_neighbors_path, index=False)
+    plot_path = run_root / relative_json_path.with_name(
+        f"{relative_json_path.stem}_event_score_dist.png"
+    )
+    write_event_score_distribution_plot(json_payload, out_path=plot_path)
     return str(relative_json_path)
 
 
@@ -1549,6 +1556,7 @@ def predict_aa_forecast_fold(
         )
         base_prediction = np.asarray(target_predictions[job.model], dtype=float)
         current_last_y = float(train_df[target_col].iloc[-1])
+        bank_event_scores = [float(entry["event_score"]) for entry in bank]
         retrieval_summary = {
             "cutoff": str(pd.Timestamp(train_df[dt_col].iloc[-1])),
             "train_end_ds": str(pd.Timestamp(train_df[dt_col].iloc[-1])),
@@ -1560,6 +1568,7 @@ def predict_aa_forecast_fold(
             "top_k_used": len(retrieval_result["top_neighbors"]),
             "candidate_count": candidate_count,
             "eligible_candidate_count": len(eligible_bank),
+            "bank_event_scores": bank_event_scores,
             "effective_event_threshold": effective_event_threshold,
             "trigger_quantile": retrieval_cfg.trigger_quantile,
             "recency_gap_steps": retrieval_cfg.recency_gap_steps,

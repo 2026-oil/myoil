@@ -1298,6 +1298,7 @@ def test_runtime_aaforecast_plugin_uncertainty_smoke(
     )
     retrieval_dir = output_root / "aa_forecast" / "retrieval"
     retrieval_summary_files = sorted(retrieval_dir.glob("*.json"))
+    retrieval_plot_files = sorted(retrieval_dir.glob("*_event_score_dist.png"))
     retrieval_neighbor_files = sorted(retrieval_dir.glob("*.neighbors.csv"))
     assert distribution_files
     assert uncertainty_csv_files
@@ -1306,6 +1307,8 @@ def test_runtime_aaforecast_plugin_uncertainty_smoke(
     assert distribution_combined_csv_files
     assert distribution_png_files
     assert retrieval_summary_files
+    assert retrieval_plot_files
+    assert len(retrieval_plot_files) == len(retrieval_summary_files)
     assert retrieval_neighbor_files
     payload = json.loads(distribution_files[0].read_text())
     uncertainty_frame = pd.read_csv(uncertainty_csv_files[0])
@@ -1324,6 +1327,8 @@ def test_runtime_aaforecast_plugin_uncertainty_smoke(
     assert retrieval_payload["retrieval_attempted"] is True
     assert retrieval_payload["retrieval_applied"] is False
     assert retrieval_payload["skip_reason"] == "below_event_threshold"
+    assert "bank_event_scores" in retrieval_payload
+    assert isinstance(retrieval_payload["bank_event_scores"], list)
     assert retrieval_payload["top_k_requested"] == 2
     assert retrieval_payload["top_k_used"] == 0
     assert retrieval_payload["blend_max"] == pytest.approx(0.2)
@@ -1477,6 +1482,7 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
         fold_root.glob("*.prediction_distribution_by_dropout.png")
     )
     retrieval_summary_files = sorted(retrieval_fold_root.glob("*.json"))
+    retrieval_plot_files = sorted(retrieval_fold_root.glob("*_event_score_dist.png"))
     retrieval_neighbor_files = sorted(retrieval_fold_root.glob("*.neighbors.csv"))
     metrics_payload = json.loads(
         (common_fold_root / "metrics.json").read_text(encoding="utf-8")
@@ -1497,6 +1503,8 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     assert distribution_combined_csv_files
     assert distribution_plot_files
     assert retrieval_summary_files
+    assert retrieval_plot_files
+    assert len(retrieval_plot_files) == len(retrieval_summary_files)
     assert retrieval_neighbor_files
 
     candidate_stats = pd.read_csv(candidate_stats_files[0])
@@ -1550,6 +1558,8 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     assert retrieval_summary["retrieval_attempted"] is True
     assert retrieval_summary["retrieval_applied"] is False
     assert retrieval_summary["skip_reason"] == "below_event_threshold"
+    assert "bank_event_scores" in retrieval_summary
+    assert isinstance(retrieval_summary["bank_event_scores"], list)
     assert retrieval_neighbors.empty
 
 

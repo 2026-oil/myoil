@@ -1,0 +1,25 @@
+aa_forecast:
+  model: gru
+  tune_training: false
+  lowess_frac: 0.6
+  lowess_delta: 0.01
+  uncertainty:
+    enabled: true
+    sample_count: 2
+  retrieval:
+    enabled: true
+    config_path: tests/fixtures/finding_aaforecast_smoke_retrieval.yaml
+  model_params:
+    encoder_hidden_size: 16
+    encoder_n_layers: 1
+    encoder_dropout: 0.1
+    decoder_hidden_size: 16
+    decoder_layers: 1
+    season_length: 4
+    trend_kernel_size: 3
+    start_padding_enabled: true
+  star_anomaly_tails:
+    upward:
+    - event
+    two_sided: []
+  thresh: 3.5

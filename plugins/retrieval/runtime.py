@@ -16,14 +16,12 @@ import numpy as np
 import pandas as pd
 
 from . import config as _cfg
+from .event_score_distribution_plot import write_event_score_distribution_plot
 from .signatures import (
     _build_star_extractor,
     _resolve_tail_modes,
     compute_star_signature,
 )
-
-RETRIEVAL_SHAPE_WEIGHT = 0.20
-RETRIEVAL_EVENT_WEIGHT = 0.80
 
 
 # ---------------------------------------------------------------------------
@@ -178,10 +176,7 @@ def _retrieve_neighbors(
                 retrieval_cfg.event_score_log_bonus_alpha * event_score_log_bonus
             )
         if retrieval_cfg.use_shape_key and retrieval_cfg.use_event_key:
-            similarity = (
-                RETRIEVAL_SHAPE_WEIGHT * shape_similarity
-                + RETRIEVAL_EVENT_WEIGHT * event_component
-            )
+            similarity = 0.5 * (shape_similarity + event_component)
         elif retrieval_cfg.use_event_key:
             similarity = event_component
         elif retrieval_cfg.use_shape_key:
@@ -334,6 +329,12 @@ def _write_retrieval_artifacts(
             serializable_summary[key] = value
 
     _write_json(summary_path, serializable_summary)
+    plot_path = summary_path.with_name(
+        f"{summary_path.stem}_event_score_dist.png"
+    )
+    write_event_score_distribution_plot(
+        serializable_summary, out_path=plot_path
+    )
     return str(summary_path)
 
 
@@ -417,6 +418,7 @@ def post_predict_retrieval(
 
     base_prediction = np.asarray(target_predictions[prediction_col], dtype=float)
     current_last_y = float(train_df[target_col].iloc[-1])
+    bank_event_scores = [float(entry["event_score"]) for entry in bank]
 
     retrieval_summary: dict[str, Any] = {
         "cutoff": str(pd.Timestamp(train_df[dt_col].iloc[-1])),
@@ -429,6 +431,7 @@ def post_predict_retrieval(
         "top_k_used": len(retrieval_result["top_neighbors"]),
         "candidate_count": candidate_count,
         "eligible_candidate_count": len(eligible_bank),
+        "bank_event_scores": bank_event_scores,
         "effective_event_threshold": effective_event_threshold,
         "trigger_quantile": retrieval_cfg.trigger_quantile,
         "recency_gap_steps": retrieval_cfg.recency_gap_steps,

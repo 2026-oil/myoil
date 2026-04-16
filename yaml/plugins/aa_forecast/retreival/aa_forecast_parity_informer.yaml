@@ -19,15 +19,13 @@ aa_forecast:
   star_anomaly_tails:
     upward:
     - GPRD_THREAT
-    - BS_Core_Index_A
-    - BS_Core_Index_C
     two_sided: []
   thresh: 3.5
   retrieval:
     enabled: false
     top_k: 5
     recency_gap_steps: 8
-    trigger_quantile: 0.8
+    trigger_quantile: 0.3
     min_similarity: 0.55
     blend_max: 0.25
     use_uncertainty_gate: true

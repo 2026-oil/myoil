@@ -1,27 +1,24 @@
 retrieval:
-  enabled: true
   star:
     season_length: 4
-    lowess_frac: 0.35
+    lowess_frac: 0.6
     lowess_delta: 0.01
     thresh: 3.5
     anomaly_tails:
       upward:
-      - GPRD_THREAT
+      - event
       two_sided: []
   mode: posthoc_blend
-  top_k: 3
-  recency_gap_steps: 8
-  trigger_quantile: 0.2
+  top_k: 2
+  recency_gap_steps: 0
+  trigger_quantile: 0.5
   min_similarity: 0.0
   similarity: cosine
-  temperature: 0.1
+  temperature: 0.5
   blend_floor: 0.0
-  blend_max: 1.0
+  blend_max: 0.5
   use_uncertainty_gate: true
-  use_shape_key: false
+  use_shape_key: true
   use_event_key: true
   event_score_log_bonus_alpha: 0.0
   event_score_log_bonus_cap: 0.0
-
-

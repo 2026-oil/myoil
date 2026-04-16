@@ -1,0 +1,10 @@
+[
+  ["GPRD_THREAT", "BS_Core_Index_A", "BS_Core_Index_C", "GPRD", "GPRD_ACT"],
+  ["GPRD_THREAT", "BS_Core_Index_A", "BS_Core_Index_C", "GPRD"],
+  ["GPRD_THREAT", "BS_Core_Index_A", "BS_Core_Index_C", "GPRD_ACT"],
+  ["GPRD_THREAT", "BS_Core_Index_A", "BS_Core_Index_C"],
+  ["GPRD_THREAT", "GPRD", "GPRD_ACT"],
+  ["GPRD_THREAT", "GPRD"],
+  ["GPRD_THREAT", "GPRD_ACT"],
+  ["GPRD_THREAT"]
+]

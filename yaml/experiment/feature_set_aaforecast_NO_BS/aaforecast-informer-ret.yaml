@@ -5,13 +5,13 @@ dataset:
   target_col: Com_BrentCrudeOil
   dt_col: dt
   hist_exog_cols:
+  - Idx_DxyUSD
   - GPRD_THREAT
   - GPRD
   - GPRD_ACT
   - Idx_OVX
   - Com_LMEX
   - Com_BloombergCommodity_BCOM
-  - Idx_DxyUSD
   futr_exog_cols: []
   static_exog_cols: []
 training_search:
