@@ -222,7 +222,9 @@ class RetrievalStagePlugin:
         run_root: Path | None,
         params_override: dict[str, Any] | None = None,
         training_override: dict[str, Any] | None = None,
+        fold_idx: int | None = None,
     ) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, Any | None]:
+        del fold_idx
         raise NotImplementedError(
             "retrieval plugin does not own top-level jobs; "
             "prediction is handled by post_predict_fold"

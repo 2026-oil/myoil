@@ -185,6 +185,7 @@ class StagePlugin(Protocol):
         run_root: Path | None,
         params_override: dict[str, Any] | None = None,
         training_override: dict[str, Any] | None = None,
+        fold_idx: int | None = None,
     ) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, Any | None]:
         """Run a plugin-owned top-level fold prediction path."""
         ...

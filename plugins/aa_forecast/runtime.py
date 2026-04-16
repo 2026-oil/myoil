@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,8 @@ from plugins.retrieval.runtime import (
 )
 
 from . import config as _cfg
+
+logger = logging.getLogger(__name__)
 
 _RETRIEVAL_OVERRIDE_KEYS = {
     "top_k",

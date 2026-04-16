@@ -759,6 +759,7 @@ def _fit_and_predict_fold(
     test_idx: list[int],
     params_override: dict[str, Any] | None = None,
     training_override: dict[str, Any] | None = None,
+    fold_idx: int | None = None,
 ) -> tuple[pd.DataFrame, pd.Series, pd.Timestamp, pd.DataFrame, Any | None]:
     effective_loaded = loaded
     dt_col = loaded.config.dataset.dt_col
@@ -775,6 +776,7 @@ def _fit_and_predict_fold(
             run_root=run_root,
             params_override=params_override,
             training_override=training_override,
+            fold_idx=fold_idx,
         )
     stage_result = get_active_stage_plugin(loaded.config)
     if stage_result is not None:
@@ -1221,6 +1223,7 @@ def _main_job_objective(
                     "test_idx": test_idx,
                     "params_override": candidate_params,
                     "training_override": candidate_training_params,
+                    "fold_idx": fold_idx,
                 }
                 (
                     target_predictions,
@@ -3034,6 +3037,7 @@ def _run_single_job(
                     "test_idx": test_idx,
                     "params_override": replay_params_override,
                     "training_override": effective_training_params,
+                    "fold_idx": fold_idx,
                 }
                 if get_active_stage_plugin(loaded.config) is not None:
                     fit_kwargs["run_root"] = run_root

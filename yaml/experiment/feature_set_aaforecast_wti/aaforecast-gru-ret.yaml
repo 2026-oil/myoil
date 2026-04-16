@@ -2,7 +2,7 @@ task:
   name: aaforecast_gru-ret
 dataset:
   path: data/df.csv
-  target_col: Com_BrentCrudeOil
+  target_col: Com_CrudeOil
   dt_col: dt
   hist_exog_cols:
   - GPRD_THREAT
