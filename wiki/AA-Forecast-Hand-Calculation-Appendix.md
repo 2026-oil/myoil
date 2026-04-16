@@ -263,13 +263,574 @@ r_2^{(B)} = \frac{132 - 110}{\max(|110|, \epsilon)} = \frac{22}{110} = 0.20
 
 이 예시는 retrieval가 “과거의 상대 수익률 경로를 현재 scale에 다시 입힌다”는 직관을 설명할 때 반복 사용합니다.
 
+---
+
+## 메모리 뱅크 Retrieval 손계산 — 전체 흐름 예시
+
+이 섹션은 메모리 뱅크 빌드부터 최종 blended prediction까지를 **단계별 손계산**으로 전개합니다.  
+위에서 정의한 공통 toy series와 표기법을 그대로 사용하며, [Retrieval 손계산 완전 해설](Retrieval-Deep-Dive-Hand-Calculation) 페이지의 end-to-end 예시와 숫자가 대응합니다.
+
+### R-0. 이 예시에서 사용하는 config
+
+| 파라미터 | toy 값 | 의미 |
+|---|---|---|
+| `L` (input_size) | `4` | window 길이 |
+| `H` (horizon) | `2` | 예측 horizon |
+| `top_k` | `1` | 검색할 최상위 이웃 수 |
+| `recency_gap_steps` | `0` | toy simplification (repo default=8) |
+| `event_score_threshold` | `1.0` | toy simplification (repo default=400.0) |
+| `min_similarity` | `0.7` | 이웃 최소 유사도 |
+| `use_shape_key` | `false` | shape 유사도 사용 안 함 |
+| `use_event_key` | `true` | event 유사도 사용 |
+| `event_score_log_bonus_alpha` | `0.15` | log bonus 가중치 |
+| `event_score_log_bonus_cap` | `0.1` | log bonus 상한 |
+| `temperature` | `0.1` | softmax temperature |
+| `blend_floor` | `0.0` | blend weight 하한 |
+| `blend_max` | `1.0` | blend weight 상한 |
+| `use_uncertainty_gate` | `true` | horizon별 uncertainty로 blend 조정 여부 |
+
+> [!NOTE]
+> Provenance: `toy simplification`
+>
+> `recency_gap_steps=0`, `event_score_threshold=1.0`은 toy에서 계산 구조를 보이기 위한 축소값입니다.  
+> 실제 repo default는 각각 `8`과 `400.0`입니다.
+
+공통 toy series:
+
+\[
+y = [100, 101, 102, 120, 132, 126, 107, 110, 121, 132]
+\]
+\[
+GPRD\_THREAT = [10, 12, 13, 14, 15, 14, 12, 14, 30, 35]
+\]
+
+---
+
+### R-1. 메모리 뱅크 빌드
+
+**유효 anchor 범위 계산:**
+
+\[
+last\_idx = 9, \quad max\_end\_idx = last\_idx - H - gap = 9 - 2 - 0 = 7
+\]
+
+\[
+\text{유효 } end\_idx \in [L-1,\; max\_end\_idx] = [3,\; 7]
+\]
+
+따라서 anchor 후보: \(i \in \{3, 4, 5, 6, 7\}\), 총 5개.  
+이 예시에서는 설명을 위해 anchor=3 (candidate A)과 anchor=7 (candidate B) 두 개를 중점적으로 사용합니다.
+
+#### candidate A (anchor = 3)
+
+window: \(y[0:4] = [100, 101, 102, 120]\)
+
+**shape_vector 계산** (raw target values를 L2 정규화):
+
+\[
+v^{(A)} = [100, 101, 102, 120]
+\]
+
+\[
+\|v^{(A)}\| = \sqrt{100^2 + 101^2 + 102^2 + 120^2} = \sqrt{10000 + 10201 + 10404 + 14400} = \sqrt{45005} \approx 212.1
+\]
+
+\[
+shape\_vector^{(A)} \approx \left[\frac{100}{212.1},\; \frac{101}{212.1},\; \frac{102}{212.1},\; \frac{120}{212.1}\right] \approx [0.4715,\; 0.4762,\; 0.4809,\; 0.5658]
+\]
+
+**event_vector 및 event_score** (teaching placeholder):  
+GPRD_THREAT for window 0~3 = \([10, 12, 13, 14]\) — 완만한 상승, 큰 잔차 없음.
+
+toy STAR 결과 (단순화):
+```text
+target_critical_mask   (L=4): [0, 0, 0, 0]
+hist_critical_mask     (L=4): [0, 0, 0, 0]
+combined_count                : [0, 0, 0, 0]
+channel_activity (L×2)        : 모두 0
+```
+
+\[
+event\_score^{(A)} = \sum count\_active + \sum |channel\_activity| = 0 + 0 = 0.0
+\]
+
+\(event\_score^{(A)} = 0.0 < threshold = 1.0\) → **candidate A 탈락** (bank에 포함되지 않음).
+
+**anchor value, future values, future returns** (참고용):
+
+\[
+a^{(A)} = y_3 = 120
+\]
+
+\[
+r_1^{(A)} = \frac{y_4 - a^{(A)}}{\max(|a^{(A)}|, \varepsilon)} = \frac{132 - 120}{120} = \frac{12}{120} = 0.10
+\]
+
+\[
+r_2^{(A)} = \frac{y_5 - a^{(A)}}{\max(|a^{(A)}|, \varepsilon)} = \frac{126 - 120}{120} = \frac{6}{120} = 0.05
+\]
+
+#### candidate B (anchor = 7)
+
+window: \(y[4:8] = [132, 126, 107, 110]\)
+
+**shape_vector 계산:**
+
+\[
+v^{(B)} = [132, 126, 107, 110]
+\]
+
+\[
+\|v^{(B)}\| = \sqrt{132^2 + 126^2 + 107^2 + 110^2} = \sqrt{17424 + 15876 + 11449 + 12100} = \sqrt{56849} \approx 238.4
+\]
+
+\[
+shape\_vector^{(B)} \approx \left[\frac{132}{238.4},\; \frac{126}{238.4},\; \frac{107}{238.4},\; \frac{110}{238.4}\right] \approx [0.5537,\; 0.5285,\; 0.4488,\; 0.4614]
+\]
+
+**event_vector 및 event_score** (teaching placeholder):  
+GPRD_THREAT for window 4~7 = \([15, 14, 12, 14]\) — 뚜렷한 이상치 없지만 toy threshold=1.0에서는 통과.
+
+toy STAR 결과 (단순화):
+```text
+target_critical_mask   (L=4): [0, 0, 0, 0]
+hist_critical_mask     (L=4): [0, 0, 0, 0]
+combined_count                : [0, 0, 0, 0]
+channel_activity (L×2)        : 모두 0, 단 마지막 시점 소량 활동
+```
+
+toy에서 `event_score_B ≈ 2.5` (teaching placeholder).
+
+\[
+event\_score^{(B)} = 2.5 \geq threshold = 1.0 \quad \Rightarrow \quad \textbf{candidate B 통과}
+\]
+
+**anchor value, future values, future returns:**
+
+\[
+a^{(B)} = y_7 = 110
+\]
+
+\[
+r_1^{(B)} = \frac{y_8 - a^{(B)}}{\max(|a^{(B)}|, \varepsilon)} = \frac{121 - 110}{110} = \frac{11}{110} = 0.10
+\]
+
+\[
+r_2^{(B)} = \frac{y_9 - a^{(B)}}{\max(|a^{(B)}|, \varepsilon)} = \frac{132 - 110}{110} = \frac{22}{110} = 0.20
+\]
+
+**bank 저장 레코드 (candidate B):**
+
+```text
+{
+  "shape_vector"       : normalize([132, 126, 107, 110]) ≈ [0.5537, 0.5285, 0.4488, 0.4614],
+  "event_vector"       : normalize(event_vector_raw_B)  — L2 정규화 완료,
+  "event_score"        : 2.5,
+  "anchor_target_value": 110,
+  "future_returns"     : [0.10, 0.20],
+}
+```
+
+---
+
+### R-2. Query 빌드
+
+query window = 마지막 \(L=4\)개 행: 인덱스 6~9
+
+\[
+Q = [107, 110, 121, 132], \quad y_T = 132
+\]
+
+**shape_vector 계산:**
+
+\[
+v^{Q} = [107, 110, 121, 132]
+\]
+
+\[
+\|v^{Q}\| = \sqrt{107^2 + 110^2 + 121^2 + 132^2} = \sqrt{11449 + 12100 + 14641 + 17424} = \sqrt{55614} \approx 235.8
+\]
+
+\[
+shape\_vector^{Q} \approx \left[\frac{107}{235.8},\; \frac{110}{235.8},\; \frac{121}{235.8},\; \frac{132}{235.8}\right] \approx [0.4537,\; 0.4665,\; 0.5132,\; 0.5598]
+\]
+
+**event_vector 및 event_score:**  
+query window에서 GPRD_THREAT = \([12, 14, 30, 35]\) — 인덱스 8, 9에 급등.
+
+toy STAR 결과 (단순화):
+
+```text
+target_critical_mask   (L=4, 1-채널): [[0], [0], [0], [1]]
+target_ranking_score   (L=4, 1-채널): [[0], [0], [0], [1.60]]
+target_activity                      : [[0], [0], [0], [1.60]]
+
+hist_critical_mask     (L=4, GPRD_THREAT): [[0], [0], [1], [1]]
+hist_ranking_score     (L=4)             : [[0], [0], [1.40], [1.70]]
+hist_activity                            : [[0], [0], [1.40], [1.70]]
+```
+
+combined_count (= target_count + hist_count):
+
+\[
+combined\_count = [0,\; 0,\; 1,\; 2]
+\]
+
+channel_activity (\(L=4\), 2-채널 = target + GPRD_THREAT):
+
+\[
+channel\_activity = \begin{bmatrix}0 & 0 \\ 0 & 0 \\ 0 & 1.40 \\ 1.60 & 1.70\end{bmatrix}
+\]
+
+event_vector_raw 조립:
+
+```text
+critical_mask_flat  (L=4)     : [0, 0, 1, 1]
+count_active_flat   (L=4)     : [0, 0, 1, 2]
+channel_act_flat    (L*2=8)   : [0, 0, 0, 0, 0, 1.40, 1.60, 1.70]   ← C-order flatten
+activity_sums       (2-채널)  : [1.60, 3.10]
+activity_max        (2-채널)  : [1.60, 1.70]
+```
+
+concat 결과 (길이 = 4+4+8+2+2 = 20):
+
+\[
+event\_vector\_raw^{Q} = [\underbrace{0,0,1,1}_{\text{critical\_mask}},\; \underbrace{0,0,1,2}_{\text{count\_active}},\; \underbrace{0,0,0,0,0,1.40,1.60,1.70}_{\text{channel\_act}},\; \underbrace{1.60,3.10}_{\text{sums}},\; \underbrace{1.60,1.70}_{\text{max}}]
+\]
+
+L2 정규화 후 \(event\_vector^{Q}\) 를 얻는다.
+
+event_score 계산:
+
+\[
+event\_score^{Q} = \sum count\_active + \sum |channel\_activity|
+= (0+0+1+2) + (0+0+1.40+1.60+1.70) = 3 + 4.70 = 7.70
+\]
+
+\(event\_score^{Q} = 7.70 \geq threshold = 1.0\) → **query 통과, retrieval 실행.**
+
+> [!NOTE]
+> Provenance: `toy simplification`
+>
+> 실제 STAR는 LOWESS 트렌드 제거 + 잔차 임계화 기반입니다. 위 ranking_score 숫자는 동작 구조를 설명하기 위한 teaching placeholder입니다.
+
+---
+
+### R-3. Neighbor 검색
+
+**bank 상태:**
+
+| candidate | event_score | shape_vector | future_returns |
+|---|---|---|---|
+| A | 0.0 (탈락) | — | — |
+| B | 2.5 (통과) | normalize([132,126,107,110]) | [0.10, 0.20] |
+
+bank에 남은 후보: **candidate B 단독**.
+
+**similarity 계산 (candidate B vs query):**
+
+`use_shape_key=false`, `use_event_key=true`이므로:
+
+\[
+similarity = event\_component
+\]
+
+**event_score log bonus:**
+
+\[
+log\_bonus = \min\!\left(\max\!\left(\ln\frac{event\_score^{(B)}}{event\_score^{Q}},\; 0\right),\; cap\right) = \min\!\left(\max\!\left(\ln\frac{2.5}{7.70},\; 0\right),\; 0.1\right)
+\]
+
+\[
+\ln\frac{2.5}{7.70} = \ln(0.3247) \approx -1.12 < 0 \quad \Rightarrow \quad \max(-1.12,\; 0) = 0 \quad \Rightarrow \quad log\_bonus = 0
+\]
+
+candidate B의 event_score가 query보다 낮으므로 bonus 없음.
+
+\[
+event\_component = event\_similarity + 0.15 \times 0 = event\_similarity
+\]
+
+**event_similarity** (L2-normalized 벡터의 내적 = cosine similarity):
+
+query와 candidate B의 event_vector는 모두 L2 정규화되어 있으므로:
+
+\[
+event\_similarity = event\_vector^{Q} \cdot event\_vector^{(B)}
+\]
+
+두 window 모두 마지막 1~2 시점에서 이벤트가 집중되는 구조적 유사성이 있음.
+
+toy에서 `event_similarity ≈ 0.82` (teaching placeholder).
+
+\[
+similarity = 0.82
+\]
+
+**min_similarity 필터:**
+
+\[
+0.82 \geq min\_similarity = 0.7 \quad \Rightarrow \quad \text{candidate B 통과}
+\]
+
+scored_neighbors = [B (similarity=0.82)].
+
+---
+
+### R-4. Top-k 선택 및 Softmax 가중치
+
+`top_k=1`이므로 상위 1개만 선택: **candidate B**.
+
+softmax weight 계산:
+
+\[
+\ell_B = \frac{similarity_B}{temperature} = \frac{0.82}{0.1} = 8.2
+\]
+
+후보가 1개뿐이므로 numerical stability 보정 후:
+
+\[
+\ell_B - \max(\ell) = 8.2 - 8.2 = 0
+\]
+
+\[
+w_B = \frac{e^{0}}{e^{0}} = \frac{1}{1} = 1.0
+\]
+
+---
+
+### R-5. Memory Prediction 계산
+
+가중 평균 수익률:
+
+\[
+\bar{r}_h = \sum_i w_i \cdot r_h^{(i)} = 1.0 \times r_h^{(B)}
+\]
+
+\[
+\bar{r}_1 = 1.0 \times 0.10 = 0.10, \quad \bar{r}_2 = 1.0 \times 0.20 = 0.20
+\]
+
+현재 마지막 값 및 scale:
+
+\[
+y_T = 132, \quad scale = \max(|y_T|,\; \varepsilon) = \max(132,\; 10^{-8}) = 132
+\]
+
+memory prediction:
+
+\[
+\hat{y}_1^{mem} = y_T + scale \times \bar{r}_1 = 132 + 132 \times 0.10 = 132 + 13.2 = 145.2
+\]
+
+\[
+\hat{y}_2^{mem} = y_T + scale \times \bar{r}_2 = 132 + 132 \times 0.20 = 132 + 26.4 = 158.4
+\]
+
+\[
+\hat{y}^{mem} = [145.2,\; 158.4]
+\]
+
+---
+
+### R-6. Uncertainty-Gated Blend 및 Final Prediction
+
+**similarity_scale:**
+
+\[
+mean\_similarity = \frac{1}{1} \times 0.82 = 0.82
+\]
+
+\[
+similarity\_scale = \text{clip}(0.82,\; 0,\; 1) = 0.82
+\]
+
+**uncertainty_scale:**
+
+이 예시는 standalone retrieval 경로 (`uncertainty_std=None`):
+
+\[
+uncertainty\_scale = [1.0,\; 1.0]
+\]
+
+AA retrieval 경로 (예: `std_by_horizon = [2.0, 4.0]`)일 경우:
+
+\[
+uncertainty\_scale = \left[\frac{2.0}{4.0},\; \frac{4.0}{4.0}\right] = [0.5,\; 1.0]
+\]
+
+아래는 standalone 경로 기준으로 계속합니다.
+
+**blend weight:**
+
+\[
+\lambda_h = \text{clip}\!\left(\; blend\_floor + (blend\_max - blend\_floor) \times similarity\_scale \times uncertainty\_scale_h,\; blend\_floor,\; blend\_max \right)
+\]
+
+`blend_floor=0`, `blend_max=1`:
+
+\[
+\lambda_1 = \text{clip}(0 + (1-0) \times 0.82 \times 1.0,\; 0,\; 1) = \text{clip}(0.82,\; 0,\; 1) = 0.82
+\]
+
+\[
+\lambda_2 = \text{clip}(0 + (1-0) \times 0.82 \times 1.0,\; 0,\; 1) = 0.82
+\]
+
+**final prediction** (base prediction은 schematic placeholder):
+
+\[
+\hat{y}^{base} = [136,\; 138]
+\]
+
+\[
+\hat{y}_1^{final} = (1 - 0.82) \times 136 + 0.82 \times 145.2 = 0.18 \times 136 + 0.82 \times 145.2 = 24.48 + 119.064 = 143.544
+\]
+
+\[
+\hat{y}_2^{final} = (1 - 0.82) \times 138 + 0.82 \times 158.4 = 0.18 \times 138 + 0.82 \times 158.4 = 24.84 + 129.888 = 154.728
+\]
+
+\[
+\hat{y}^{final} = [143.544,\; 154.728]
+\]
+
+---
+
+### R-7. 전체 단계 요약표
+
+| 단계 | 항목 | h=1 | h=2 |
+|---|---|---|---|
+| R-1 | candidate A event_score | 0.0 (탈락) | — |
+| R-1 | candidate B event_score | 2.5 (통과) | — |
+| R-1 | candidate B future return \(r_h^{(B)}\) | 0.10 | 0.20 |
+| R-2 | query event_score | 7.70 (통과) | — |
+| R-3 | event_similarity (B vs Q) | 0.82 | — |
+| R-3 | log_bonus | 0.0 | — |
+| R-3 | combined similarity | 0.82 (통과) | — |
+| R-4 | softmax weight \(w_B\) | 1.0 | — |
+| R-5 | \(\bar{r}_h\) | 0.10 | 0.20 |
+| R-5 | \(\hat{y}_h^{mem}\) | 145.2 | 158.4 |
+| R-6 | similarity_scale | 0.82 | — |
+| R-6 | uncertainty_scale | 1.0 | 1.0 |
+| R-6 | blend weight \(\lambda_h\) | 0.82 | 0.82 |
+| R-6 | base prediction | 136 | 138 |
+| **R-6** | **final prediction** | **143.544** | **154.728** |
+
+---
+
+### R-8. 변형 시나리오 — top_k=2 (candidate A도 통과할 경우)
+
+candidate A가 threshold를 통과하고, event_similarity(A vs Q) ≈ 0.75라고 가정:
+
+| candidate | similarity |
+|---|---|
+| B | 0.82 |
+| A | 0.75 |
+
+softmax (`temperature=0.1`):
+
+\[
+\ell_B = \frac{0.82}{0.1} = 8.2, \quad \ell_A = \frac{0.75}{0.1} = 7.5
+\]
+
+numerical stability 보정:
+
+\[
+\ell_B - 8.2 = 0, \quad \ell_A - 8.2 = -0.7
+\]
+
+\[
+w_B = \frac{e^0}{e^0 + e^{-0.7}} = \frac{1}{1 + 0.4966} = \frac{1}{1.4966} \approx 0.668
+\]
+
+\[
+w_A = \frac{e^{-0.7}}{1.4966} \approx \frac{0.4966}{1.4966} \approx 0.332
+\]
+
+가중 평균 수익률:
+
+\[
+\bar{r}_1 = 0.668 \times 0.10 + 0.332 \times 0.10 = 0.0668 + 0.0332 = 0.10
+\]
+
+\[
+\bar{r}_2 = 0.668 \times 0.20 + 0.332 \times 0.05 = 0.1336 + 0.0166 = 0.1502
+\]
+
+memory prediction:
+
+\[
+\hat{y}_1^{mem} = 132 + 132 \times 0.10 = 145.2
+\]
+
+\[
+\hat{y}_2^{mem} = 132 + 132 \times 0.1502 = 132 + 19.826 = 151.826
+\]
+
+h=2 memory prediction이 top_k=1 케이스(158.4)보다 낮아집니다. candidate A의 \(r_2^{(A)} = 0.05\)가 candidate B(0.20)보다 훨씬 낮아서 가중 평균이 내려가기 때문입니다.
+
+---
+
+### R-9. 변형 시나리오 — uncertainty gate (AA retrieval 경로)
+
+AA retrieval에서 `std_by_horizon = [2.0, 4.0]`이 넘어온 경우:
+
+\[
+max\_std = 4.0, \quad uncertainty\_scale = \left[\frac{2.0}{4.0},\; \frac{4.0}{4.0}\right] = [0.5,\; 1.0]
+\]
+
+\[
+\lambda_1 = \text{clip}(0.82 \times 0.5,\; 0,\; 1) = 0.41
+\]
+
+\[
+\lambda_2 = \text{clip}(0.82 \times 1.0,\; 0,\; 1) = 0.82
+\]
+
+uncertainty가 작은 h=1에는 retrieval이 적게 반영되고, uncertainty가 큰 h=2에는 더 많이 반영됩니다. "모델이 자신 없는 horizon일수록 과거 기억에 더 의존"하는 설계입니다.
+
+base prediction \(\hat{y}^{base} = [136,\; 138]\) 기준:
+
+\[
+\hat{y}_1^{final} = (1 - 0.41) \times 136 + 0.41 \times 145.2 = 0.59 \times 136 + 0.41 \times 145.2 = 80.24 + 59.532 = 139.772
+\]
+
+\[
+\hat{y}_2^{final} = (1 - 0.82) \times 138 + 0.82 \times 158.4 = 24.84 + 129.888 = 154.728
+\]
+
+---
+
+### R-10. 자주 헷갈리는 포인트
+
+| 질문 | 답 |
+|---|---|
+| shape_vector는 z-score인가? | 아니다. raw target 값을 **L2 정규화**한 것이다. z-score가 아니다. |
+| event_vector는 STAR 잔차 그 자체인가? | 아니다. `ranking_score × critical_mask`를 여러 통계(합, 최댓값 등)와 concat해 L2 정규화한 것이다. |
+| event_score threshold는 query에도 적용되나? | 그렇다. query의 event_score가 threshold 미만이면 retrieval 전체가 skip된다. |
+| recency_gap_steps는 무엇을 막는가? | 최근 N스텝을 bank에서 제외해 query와 지나치게 가까운 시점이 neighbor로 선택되는 것을 막는다. |
+| log bonus는 언제 0인가? | candidate event_score ≤ query event_score일 때 (ln ≤ 0 → clamp to 0). |
+| standalone vs AA retrieval의 blend 차이는? | standalone은 `uncertainty_std=None` → `uncertainty_scale=1.0`. AA는 dropout 샘플 std를 horizon별로 사용해 scale이 달라진다. |
+| future return의 분모는 무엇인가? | `max(|anchor_value|, ε)` — 0에 가까운 anchor에 대한 수치 안정화 장치다. |
+| 메모리 예측의 기준점은 무엇인가? | `current_last_y = y_T` — raw train_df 마지막 타깃값. transformed 값이 아니다. |
+
+---
+
 ## 소스 앵커
 
-Source: `plugins/retrieval/runtime.py:31-71`, `plugins/retrieval/runtime.py:123-235`, `plugins/retrieval/runtime.py:248-281`, `plugins/aa_forecast/runtime.py:1110-1196`, `plugins/aa_forecast/runtime.py:1439-1496`, `yaml/plugins/retrieval/baseline_retrieval.yaml:1-27`
+- `plugins/retrieval/signatures.py:22-124`
+- `plugins/retrieval/runtime.py:31-71`
+- `plugins/retrieval/runtime.py:123-235`
+- `plugins/retrieval/runtime.py:248-281`
+- `plugins/aa_forecast/runtime.py:1110-1196`
+- `plugins/aa_forecast/runtime.py:1439-1496`
+- `yaml/plugins/retrieval/baseline_retrieval.yaml:1-27`
 
 ## 관련 페이지
 
 - [AA-Forecast 손계산 패키지 허브](AA-Forecast-Hand-Calculation-Hub)
+- [Retrieval 손계산 완전 해설](Retrieval-Deep-Dive-Hand-Calculation)
 - [AA-Forecast 베이스라인 + Retrieval](AA-Forecast-Baseline-Retrieval)
 - [AA-Forecast + GRU + Retrieval](AA-Forecast-GRU-Retrieval)
 - [AA-Forecast + Informer + Retrieval](AA-Forecast-Informer-Retrieval)
