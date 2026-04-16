@@ -9,11 +9,9 @@ configs=(
   "yaml/experiment/feature_set_aaforecast_dubai/baseline-ret.yaml"
   "yaml/experiment/feature_set_aaforecast_dubai/aaforecast-informer-ret.yaml"
   "yaml/experiment/feature_set_aaforecast_dubai/aaforecast-gru-ret.yaml"
-  "yaml/experiment/feature_set_aaforecast_dubai/aaforecast-patchtst-ret.yaml"
   "yaml/experiment/feature_set_aaforecast_dubai/aaforecast-timexer-ret.yaml"
   "yaml/experiment/feature_set_aaforecast_dubai/aaforecast-informer.yaml"
   "yaml/experiment/feature_set_aaforecast_dubai/aaforecast-gru.yaml"
-  "yaml/experiment/feature_set_aaforecast_dubai/aaforecast-patchtst.yaml"
   "yaml/experiment/feature_set_aaforecast_dubai/aaforecast-timexer.yaml"
 )
 
