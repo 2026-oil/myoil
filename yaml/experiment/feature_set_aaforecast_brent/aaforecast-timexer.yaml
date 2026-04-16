@@ -19,6 +19,3 @@ training_search:
 aa_forecast:
   enabled: true
   config_path: yaml/plugins/aa_forecast/aa_forecast_timexer.yaml
-retrieval:
-  enabled: false
-

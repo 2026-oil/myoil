@@ -7,7 +7,7 @@ aa_forecast:
     enabled: true
     sample_count: 50
   model_params:
-    hidden_size: 256
+    hidden_size: 128
     n_head: 8
     encoder_layers: 2
     dropout: 0.1
