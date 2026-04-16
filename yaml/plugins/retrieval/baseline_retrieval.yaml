@@ -13,7 +13,7 @@ retrieval:
   top_k: 1
   recency_gap_steps: 8
   trigger_quantile: 0.8
-  min_similarity: 0.7
+  min_similarity: 0.5
   similarity: cosine
   temperature: 0.1
   blend_floor: 0.0
