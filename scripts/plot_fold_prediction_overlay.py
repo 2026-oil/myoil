@@ -1,4 +1,4 @@
-"""Overlay y_hat from many completed runs, one PNG per CV fold.
+"""Overlay y_hat from many completed runs.
 
 Reads per-run forecasts from either:
   - ``<run_root>/summary/folds/fold_*/predictions.csv`` (preferred), or
@@ -18,6 +18,11 @@ Examples:
     --run-dir runs/some_task_run_1 \\
     --run-dir runs/some_task_run_2 \\
     --output-dir runs/_compare_two
+
+  uv run python scripts/plot_fold_prediction_overlay.py \\
+    --continuous \\
+    --runs-glob 'runs/raw/feature_set_aaforecast_aaforecast*-ret' \\
+    --output-dir runs/raw/_ret_continuous_overlay
 """
 
 from __future__ import annotations
@@ -30,6 +35,10 @@ from typing import Iterable
 import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+import runtime_support.runner as runtime  # noqa: E402
 
 
 def _forecast_job_roots(run_root: Path) -> list[Path]:
@@ -179,18 +188,454 @@ def _filter_model(frame: pd.DataFrame, model: str | None) -> pd.DataFrame:
     return frame[frame["model"] == model].copy()
 
 
+def _display_label_from_run_id(run_id: str) -> str:
+    prefix = "feature_set_aaforecast_aaforecast_"
+    normalized = run_id
+    if normalized.startswith(prefix):
+        normalized = normalized.removeprefix(prefix)
+    pieces = normalized.split("-")
+    backbone = pieces[0].upper()
+    suffix = " RET" if "ret" in pieces[1:] else ""
+    return f"{backbone}{suffix}"
+
+
+def _annotate_series_identity(frame: pd.DataFrame, *, run_id: str) -> pd.DataFrame:
+    annotated = frame.copy()
+    normalized_run_id = run_id.lower()
+    if normalized_run_id.startswith("feature_set_aaforecast_aaforecast_"):
+        annotated["series_id"] = run_id
+        annotated["display_label"] = f"AAForecast {_display_label_from_run_id(run_id)}"
+        return annotated
+
+    model_values = (
+        annotated["model"].astype(str)
+        if "model" in annotated.columns
+        else pd.Series(["prediction"] * len(annotated), index=annotated.index)
+    )
+    family_label = "Baseline" if "baseline" in normalized_run_id else run_id
+    suffix = " RET" if "-ret" in normalized_run_id else ""
+    annotated["series_id"] = run_id + "::" + model_values
+    annotated["display_label"] = family_label + " " + model_values + suffix
+    return annotated
+
+
+def _normalize_timestamp_series(series: pd.Series) -> pd.Series:
+    return pd.Series(pd.to_datetime(series, errors="coerce")).map(
+        runtime._normalize_summary_timestamp
+    )
+
+
+def _connected_plot_frame(
+    anchor_frame: pd.DataFrame,
+    frame: pd.DataFrame,
+    *,
+    value_col: str,
+) -> pd.DataFrame:
+    plot_frame = frame[["ds", value_col]].copy()
+    plot_frame["ds"] = pd.to_datetime(plot_frame["ds"], errors="coerce")
+    plot_frame[value_col] = pd.to_numeric(plot_frame[value_col], errors="coerce")
+    plot_frame = plot_frame.dropna(subset=["ds", value_col]).reset_index(drop=True)
+    if anchor_frame.empty or plot_frame.empty:
+        return plot_frame
+    anchor = anchor_frame.rename(columns={"y": value_col})
+    return pd.concat([anchor, plot_frame], ignore_index=True)
+
+
+def _frame_signature(frame: pd.DataFrame) -> tuple[tuple[str, float | None], ...]:
+    normalized = frame.copy()
+    normalized["ds"] = pd.to_datetime(normalized["ds"], errors="coerce")
+    normalized["y"] = pd.to_numeric(normalized["y"], errors="coerce")
+    normalized = normalized.dropna(subset=["ds"]).reset_index(drop=True)
+    return tuple(
+        (
+            pd.Timestamp(ds).isoformat(),
+            None if pd.isna(y) else float(y),
+        )
+        for ds, y in zip(normalized["ds"], normalized["y"], strict=True)
+    )
+
+
+def _validate_fold_alignment(fold_frame: pd.DataFrame, fold_idx: int) -> None:
+    train_end_values = (
+        pd.Series(fold_frame.get("train_end_ds"))
+        .dropna()
+        .pipe(_normalize_timestamp_series)
+        .dropna()
+        .drop_duplicates()
+    )
+    if len(train_end_values) > 1:
+        values = ", ".join(pd.Timestamp(value).date().isoformat() for value in train_end_values)
+        raise ValueError(
+            f"Fold {fold_idx:03d} has inconsistent train_end_ds values across runs: {values}"
+        )
+
+
+def _resolve_actual_frames_for_fold(
+    fold_frame: pd.DataFrame,
+    *,
+    fold_idx: int,
+    history_steps_override: int | None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    _validate_fold_alignment(fold_frame, fold_idx)
+    reference_input = pd.DataFrame()
+    reference_output = pd.DataFrame()
+    resolved = False
+    for run_root_text in fold_frame["run_root"].drop_duplicates().tolist():
+        run_root = Path(str(run_root_text))
+        run_frame = fold_frame[fold_frame["run_root"] == run_root_text].copy()
+        input_actual_frame, output_actual_frame = runtime._summary_overlay_actual_frames(
+            run_root,
+            run_frame,
+            history_steps_override=history_steps_override,
+        )
+        if input_actual_frame.empty and output_actual_frame.empty:
+            continue
+        if not resolved:
+            reference_input = input_actual_frame.reset_index(drop=True)
+            reference_output = output_actual_frame.reset_index(drop=True)
+            resolved = True
+            continue
+        if _frame_signature(reference_input) != _frame_signature(input_actual_frame):
+            raise ValueError(
+                f"Fold {fold_idx:03d} has inconsistent input actual series across runs"
+            )
+        if _frame_signature(reference_output) != _frame_signature(output_actual_frame):
+            raise ValueError(
+                f"Fold {fold_idx:03d} has inconsistent output actual series across runs"
+            )
+    if not resolved:
+        raise ValueError(
+            f"Fold {fold_idx:03d} could not restore input/output actual frames from the selected runs"
+        )
+    return reference_input, reference_output
+
+
+def _load_shared_actual_series(run_roots: Iterable[Path]) -> pd.DataFrame:
+    dataset_signature: tuple[str, str, str] | None = None
+    actual_series = pd.DataFrame()
+    for run_root in run_roots:
+        loaded = runtime._load_summary_loaded_config(run_root)
+        candidate_signature = (
+            str(Path(loaded.config.dataset.path).resolve()),
+            loaded.config.dataset.dt_col,
+            loaded.config.dataset.target_col,
+        )
+        if dataset_signature is None:
+            dataset_signature = candidate_signature
+            dataset_path, dt_col, target_col = candidate_signature
+            source_df = pd.read_csv(dataset_path)
+            if source_df.empty:
+                raise ValueError(f"Shared dataset is empty: {dataset_path}")
+            actual_series = (
+                source_df[[dt_col, target_col]]
+                .rename(columns={dt_col: "ds", target_col: "y"})
+                .copy()
+            )
+            actual_series["ds"] = pd.to_datetime(actual_series["ds"], errors="coerce")
+            actual_series["y"] = pd.to_numeric(actual_series["y"], errors="coerce")
+            actual_series = (
+                actual_series.dropna(subset=["ds", "y"])
+                .drop_duplicates(subset=["ds"])
+                .sort_values("ds", kind="stable")
+                .reset_index(drop=True)
+            )
+            continue
+        if candidate_signature != dataset_signature:
+            raise ValueError(
+                "Continuous overlay requires all runs to share one dataset path, dt_col, and target_col"
+            )
+    if dataset_signature is None or actual_series.empty:
+        raise ValueError("Continuous overlay could not resolve a shared actual series")
+    return actual_series
+
+
+def _collect_fold_boundaries(combined: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+    for fold_idx in sorted(combined["fold_idx"].dropna().unique()):
+        fold_frame = combined[combined["fold_idx"] == fold_idx].copy()
+        _validate_fold_alignment(fold_frame, int(fold_idx))
+        boundary_values = (
+            pd.Series(fold_frame["train_end_ds"])
+            .dropna()
+            .pipe(_normalize_timestamp_series)
+            .dropna()
+            .drop_duplicates()
+        )
+        if len(boundary_values) != 1:
+            raise ValueError(
+                f"Continuous overlay requires a single train_end_ds per fold; fold={int(fold_idx):03d}"
+            )
+        rows.append(
+            {
+                "fold_idx": int(fold_idx),
+                "train_end_ds": pd.Timestamp(boundary_values.iloc[0]),
+            }
+        )
+    return pd.DataFrame(rows).sort_values("fold_idx", kind="stable").reset_index(drop=True)
+
+
+def _plot_single_fold_overlay(
+    fold_frame: pd.DataFrame,
+    *,
+    input_actual_frame: pd.DataFrame,
+    output_actual_frame: pd.DataFrame,
+    output_path: Path,
+    title: str,
+    show_mean_band: bool,
+    alpha_per_run: float,
+) -> Path:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    actual_anchor_frame = (
+        input_actual_frame.tail(1)[["ds", "y"]].copy()
+        if not input_actual_frame.empty
+        else pd.DataFrame(columns=["ds", "y"])
+    )
+
+    if not input_actual_frame.empty:
+        ax.plot(
+            input_actual_frame["ds"],
+            input_actual_frame["y"],
+            label="actual (input)",
+            linewidth=2.0,
+            color="black",
+        )
+    if not output_actual_frame.empty and output_actual_frame["y"].notna().any():
+        observed_output = _connected_plot_frame(
+            actual_anchor_frame,
+            output_actual_frame,
+            value_col="y",
+        )
+        ax.plot(
+            observed_output["ds"],
+            observed_output["y"],
+            label="actual (output)",
+            linewidth=1.8,
+            linestyle="--",
+            color="dimgray",
+        )
+
+    plot_frame = fold_frame.copy()
+    plot_frame["ds"] = pd.to_datetime(plot_frame["ds"], errors="coerce")
+    if "series_id" not in plot_frame.columns:
+        plot_frame["series_id"] = plot_frame["run_id"]
+    if "display_label" not in plot_frame.columns:
+        plot_frame["display_label"] = plot_frame["run_id"]
+    series_ids = plot_frame["series_id"].drop_duplicates().tolist()
+    for series_id in series_ids:
+        part = (
+            plot_frame[plot_frame["series_id"] == series_id]
+            .sort_values(["ds", "horizon_step"], kind="stable")
+            .reset_index(drop=True)
+        )
+        if "y" in part.columns:
+            part = part[part["y"].notna()].reset_index(drop=True)
+        if part.empty:
+            continue
+        connected_model_frame = _connected_plot_frame(
+            actual_anchor_frame,
+            part,
+            value_col="y_hat",
+        )
+        if connected_model_frame.empty:
+            continue
+        prediction_point_indices = list(range(1, len(connected_model_frame)))
+        ax.plot(
+            connected_model_frame["ds"],
+            connected_model_frame["y_hat"],
+            label=str(part["display_label"].iloc[0]),
+            linewidth=1.6,
+            alpha=alpha_per_run,
+            marker="o",
+            markersize=4,
+            markevery=prediction_point_indices if prediction_point_indices else None,
+        )
+
+    if show_mean_band and len(series_ids) > 1:
+        group_keys = ["ds"]
+        if "horizon_step" in plot_frame.columns:
+            group_keys.append("horizon_step")
+        stats = (
+            plot_frame.groupby(group_keys, sort=False)["y_hat"]
+            .agg(["mean", "std"])
+            .reset_index()
+            .sort_values(group_keys, kind="stable")
+        )
+        stats["ds"] = pd.to_datetime(stats["ds"], errors="coerce")
+        mean_hat = pd.to_numeric(stats["mean"], errors="coerce")
+        std_hat = pd.to_numeric(stats["std"], errors="coerce").fillna(0.0)
+        ax.plot(
+            stats["ds"],
+            mean_hat,
+            color="darkred",
+            linewidth=2.0,
+            label="mean y_hat",
+            zorder=4,
+        )
+        ax.fill_between(
+            stats["ds"],
+            mean_hat - std_hat,
+            mean_hat + std_hat,
+            color="darkred",
+            alpha=0.12,
+            label="±1 std (y_hat)",
+        )
+
+    ax.set_title(title)
+    ax.set_xlabel("ds")
+    ax.set_ylabel("y")
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="best", fontsize=8)
+    fig.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+    return output_path
+
+
+def _plot_continuous_overlay(
+    combined: pd.DataFrame,
+    *,
+    actual_series: pd.DataFrame,
+    fold_boundaries: pd.DataFrame,
+    output_path: Path,
+    title: str,
+    show_mean_band: bool,
+    alpha_per_run: float,
+    x_start: str | None = None,
+    x_end: str | None = None,
+) -> Path:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(14, 6))
+    ax.plot(
+        actual_series["ds"],
+        actual_series["y"],
+        label="actual",
+        linewidth=2.0,
+        color="black",
+        zorder=1,
+    )
+
+    plot_frame = combined.copy()
+    plot_frame["ds"] = pd.to_datetime(plot_frame["ds"], errors="coerce")
+    plot_frame["train_end_ds"] = _normalize_timestamp_series(plot_frame["train_end_ds"])
+    plot_frame = plot_frame.dropna(subset=["ds", "y_hat", "train_end_ds"]).copy()
+    if "series_id" not in plot_frame.columns:
+        plot_frame["series_id"] = plot_frame["run_id"]
+    if "display_label" not in plot_frame.columns:
+        plot_frame["display_label"] = plot_frame["run_id"]
+
+    for series_id in plot_frame["series_id"].drop_duplicates().tolist():
+        run_frame = plot_frame[plot_frame["series_id"] == series_id].copy()
+        label = str(run_frame["display_label"].iloc[0])
+        first_segment = True
+        for fold_idx in sorted(run_frame["fold_idx"].dropna().unique()):
+            segment = (
+                run_frame[run_frame["fold_idx"] == fold_idx]
+                .sort_values(["ds", "horizon_step"], kind="stable")
+                .reset_index(drop=True)
+            )
+            if segment.empty:
+                continue
+            ax.plot(
+                segment["ds"],
+                pd.to_numeric(segment["y_hat"], errors="coerce"),
+                label=label if first_segment else "_nolegend_",
+                linewidth=1.8,
+                alpha=alpha_per_run,
+                marker="o",
+                markersize=4,
+                zorder=3,
+            )
+            first_segment = False
+
+    if show_mean_band and plot_frame["series_id"].nunique() > 1:
+        group_keys = ["ds"]
+        if "horizon_step" in plot_frame.columns:
+            group_keys.append("horizon_step")
+        stats = (
+            plot_frame.groupby(group_keys, sort=False)["y_hat"]
+            .agg(["mean", "std"])
+            .reset_index()
+            .sort_values(group_keys, kind="stable")
+        )
+        stats["ds"] = pd.to_datetime(stats["ds"], errors="coerce")
+        mean_hat = pd.to_numeric(stats["mean"], errors="coerce")
+        std_hat = pd.to_numeric(stats["std"], errors="coerce").fillna(0.0)
+        ax.plot(
+            stats["ds"],
+            mean_hat,
+            color="darkred",
+            linewidth=2.0,
+            label="mean y_hat",
+            zorder=4,
+        )
+        ax.fill_between(
+            stats["ds"],
+            mean_hat - std_hat,
+            mean_hat + std_hat,
+            color="darkred",
+            alpha=0.12,
+            label="±1 std (y_hat)",
+        )
+
+    for boundary in fold_boundaries["train_end_ds"].tolist():
+        ax.axvline(
+            pd.Timestamp(boundary),
+            color="grey",
+            linestyle=":",
+            linewidth=1.0,
+            alpha=0.75,
+        )
+
+    xlim_kwargs: dict[str, pd.Timestamp] = {}
+    if x_start is not None:
+        requested_start = pd.Timestamp(x_start)
+        candidate_dates = list(
+            actual_series.loc[actual_series["ds"] >= requested_start, "ds"].tolist()
+        )
+        candidate_dates.extend(
+            plot_frame.loc[plot_frame["ds"] >= requested_start, "ds"].tolist()
+        )
+        effective_start = (
+            min(pd.Timestamp(value) for value in candidate_dates)
+            if candidate_dates
+            else requested_start
+        )
+        xlim_kwargs["left"] = effective_start
+    if x_end is not None:
+        xlim_kwargs["right"] = pd.Timestamp(x_end)
+    if xlim_kwargs:
+        ax.set_xlim(**xlim_kwargs)
+
+    ax.set_title(title)
+    ax.set_xlabel("ds")
+    ax.set_ylabel("y")
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="best", fontsize=8)
+    fig.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+    return output_path
+
+
 def plot_folds(
     combined: pd.DataFrame,
     output_dir: Path,
     *,
     show_mean_band: bool,
     alpha_per_run: float,
+    window_history_steps: int | None,
 ) -> list[Path]:
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
     output_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
     for fold_idx in sorted(combined["fold_idx"].unique()):
@@ -198,90 +643,72 @@ def plot_folds(
         if sub.empty:
             continue
         sub["ds"] = pd.to_datetime(sub["ds"], errors="coerce")
+        if "horizon_step" not in sub.columns:
+            sub["horizon_step"] = 0
         sub = sub.dropna(subset=["ds", "y_hat"])
         if sub.empty:
             continue
-
-        fig, ax = plt.subplots(figsize=(12, 5))
         run_ids = sorted(sub["run_id"].unique())
         n_runs = len(run_ids)
-
-        # Actual y: should match across runs for same (ds, [horizon_step]); take first non-null
-        y_keys = ["ds"]
-        if "horizon_step" in sub.columns:
-            y_keys.append("horizon_step")
-        if "y" in sub.columns:
-            y_ref = (
-                sub.groupby(y_keys, sort=False)["y"]
-                .first()
-                .reset_index()
-                .sort_values(y_keys, kind="stable")
-            )
-            y_ref["ds"] = pd.to_datetime(y_ref["ds"], errors="coerce")
-        else:
-            y_ref = pd.DataFrame(columns=y_keys + ["y"])
-        if "y" in y_ref.columns and not y_ref["y"].isna().all():
-            ax.plot(
-                y_ref["ds"],
-                pd.to_numeric(y_ref["y"], errors="coerce"),
-                color="black",
-                linewidth=2.2,
-                label="y (actual)",
-                zorder=5,
-            )
-
-        for run_id in run_ids:
-            part = sub[sub["run_id"] == run_id].sort_values("ds", kind="stable")
-            ax.plot(
-                part["ds"],
-                pd.to_numeric(part["y_hat"], errors="coerce"),
-                color="C0",
-                alpha=alpha_per_run,
-                linewidth=0.9,
-                zorder=1,
-            )
-
-        if show_mean_band and n_runs > 1:
-            group_keys = ["ds"]
-            if "horizon_step" in sub.columns:
-                group_keys.append("horizon_step")
-            g = sub.groupby(group_keys, sort=False)["y_hat"].agg(["mean", "std"]).reset_index()
-            g["ds"] = pd.to_datetime(g["ds"])
-            g = g.sort_values(group_keys, kind="stable")
-            mean_hat = pd.to_numeric(g["mean"], errors="coerce")
-            std_hat = pd.to_numeric(g["std"], errors="coerce").fillna(0.0)
-            ax.plot(
-                g["ds"],
-                mean_hat,
-                color="darkred",
-                linewidth=2.0,
-                label="mean y_hat",
-                zorder=4,
-            )
-            ax.fill_between(
-                g["ds"],
-                mean_hat - std_hat,
-                mean_hat + std_hat,
-                color="darkred",
-                alpha=0.12,
-                label="±1 std (y_hat)",
-            )
-
-        ax.set_title(
-            f"Fold {int(fold_idx):03d} — {n_runs} runs, y_hat overlay (alpha={alpha_per_run})"
+        input_actual_frame, output_actual_frame = _resolve_actual_frames_for_fold(
+            sub,
+            fold_idx=int(fold_idx),
+            history_steps_override=None,
         )
-        ax.set_xlabel("ds")
-        ax.set_ylabel("value")
-        ax.grid(True, alpha=0.3)
-        has_y_plot = "y" in y_ref.columns and not y_ref["y"].isna().all()
-        if show_mean_band or has_y_plot:
-            ax.legend(loc="best", fontsize=8)
-        fig.tight_layout()
-        out_path = output_dir / f"fold_{int(fold_idx):03d}_predictions_overlay.png"
-        fig.savefig(out_path, dpi=150)
-        plt.close(fig)
+        out_path = _plot_single_fold_overlay(
+            sub,
+            input_actual_frame=input_actual_frame,
+            output_actual_frame=output_actual_frame,
+            output_path=output_dir / f"fold_{int(fold_idx):03d}_predictions_overlay.png",
+            title=f"Fold {int(fold_idx):03d} — {n_runs} runs",
+            show_mean_band=show_mean_band,
+            alpha_per_run=alpha_per_run,
+        )
         written.append(out_path)
+
+        if window_history_steps is not None and int(window_history_steps) > 0:
+            input_window_frame, output_window_frame = _resolve_actual_frames_for_fold(
+                sub,
+                fold_idx=int(fold_idx),
+                history_steps_override=int(window_history_steps),
+            )
+            window_path = _plot_single_fold_overlay(
+                sub,
+                input_actual_frame=input_window_frame,
+                output_actual_frame=output_window_frame,
+                output_path=output_dir
+                / f"fold_{int(fold_idx):03d}_predictions_overlay_window_{int(window_history_steps)}.png",
+                title=f"Fold {int(fold_idx):03d} — {n_runs} runs (input last {int(window_history_steps)})",
+                show_mean_band=show_mean_band,
+                alpha_per_run=alpha_per_run,
+            )
+            written.append(window_path)
     return written
+
+
+def plot_continuous_series(
+    combined: pd.DataFrame,
+    *,
+    run_roots: Iterable[Path],
+    output_path: Path,
+    show_mean_band: bool,
+    alpha_per_run: float,
+    x_start: str | None = None,
+    x_end: str | None = None,
+) -> Path:
+    actual_series = _load_shared_actual_series(run_roots)
+    fold_boundaries = _collect_fold_boundaries(combined)
+    return _plot_continuous_overlay(
+        combined,
+        actual_series=actual_series,
+        fold_boundaries=fold_boundaries,
+        output_path=output_path,
+        title=f"Continuous forecast overlay across {combined['run_id'].nunique()} runs",
+        show_mean_band=show_mean_band,
+        alpha_per_run=alpha_per_run,
+        x_start=x_start,
+        x_end=x_end,
+    )
 
 
 def main() -> None:
@@ -330,8 +757,29 @@ def main() -> None:
     parser.add_argument(
         "--alpha",
         type=float,
-        default=0.08,
-        help="Line alpha for each run's y_hat (default: 0.08).",
+        default=0.9,
+        help="Line alpha for each run's y_hat (default: 0.9).",
+    )
+    parser.add_argument(
+        "--window-history-steps",
+        type=int,
+        default=16,
+        help="Also render a second variant with this many input history steps (default: 16). Use 0 to disable.",
+    )
+    parser.add_argument(
+        "--continuous",
+        action="store_true",
+        help="Write one real-date continuous overlay across all folds instead of per-fold figures.",
+    )
+    parser.add_argument(
+        "--x-start",
+        default=None,
+        help="Optional left x-axis bound for continuous plots, e.g. 2025-08-15.",
+    )
+    parser.add_argument(
+        "--x-end",
+        default=None,
+        help="Optional right x-axis bound for continuous plots, e.g. 2026-03-09.",
     )
     args = parser.parse_args()
 
@@ -364,6 +812,8 @@ def main() -> None:
             continue
         part = part.copy()
         part["run_id"] = run_root.name
+        part["run_root"] = str(run_root.resolve())
+        part = _annotate_series_identity(part, run_id=run_root.name)
         frames.append(part)
 
     if not frames:
@@ -389,17 +839,34 @@ def main() -> None:
         if args.output_dir.is_absolute()
         else (REPO_ROOT / args.output_dir).resolve()
     )
-    paths = plot_folds(
-        combined,
-        out_dir,
-        show_mean_band=args.mean_band,
-        alpha_per_run=args.alpha,
-    )
-    print(f"Wrote {len(paths)} figure(s) under {out_dir}")
-    for p in paths[:12]:
-        print(f"  {p}")
-    if len(paths) > 12:
-        print(f"  ... and {len(paths) - 12} more")
+    if args.continuous:
+        output_path = out_dir / "all_folds_continuous_overlay.png"
+        path = plot_continuous_series(
+            combined,
+            run_roots=run_roots,
+            output_path=output_path,
+            show_mean_band=args.mean_band,
+            alpha_per_run=args.alpha,
+            x_start=args.x_start,
+            x_end=args.x_end,
+        )
+        print(f"Wrote 1 figure under {out_dir}")
+        print(f"  {path}")
+    else:
+        paths = plot_folds(
+            combined,
+            out_dir,
+            show_mean_band=args.mean_band,
+            alpha_per_run=args.alpha,
+            window_history_steps=(
+                None if args.window_history_steps <= 0 else args.window_history_steps
+            ),
+        )
+        print(f"Wrote {len(paths)} figure(s) under {out_dir}")
+        for p in paths[:12]:
+            print(f"  {p}")
+        if len(paths) > 12:
+            print(f"  ... and {len(paths) - 12} more")
     if skipped:
         print("Skipped:", file=sys.stderr)
         for line in skipped:

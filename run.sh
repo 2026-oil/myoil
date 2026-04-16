@@ -4,7 +4,7 @@ set -uo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$repo_root"
 
-timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+timestamp="${NF_CASE_TIMESTAMP:-$(date -u +%Y%m%dT%H%M%SZ)}"
 log_root="${NF_CASE_LOG_ROOT:-runs/_batch_logs}"
 log_dir="${log_root}/${timestamp}"
 mkdir -p "$log_dir"
