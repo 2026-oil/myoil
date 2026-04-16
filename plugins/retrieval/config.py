@@ -26,7 +26,6 @@ RETRIEVAL_PLUGIN_DETAIL_KEYS = {
     "blend_floor",
     "blend_max",
     "use_uncertainty_gate",
-    "use_shape_key",
     "use_event_key",
     "event_score_log_bonus_alpha",
     "event_score_log_bonus_cap",
@@ -74,7 +73,6 @@ class RetrievalConfig:
     similarity: str = "cosine"
     temperature: float = 0.10
     memory_value_mode: str = "future_return"
-    use_shape_key: bool = True
     use_event_key: bool = True
     blend_floor: float = 0.0
     event_score_log_bonus_alpha: float = 0.0
@@ -305,20 +303,13 @@ def _normalize_retrieval_config(
         field_name=f"{section}.use_uncertainty_gate",
         default=defaults.use_uncertainty_gate,
     )
-    use_shape_key = coerce_bool(
-        payload.get("use_shape_key", defaults.use_shape_key),
-        field_name=f"{section}.use_shape_key",
-        default=defaults.use_shape_key,
-    )
     use_event_key = coerce_bool(
         payload.get("use_event_key", defaults.use_event_key),
         field_name=f"{section}.use_event_key",
         default=defaults.use_event_key,
     )
-    if not (use_shape_key or use_event_key):
-        raise ValueError(
-            f"{section}: at least one of use_shape_key or use_event_key must be true"
-        )
+    if not use_event_key:
+        raise ValueError(f"{section}.use_event_key must be true (event-only retrieval)")
 
     event_score_log_bonus_alpha = _coerce_non_negative_float(
         payload.get("event_score_log_bonus_alpha", defaults.event_score_log_bonus_alpha),
@@ -343,7 +334,6 @@ def _normalize_retrieval_config(
         temperature=temperature,
         memory_value_mode=memory_value_mode,
         use_uncertainty_gate=use_uncertainty_gate,
-        use_shape_key=use_shape_key,
         use_event_key=use_event_key,
         event_score_log_bonus_alpha=event_score_log_bonus_alpha,
         event_score_log_bonus_cap=event_score_log_bonus_cap,
@@ -401,6 +391,7 @@ def normalize_retrieval_plugin_config(
         unknown_keys(raw, allowed=RETRIEVAL_PLUGIN_TOP_KEYS, section="retrieval")
         return RetrievalPluginConfig(enabled=True, config_path=config_path)
 
+    raw.pop("use_shape_key", None)
     unknown_keys(raw, allowed=RETRIEVAL_PLUGIN_DETAIL_KEYS, section="retrieval")
 
     star_cfg = _normalize_star_config(
@@ -443,6 +434,7 @@ def normalize_retrieval_detail_payload(
     if not isinstance(retrieval_section, dict):
         raise ValueError("retrieval plugin config 'retrieval' must be a mapping")
     raw = dict(retrieval_section)
+    raw.pop("use_shape_key", None)
     unknown_keys(raw, allowed=RETRIEVAL_PLUGIN_DETAIL_KEYS, section="retrieval")
 
     star_cfg = _normalize_star_config(
@@ -499,7 +491,6 @@ def retrieval_config_to_dict(cfg: RetrievalPluginConfig) -> dict[str, Any]:
         "blend_floor": r.blend_floor,
         "blend_max": r.blend_max,
         "use_uncertainty_gate": r.use_uncertainty_gate,
-        "use_shape_key": r.use_shape_key,
         "use_event_key": r.use_event_key,
         "event_score_log_bonus_alpha": r.event_score_log_bonus_alpha,
         "event_score_log_bonus_cap": r.event_score_log_bonus_cap,

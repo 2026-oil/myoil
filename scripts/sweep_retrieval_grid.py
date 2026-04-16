@@ -24,8 +24,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 GRID: dict[str, list[Any]] = {
     "use_uncertainty_gate": [True, False],
-    "use_shape_key": [True, False],
-    "use_event_key": [True, False],
     "top_k": [1, 3, 5],
     "recency_gap_steps": [4, 8, 16],
     "trigger_quantile": [0.7, 0.8, 0.9],
@@ -100,8 +98,6 @@ CONFIGS_TXT = EXPERIMENT_DIR / "configs.txt"
 
 
 def _is_valid_combo(combo: dict[str, Any]) -> bool:
-    if not combo["use_shape_key"] and not combo["use_event_key"]:
-        return False
     if combo["blend_floor"] > combo["blend_max"]:
         return False
     return True
@@ -119,7 +115,7 @@ def generate_combos() -> list[dict[str, Any]]:
 
 
 def _build_retrieval_block(combo: dict[str, Any]) -> dict[str, Any]:
-    return {"enabled": True, **combo}
+    return {"enabled": True, "use_event_key": True, **combo}
 
 
 def _build_plugin_yaml(combo: dict[str, Any]) -> dict[str, Any]:

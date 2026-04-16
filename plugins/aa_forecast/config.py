@@ -60,7 +60,6 @@ AA_FORECAST_RETRIEVAL_KEYS = {
     "similarity",
     "temperature",
     "memory_value_mode",
-    "use_shape_key",
     "use_event_key",
     "event_score_log_bonus_alpha",
     "event_score_log_bonus_cap",
@@ -110,7 +109,6 @@ class AAForecastRetrievalConfig:
     similarity: str = "cosine"
     temperature: float = 0.10
     memory_value_mode: str = "future_return"
-    use_shape_key: bool = True
     use_event_key: bool = True
     blend_floor: float = 0.0
     event_score_log_bonus_alpha: float = 0.0
@@ -201,7 +199,6 @@ def aa_forecast_retrieval_public_dict(
         "similarity": retrieval.similarity,
         "temperature": retrieval.temperature,
         "memory_value_mode": retrieval.memory_value_mode,
-        "use_shape_key": retrieval.use_shape_key,
         "use_event_key": retrieval.use_event_key,
         "event_score_log_bonus_alpha": retrieval.event_score_log_bonus_alpha,
         "event_score_log_bonus_cap": retrieval.event_score_log_bonus_cap,
@@ -479,6 +476,7 @@ def _normalize_retrieval_config(
     if not isinstance(value, dict):
         raise ValueError(f"{section} must be a mapping")
     payload = dict(value)
+    payload.pop("use_shape_key", None)
     unknown_keys(payload, allowed=AA_FORECAST_RETRIEVAL_KEYS, section=section)
     enabled = coerce_bool(
         payload.get("enabled"),
@@ -532,6 +530,7 @@ def _normalize_retrieval_config(
                 f"{section}.config_path must contain a top-level 'retrieval' mapping"
             )
         payload = dict(retrieval_section)
+        payload.pop("use_shape_key", None)
         _unknown_keys(
             payload,
             allowed=AA_FORECAST_RETRIEVAL_KEYS | {"star"},
@@ -613,11 +612,6 @@ def _normalize_retrieval_config(
         field_name=f"{section}.use_uncertainty_gate",
         default=AAForecastRetrievalConfig().use_uncertainty_gate,
     )
-    use_shape_key = coerce_bool(
-        payload.get("use_shape_key", AAForecastRetrievalConfig().use_shape_key),
-        field_name=f"{section}.use_shape_key",
-        default=AAForecastRetrievalConfig().use_shape_key,
-    )
     use_event_key = coerce_bool(
         payload.get("use_event_key", AAForecastRetrievalConfig().use_event_key),
         field_name=f"{section}.use_event_key",
@@ -641,10 +635,10 @@ def _normalize_retrieval_config(
         raise ValueError(
             f"{section}.enabled=true requires aa_forecast.uncertainty.enabled=true"
         )
-    if enabled and not (use_shape_key or use_event_key):
+    if enabled and not use_event_key:
         raise ValueError(
-            f"{section}.enabled=true requires at least one of "
-            f"{section}.use_shape_key or {section}.use_event_key to be true"
+            f"{section}.enabled=true requires {section}.use_event_key=true "
+            "(event-only retrieval)"
         )
     return AAForecastRetrievalConfig(
         enabled=enabled,
@@ -661,7 +655,6 @@ def _normalize_retrieval_config(
         similarity=AAForecastRetrievalConfig().similarity,
         temperature=AAForecastRetrievalConfig().temperature,
         memory_value_mode=AAForecastRetrievalConfig().memory_value_mode,
-        use_shape_key=use_shape_key,
         use_event_key=use_event_key,
         event_score_log_bonus_alpha=event_score_log_bonus_alpha,
         event_score_log_bonus_cap=event_score_log_bonus_cap,

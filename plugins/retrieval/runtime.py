@@ -91,7 +91,6 @@ def _build_memory_bank(
                 "candidate_future_end_ds": str(
                     pd.Timestamp(raw_train_df[dt_col].iloc[end_idx + horizon])
                 ),
-                "shape_vector": signature["shape_vector"],
                 "event_vector": signature["event_vector"],
                 "event_score": signature["event_score"],
                 "anchor_target_value": anchor_value,
@@ -151,21 +150,17 @@ def _retrieve_neighbors(
             "mean_similarity": 0.0,
             "max_similarity": 0.0,
         }
+    if not retrieval_cfg.use_event_key:
+        raise ValueError("retrieval requires use_event_key=true")
     scored_neighbors: list[dict[str, Any]] = []
     for entry in bank:
         if float(entry["event_score"]) < threshold:
             continue
-        shape_similarity = _cosine_similarity(
-            query["shape_vector"], entry["shape_vector"]
-        )
         event_similarity = _cosine_similarity(
             query["event_vector"], entry["event_vector"]
         )
         event_component = event_similarity
-        if (
-            retrieval_cfg.use_event_key
-            and retrieval_cfg.event_score_log_bonus_alpha > 0.0
-        ):
+        if retrieval_cfg.event_score_log_bonus_alpha > 0.0:
             query_event_score = max(float(query["event_score"]), 1e-8)
             candidate_event_score = max(float(entry["event_score"]), 1e-8)
             event_score_log_bonus = min(
@@ -175,22 +170,12 @@ def _retrieve_neighbors(
             event_component = event_component + (
                 retrieval_cfg.event_score_log_bonus_alpha * event_score_log_bonus
             )
-        if retrieval_cfg.use_shape_key and retrieval_cfg.use_event_key:
-            similarity = 0.5 * (shape_similarity + event_component)
-        elif retrieval_cfg.use_event_key:
-            similarity = event_component
-        elif retrieval_cfg.use_shape_key:
-            similarity = shape_similarity
-        else:
-            raise ValueError(
-                "retrieval requires at least one similarity key enabled"
-            )
+        similarity = event_component
         if similarity < retrieval_cfg.min_similarity:
             continue
         scored_neighbors.append(
             {
                 **entry,
-                "shape_similarity": shape_similarity,
                 "event_similarity": event_similarity,
                 "similarity": similarity,
             }

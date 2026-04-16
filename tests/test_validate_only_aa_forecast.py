@@ -237,7 +237,6 @@ def _assert_retrieval_payload(
     assert payload["similarity"] == "cosine"
     assert payload["temperature"] == pytest.approx(0.1)
     assert payload["memory_value_mode"] == "future_return"
-    assert payload["use_shape_key"] is True
     assert payload["use_event_key"] is True
 
 

@@ -30,7 +30,6 @@ _RETRIEVAL_OVERRIDE_KEYS = {
     "blend_floor",
     "blend_max",
     "use_uncertainty_gate",
-    "use_shape_key",
     "use_event_key",
     "event_score_log_bonus_alpha",
     "event_score_log_bonus_cap",
@@ -164,9 +163,9 @@ def _apply_retrieval_overrides(
         raise ValueError(
             "aa_forecast retrieval override must satisfy blend_floor <= blend_max"
         )
-    if patched.enabled and not (patched.use_shape_key or patched.use_event_key):
+    if patched.enabled and not patched.use_event_key:
         raise ValueError(
-            "aa_forecast retrieval override requires use_shape_key or use_event_key"
+            "aa_forecast retrieval override requires use_event_key=true (event-only)"
         )
     return patched
 
@@ -1179,10 +1178,8 @@ def _build_retrieval_signature(
             activity_max,
         ]
     )
-    shape_vector = transformed_window_df[target_col].to_numpy(dtype=float)
     event_score = float(count_active_channels.sum() + np.abs(channel_activity).sum())
     return {
-        "shape_vector": _normalize_signature(shape_vector),
         "event_vector": _normalize_signature(event_vector),
         "event_score": event_score,
     }
@@ -1231,7 +1228,6 @@ def _build_event_memory_bank(
                 "candidate_future_end_ds": str(
                     pd.Timestamp(raw_train_df[dt_col].iloc[end_idx + horizon])
                 ),
-                "shape_vector": signature["shape_vector"],
                 "event_vector": signature["event_vector"],
                 "event_score": signature["event_score"],
                 "anchor_target_value": anchor_value,
@@ -1306,7 +1302,6 @@ def _write_retrieval_artifacts(
             "candidate_end_ds": neighbor["candidate_end_ds"],
             "candidate_future_end_ds": neighbor["candidate_future_end_ds"],
             "similarity": neighbor["similarity"],
-            "shape_similarity": neighbor["shape_similarity"],
             "event_similarity": neighbor["event_similarity"],
             "softmax_weight": neighbor["softmax_weight"],
             "event_score": neighbor["event_score"],
@@ -1326,7 +1321,6 @@ def _write_retrieval_artifacts(
             "candidate_end_ds": neighbor["candidate_end_ds"],
             "candidate_future_end_ds": neighbor["candidate_future_end_ds"],
             "similarity": neighbor["similarity"],
-            "shape_similarity": neighbor["shape_similarity"],
             "event_similarity": neighbor["event_similarity"],
             "softmax_weight": neighbor["softmax_weight"],
             "event_score": neighbor["event_score"],

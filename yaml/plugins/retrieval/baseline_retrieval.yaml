@@ -19,7 +19,6 @@ retrieval:
   blend_floor: 0.0
   blend_max: 1.0
   use_uncertainty_gate: true
-  use_shape_key: false
   use_event_key: true
   event_score_log_bonus_alpha: 0.0
   event_score_log_bonus_cap: 0.0

@@ -966,16 +966,6 @@ aa_forecast_models:
       choices:
       - true
       - false
-    use_shape_key:
-      type: categorical
-      choices:
-      - true
-      - false
-    use_event_key:
-      type: categorical
-      choices:
-      - true
-      - false
     event_score_log_bonus_alpha:
       type: categorical
       choices:
@@ -1181,16 +1171,6 @@ aa_forecast_models:
       - 0.75
       - 1.0
     use_uncertainty_gate:
-      type: categorical
-      choices:
-      - true
-      - false
-    use_shape_key:
-      type: categorical
-      choices:
-      - true
-      - false
-    use_event_key:
       type: categorical
       choices:
       - true
@@ -1427,16 +1407,6 @@ aa_forecast_models:
       choices:
       - true
       - false
-    use_shape_key:
-      type: categorical
-      choices:
-      - true
-      - false
-    use_event_key:
-      type: categorical
-      choices:
-      - true
-      - false
     event_score_log_bonus_alpha:
       type: categorical
       choices:
@@ -1592,16 +1562,6 @@ aa_forecast_models:
       - 0.75
       - 1.0
     use_uncertainty_gate:
-      type: categorical
-      choices:
-      - true
-      - false
-    use_shape_key:
-      type: categorical
-      choices:
-      - true
-      - false
-    use_event_key:
       type: categorical
       choices:
       - true

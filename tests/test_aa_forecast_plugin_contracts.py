@@ -261,7 +261,6 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
     assert payload["retrieval"]["trigger_quantile"] == pytest.approx(0.9)
     assert payload["retrieval"]["neighbor_min_event_ratio"] == pytest.approx(0.0)
     assert payload["retrieval"]["memory_value_mode"] == "future_return"
-    assert payload["retrieval"]["use_shape_key"] is True
     assert payload["retrieval"]["use_event_key"] is True
 
 
@@ -1494,7 +1493,6 @@ def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(
                     "future_returns": np.asarray([0.1]),
                     "event_score": 3.0,
                     "anchor_target_value": 5.0,
-                    "shape_vector": np.asarray([1.0]),
                     "event_vector": np.asarray([1.0]),
                 }
             ],
@@ -1505,7 +1503,6 @@ def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(
         aa_runtime,
         "_build_event_query",
         lambda **_kwargs: {
-            "shape_vector": np.asarray([1.0]),
             "event_vector": np.asarray([1.0]),
             "event_score": 5.0,
         },
@@ -1524,7 +1521,6 @@ def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(
                     "future_returns": np.asarray([0.1]),
                     "event_score": 3.0,
                     "anchor_target_value": 5.0,
-                    "shape_similarity": 0.8,
                     "event_similarity": 0.9,
                     "similarity": 0.86,
                     "softmax_weight": 1.0,
@@ -1578,21 +1574,18 @@ def test_retrieve_event_neighbors_event_score_bonus_can_flip_top1() -> None:
         trigger_quantile=0.9,
         min_similarity=0.0,
         temperature=0.1,
-        use_shape_key=False,
         use_event_key=True,
         event_score_log_bonus_alpha=0.15,
         event_score_log_bonus_cap=0.1,
     )
     query = {
         "event_score": 1.0,
-        "shape_vector": np.array([1.0, 0.0], dtype=float),
         "event_vector": np.array([1.0, 0.0], dtype=float),
     }
     bank = [
         {
             "candidate_end_ds": "plain-top1",
             "candidate_future_end_ds": "plain-top1+2",
-            "shape_vector": np.array([1.0, 0.0], dtype=float),
             "event_vector": np.array([0.885, np.sqrt(1 - 0.885**2)], dtype=float),
             "event_score": 1.0,
             "anchor_target_value": 1.0,
@@ -1601,7 +1594,6 @@ def test_retrieve_event_neighbors_event_score_bonus_can_flip_top1() -> None:
         {
             "candidate_end_ds": "spike-analogue",
             "candidate_future_end_ds": "spike-analogue+2",
-            "shape_vector": np.array([1.0, 0.0], dtype=float),
             "event_vector": np.array([0.872, np.sqrt(1 - 0.872**2)], dtype=float),
             "event_score": 1.2,
             "anchor_target_value": 1.0,
@@ -1626,7 +1618,6 @@ def test_retrieve_event_neighbors_ignores_neighbor_min_event_ratio() -> None:
         trigger_quantile=0.9,
         min_similarity=0.0,
         temperature=0.1,
-        use_shape_key=False,
         use_event_key=True,
         event_score_log_bonus_alpha=0.0,
         event_score_log_bonus_cap=0.0,
@@ -1634,14 +1625,12 @@ def test_retrieve_event_neighbors_ignores_neighbor_min_event_ratio() -> None:
     )
     query = {
         "event_score": 5.0,
-        "shape_vector": np.array([1.0, 0.0], dtype=float),
         "event_vector": np.array([1.0, 0.0], dtype=float),
     }
     bank = [
         {
             "candidate_end_ds": "anchor-like",
             "candidate_future_end_ds": "anchor-like+1",
-            "shape_vector": np.array([1.0, 0.0], dtype=float),
             "event_vector": np.array([1.0, 0.0], dtype=float),
             "event_score": 2.0,
             "anchor_target_value": 1.0,
@@ -1766,7 +1755,6 @@ def test_predict_aa_forecast_fold_records_retrieval_skip_without_error(
         aa_runtime,
         "_build_event_query",
         lambda **_kwargs: {
-            "shape_vector": np.asarray([1.0]),
             "event_vector": np.asarray([1.0]),
             "event_score": 5.0,
         },
@@ -1820,7 +1808,7 @@ def test_split_runtime_overrides_moves_retrieval_keys_out_of_model_payload() -> 
             "season_length": 4,
             "top_k": 3,
             "min_similarity": 0.8,
-            "use_shape_key": False,
+            "use_event_key": True,
         }
     )
 
@@ -1828,7 +1816,7 @@ def test_split_runtime_overrides_moves_retrieval_keys_out_of_model_payload() -> 
     assert retrieval_override == {
         "top_k": 3,
         "min_similarity": 0.8,
-        "use_shape_key": False,
+        "use_event_key": True,
     }
 
 
@@ -1851,7 +1839,7 @@ def test_normalize_legacy_best_params_for_replay_maps_aaforecast_top_k() -> None
     assert normalized["season_length"] == 4
 
 
-def test_sanitize_aaforecast_trial_params_enforces_similarity_key() -> None:
+def test_sanitize_aaforecast_trial_params_enforces_event_key() -> None:
     sanitized = runtime._sanitize_aaforecast_trial_params(
         model_name="AAForecast",
         candidate_params={
@@ -1861,7 +1849,7 @@ def test_sanitize_aaforecast_trial_params_enforces_similarity_key() -> None:
         },
     )
 
-    assert sanitized["use_shape_key"] is False
+    assert "use_shape_key" not in sanitized
     assert sanitized["use_event_key"] is True
     assert sanitized["season_length"] == 4
 
@@ -1882,7 +1870,6 @@ def test_apply_retrieval_overrides_updates_runtime_retrieval_config() -> None:
             "blend_floor": 0.0,
             "blend_max": 1.0,
             "use_uncertainty_gate": True,
-            "use_shape_key": False,
             "use_event_key": True,
             "event_score_log_bonus_alpha": 0.15,
             "event_score_log_bonus_cap": 0.1,
@@ -1897,7 +1884,6 @@ def test_apply_retrieval_overrides_updates_runtime_retrieval_config() -> None:
     assert patched.blend_floor == pytest.approx(0.0)
     assert patched.blend_max == pytest.approx(1.0)
     assert patched.use_uncertainty_gate is True
-    assert patched.use_shape_key is False
     assert patched.use_event_key is True
     assert patched.event_score_log_bonus_alpha == pytest.approx(0.15)
     assert patched.event_score_log_bonus_cap == pytest.approx(0.1)

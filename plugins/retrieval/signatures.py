@@ -58,7 +58,7 @@ def compute_star_signature(
     hist_exog_cols: tuple[str, ...],
     hist_exog_tail_modes: tuple[str, ...],
 ) -> dict[str, Any]:
-    """Build shape_vector, event_vector, event_score from STAR decomposition.
+    """Build event_vector and event_score from STAR decomposition.
 
     This mirrors ``_build_retrieval_signature`` in the aa_forecast runtime but
     uses a standalone ``STARFeatureExtractor`` instead of the model's internal
@@ -114,11 +114,9 @@ def compute_star_signature(
             activity_max,
         ]
     )
-    shape_vector = window_df[target_col].to_numpy(dtype=float)
     event_score = float(count_active.sum() + np.abs(channel_activity).sum())
 
     return {
-        "shape_vector": _normalize_signature(shape_vector),
         "event_vector": _normalize_signature(event_vector),
         "event_score": event_score,
     }

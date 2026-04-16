@@ -1355,13 +1355,11 @@ def _sanitize_aaforecast_trial_params(
 ) -> dict[str, Any]:
     if model_name != "AAForecast":
         return candidate_params
-    use_shape_key = candidate_params.get("use_shape_key")
-    use_event_key = candidate_params.get("use_event_key")
-    if use_shape_key is False and use_event_key is False:
-        sanitized = dict(candidate_params)
+    sanitized = dict(candidate_params)
+    sanitized.pop("use_shape_key", None)
+    if sanitized.get("use_event_key") is False:
         sanitized["use_event_key"] = True
-        return sanitized
-    return candidate_params
+    return sanitized
 
 
 def _collect_main_tuning_result(

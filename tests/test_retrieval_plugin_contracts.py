@@ -159,7 +159,6 @@ def test_normalize_full_config() -> None:
             "blend_floor": 0.1,
             "blend_max": 0.5,
             "temperature": 0.2,
-            "use_shape_key": True,
             "use_event_key": True,
         },
         unknown_keys=_unknown_keys,
@@ -211,13 +210,12 @@ def test_normalize_rejects_blend_floor_gt_blend_max() -> None:
         )
 
 
-def test_normalize_rejects_both_keys_false() -> None:
-    with pytest.raises(ValueError, match="at least one"):
+def test_normalize_rejects_use_event_key_false() -> None:
+    with pytest.raises(ValueError, match="use_event_key must be true"):
         normalize_retrieval_plugin_config(
             {
                 "enabled": True,
                 "trigger_quantile": 0.8,
-                "use_shape_key": False,
                 "use_event_key": False,
             },
             unknown_keys=_unknown_keys,
@@ -337,20 +335,17 @@ def test_retrieve_neighbors_ignores_neighbor_min_event_ratio() -> None:
         trigger_quantile=0.9,
         min_similarity=0.0,
         temperature=0.1,
-        use_shape_key=False,
         use_event_key=True,
         neighbor_min_event_ratio=10.0,
     )
     query = {
         "event_score": 5.0,
-        "shape_vector": np.array([1.0, 0.0], dtype=float),
         "event_vector": np.array([1.0, 0.0], dtype=float),
     }
     bank = [
         {
             "candidate_end_ds": "anchor-like",
             "candidate_future_end_ds": "anchor-like+1",
-            "shape_vector": np.array([1.0, 0.0], dtype=float),
             "event_vector": np.array([1.0, 0.0], dtype=float),
             "event_score": 2.0,
             "anchor_target_value": 1.0,
