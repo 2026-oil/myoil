@@ -1622,6 +1622,20 @@ def test_build_retrieval_window_artifacts_short_train_left_pads_query() -> None:
     assert len(query_rows) == input_size
 
 
+def test_normalize_retrieval_series_window_aligns_mismatched_series() -> None:
+    w = {
+        "ds": ["2024-01-01", "2024-01-02", "2024-01-03"],
+        "y_raw": [1.0, 2.0, 3.0],
+        "y_transformed": [99.0],
+    }
+    out = aa_runtime._normalize_retrieval_series_window(w, input_size=3)
+    assert len(out["ds"]) == 3
+    assert len(out["y_raw"]) == 3
+    assert len(out["y_transformed"]) == 3
+    assert out["y_transformed"][0:2] == [float("nan"), float("nan")]
+    assert out["y_transformed"][2] == 99.0
+
+
 def test_retrieve_event_neighbors_event_score_bonus_can_flip_top1() -> None:
     retrieval_cfg = SimpleNamespace(
         top_k=1,

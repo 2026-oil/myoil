@@ -1330,6 +1330,34 @@ def _window_series_slice(
     return {"ds": ds, "y_raw": y_raw, "y_transformed": y_tf}
 
 
+def _align_retrieval_window_lists(window: dict[str, Any]) -> dict[str, Any]:
+    """Make ``ds`` / ``y_raw`` / ``y_transformed`` the same length before padding.
+
+    ``train_df`` and ``transformed_train_df`` can differ in row count; identical
+    ``iloc`` ranges then yield mismatched list lengths. Retrieval code assumes
+    per-step alignment, so we pad shorter series (left-pad ``ds`` with ``""``,
+    values with NaN) or trim trailing excess so all three share one length.
+    """
+    ds = list(window["ds"])
+    y_raw = list(window["y_raw"])
+    y_tf = list(window["y_transformed"])
+    L = max(len(ds), len(y_raw), len(y_tf))
+    nan = float("nan")
+    if len(ds) < L:
+        ds = [""] * (L - len(ds)) + ds
+    elif len(ds) > L:
+        ds = ds[-L:]
+    if len(y_raw) < L:
+        y_raw = [nan] * (L - len(y_raw)) + y_raw
+    elif len(y_raw) > L:
+        y_raw = y_raw[-L:]
+    if len(y_tf) < L:
+        y_tf = [nan] * (L - len(y_tf)) + y_tf
+    elif len(y_tf) > L:
+        y_tf = y_tf[-L:]
+    return {"ds": ds, "y_raw": y_raw, "y_transformed": y_tf}
+
+
 def _normalize_retrieval_series_window(
     window: dict[str, Any], *, input_size: int
 ) -> dict[str, Any]:
@@ -1340,6 +1368,7 @@ def _normalize_retrieval_series_window(
     empty ``ds`` strings and NaN targets, or (if too long) keep the trailing
     ``input_size`` points.
     """
+    window = _align_retrieval_window_lists(window)
     ds = list(window["ds"])
     y_raw = list(window["y_raw"])
     y_tf = list(window["y_transformed"])
@@ -1467,13 +1496,15 @@ def _build_retrieval_window_artifacts(
                 }
             )
             continue
-        win = _window_series_slice(
-            train_df,
-            transformed_train_df,
-            start_idx,
-            end_idx,
-            target_col,
-            dt_col,
+        win = _align_retrieval_window_lists(
+            _window_series_slice(
+                train_df,
+                transformed_train_df,
+                start_idx,
+                end_idx,
+                target_col,
+                dt_col,
+            )
         )
         fut_slice = train_df.iloc[end_idx + 1 : end_idx + 1 + horizon]
         fut_ds = pd.to_datetime(fut_slice[dt_col]).astype(str).tolist()
