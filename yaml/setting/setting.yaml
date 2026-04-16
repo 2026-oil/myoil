@@ -11,8 +11,8 @@ training:
   windows_batch_size: 64
   inference_windows_batch_size: 64
   max_steps: 600
-  val_size: 2
-  scaler_type: null
+  val_size: 6
+  scaler_type: robust
   val_check_steps: 4
   min_steps_before_early_stop: 200
   model_step_size: 1
@@ -34,9 +34,9 @@ training:
     eps: 1.0e-06
 cv:
   gap: 0
-  horizon: 2
-  step_size: 1
-  n_windows: 4
+  horizon: 4
+  step_size: 8
+  n_windows: 8
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean
 scheduler:

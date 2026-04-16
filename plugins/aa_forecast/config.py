@@ -43,7 +43,7 @@ AA_FORECAST_LINKED_KEYS = {
     "retrieval",
     "encoding_export",
 }
-AA_FORECAST_UNCERTAINTY_KEYS = {"enabled", "sample_count", "dropout_candidates"}
+AA_FORECAST_UNCERTAINTY_KEYS = {"enabled", "sample_count"}
 AA_FORECAST_STAR_ANOMALY_TAIL_KEYS = {"upward", "two_sided"}
 AA_FORECAST_RETRIEVAL_KEYS = {
     "enabled",
@@ -455,18 +455,13 @@ def _normalize_uncertainty_config(
         default=False,
     )
     default_uncertainty = AAForecastUncertaintyConfig()
-    dropout_candidates = _coerce_probability_tuple(
-        payload.get("dropout_candidates"),
-        field_name=f"{section}.dropout_candidates",
-        default=default_uncertainty.dropout_candidates,
-    )
     sample_count = _coerce_positive_int(
         payload.get("sample_count", default_uncertainty.sample_count),
         field_name=f"{section}.sample_count",
     )
     return AAForecastUncertaintyConfig(
         enabled=enabled,
-        dropout_candidates=dropout_candidates,
+        dropout_candidates=default_uncertainty.dropout_candidates,
         sample_count=sample_count,
     )
 
@@ -547,6 +542,14 @@ def _normalize_retrieval_config(
         )
         payload.pop("star", None)
 
+    # Explicit mutual exclusion: quantile gating vs fixed threshold gating.
+    # Use key presence (not default values) to avoid accidental conflicts.
+    if "trigger_quantile" in payload and "event_score_threshold" in payload:
+        raise ValueError(
+            f"{section}: trigger_quantile and event_score_threshold are mutually exclusive; "
+            "set only one"
+        )
+
     top_k = _coerce_positive_int(
         payload.get("top_k", AAForecastRetrievalConfig().top_k),
         field_name=f"{section}.top_k",
@@ -569,12 +572,14 @@ def _normalize_retrieval_config(
         field_name=f"{section}.event_score_threshold",
     )
     trigger_quantile_raw = payload.get("trigger_quantile")
+    trigger_quantile: float | None = None
     if trigger_quantile_raw is not None:
         parsed_trigger_quantile = float(trigger_quantile_raw)
         if not (0.0 < parsed_trigger_quantile < 1.0):
             raise ValueError(
                 f"{section}.trigger_quantile must satisfy 0 < value < 1"
             )
+        trigger_quantile = parsed_trigger_quantile
     _coerce_non_negative_float(
         payload.get("neighbor_min_event_ratio", 0.0),
         field_name=f"{section}.neighbor_min_event_ratio",
@@ -667,7 +672,7 @@ def _normalize_retrieval_config(
         top_k=top_k,
         recency_gap_steps=recency_gap_steps_int,
         event_score_threshold=event_score_threshold,
-        trigger_quantile=None,
+        trigger_quantile=trigger_quantile,
         neighbor_min_event_ratio=0.0,
         min_similarity=min_similarity,
         blend_floor=blend_floor,
@@ -1049,7 +1054,26 @@ def aa_forecast_selected_model_search_params(
 ) -> tuple[str, ...]:
     if stage_loaded is None or stage_loaded.search_space_payload is None:
         return ()
-    return tuple(stage_loaded.search_space_payload["models"]["AAForecast"])
+    backbone = str(stage_loaded.config.model).strip().lower()
+    try:
+        from plugins.aa_forecast.search_space import AA_FORECAST_STAGE_ONLY_PARAM_REGISTRY
+    except Exception:
+        return tuple(stage_loaded.search_space_payload["models"]["AAForecast"])
+
+    # Only model/backbone hyperparameters should participate in learned_auto.
+    # Stage-level knobs (STAR/LOWESS) are owned by the plugin config, not Optuna.
+    structural_exclusions = {
+        "attention_hidden_size",
+        "lowess_frac",
+        "lowess_delta",
+        "season_length",
+        "trend_kernel_size",
+        "start_padding_enabled",
+    }
+    allowed = set(AA_FORECAST_STAGE_ONLY_PARAM_REGISTRY.get(backbone, {}))
+    allowed_model_keys = allowed.difference(structural_exclusions)
+    keys = stage_loaded.search_space_payload["models"]["AAForecast"]
+    return tuple(key for key in keys if key in allowed_model_keys)
 
 
 def aa_forecast_selected_training_search_params(

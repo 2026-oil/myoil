@@ -13,7 +13,6 @@ retrieval:
   top_k: 1
   recency_gap_steps: 1
   trigger_quantile: 0.5
-  event_score_threshold: 0.0
   neighbor_min_event_ratio: 0.0
   min_similarity: 0.0
   similarity: cosine

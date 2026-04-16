@@ -1,0 +1,10 @@
+aa_forecast:
+  model: gru
+  tune_training: false
+  model_params: {}
+  star_anomaly_tails:
+    upward: []
+    two_sided:
+    - BS_Core_Index_A
+    - BS_Core_Index_B
+    - BS_Core_Index_C

@@ -8,7 +8,7 @@
 retrieval:
   enabled: true
   top_k: 1
-  event_score_threshold: 400.0
+  trigger_quantile: 0.80
   min_similarity: 0.35
   blend_max: 1.0
   use_uncertainty_gate: false
@@ -223,8 +223,10 @@ $$
 
 1. 길이 `input_size`의 transformed window를 자른다.
 2. 그 window로 shape/event signature를 만든다.
-3. candidate `event_score`가 `event_score_threshold`보다 작으면 버린다.
-4. surviving candidate에 대해 anchor 시점의 raw target과 그 뒤 horizon 구간의 raw future를 사용해 future return을 계산한다.
+3. `trigger_quantile`이 **없으면** candidate `event_score`가 `event_score_threshold`보다 작으면 버린다.
+4. `trigger_quantile`이 **있으면** bank는 우선 모두 만들고, 이후 `q`-quantile로 계산된
+   effective threshold로 query/candidate를 gating한다.
+5. surviving candidate에 대해 anchor 시점의 raw target과 그 뒤 horizon 구간의 raw future를 사용해 future return을 계산한다.
 
 future return은 raw level 기준으로 아래처럼 만든다.
 
@@ -267,7 +269,8 @@ dt,Com_BrentCrudeOil,GPRD_THREAT,BS_Core_Index_A,GPRD
 이 케이스의 retrieval artifact에는 다음이 기록돼 있다.
 
 - `query_event_score = 200.67826199531555`
-- `event_score_threshold = 400.0`
+- `trigger_quantile = 0.80`
+- `event_score_threshold = (trigger_quantile로 계산된 effective threshold)`
 - `retrieval_applied = false`
 - `skip_reason = below_event_threshold`
 
@@ -520,7 +523,7 @@ target_predictions[job.model] = final_prediction
 |---|---|---|---|
 | `enabled` | `_normalize_retrieval_config`, `predict_aa_forecast_fold` | retrieval 경로 on/off | retrieval path 자체 활성화 |
 | `top_k` | `_retrieve_event_neighbors` | 상위 후보 개수 제한 | 최종 neighbor 1개만 사용 |
-| `event_score_threshold` | `_build_event_memory_bank`, `_retrieve_event_neighbors` | query/candidate event score 필터 | 강한 event 신호가 있어야 retrieval 참여 |
+| `trigger_quantile` | `_effective_event_threshold`, `_retrieve_event_neighbors` | query/candidate event score 필터(quantile) | q-quantile 기반 event gate (※ `event_score_threshold`와 동시 설정 금지) |
 | `min_similarity` | `_retrieve_event_neighbors` | low-similarity candidate 제거 | 0.35 미만 candidate 제거 |
 | `blend_max` | `_blend_event_memory_prediction` | blend weight 상한 | memory prediction이 크게 반영될 수 있음 |
 | `use_uncertainty_gate` | `_blend_event_memory_prediction` | uncertainty scale 사용 여부 | std가 blend weight를 조정하지 않음 |
@@ -589,7 +592,7 @@ $$
 
 의미:
 
-- 현재 query event score가 `event_score_threshold=400.0`을 넘지 못해 retrieval이 skip된 케이스다.
+- 현재 query event score가 `trigger_quantile`로 계산된 effective threshold를 넘지 못해 retrieval이 skip된 케이스다.
 - 이 경우 후보 검색/softmax/blend가 실질적으로 적용되지 않는다.
 - 따라서 `final_prediction == base_prediction`이다.
 

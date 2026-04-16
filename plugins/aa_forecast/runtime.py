@@ -12,6 +12,7 @@ from neuralforecast import NeuralForecast
 
 from plugins.retrieval.runtime import (
     _blend_prediction as _shared_blend_prediction,
+    _effective_event_threshold as _shared_effective_event_threshold,
     _retrieve_neighbors as _shared_retrieve_neighbors,
 )
 
@@ -1255,11 +1256,13 @@ def _retrieve_event_neighbors(
     query: dict[str, Any],
     bank: list[dict[str, Any]],
     retrieval_cfg: _cfg.AAForecastRetrievalConfig,
+    effective_event_threshold: float | None = None,
 ) -> dict[str, Any]:
     return _shared_retrieve_neighbors(
         query=query,
         bank=bank,
         retrieval_cfg=retrieval_cfg,
+        effective_event_threshold=effective_event_threshold,
     )
 
 
@@ -1527,10 +1530,20 @@ def predict_aa_forecast_fold(
             target_col=target_col,
             input_size=input_size,
         )
+        effective_event_threshold = _shared_effective_event_threshold(
+            bank=bank,
+            retrieval_cfg=retrieval_cfg,  # duck-typed
+        )
+        eligible_bank = [
+            entry
+            for entry in bank
+            if float(entry["event_score"]) >= effective_event_threshold
+        ]
         retrieval_result = _retrieve_event_neighbors(
             query=query,
-            bank=bank,
+            bank=eligible_bank,
             retrieval_cfg=retrieval_cfg,
+            effective_event_threshold=effective_event_threshold,
         )
         base_prediction = np.asarray(target_predictions[job.model], dtype=float)
         current_last_y = float(train_df[target_col].iloc[-1])
@@ -1544,8 +1557,9 @@ def predict_aa_forecast_fold(
             "top_k_requested": retrieval_cfg.top_k,
             "top_k_used": len(retrieval_result["top_neighbors"]),
             "candidate_count": candidate_count,
-            "eligible_candidate_count": len(bank),
-            "event_score_threshold": retrieval_cfg.event_score_threshold,
+            "eligible_candidate_count": len(eligible_bank),
+            "event_score_threshold": effective_event_threshold,
+            "trigger_quantile": retrieval_cfg.trigger_quantile,
             "recency_gap_steps": retrieval_cfg.recency_gap_steps,
             "min_similarity": retrieval_cfg.min_similarity,
             "mean_similarity": retrieval_result["mean_similarity"],

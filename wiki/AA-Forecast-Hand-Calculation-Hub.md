@@ -75,7 +75,7 @@
 > [!NOTE]
 > Provenance: `toy simplification`
 >
-> 실제 repo default에서는 `input_size=64`, `recency_gap_steps=8`, `event_score_threshold=400.0` 같은 값이 등장합니다. 본 패키지의 toy는 계산 경로를 이해하기 위한 축소판입니다.
+> 실제 repo default에서는 `input_size=64`, `recency_gap_steps=8`, `trigger_quantile=0.80` 같은 값이 등장합니다. 본 패키지의 toy는 계산 경로를 이해하기 위한 축소판입니다.
 
 ## 패키지 내부 링크 지도
 

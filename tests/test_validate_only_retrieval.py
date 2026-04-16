@@ -81,7 +81,7 @@ def test_load_baseline_ret_linked_config_path() -> None:
         == "yaml/plugins/retrieval/baseline_retrieval.yaml"
     )
     assert cfg.stage_plugin_config.retrieval.top_k == 1
-    assert cfg.stage_plugin_config.retrieval.trigger_quantile is None
+    assert cfg.stage_plugin_config.retrieval.trigger_quantile == pytest.approx(0.8)
     assert cfg.stage_plugin_config.retrieval.min_similarity == pytest.approx(0.7)
     assert cfg.stage_plugin_config.retrieval.blend_floor == pytest.approx(0.0)
     assert cfg.stage_plugin_config.retrieval.blend_max == pytest.approx(1.0)

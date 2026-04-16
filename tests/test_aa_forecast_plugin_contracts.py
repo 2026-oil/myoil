@@ -177,7 +177,6 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
                     },
                     "top_k": 3,
                     "recency_gap_steps": 2,
-                    "event_score_threshold": 10.0,
                     "trigger_quantile": 0.9,
                     "neighbor_min_event_ratio": 0.8,
                     "min_similarity": 0.8,
@@ -238,8 +237,8 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
     assert retrieval.config_path == retrieval_path.name
     assert retrieval.top_k == 3
     assert retrieval.recency_gap_steps == 2
-    assert retrieval.event_score_threshold == pytest.approx(10.0)
-    assert retrieval.trigger_quantile is None
+    assert retrieval.event_score_threshold == pytest.approx(1.0)
+    assert retrieval.trigger_quantile == pytest.approx(0.9)
     assert retrieval.neighbor_min_event_ratio == pytest.approx(0.0)
     assert retrieval.min_similarity == pytest.approx(0.8)
     assert retrieval.blend_floor == pytest.approx(0.1)
@@ -260,7 +259,7 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
     assert payload["retrieval"]["similarity"] == "cosine"
     assert payload["retrieval"]["top_k"] == 3
     assert payload["retrieval"]["temperature"] == pytest.approx(0.1)
-    assert payload["retrieval"]["trigger_quantile"] is None
+    assert payload["retrieval"]["trigger_quantile"] == pytest.approx(0.9)
     assert payload["retrieval"]["neighbor_min_event_ratio"] == pytest.approx(0.0)
     assert payload["retrieval"]["memory_value_mode"] == "future_return"
     assert payload["retrieval"]["use_shape_key"] is True

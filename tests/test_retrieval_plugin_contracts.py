@@ -268,7 +268,7 @@ def test_config_to_dict_round_trip() -> None:
     assert serialized["top_k"] == 2
 
 
-def test_effective_event_threshold_ignores_trigger_quantile() -> None:
+def test_effective_event_threshold_respects_trigger_quantile() -> None:
     retrieval_cfg = RetrievalConfig(
         enabled=True,
         event_score_threshold=3.5,
@@ -281,7 +281,34 @@ def test_effective_event_threshold_ignores_trigger_quantile() -> None:
         retrieval_cfg=retrieval_cfg,
     )
 
-    assert threshold == pytest.approx(3.5)
+    assert threshold == pytest.approx(8.2)
+
+
+def test_effective_event_threshold_quantile_empty_bank_returns_zero() -> None:
+    retrieval_cfg = RetrievalConfig(
+        enabled=True,
+        event_score_threshold=3.5,
+        trigger_quantile=0.9,
+    )
+    threshold = retrieval_runtime._effective_event_threshold(
+        bank=[],
+        retrieval_cfg=retrieval_cfg,
+    )
+    assert threshold == pytest.approx(0.0)
+
+
+def test_normalize_rejects_trigger_quantile_and_threshold_together() -> None:
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        normalize_retrieval_plugin_config(
+            {
+                "enabled": True,
+                "trigger_quantile": 0.9,
+                "event_score_threshold": 10.0,
+            },
+            unknown_keys=_unknown_keys,
+            coerce_bool=_coerce_bool,
+            coerce_optional_path_string=_coerce_optional_path_string,
+        )
 
 
 def test_retrieve_neighbors_ignores_neighbor_min_event_ratio() -> None:

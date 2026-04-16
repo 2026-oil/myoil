@@ -1536,6 +1536,26 @@ def _resolve_relative_config_reference(
     local_candidate = (source_path.parent / candidate).resolve()
     if local_candidate.exists():
         return local_candidate
+    if repo_candidate.exists():
+        return repo_candidate
+
+    # Allow bare filenames to resolve anywhere in-repo when moved/templated configs
+    # are written into a temp directory (common in tests and generated sweep YAMLs).
+    normalized_ref = str(reference).replace("\\", "/")
+    if "/" not in normalized_ref:
+        matches = [
+            resolved
+            for resolved in repo_root.rglob(candidate.name)
+            if resolved.is_file()
+        ]
+        if len(matches) == 1:
+            return matches[0].resolve()
+        if len(matches) > 1:
+            raise FileNotFoundError(
+                "Config reference matched multiple repo files; use an explicit relative path: "
+                f"{reference} -> {[str(m.relative_to(repo_root)) for m in matches]}"
+            )
+
     return repo_candidate
 
 

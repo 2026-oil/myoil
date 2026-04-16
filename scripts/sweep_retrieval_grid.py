@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import itertools
 import shutil
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +28,7 @@ GRID: dict[str, list[Any]] = {
     "use_event_key": [True, False],
     "top_k": [1, 3, 5],
     "recency_gap_steps": [4, 8, 16],
-    "event_score_threshold": [200.0, 400.0, 600.0],
+    "trigger_quantile": [0.7, 0.8, 0.9],
     "min_similarity": [0.5, 0.7, 0.9],
     "blend_floor": [0.0],
     "blend_max": [0.5, 0.75, 1.0],

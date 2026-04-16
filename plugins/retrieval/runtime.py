@@ -77,7 +77,10 @@ def _build_memory_bank(
             hist_exog_cols=hist_exog_cols,
             hist_exog_tail_modes=hist_exog_tail_modes,
         )
-        if signature["event_score"] < retrieval_cfg.event_score_threshold:
+        if (
+            retrieval_cfg.trigger_quantile is None
+            and signature["event_score"] < retrieval_cfg.event_score_threshold
+        ):
             continue
         anchor_value = float(raw_train_df[target_col].iloc[end_idx])
         future_values = raw_train_df[target_col].iloc[
@@ -248,8 +251,14 @@ def _effective_event_threshold(
     bank: list[dict[str, Any]],
     retrieval_cfg: _cfg.RetrievalConfig,
 ) -> float:
-    del bank
-    return retrieval_cfg.event_score_threshold
+    if retrieval_cfg.trigger_quantile is None:
+        return retrieval_cfg.event_score_threshold
+    if not bank:
+        # Prefer 0.0 so query gating doesn't hide the more-informative
+        # "empty_bank" skip_reason downstream.
+        return 0.0
+    scores = np.asarray([float(item["event_score"]) for item in bank], dtype=float)
+    return float(np.quantile(scores, float(retrieval_cfg.trigger_quantile)))
 
 
 # ---------------------------------------------------------------------------
@@ -401,9 +410,15 @@ def post_predict_retrieval(
         retrieval_cfg=retrieval_cfg,
     )
 
+    eligible_bank = [
+        entry
+        for entry in bank
+        if float(entry["event_score"]) >= effective_event_threshold
+    ]
+
     retrieval_result = _retrieve_neighbors(
         query=query,
-        bank=bank,
+        bank=eligible_bank,
         retrieval_cfg=retrieval_cfg,
         effective_event_threshold=effective_event_threshold,
     )
@@ -421,8 +436,9 @@ def post_predict_retrieval(
         "top_k_requested": retrieval_cfg.top_k,
         "top_k_used": len(retrieval_result["top_neighbors"]),
         "candidate_count": candidate_count,
-        "eligible_candidate_count": len(bank),
+        "eligible_candidate_count": len(eligible_bank),
         "event_score_threshold": effective_event_threshold,
+        "trigger_quantile": retrieval_cfg.trigger_quantile,
         "recency_gap_steps": retrieval_cfg.recency_gap_steps,
         "min_similarity": retrieval_cfg.min_similarity,
         "mean_similarity": retrieval_result["mean_similarity"],

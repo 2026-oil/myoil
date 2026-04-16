@@ -230,6 +230,14 @@ def _normalize_retrieval_config(
 ) -> RetrievalConfig:
     defaults = RetrievalConfig()
 
+    # Explicit mutual exclusion: quantile gating vs fixed threshold gating.
+    # Use key presence (not default values) to avoid accidental conflicts.
+    if "trigger_quantile" in payload and "event_score_threshold" in payload:
+        raise ValueError(
+            f"{section}: trigger_quantile and event_score_threshold are mutually exclusive; "
+            "set only one"
+        )
+
     top_k = _coerce_positive_int(
         payload.get("top_k", defaults.top_k),
         field_name=f"{section}.top_k",
@@ -242,10 +250,6 @@ def _normalize_retrieval_config(
     if recency_gap_steps != recency_gap_steps_int:
         raise ValueError(f"{section}.recency_gap_steps must be an integer")
 
-    event_score_threshold = _coerce_non_negative_float(
-        payload.get("event_score_threshold", defaults.event_score_threshold),
-        field_name=f"{section}.event_score_threshold",
-    )
     trigger_quantile_raw = payload.get("trigger_quantile", defaults.trigger_quantile)
     if trigger_quantile_raw is None:
         trigger_quantile = None
@@ -255,6 +259,11 @@ def _normalize_retrieval_config(
             raise ValueError(
                 f"{section}.trigger_quantile must satisfy 0 < value < 1"
             )
+
+    event_score_threshold = _coerce_non_negative_float(
+        payload.get("event_score_threshold", defaults.event_score_threshold),
+        field_name=f"{section}.event_score_threshold",
+    )
 
     neighbor_min_event_ratio = _coerce_non_negative_float(
         payload.get("neighbor_min_event_ratio", defaults.neighbor_min_event_ratio),

@@ -8,14 +8,12 @@ retrieval:
     anomaly_tails:
       upward:
       - GPRD_THREAT
-      - BS_Core_Index_A
-      - BS_Core_Index_C
       two_sided: []
   mode: posthoc_blend
   top_k: 1
   recency_gap_steps: 8
-  event_score_threshold: 400.0
-  min_similarity: 0.5
+  trigger_quantile: 0.8
+  min_similarity: 0.7
   similarity: cosine
   temperature: 0.1
   blend_floor: 0.0
@@ -23,5 +21,7 @@ retrieval:
   use_uncertainty_gate: true
   use_shape_key: true
   use_event_key: true
-  event_score_log_bonus_alpha: 0.15
-  event_score_log_bonus_cap: 0.1
+  event_score_log_bonus_alpha: 0.0
+  event_score_log_bonus_cap: 0.0
+
+

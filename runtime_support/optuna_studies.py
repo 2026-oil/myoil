@@ -261,24 +261,46 @@ def build_study_context(
 
 
 def study_catalog_entry(context: StudyContext) -> dict[str, Any]:
+    # Some tests patch a lightweight stand-in for StudyContext. Keep this
+    # catalog helper tolerant so metadata emission never becomes a hard
+    # dependency in replay-only flows.
+    study_index = getattr(context, "study_index", None)
+    selection = getattr(context, "selection", None)
+
+    def _resolve_path(value: Any) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, Path):
+            return str(value.resolve())
+        return str(Path(value).resolve())
+
+    default_label = (
+        f"study-{int(study_index):02d}" if isinstance(study_index, int) else None
+    )
+    study_label = getattr(context, "study_label", default_label)
     return {
-        "study_index": context.study_index,
-        "study_label": context.study_label,
-        "study_root": str(context.study_root.resolve()),
-        "study_name": context.study_name,
-        "storage_path": str(context.storage_path.resolve()),
-        "summary_path": str(context.summary_path.resolve()),
-        "best_params_path": str(context.best_params_path.resolve()),
-        "training_best_params_path": (
-            str(context.training_best_params_path.resolve())
-            if context.training_best_params_path is not None
-            else None
+        "study_index": study_index,
+        "study_label": study_label,
+        "study_root": _resolve_path(getattr(context, "study_root", None)),
+        "study_name": getattr(context, "study_name", None),
+        "storage_path": _resolve_path(getattr(context, "storage_path", None)),
+        "summary_path": _resolve_path(getattr(context, "summary_path", None)),
+        "best_params_path": _resolve_path(getattr(context, "best_params_path", None)),
+        "training_best_params_path": _resolve_path(
+            getattr(context, "training_best_params_path", None)
         ),
-        "sampler_seed": context.sampler_seed,
-        "proposal_flow_id": context.proposal_flow_id,
-        "selected": context.study_index == context.selection.selected_study_index,
-        "canonical_projection": (
-            context.study_index == context.selection.canonical_projection_study_index
+        "sampler_seed": getattr(context, "sampler_seed", None),
+        "proposal_flow_id": getattr(context, "proposal_flow_id", None),
+        "selected": bool(
+            isinstance(study_index, int)
+            and selection is not None
+            and study_index == getattr(selection, "selected_study_index", None)
+        ),
+        "canonical_projection": bool(
+            isinstance(study_index, int)
+            and selection is not None
+            and study_index
+            == getattr(selection, "canonical_projection_study_index", None)
         ),
     }
 
