@@ -74,6 +74,7 @@ def _build_memory_bank(
             target_col=target_col,
             hist_exog_cols=hist_exog_cols,
             hist_exog_tail_modes=hist_exog_tail_modes,
+            insample_y_included=retrieval_cfg.insample_y_included,
         )
         anchor_value = float(raw_train_df[target_col].iloc[end_idx])
         future_values = raw_train_df[target_col].iloc[
@@ -107,6 +108,7 @@ def _build_query(
     target_col: str,
     hist_exog_cols: tuple[str, ...],
     hist_exog_tail_modes: tuple[str, ...],
+    retrieval_cfg: _cfg.RetrievalConfig,
     input_size: int,
 ) -> dict[str, Any]:
     window = transformed_train_df.iloc[-input_size:].reset_index(drop=True)
@@ -116,6 +118,7 @@ def _build_query(
         target_col=target_col,
         hist_exog_cols=hist_exog_cols,
         hist_exog_tail_modes=hist_exog_tail_modes,
+        insample_y_included=retrieval_cfg.insample_y_included,
     )
 
 
@@ -380,6 +383,7 @@ def post_predict_retrieval(
         target_col=target_col,
         hist_exog_cols=available_hist_exog,
         hist_exog_tail_modes=hist_exog_tail_modes,
+        retrieval_cfg=retrieval_cfg,
         input_size=input_size,
     )
 

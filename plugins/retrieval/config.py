@@ -18,6 +18,7 @@ RETRIEVAL_PLUGIN_DETAIL_KEYS = {
     "similarity",
     "temperature",
     "memory_value_mode",
+    "insample_y_included",
     "top_k",
     "recency_gap_steps",
     "trigger_quantile",
@@ -73,6 +74,7 @@ class RetrievalConfig:
     similarity: str = "cosine"
     temperature: float = 0.10
     memory_value_mode: str = "future_return"
+    insample_y_included: bool = True
     use_event_key: bool = True
     blend_floor: float = 0.0
     event_score_log_bonus_alpha: float = 0.0
@@ -303,6 +305,11 @@ def _normalize_retrieval_config(
         field_name=f"{section}.use_uncertainty_gate",
         default=defaults.use_uncertainty_gate,
     )
+    insample_y_included = coerce_bool(
+        payload.get("insample_y_included", defaults.insample_y_included),
+        field_name=f"{section}.insample_y_included",
+        default=defaults.insample_y_included,
+    )
     use_event_key = coerce_bool(
         payload.get("use_event_key", defaults.use_event_key),
         field_name=f"{section}.use_event_key",
@@ -333,6 +340,7 @@ def _normalize_retrieval_config(
         similarity=similarity,
         temperature=temperature,
         memory_value_mode=memory_value_mode,
+        insample_y_included=insample_y_included,
         use_uncertainty_gate=use_uncertainty_gate,
         use_event_key=use_event_key,
         event_score_log_bonus_alpha=event_score_log_bonus_alpha,
@@ -483,6 +491,7 @@ def retrieval_config_to_dict(cfg: RetrievalPluginConfig) -> dict[str, Any]:
         "similarity": r.similarity,
         "temperature": r.temperature,
         "memory_value_mode": r.memory_value_mode,
+        "insample_y_included": r.insample_y_included,
         "top_k": r.top_k,
         "recency_gap_steps": r.recency_gap_steps,
         "trigger_quantile": r.trigger_quantile,

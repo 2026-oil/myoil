@@ -33,6 +33,7 @@ _RETRIEVAL_OVERRIDE_KEYS = {
     "blend_floor",
     "blend_max",
     "use_uncertainty_gate",
+    "insample_y_included",
     "use_event_key",
     "event_score_log_bonus_alpha",
     "event_score_log_bonus_cap",
@@ -1143,15 +1144,27 @@ def _require_star_payload(
     )
 
 
+def _payload_array(payload: dict[str, Any], key: str) -> np.ndarray:
+    if key not in payload:
+        raise ValueError(f"aa_forecast retrieval requires STAR payload key: {key}")
+    value = payload[key].detach().cpu().numpy().astype(float)
+    return value
+
+
 def _build_retrieval_signature(
     *,
     model: Any,
     transformed_window_df: pd.DataFrame,
     target_col: str,
+    insample_y_included: bool = True,
 ) -> dict[str, Any]:
     if not hasattr(model, "_compute_star_outputs"):
         raise ValueError(
             "aa_forecast retrieval requires model._compute_star_outputs for V0"
+        )
+    if not insample_y_included and not getattr(model, "hist_exog_list", ()):
+        raise ValueError(
+            "aa_forecast retrieval exog-only signatures require at least one hist exog column"
         )
     insample_y = torch.as_tensor(
         transformed_window_df[target_col].to_numpy(dtype=np.float32),
@@ -1167,9 +1180,46 @@ def _build_retrieval_signature(
         ).reshape(1, len(transformed_window_df), -1)
     with torch.no_grad():
         payload = model._compute_star_outputs(insample_y, hist_exog)
-    critical_mask, count_active_channels, channel_activity = _require_star_payload(
-        payload
-    )
+    if insample_y_included:
+        critical_mask, count_active_channels, channel_activity = _require_star_payload(
+            payload
+        )
+    else:
+        required = (
+            "star_hist_activity",
+            "non_star_star_activity",
+            "non_star_regime_activity",
+            "star_hist_count",
+            "non_star_star_count",
+            "non_star_regime_count",
+        )
+        missing = [key for key in required if key not in payload]
+        if missing:
+            raise ValueError(
+                "aa_forecast retrieval exog-only signatures require STAR payload keys: "
+                + ", ".join(required)
+                + f"; missing: {', '.join(missing)}"
+            )
+        channel_parts = []
+        for key in (
+            "star_hist_activity",
+            "non_star_star_activity",
+            "non_star_regime_activity",
+        ):
+            part = _payload_array(payload, key)
+            if part.ndim != 3:
+                raise ValueError(
+                    f"aa_forecast retrieval requires 3D {key} payload"
+                )
+            if part.shape[2] > 0:
+                channel_parts.append(part.reshape(part.shape[1], part.shape[2]))
+        channel_activity = np.concatenate(channel_parts, axis=1)
+        star_hist_count = _payload_array(payload, "star_hist_count")
+        non_star_star_count = _payload_array(payload, "non_star_star_count")
+        non_star_regime_count = _payload_array(payload, "non_star_regime_count")
+        combined_count = star_hist_count + non_star_star_count + non_star_regime_count
+        critical_mask = (combined_count > 0).reshape(-1).astype(float)
+        count_active_channels = combined_count.reshape(-1).astype(float)
     activity_sums = channel_activity.sum(axis=0)
     activity_max = channel_activity.max(axis=0)
     event_vector = np.concatenate(
@@ -1214,6 +1264,7 @@ def _build_event_memory_bank(
             model=model,
             transformed_window_df=transformed_window,
             target_col=target_col,
+            insample_y_included=retrieval_cfg.insample_y_included,
         )
         anchor_value = float(raw_train_df[target_col].iloc[end_idx])
         future_values = raw_train_df[target_col].iloc[
@@ -1245,6 +1296,7 @@ def _build_event_query(
     model: Any,
     transformed_train_df: pd.DataFrame,
     target_col: str,
+    retrieval_cfg: Any,
     input_size: int,
 ) -> dict[str, Any]:
     transformed_window = transformed_train_df.iloc[-input_size:].reset_index(drop=True)
@@ -1252,6 +1304,7 @@ def _build_event_query(
         model=model,
         transformed_window_df=transformed_window,
         target_col=target_col,
+        insample_y_included=retrieval_cfg.insample_y_included,
     )
 
 
@@ -1952,6 +2005,7 @@ def predict_aa_forecast_fold(
             model=nf.models[0],
             transformed_train_df=transformed_train_df,
             target_col=target_col,
+            retrieval_cfg=retrieval_cfg,
             input_size=input_size,
         )
         effective_event_threshold = _shared_effective_event_threshold(

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from plugin_contracts.stage_plugin import StagePlugin
@@ -17,6 +18,7 @@ from plugins.retrieval.config import (
 )
 from plugins.retrieval.plugin import RetrievalStagePlugin
 import plugins.retrieval.runtime as retrieval_runtime
+from plugins.retrieval.signatures import _build_star_extractor, compute_star_signature
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -159,6 +161,7 @@ def test_normalize_full_config() -> None:
             "blend_floor": 0.1,
             "blend_max": 0.5,
             "temperature": 0.2,
+            "insample_y_included": False,
             "use_event_key": True,
         },
         unknown_keys=_unknown_keys,
@@ -173,6 +176,7 @@ def test_normalize_full_config() -> None:
     assert cfg.retrieval.trigger_quantile == pytest.approx(0.85)
     assert cfg.retrieval.blend_floor == 0.1
     assert cfg.retrieval.blend_max == 0.5
+    assert cfg.retrieval.insample_y_included is False
 
 
 def test_normalize_rejects_unknown_top_level_key() -> None:
@@ -275,6 +279,55 @@ def test_config_to_dict_round_trip() -> None:
     assert serialized["star"]["thresh"] == 3.0
     assert serialized["top_k"] == 2
     assert serialized["trigger_quantile"] == pytest.approx(0.75)
+    assert serialized["insample_y_included"] is True
+
+
+def test_compute_star_signature_supports_exog_only_mode() -> None:
+    star = _build_star_extractor(RetrievalStarConfig())
+    frame = pd.DataFrame(
+        {
+            "target": [1.0, 1.1, 1.2, 1.3],
+            "event": [0.0, 0.0, 5.0, 0.0],
+        }
+    )
+
+    with_target = compute_star_signature(
+        star=star,
+        window_df=frame,
+        target_col="target",
+        hist_exog_cols=("event",),
+        hist_exog_tail_modes=("upward",),
+        insample_y_included=True,
+    )
+    exog_only = compute_star_signature(
+        star=star,
+        window_df=frame,
+        target_col="target",
+        hist_exog_cols=("event",),
+        hist_exog_tail_modes=("upward",),
+        insample_y_included=False,
+    )
+
+    assert exog_only["event_vector"].shape[0] < with_target["event_vector"].shape[0]
+    with_target_prefix = with_target["event_vector"][
+        : exog_only["event_vector"].shape[0]
+    ]
+    assert not np.allclose(exog_only["event_vector"], with_target_prefix)
+
+
+def test_compute_star_signature_exog_only_requires_hist_exog() -> None:
+    star = _build_star_extractor(RetrievalStarConfig())
+    frame = pd.DataFrame({"target": [1.0, 1.1, 1.2, 1.3]})
+
+    with pytest.raises(ValueError, match="require at least one hist exog column"):
+        compute_star_signature(
+            star=star,
+            window_df=frame,
+            target_col="target",
+            hist_exog_cols=(),
+            hist_exog_tail_modes=(),
+            insample_y_included=False,
+        )
 
 
 def test_normalize_requires_trigger_quantile_when_enabled() -> None:

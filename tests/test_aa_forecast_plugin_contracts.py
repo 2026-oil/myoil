@@ -6,6 +6,7 @@ from dataclasses import replace
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -18,12 +19,14 @@ from plugins.aa_forecast.config import (
     AAForecastPluginConfig,
     aa_forecast_plugin_state_dict,
     aa_forecast_stage_document_type,
+    resolve_aa_forecast_hist_exog,
 )
 from plugins.aa_forecast.plugin import AAForecastStagePlugin
 from plugins.aa_forecast.search_space import AA_FORECAST_STAGE_ONLY_PARAM_REGISTRY
 import plugins.aa_forecast.runtime as aa_runtime
 import runtime_support.forecast_models as forecast_models
 import runtime_support.runner as runtime
+from neuralforecast.models.aaforecast.model import AAForecast
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -114,6 +117,59 @@ def test_aa_forecast_stage_document_type_rejects_unknown_suffix() -> None:
         aa_forecast_stage_document_type(Path("stage.json"))
 
 
+def test_resolve_aa_forecast_hist_exog_accepts_non_prefix_star_subset() -> None:
+    config = AAForecastPluginConfig(
+        enabled=True,
+        model="gru",
+        star_anomaly_tails={
+            "upward": ("GPRD", "Idx_OVX"),
+            "two_sided": (),
+        },
+    )
+
+    resolved = resolve_aa_forecast_hist_exog(
+        config,
+        hist_exog_cols=(
+            "GPRD_THREAT",
+            "GPRD",
+            "GPRD_ACT",
+            "Idx_OVX",
+            "Com_LMEX",
+        ),
+    )
+
+    assert resolved.star_hist_exog_cols_resolved == ("GPRD", "Idx_OVX")
+    assert resolved.non_star_hist_exog_cols_resolved == (
+        "GPRD_THREAT",
+        "GPRD_ACT",
+        "Com_LMEX",
+    )
+    assert resolved.star_anomaly_tail_modes_resolved == ("upward", "upward")
+
+
+def test_aaforecast_model_accepts_interleaved_star_and_non_star_groups() -> None:
+    model = object.__new__(AAForecast)
+    model.hist_exog_size = 5
+    model.hist_exog_list = (
+        "GPRD_THREAT",
+        "GPRD",
+        "GPRD_ACT",
+        "Idx_OVX",
+        "Com_LMEX",
+    )
+    model.star_hist_exog_list = ("GPRD", "Idx_OVX")
+    model.non_star_hist_exog_list = (
+        "GPRD_THREAT",
+        "GPRD_ACT",
+        "Com_LMEX",
+    )
+
+    star_idx, non_star_idx = AAForecast._resolve_hist_exog_groups(model)
+
+    assert star_idx == (1, 3)
+    assert non_star_idx == (0, 2, 4)
+
+
 def test_fanout_filter_payload_requires_dict() -> None:
     plugin = AAForecastStagePlugin()
     with pytest.raises(TypeError, match="dict"):
@@ -201,10 +257,10 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
                     "tune_training": False,
                     "star_anomaly_tails": {"upward": ["event"], "two_sided": []},
                     "uncertainty": {"enabled": True, "sample_count": 2},
-                    "retrieval": {
-                        "enabled": True,
-                        "config_path": retrieval_path.name,
-                    },
+                "retrieval": {
+                    "enabled": True,
+                    "config_path": retrieval_path.name,
+                },
                     "model_params": {},
                 }
             },
@@ -246,6 +302,7 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
     assert retrieval.similarity == "cosine"
     assert retrieval.temperature == pytest.approx(0.1)
     assert retrieval.memory_value_mode == "future_return"
+    assert retrieval.insample_y_included is True
     assert retrieval.use_uncertainty_gate is True
 
     payload = aa_forecast_plugin_state_dict(
@@ -261,6 +318,7 @@ def test_load_app_config_accepts_retrieval_block_and_projects_state_defaults(
     assert payload["retrieval"]["trigger_quantile"] == pytest.approx(0.9)
     assert payload["retrieval"]["neighbor_min_event_ratio"] == pytest.approx(0.0)
     assert payload["retrieval"]["memory_value_mode"] == "future_return"
+    assert payload["retrieval"]["insample_y_included"] is True
     assert payload["retrieval"]["use_event_key"] is True
 
 
@@ -1867,6 +1925,60 @@ def test_build_retrieval_signature_rejects_missing_star_payload_keys() -> None:
             model=_BrokenModel(),
             transformed_window_df=pd.DataFrame({"target": [1.0, 2.0]}),
             target_col="target",
+        )
+
+
+def test_build_retrieval_signature_supports_exog_only_mode() -> None:
+    class _Model:
+        hist_exog_list = ("event",)
+
+        def _compute_star_outputs(self, insample_y, hist_exog):
+            del insample_y, hist_exog
+            return {
+                "critical_mask": torch.tensor([[[1.0], [1.0]]]),
+                "count_active_channels": torch.tensor([[[2.0], [2.0]]]),
+                "channel_activity": torch.tensor([[[9.0, 1.0], [9.0, 2.0]]]),
+                "star_hist_activity": torch.tensor([[[1.0], [2.0]]]),
+                "non_star_star_activity": torch.zeros((1, 2, 0)),
+                "non_star_regime_activity": torch.zeros((1, 2, 0)),
+                "star_hist_count": torch.tensor([[[1.0], [1.0]]]),
+                "non_star_star_count": torch.tensor([[[0.0], [0.0]]]),
+                "non_star_regime_count": torch.tensor([[[0.0], [0.0]]]),
+            }
+
+    frame = pd.DataFrame({"target": [1.0, 2.0], "event": [3.0, 4.0]})
+
+    with_target = aa_runtime._build_retrieval_signature(
+        model=_Model(),
+        transformed_window_df=frame,
+        target_col="target",
+        insample_y_included=True,
+    )
+    exog_only = aa_runtime._build_retrieval_signature(
+        model=_Model(),
+        transformed_window_df=frame,
+        target_col="target",
+        insample_y_included=False,
+    )
+
+    assert exog_only["event_vector"].shape[0] < with_target["event_vector"].shape[0]
+    assert exog_only["event_score"] < with_target["event_score"]
+
+
+def test_build_retrieval_signature_exog_only_requires_hist_exog() -> None:
+    class _NoHistModel:
+        hist_exog_list = ()
+
+        def _compute_star_outputs(self, insample_y, hist_exog):
+            del insample_y, hist_exog
+            return {}
+
+    with pytest.raises(ValueError, match="require at least one hist exog column"):
+        aa_runtime._build_retrieval_signature(
+            model=_NoHistModel(),
+            transformed_window_df=pd.DataFrame({"target": [1.0, 2.0]}),
+            target_col="target",
+            insample_y_included=False,
         )
 
 

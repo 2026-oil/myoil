@@ -86,6 +86,7 @@ def test_load_baseline_ret_linked_config_path() -> None:
     assert cfg.stage_plugin_config.retrieval.blend_floor == pytest.approx(0.0)
     assert cfg.stage_plugin_config.retrieval.blend_max == pytest.approx(1.0)
     assert cfg.stage_plugin_config.retrieval.use_uncertainty_gate is True
+    assert cfg.stage_plugin_config.retrieval.insample_y_included is False
 
 
 def test_baseline_hist_exog_columns_exist_in_df() -> None:

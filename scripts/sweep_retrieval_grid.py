@@ -23,15 +23,22 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # ---------------------------------------------------------------------------
 
 GRID: dict[str, list[Any]] = {
-    "use_uncertainty_gate": [True, False],
-    "top_k": [1, 3, 5],
-    "recency_gap_steps": [4, 8, 16],
-    "trigger_quantile": [0.7, 0.8, 0.9],
-    "min_similarity": [0.5, 0.7, 0.9],
-    "blend_floor": [0.0],
-    "blend_max": [0.5, 0.75, 1.0],
-    "event_score_log_bonus_alpha": [0.0, 0.15, 0.3],
-    "event_score_log_bonus_cap": [0.0, 0.1],
+    "star_anomaly_tails_upward": [
+        ["GPRD_THREAT"],
+        ["GPRD"],
+        ["GPRD_ACT"],
+        ["Idx_OVX"],
+        ["GPRD_THREAT", "GPRD"],
+        ["GPRD_THREAT", "GPRD_ACT"],
+        ["GPRD", "GPRD_ACT"],
+        ["GPRD", "Idx_OVX"],
+        ["GPRD_THREAT", "GPRD", "GPRD_ACT"],
+        ["GPRD_THREAT", "GPRD", "GPRD_ACT", "Idx_OVX"],
+    ],
+    # NOTE: aa_forecast.retrieval.trigger_quantile requires 0 < value < 1.
+    "trigger_quantile": [0.05, 0.1, 0.2],
+    "min_similarity": [0.0, 0.3, 0.5],
+    "top_k": [1, 3, 5, 7],
 }
 
 # ---------------------------------------------------------------------------
@@ -40,30 +47,45 @@ GRID: dict[str, list[Any]] = {
 
 PLUGIN_FIXED: dict[str, Any] = {
     "aa_forecast": {
-        "model": "informer",
+        "model": "timexer",
         "tune_training": False,
         "lowess_frac": 0.35,
         "lowess_delta": 0.01,
         "uncertainty": {
             "enabled": True,
-            "dropout_candidates": [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3],
-            "sample_count": 50,
+            # Keep uncertainty enabled because aa_forecast retrieval requires it, but
+            # keep the sweep lightweight (grid size already dominates runtime).
+            "dropout_candidates": [0.2, 0.3],
+            "sample_count": 3,
         },
         "model_params": {
             "hidden_size": 128,
-            "n_head": 8,
-            "encoder_layers": 2,
+            "n_heads": 8,
+            "e_layers": 2,
             "dropout": 0.1,
-            "factor": 3,
-            "decoder_hidden_size": 192,
+            "d_ff": 256,
+            "patch_len": 8,
+            "use_norm": True,
+            "decoder_hidden_size": 128,
             "decoder_layers": 4,
             "season_length": 4,
         },
         "star_anomaly_tails": {
-            "upward": ["GPRD_THREAT", "BS_Core_Index_A", "BS_Core_Index_C"],
+            "upward": ["GPRD_THREAT"],  # will be overridden by grid
             "two_sided": [],
         },
         "thresh": 3.5,
+        "retrieval": {
+            "recency_gap_steps": 8,
+            "similarity": "cosine",
+            "temperature": 0.1,
+            "blend_floor": 0.0,
+            "blend_max": 1.0,
+            "use_uncertainty_gate": True,
+            "use_event_key": True,
+            "event_score_log_bonus_alpha": 0.0,
+            "event_score_log_bonus_cap": 0.0,
+        },
     }
 }
 
@@ -75,11 +97,8 @@ EXPERIMENT_TEMPLATE: dict[str, Any] = {
         "dt_col": "dt",
         "hist_exog_cols": [
             "GPRD_THREAT",
-            "BS_Core_Index_A",
             "GPRD",
             "GPRD_ACT",
-            "BS_Core_Index_B",
-            "BS_Core_Index_C",
             "Idx_OVX",
             "Com_LMEX",
             "Com_BloombergCommodity_BCOM",
@@ -97,31 +116,43 @@ EXPERIMENT_DIR = REPO_ROOT / "yaml" / "experiment" / "sweep_retrieval"
 CONFIGS_TXT = EXPERIMENT_DIR / "configs.txt"
 
 
-def _is_valid_combo(combo: dict[str, Any]) -> bool:
-    if combo["blend_floor"] > combo["blend_max"]:
-        return False
-    return True
-
-
 def generate_combos() -> list[dict[str, Any]]:
     keys = list(GRID.keys())
     all_values = [GRID[k] for k in keys]
     combos: list[dict[str, Any]] = []
     for values in itertools.product(*all_values):
         combo = dict(zip(keys, values))
-        if _is_valid_combo(combo):
-            combos.append(combo)
+        combos.append(combo)
     return combos
 
 
 def _build_retrieval_block(combo: dict[str, Any]) -> dict[str, Any]:
-    return {"enabled": True, "use_event_key": True, **combo}
+    return {
+        "enabled": True,
+        "top_k": combo["top_k"],
+        "trigger_quantile": combo["trigger_quantile"],
+        "min_similarity": combo["min_similarity"],
+        "use_event_key": True,
+        "recency_gap_steps": 8,
+        "similarity": "cosine",
+        "temperature": 0.1,
+        "blend_floor": 0.0,
+        "blend_max": 1.0,
+        "use_uncertainty_gate": True,
+        "event_score_log_bonus_alpha": 0.0,
+        "event_score_log_bonus_cap": 0.0,
+    }
 
 
 def _build_plugin_yaml(combo: dict[str, Any]) -> dict[str, Any]:
     import copy
 
     doc = copy.deepcopy(PLUGIN_FIXED)
+    # Override star_anomaly_tails with grid values
+    doc["aa_forecast"]["star_anomaly_tails"]["upward"] = combo[
+        "star_anomaly_tails_upward"
+    ]
+    # Set retrieval params from grid
     doc["aa_forecast"]["retrieval"] = _build_retrieval_block(combo)
     return doc
 
@@ -136,7 +167,9 @@ def _build_experiment_yaml(idx: int, plugin_rel_path: str) -> dict[str, Any]:
 
 
 def _yaml_dump(data: dict[str, Any]) -> str:
-    return yaml.dump(data, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    return yaml.dump(
+        data, default_flow_style=False, sort_keys=False, allow_unicode=True
+    )
 
 
 def generate(*, dry_run: bool = False) -> int:
@@ -152,7 +185,7 @@ def generate(*, dry_run: bool = False) -> int:
 
     config_paths: list[str] = []
     for idx, combo in enumerate(combos, start=1):
-        plugin_filename = f"aa_forecast_informer-ret-{idx:04d}.yaml"
+        plugin_filename = f"aa_forecast_timexer-ret-{idx:04d}.yaml"
         experiment_filename = f"sweep-{idx:04d}.yaml"
 
         plugin_path = PLUGIN_DIR / plugin_filename
@@ -169,7 +202,9 @@ def generate(*, dry_run: bool = False) -> int:
 
     CONFIGS_TXT.write_text("\n".join(config_paths) + "\n", encoding="utf-8")
     print(f"Generated {total} plugin YAMLs  -> {PLUGIN_DIR.relative_to(REPO_ROOT)}/")
-    print(f"Generated {total} experiment YAMLs -> {EXPERIMENT_DIR.relative_to(REPO_ROOT)}/")
+    print(
+        f"Generated {total} experiment YAMLs -> {EXPERIMENT_DIR.relative_to(REPO_ROOT)}/"
+    )
     print(f"Config list -> {CONFIGS_TXT.relative_to(REPO_ROOT)}")
     return total
 
@@ -184,9 +219,17 @@ def clean() -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate retrieval grid-sweep configs")
-    parser.add_argument("--dry-run", action="store_true", help="Print combo count without generating files")
-    parser.add_argument("--clean", action="store_true", help="Remove generated sweep directories")
+    parser = argparse.ArgumentParser(
+        description="Generate retrieval grid-sweep configs"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print combo count without generating files",
+    )
+    parser.add_argument(
+        "--clean", action="store_true", help="Remove generated sweep directories"
+    )
     args = parser.parse_args()
 
     if args.clean:

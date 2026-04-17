@@ -221,6 +221,7 @@ def _assert_retrieval_payload(
     blend_floor: float,
     blend_max: float,
     use_uncertainty_gate: bool,
+    insample_y_included: bool = True,
 ) -> None:
     assert payload["enabled"] is enabled
     assert payload["top_k"] == top_k
@@ -237,6 +238,7 @@ def _assert_retrieval_payload(
     assert payload["similarity"] == "cosine"
     assert payload["temperature"] == pytest.approx(0.1)
     assert payload["memory_value_mode"] == "future_return"
+    assert payload["insample_y_included"] is insample_y_included
     assert payload["use_event_key"] is True
 
 

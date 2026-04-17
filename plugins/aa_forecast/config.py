@@ -43,7 +43,7 @@ AA_FORECAST_LINKED_KEYS = {
     "retrieval",
     "encoding_export",
 }
-AA_FORECAST_UNCERTAINTY_KEYS = {"enabled", "sample_count"}
+AA_FORECAST_UNCERTAINTY_KEYS = {"enabled", "dropout_candidates", "sample_count"}
 AA_FORECAST_STAR_ANOMALY_TAIL_KEYS = {"upward", "two_sided"}
 AA_FORECAST_RETRIEVAL_KEYS = {
     "enabled",
@@ -60,6 +60,7 @@ AA_FORECAST_RETRIEVAL_KEYS = {
     "similarity",
     "temperature",
     "memory_value_mode",
+    "insample_y_included",
     "use_event_key",
     "event_score_log_bonus_alpha",
     "event_score_log_bonus_cap",
@@ -109,6 +110,7 @@ class AAForecastRetrievalConfig:
     similarity: str = "cosine"
     temperature: float = 0.10
     memory_value_mode: str = "future_return"
+    insample_y_included: bool = True
     use_event_key: bool = True
     blend_floor: float = 0.0
     event_score_log_bonus_alpha: float = 0.0
@@ -199,6 +201,7 @@ def aa_forecast_retrieval_public_dict(
         "similarity": retrieval.similarity,
         "temperature": retrieval.temperature,
         "memory_value_mode": retrieval.memory_value_mode,
+        "insample_y_included": retrieval.insample_y_included,
         "use_event_key": retrieval.use_event_key,
         "event_score_log_bonus_alpha": retrieval.event_score_log_bonus_alpha,
         "event_score_log_bonus_cap": retrieval.event_score_log_bonus_cap,
@@ -612,6 +615,14 @@ def _normalize_retrieval_config(
         field_name=f"{section}.use_uncertainty_gate",
         default=AAForecastRetrievalConfig().use_uncertainty_gate,
     )
+    insample_y_included = coerce_bool(
+        payload.get(
+            "insample_y_included",
+            AAForecastRetrievalConfig().insample_y_included,
+        ),
+        field_name=f"{section}.insample_y_included",
+        default=AAForecastRetrievalConfig().insample_y_included,
+    )
     use_event_key = coerce_bool(
         payload.get("use_event_key", AAForecastRetrievalConfig().use_event_key),
         field_name=f"{section}.use_event_key",
@@ -655,6 +666,7 @@ def _normalize_retrieval_config(
         similarity=AAForecastRetrievalConfig().similarity,
         temperature=AAForecastRetrievalConfig().temperature,
         memory_value_mode=AAForecastRetrievalConfig().memory_value_mode,
+        insample_y_included=insample_y_included,
         use_event_key=use_event_key,
         event_score_log_bonus_alpha=event_score_log_bonus_alpha,
         event_score_log_bonus_cap=event_score_log_bonus_cap,

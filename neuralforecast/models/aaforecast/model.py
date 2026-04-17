@@ -1471,6 +1471,8 @@ class AAForecast(BaseModel):
             ),
             "critical_mask": combined_count > 0,
             "count_active_channels": combined_count,
+            "target_count": target_count,
+            "star_hist_count": star_hist_count,
             "star_hist_activity": star_hist_activity,
             "star_hist_signed_score": star_hist_signed_score,
             "channel_activity": torch.cat(
@@ -1626,7 +1628,9 @@ class AAForecast(BaseModel):
             raise ValueError(
                 "AAForecast non_star_hist_exog_list must follow hist_exog_list order exactly"
             )
-        if resolved_star + resolved_non_star != tuple(self.hist_exog_list):
+        if set(all_names) != set(self.hist_exog_list) or len(all_names) != len(
+            self.hist_exog_list
+        ):
             raise ValueError(
                 "AAForecast hist exog groups must cover hist_exog_list exactly"
             )

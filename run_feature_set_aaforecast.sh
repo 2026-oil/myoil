@@ -5,14 +5,14 @@ repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$repo_root"
 
 configs=(
-  "yaml/experiment/feature_set_aaforecast_brent/baseline.yaml"
-  "yaml/experiment/feature_set_aaforecast_brent/baseline-ret.yaml"
-  "yaml/experiment/feature_set_aaforecast_brent/aaforecast-informer-ret.yaml"
-  "yaml/experiment/feature_set_aaforecast_brent/aaforecast-gru-ret.yaml"
-  "yaml/experiment/feature_set_aaforecast_brent/aaforecast-timexer-ret.yaml"
-  "yaml/experiment/feature_set_aaforecast_brent/aaforecast-informer.yaml"
-  "yaml/experiment/feature_set_aaforecast_brent/aaforecast-gru.yaml"
-  "yaml/experiment/feature_set_aaforecast_brent/aaforecast-timexer.yaml"
+  "yaml/experiment/feature_set_aaforecast_wti/baseline.yaml"
+  "yaml/experiment/feature_set_aaforecast_wti/baseline-ret.yaml"
+  "yaml/experiment/feature_set_aaforecast_wti/aaforecast-informer-ret.yaml"
+  "yaml/experiment/feature_set_aaforecast_wti/aaforecast-gru-ret.yaml"
+  "yaml/experiment/feature_set_aaforecast_wti/aaforecast-timexer-ret.yaml"
+  "yaml/experiment/feature_set_aaforecast_wti/aaforecast-informer.yaml"
+  "yaml/experiment/feature_set_aaforecast_wti/aaforecast-gru.yaml"
+  "yaml/experiment/feature_set_aaforecast_wti/aaforecast-timexer.yaml"
 )
 
 printf -v nf_case_configs '%s\n' "${configs[@]}"

@@ -50,6 +50,50 @@ def _resolve_tail_modes(
     return tuple(modes)
 
 
+def retrieval_timestep_combined_critical_mask(
+    *,
+    star: STARFeatureExtractor,
+    window_df: pd.DataFrame,
+    target_col: str,
+    hist_exog_cols: tuple[str, ...],
+    hist_exog_tail_modes: tuple[str, ...],
+    insample_y_included: bool = True,
+) -> np.ndarray:
+    """Per-timestep OR of STAR ``critical_mask`` over target + hist exog (retrieval contract).
+
+    Matches ``compute_star_signature`` / aa_forecast retrieval: target channel always uses
+    ``tail_modes=('two_sided',)``; each hist exog column uses ``hist_exog_tail_modes``.
+    """
+    if not insample_y_included and not hist_exog_cols:
+        raise ValueError(
+            "retrieval exog-only signatures require at least one hist exog column"
+        )
+
+    seq_len = len(window_df)
+    combined_count = np.zeros((1, seq_len, 1), dtype=float)
+    if insample_y_included:
+        target_values = window_df[target_col].to_numpy(dtype=np.float32)
+        insample_y = torch.as_tensor(target_values, dtype=torch.float32).reshape(
+            1, -1, 1
+        )
+        with torch.no_grad():
+            target_star = star(insample_y, tail_modes=("two_sided",))
+        target_mask = target_star["critical_mask"].numpy().astype(float)
+        combined_count = combined_count + target_mask.astype(float).sum(
+            axis=2, keepdims=True
+        )
+    if hist_exog_cols:
+        hist_values = window_df[list(hist_exog_cols)].to_numpy(dtype=np.float32)
+        hist_tensor = torch.as_tensor(hist_values, dtype=torch.float32).unsqueeze(0)
+        with torch.no_grad():
+            hist_star = star(hist_tensor, tail_modes=hist_exog_tail_modes)
+        hist_mask = hist_star["critical_mask"].numpy().astype(float)
+        combined_count = combined_count + hist_mask.astype(float).sum(
+            axis=2, keepdims=True
+        )
+    return (combined_count > 0).reshape(-1)
+
+
 def compute_star_signature(
     *,
     star: STARFeatureExtractor,
@@ -57,6 +101,7 @@ def compute_star_signature(
     target_col: str,
     hist_exog_cols: tuple[str, ...],
     hist_exog_tail_modes: tuple[str, ...],
+    insample_y_included: bool = True,
 ) -> dict[str, Any]:
     """Build event_vector and event_score from STAR decomposition.
 
@@ -64,21 +109,32 @@ def compute_star_signature(
     uses a standalone ``STARFeatureExtractor`` instead of the model's internal
     STAR outputs.
     """
-    target_values = window_df[target_col].to_numpy(dtype=np.float32)
-    insample_y = torch.as_tensor(target_values, dtype=torch.float32).reshape(1, -1, 1)
+    if not insample_y_included and not hist_exog_cols:
+        raise ValueError(
+            "retrieval exog-only signatures require at least one hist exog column"
+        )
 
-    with torch.no_grad():
-        target_star = star(insample_y, tail_modes=("two_sided",))
+    seq_len = len(window_df)
+    all_activity: list[np.ndarray] = []
+    combined_count = np.zeros((1, seq_len, 1), dtype=float)
 
-    target_mask = target_star["critical_mask"].numpy().astype(float)
-    target_ranking = target_star["ranking_score"].numpy().astype(float)
-    target_activity = target_ranking * target_mask
+    if insample_y_included:
+        target_values = window_df[target_col].to_numpy(dtype=np.float32)
+        insample_y = torch.as_tensor(target_values, dtype=torch.float32).reshape(
+            1, -1, 1
+        )
+        with torch.no_grad():
+            target_star = star(insample_y, tail_modes=("two_sided",))
 
-    # target_count: per-timestep count of active channels (target has 1 channel)
-    target_count = target_mask.astype(float).sum(axis=2, keepdims=True)
-
-    hist_activities: list[np.ndarray] = []
-    hist_count = np.zeros_like(target_count)
+        target_mask = target_star["critical_mask"].numpy().astype(float)
+        target_ranking = target_star["ranking_score"].numpy().astype(float)
+        target_activity = target_ranking * target_mask
+        combined_count = combined_count + target_mask.astype(float).sum(
+            axis=2, keepdims=True
+        )
+        all_activity.append(
+            target_activity.reshape(target_activity.shape[1], target_activity.shape[2])
+        )
 
     if hist_exog_cols:
         hist_values = window_df[list(hist_exog_cols)].to_numpy(dtype=np.float32)
@@ -88,16 +144,11 @@ def compute_star_signature(
         hist_mask = hist_star["critical_mask"].numpy().astype(float)
         hist_ranking = hist_star["ranking_score"].numpy().astype(float)
         hist_act = hist_ranking * hist_mask
-        hist_activities.append(hist_act.reshape(hist_act.shape[1], hist_act.shape[2]))
-        hist_count = hist_mask.astype(float).sum(axis=2, keepdims=True)
+        all_activity.append(hist_act.reshape(hist_act.shape[1], hist_act.shape[2]))
+        combined_count = combined_count + hist_mask.astype(float).sum(
+            axis=2, keepdims=True
+        )
 
-    combined_count = target_count + hist_count
-
-    # Flatten to 2D (time, channels) for concatenation
-    target_activity_2d = target_activity.reshape(
-        target_activity.shape[1], target_activity.shape[2]
-    )
-    all_activity = [target_activity_2d] + hist_activities
     channel_activity = np.concatenate(all_activity, axis=1)
 
     critical_mask = (combined_count > 0).reshape(-1).astype(float)

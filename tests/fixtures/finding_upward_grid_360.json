@@ -1,0 +1,12 @@
+[
+  ["GPRD_THREAT"],
+  ["GPRD"],
+  ["GPRD_ACT"],
+  ["Idx_OVX"],
+  ["GPRD_THREAT", "GPRD"],
+  ["GPRD_THREAT", "GPRD_ACT"],
+  ["GPRD", "GPRD_ACT"],
+  ["GPRD", "Idx_OVX"],
+  ["GPRD_THREAT", "GPRD", "GPRD_ACT"],
+  ["GPRD_THREAT", "GPRD", "GPRD_ACT", "Idx_OVX"]
+]

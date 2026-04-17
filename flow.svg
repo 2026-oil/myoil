@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="620" viewBox="0 0 1600 620">
+  <defs>
+    <style>
+      .title { font: 700 72px 'Georgia', 'Times New Roman', serif; fill: #111; }
+      .label { font: 600 62px 'Georgia', 'Times New Roman', serif; fill: #111; }
+      .text { font: 40px 'Georgia', 'Times New Roman', serif; fill: #222; }
+      .small { font: 52px 'Georgia', 'Times New Roman', serif; fill: #222; }
+      .tiny { font: 28px 'Georgia', 'Times New Roman', serif; fill: #333; }
+      .mono-heavy { font: 60px 'Arial Black', 'Arial', sans-serif; font-weight: 900; fill: #d44b43; }
+      .panel { fill: #fafafa; stroke: #444; stroke-width: 4.5; stroke-dasharray: 10 6; rx: 28; ry: 28; }
+      .arrow { stroke: #222; stroke-width: 5.5; fill: none; marker-end: url(#arrowhead); }
+      .dasharrow { stroke: #444; stroke-width: 4.5; fill: none; stroke-dasharray: 6 6; marker-end: url(#arrowhead); }
+      .cardstroke { stroke: #333; stroke-width: 5.5; rx: 18; ry: 18; }
+      .outbox { fill: #fdfdfd; stroke: #222; stroke-width: 5.5; rx: 18; ry: 18; }
+    </style>
+    <marker id="arrowhead" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L12,5 L0,10 z" fill="#222"/>
+    </marker>
+    <linearGradient id="goldGrad" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f5cb54"/>
+      <stop offset="100%" stop-color="#d7a41d"/>
+    </linearGradient>
+    <linearGradient id="orangeGrad" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#de7d37"/>
+      <stop offset="100%" stop-color="#b95b19"/>
+    </linearGradient>
+    <linearGradient id="beigeGrad" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#fdf1c0"/>
+      <stop offset="100%" stop-color="#f4e5a7"/>
+    </linearGradient>
+    <linearGradient id="mintGrad" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#d5ead8"/>
+      <stop offset="100%" stop-color="#b9d6bf"/>
+    </linearGradient>
+    <linearGradient id="tealGrad" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#72ddd3"/>
+      <stop offset="100%" stop-color="#43b7ae"/>
+    </linearGradient>
+    <linearGradient id="blueGrad" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#4bbcf2"/>
+      <stop offset="100%" stop-color="#1c86c8"/>
+    </linearGradient>
+    <linearGradient id="lavGrad" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#d8dbe8"/>
+      <stop offset="100%" stop-color="#bfc5d7"/>
+    </linearGradient>
+    <linearGradient id="roseGrad" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f3b6af"/>
+      <stop offset="100%" stop-color="#e68f84"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="2.0" dy="3.0" stdDeviation="8.0" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Optimized Background Panels -->
+  <rect x="10" y="55" width="280" height="500" class="panel"/>
+  <rect x="305" y="55" width="300" height="500" class="panel"/>
+  <rect x="620" y="55" width="300" height="500" class="panel"/>
+  <rect x="935" y="55" width="300" height="500" class="panel"/>
+  <rect x="1250" y="55" width="335" height="500" class="panel"/>
+
+  <!-- Aligned Giant Titles -->
+  <text x="150" y="110" text-anchor="middle" class="title">STAR</text>
+  <text x="455" y="110" text-anchor="middle" class="title">AAForecast</text>
+  <text x="770" y="110" text-anchor="middle" class="title">Uncertainty</text>
+  <text x="1085" y="110" text-anchor="middle" class="title">Retrieval</text>
+  <text x="1417.5" y="110" text-anchor="middle" class="title">Final</text>
+
+  <!-- Panel 1: STAR Details (Iconic Style) -->
+  <g transform="translate(0, 100)">
+    <rect x="180" y="130" width="90" height="42" fill="white" stroke="#444" stroke-width="1.7"/>
+    <polyline points="182,155 187,148 192,152 197,144 202,150 207,138 212,144 217,132 222,142 227,135 232,146 237,138 242,148 247,140 252,152 257,144 262,156 267,148 270,155" fill="none" stroke="#4a58ff" stroke-width="3.5"/>
+    <rect x="180" y="190" width="90" height="42" fill="white" stroke="#444" stroke-width="1.7"/>
+    <path d="M182,218 Q210,200 240,215 T270,205" fill="none" stroke="#8b8b8b" stroke-width="5.0"/>
+    <rect x="180" y="250" width="90" height="42" fill="white" stroke="#444" stroke-width="1.7"/>
+    <path d="M182,271 c5,-18 15,-18 20,0 s15,18 20,0 c5,-18 15,-18 20,0" fill="none" stroke="#9fc1ff" stroke-width="4.5"/>
+    <rect x="180" y="310" width="90" height="42" fill="white" stroke="#444" stroke-width="1.7"/>
+    <polyline points="182,345 210,345 215,315 220,345 245,345 250,310 255,345 270,345" fill="none" stroke="#ef6f68" stroke-width="5.0"/>
+  </g>
+
+  <!-- Panel 2: AAForecast Module -->
+  <g filter="url(#shadow)">
+    <rect x="330" y="180" width="250" height="110" fill="url(#orangeGrad)" class="cardstroke"/>
+    <text x="455" y="245" text-anchor="middle" class="label" fill="#fff" font-size="34">STAR Decomp. Set</text>
+
+    <rect x="330" y="310" width="250" height="130" fill="url(#beigeGrad)" class="cardstroke"/>
+    <text x="455" y="365" text-anchor="middle" class="label">Backbone</text>
+    <text x="455" y="410" text-anchor="middle" class="small">(Neural)</text>
+
+    <rect x="330" y="460" width="250" height="110" fill="url(#mintGrad)" class="cardstroke"/>
+    <text x="455" y="525" text-anchor="middle" class="label">Head</text>
+  </g>
+
+  <!-- Panel 3: Uncertainty Optimization -->
+  <g filter="url(#shadow)">
+    <rect x="635" y="180" width="270" height="185" fill="#fff" class="cardstroke"/>
+    <text x="770" y="235" text-anchor="middle" class="label">Dynamic Ens.</text>
+    
+    <g transform="translate(15, 80)">
+      <line x1="680" y1="185" x2="680" y2="285" stroke="#333" stroke-width="5.0"/>
+      <rect x="630" y="210" width="100" height="45" fill="#d5ead8" stroke="#333" stroke-width="5.0"/>
+      
+      <line x1="785" y1="180" x2="785" y2="290" stroke="#333" stroke-width="5.0"/>
+      <rect x="735" y="200" width="100" height="55" fill="#d5ead8" stroke="#333" stroke-width="5.0"/>
+    </g>
+
+    <rect x="635" y="385" width="270" height="185" fill="url(#tealGrad)" class="cardstroke"/>
+    <text x="770" y="480" text-anchor="middle" class="label" fill="#fff">Uncertainty</text>
+  </g>
+
+  <!-- Panel 4: Retrieval Augmented -->
+  <g filter="url(#shadow)">
+    <rect x="925" y="180" width="310" height="185" fill="url(#roseGrad)" class="cardstroke"/>
+    <text x="1080" y="275" text-anchor="middle" class="label">Event Query</text>
+
+    <rect x="925" y="385" width="310" height="185" fill="url(#mintGrad)" class="cardstroke"/>
+    <text x="1080" y="450" text-anchor="middle" class="label">Memory Bank Search</text>
+    <text x="1080" y="510" text-anchor="middle" class="small">Top-K Analogues (k=1)</text>
+  </g>
+
+  <!-- Panel 5: Final Output (Small Digit Points) -->
+  <g filter="url(#shadow)">
+    <rect x="1275" y="160" width="285" height="410" class="outbox"/>
+    
+    <text x="1417.5" y="215" text-anchor="middle" class="label">Analogue Digit</text>
+    
+    <!-- Path shifted left -->
+    <path d="M1295,340 L1315,310 L1335,330 L1355,285 L1385,315 L1410,270" fill="none" stroke="#5a5ce6" stroke-width="10" stroke-linecap="round"/>
+    
+    <g>
+      <!-- Small Circles with Labels -->
+      <circle cx="1355" cy="285" r="8" fill="#f1a13e" stroke="#fff" stroke-width="2.5"/>
+      <text x="1370" y="295" text-anchor="start" class="mono-heavy" font-size="32">ŷ1</text>
+      
+      <circle cx="1385" cy="315" r="8" fill="#f1a13e" stroke="#fff" stroke-width="2.5"/>
+      <text x="1400" y="325" text-anchor="start" class="mono-heavy" font-size="32">ŷ2</text>
+      
+      <circle cx="1410" cy="270" r="8" fill="#f1a13e" stroke="#fff" stroke-width="2.5"/>
+      <text x="1425" y="280" text-anchor="start" class="mono-heavy" font-size="32">ŷ3</text>
+    </g>
+
+    <line x1="1295" y1="395" x2="1535" y2="395" stroke="#ccc" stroke-width="3.5" stroke-dasharray="10 10"/>
+
+    <text x="1417.5" y="445" text-anchor="middle" class="label">Weight Dist</text>
+    <g transform="translate(1417.5, 525)">
+       <rect x="-85" y="-15" width="45" height="40" fill="#3498db" opacity="0.6"/>
+       <rect x="-22" y="-55" width="45" height="80" fill="#3498db" opacity="0.6"/>
+       <rect x="40" y="-35" width="45" height="60" fill="#3498db" opacity="0.6"/>
+    </g>
+  </g>
+</svg>
