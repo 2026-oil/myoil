@@ -1,8 +1,8 @@
 aa_forecast:
   model: gru
   tune_training: false
-  lowess_frac: 0.3134904286000733
-  lowess_delta: 0.04454616550173561
+  lowess_frac: 0.359
+  lowess_delta: 0.008
   uncertainty:
     enabled: true
     sample_count: 50
@@ -17,8 +17,10 @@ aa_forecast:
     upward:
     - GPRD
     - GPRD_ACT
+    - GPRD_THREAT
+    - Idx_OVX
     two_sided: []
-  thresh: 2.4802801702675485
+  thresh: 3.08
   retrieval:
     enabled: true
     config_path: ../retrieval/baseline_retrieval.yaml

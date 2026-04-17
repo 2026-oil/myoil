@@ -145,6 +145,129 @@ def _write_aaforecast_exog_only_fixture(tmp_path: Path, *, insample_y_included: 
     return main_path
 
 
+def _write_aaforecast_timexer_fixture(tmp_path: Path, *, insample_y_included: bool) -> Path:
+    dataset_path = REPO_ROOT / "tests" / "fixtures" / "aa_forecast_runtime_smoke.csv"
+    retrieval_path = tmp_path / "timexer_retrieval.yaml"
+    retrieval_path.write_text(
+        "\n".join(
+            [
+                "retrieval:",
+                "  star:",
+                "    season_length: 4",
+                "    lowess_frac: 0.6",
+                "    lowess_delta: 0.01",
+                "    thresh: 3.5",
+                "    anomaly_tails:",
+                "      upward:",
+                "      - event",
+                "      two_sided: []",
+                "  mode: posthoc_blend",
+                "  top_k: 2",
+                "  recency_gap_steps: 0",
+                "  trigger_quantile: 0.5",
+                "  min_similarity: 0.0",
+                "  similarity: cosine",
+                "  temperature: 0.5",
+                "  blend_floor: 0.0",
+                "  blend_max: 0.5",
+                "  use_uncertainty_gate: true",
+                f"  insample_y_included: {'true' if insample_y_included else 'false'}",
+                "  use_event_key: true",
+                "  event_score_log_bonus_alpha: 0.0",
+                "  event_score_log_bonus_cap: 0.0",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    plugin_path = tmp_path / "timexer_plugin.yaml"
+    plugin_path.write_text(
+        "\n".join(
+            [
+                "aa_forecast:",
+                "  model: timexer",
+                "  tune_training: false",
+                "  lowess_frac: 0.6",
+                "  lowess_delta: 0.01",
+                "  uncertainty:",
+                "    enabled: true",
+                "    sample_count: 2",
+                "  retrieval:",
+                "    enabled: true",
+                f"    config_path: {retrieval_path.name}",
+                "  model_params:",
+                "    hidden_size: 16",
+                "    n_heads: 8",
+                "    e_layers: 1",
+                "    dropout: 0.1",
+                "    d_ff: 32",
+                "    patch_len: 8",
+                "    use_norm: true",
+                "    decoder_hidden_size: 16",
+                "    decoder_layers: 1",
+                "    season_length: 4",
+                "  star_anomaly_tails:",
+                "    upward:",
+                "    - event",
+                "    two_sided: []",
+                "  thresh: 3.5",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    main_path = tmp_path / "timexer_main.yaml"
+    main_path.write_text(
+        "\n".join(
+            [
+                "task:",
+                "  name: final_find_timexer_smoke",
+                "dataset:",
+                f"  path: {dataset_path}",
+                "  target_col: target",
+                "  dt_col: dt",
+                "  hist_exog_cols:",
+                "  - event",
+                "  futr_exog_cols: []",
+                "  static_exog_cols: []",
+                "runtime:",
+                "  random_seed: 7",
+                "  transformations_target: diff",
+                "  transformations_exog: diff",
+                "training:",
+                "  input_size: 8",
+                "  batch_size: 1",
+                "  valid_batch_size: 1",
+                "  windows_batch_size: 8",
+                "  inference_windows_batch_size: 8",
+                "  max_steps: 1",
+                "  val_size: 2",
+                "  val_check_steps: 1",
+                "  early_stop_patience_steps: -1",
+                "  loss: mse",
+                "  accelerator: cpu",
+                "cv:",
+                "  horizon: 2",
+                "  step_size: 1",
+                "  n_windows: 1",
+                "  gap: 0",
+                "  overlap_eval_policy: by_cutoff_mean",
+                "scheduler:",
+                "  gpu_ids:",
+                "  - 0",
+                "  max_concurrent_jobs: 1",
+                "  worker_devices: 1",
+                "aa_forecast:",
+                "  enabled: true",
+                f"  config_path: {plugin_path.name}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return main_path
+
+
 def test_load_targets_json_accepts_strings_and_objects(tmp_path: Path) -> None:
     final_find = _load_final_find_script()
     targets_path = tmp_path / "targets.json"
@@ -422,3 +545,51 @@ def test_final_find_optuna_resume_accumulates_trials(tmp_path: Path) -> None:
     assert summary["search_mode"] == "optuna"
     assert summary["study_summary"]["n_trials"] == 5
     assert summary["study_summary"]["study_name"] == "resume-test"
+
+
+def test_filter_input_sizes_for_timexer_patch_len() -> None:
+    final_find = _load_final_find_script()
+    from plugins.aa_forecast.config import AAForecastPluginConfig
+
+    stage_cfg = AAForecastPluginConfig(
+        enabled=True,
+        model="timexer",
+        model_params={"patch_len": 8},
+    )
+    assert final_find._filter_input_sizes_for_backbone(
+        [12, 13, 14, 15, 16, 17, 18, 19, 20], stage_cfg=stage_cfg
+    ) == [16]
+
+
+def test_final_find_timexer_dry_run_reports_filtered_input_sizes(tmp_path: Path) -> None:
+    main_path = _write_aaforecast_timexer_fixture(tmp_path, insample_y_included=False)
+    target_path = tmp_path / "targets.json"
+    target_path.write_text(json.dumps(["2024-01-15"]), encoding="utf-8")
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "final_find.py"),
+            "--config",
+            str(main_path),
+            "--targets-json",
+            str(target_path),
+            "--min-input-size",
+            "12",
+            "--max-input-size",
+            "20",
+            "--search-mode",
+            "optuna",
+            "--exog-grid",
+            "event",
+            "--upward-grid",
+            "event",
+            "--dry-run",
+        ],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "filtered input_sizes for backbone constraints (timexer): [16]" in proc.stderr
+    assert "input_sizes=[16]" in proc.stdout

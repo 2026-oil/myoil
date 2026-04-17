@@ -664,7 +664,7 @@ def _normalize_retrieval_config(
         use_uncertainty_gate=use_uncertainty_gate,
         mode=AAForecastRetrievalConfig().mode,
         similarity=AAForecastRetrievalConfig().similarity,
-        temperature=AAForecastRetrievalConfig().temperature,
+        temperature=temperature,
         memory_value_mode=AAForecastRetrievalConfig().memory_value_mode,
         insample_y_included=insample_y_included,
         use_event_key=use_event_key,

@@ -494,12 +494,29 @@ def _suggest_non_empty_subset(
 ) -> list[str]:
     if len(columns) == 1:
         return [str(columns[0])]
-    selected = [
+    required = str(trial.suggest_categorical(f"{prefix}__required", list(columns)))
+    selected = [required]
+    selected.extend(
         str(column)
         for column in columns
-        if trial.suggest_categorical(f"{prefix}__{column}", [False, True])
-    ]
+        if column != required
+        and trial.suggest_categorical(f"{prefix}__{column}", [False, True])
+    )
     return selected
+
+
+def _filter_input_sizes_for_backbone(
+    input_sizes: Sequence[int],
+    *,
+    stage_cfg: AAForecastPluginConfig,
+) -> list[int]:
+    filtered = [int(size) for size in input_sizes]
+    if str(stage_cfg.model).strip().lower() != "timexer":
+        return filtered
+    patch_len = int(stage_cfg.model_params.get("patch_len", 1))
+    if patch_len <= 0:
+        raise ValueError(f"aa_forecast timexer patch_len must be positive, got {patch_len}")
+    return [size for size in filtered if size % patch_len == 0]
 
 
 def run_final_find_optuna(
@@ -933,10 +950,20 @@ def main(argv: list[str] | None = None) -> int:
             input_sizes = [int(loaded.config.training.input_size)]
     before_filter = list(input_sizes)
     input_sizes = [size for size in input_sizes if size >= args.min_input_size]
+    filtered_for_backbone = _filter_input_sizes_for_backbone(
+        input_sizes, stage_cfg=stage_cfg
+    )
+    if filtered_for_backbone != input_sizes:
+        print(
+            "final_find: filtered input_sizes for backbone constraints "
+            f"({stage_cfg.model}): {filtered_for_backbone}",
+            file=sys.stderr,
+        )
+    input_sizes = filtered_for_backbone
     if not input_sizes:
         print(
-            f"error: no input_sizes remain after --min-input-size {args.min_input_size} "
-            f"(candidates were {before_filter})",
+            f"error: no input_sizes remain after filtering "
+            f"(min-input-size/backbone constraints; candidates were {before_filter})",
             file=sys.stderr,
         )
         return 1

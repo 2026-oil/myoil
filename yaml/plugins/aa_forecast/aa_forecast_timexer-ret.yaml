@@ -7,7 +7,6 @@ aa_forecast:
   uncertainty:
     enabled: true
     sample_count: 50
-
   model_params:
     hidden_size: 128
     n_heads: 8
@@ -24,6 +23,7 @@ aa_forecast:
     - GPRD
     - GPRD_ACT
     - GPRD_THREAT
+    - Idx_OVX
     two_sided: []
   retrieval:
     enabled: true
