@@ -8,8 +8,6 @@ build
 dist
 .vscode
 *.gif
-*.csv
-*/data/*
 *.parquet
 tmp
 _docs/
@@ -20,7 +18,6 @@ sidebar.yml
 nbs/.last_checked
 _proc
 lightning_logs/
-/**/data/
 debug_run
 
 longhorizon/

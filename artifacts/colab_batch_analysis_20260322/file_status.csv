@@ -1,0 +1,2 @@
+remote,status,error
+gdrive2:runs/colab_batch/bomb__brentoil-case3-family-h8-diff-exloss-i128-res-delta/scheduler/workers/NHITS/residual/NHITS/corrected_folds.csv,error,"Command '['rclone', 'cat', 'gdrive2:runs/colab_batch/bomb__brentoil-case3-family-h8-diff-exloss-i128-res-delta/scheduler/workers/NHITS/residual/NHITS/corrected_folds.csv']' timed out after 20 seconds"
