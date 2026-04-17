@@ -88,6 +88,8 @@ from neuralforecast.models.bs_preforcast_direct import (
 ENTRYPOINT_VERSION = "neuralforecast-runtime-v1"
 LOSS_CURVE_PLOT_FILENAME = "loss_curve.png"
 LOSS_CURVE_SAMPLE_FILENAME = "loss_curve_every_10_global_steps.csv"
+LOSS_CURVE_SMOOTHED_SAMPLE_FILENAME = "loss_curve_smoothed_every_10_global_steps.csv"
+LOSS_CURVE_VALIDATION_FILENAME = "loss_curve_validation_points.csv"
 SUMMARY_LOSS_ARTIFACTS_FILENAME = "loss_curve_artifacts.csv"
 SUMMARY_RESULTS_FILENAME = "result.csv"
 TRIAL_PREDICTIONS_FILENAME = "predictions.csv"
@@ -95,6 +97,7 @@ TRIAL_FOLD_PLOT_FILENAME = "plot.png"
 TRIAL_FOLD_METRICS_FILENAME = "metrics.json"
 TRIAL_FOLD_CHECKPOINT_FILENAME = "checkpoint.pt"
 LOSS_CURVE_SAMPLE_EVERY_N_STEPS = 10
+LOSS_CURVE_TRAIN_SMOOTHING_WINDOW = 5
 
 
 class _OptunaTrialFailure(RuntimeError):
@@ -586,18 +589,37 @@ def _resolve_freq(loaded: LoadedConfig, source_df: pd.DataFrame) -> str:
 @dataclass(frozen=True)
 class _FoldDiffContext:
     target_col: str
-    anchor: float | None = None
-    transform_target: bool = True
+    target_diff_order: int = 0
+    target_anchor: float | None = None
+    target_first_diff_anchor: float | None = None
+    hist_exog_diff_order: int = 0
     hist_exog_cols: tuple[str, ...] = ()
 
 
+def _runtime_diff_order(mode: str | None) -> int:
+    if mode is None:
+        return 0
+    if mode == "diff":
+        return 1
+    if mode == "diff-diff":
+        return 2
+    raise ValueError(f"Unsupported runtime transformation mode: {mode}")
+
+
+def _apply_diff_transform(series: pd.Series, order: int) -> pd.Series:
+    transformed = series.reset_index(drop=True).astype(float)
+    for _ in range(order):
+        transformed = transformed.diff()
+    return transformed
+
+
 def _has_target_diff(loaded: LoadedConfig) -> bool:
-    return loaded.config.runtime.transformations_target == "diff"
+    return _runtime_diff_order(loaded.config.runtime.transformations_target) > 0
 
 
 def _has_hist_exog_diff(loaded: LoadedConfig) -> bool:
     return bool(
-        loaded.config.runtime.transformations_exog == "diff"
+        _runtime_diff_order(loaded.config.runtime.transformations_exog) > 0
         and loaded.config.dataset.hist_exog_cols
     )
 
@@ -612,20 +634,42 @@ def _build_fold_diff_context(
     *,
     target_col: str | None = None,
 ) -> _FoldDiffContext | None:
-    target_diff = _has_target_diff(loaded)
-    exog_diff = _has_hist_exog_diff(loaded)
-    if not target_diff and not exog_diff:
+    target_diff_order = _runtime_diff_order(
+        loaded.config.runtime.transformations_target
+    )
+    hist_exog_diff_order = (
+        _runtime_diff_order(loaded.config.runtime.transformations_exog)
+        if loaded.config.dataset.hist_exog_cols
+        else 0
+    )
+    if target_diff_order == 0 and hist_exog_diff_order == 0:
         return None
     active_target_col = target_col or loaded.config.dataset.target_col
-    if len(train_df) < 2:
+    required_rows = max(target_diff_order, hist_exog_diff_order) + 1
+    if len(train_df) < required_rows:
         raise ValueError(
-            "runtime.transformations_target/exog=diff requires at least 2 training rows per fold"
+            "runtime.transformations_target/exog requires at least "
+            f"{required_rows} training rows per fold for the configured "
+            "diff order"
         )
+    target_anchor = None
+    target_first_diff_anchor = None
+    if target_diff_order > 0:
+        target_values = train_df[active_target_col].reset_index(drop=True).astype(float)
+        target_anchor = float(target_values.iloc[-1])
+        if target_diff_order > 1:
+            target_first_diff_anchor = float(
+                _apply_diff_transform(target_values, 1).iloc[-1]
+            )
     return _FoldDiffContext(
         target_col=active_target_col,
-        anchor=float(train_df[active_target_col].iloc[-1]) if target_diff else None,
-        transform_target=target_diff,
-        hist_exog_cols=loaded.config.dataset.hist_exog_cols if exog_diff else (),
+        target_diff_order=target_diff_order,
+        target_anchor=target_anchor,
+        target_first_diff_anchor=target_first_diff_anchor,
+        hist_exog_diff_order=hist_exog_diff_order,
+        hist_exog_cols=(
+            loaded.config.dataset.hist_exog_cols if hist_exog_diff_order > 0 else ()
+        ),
     )
 
 
@@ -636,17 +680,26 @@ def _transform_training_frame(
     normalized = train_df.reset_index(drop=True).copy()
     if diff_context is None:
         return normalized
-    if diff_context.transform_target:
-        normalized[diff_context.target_col] = (
-            normalized[diff_context.target_col].astype(float).diff()
+    trim_rows = max(
+        diff_context.target_diff_order,
+        diff_context.hist_exog_diff_order,
+    )
+    if diff_context.target_diff_order > 0:
+        normalized[diff_context.target_col] = _apply_diff_transform(
+            normalized[diff_context.target_col],
+            diff_context.target_diff_order,
         )
     for column in diff_context.hist_exog_cols:
         if column in normalized.columns:
-            normalized[column] = normalized[column].astype(float).diff()
-    transformed = normalized.iloc[1:].reset_index(drop=True)
+            normalized[column] = _apply_diff_transform(
+                normalized[column],
+                diff_context.hist_exog_diff_order,
+            )
+    transformed = normalized.iloc[trim_rows:].reset_index(drop=True)
     if transformed.empty:
         raise ValueError(
-            "runtime.transformations_target/exog=diff removed all training rows; need at least 2 rows"
+            "runtime.transformations_target/exog removed all training rows; "
+            "need more rows than the configured diff order"
         )
     return transformed
 
@@ -656,12 +709,16 @@ def _transform_training_series(
     diff_context: _FoldDiffContext | None,
 ) -> pd.Series:
     normalized = history.reset_index(drop=True).astype(float)
-    if diff_context is None or not diff_context.transform_target:
+    if diff_context is None or diff_context.target_diff_order == 0:
         return normalized
-    transformed = normalized.diff().iloc[1:].reset_index(drop=True)
+    transformed = _apply_diff_transform(
+        normalized,
+        diff_context.target_diff_order,
+    ).iloc[diff_context.target_diff_order :].reset_index(drop=True)
     if transformed.empty:
         raise ValueError(
-            "runtime.transformations_target/exog=diff removed all training rows; need at least 2 rows"
+            "runtime.transformations_target/exog removed all training rows; "
+            "need more rows than the configured diff order"
         )
     return transformed
 
@@ -671,11 +728,29 @@ def _restore_prediction_series(
     diff_context: _FoldDiffContext | None,
 ) -> pd.Series:
     restored = predictions.reset_index(drop=True).astype(float)
-    if diff_context is None or not diff_context.transform_target:
+    if diff_context is None or diff_context.target_diff_order == 0:
         return restored
-    if diff_context.anchor is None:
+    if diff_context.target_anchor is None:
         raise ValueError("diff target restoration requires a target anchor")
-    return (restored.cumsum() + diff_context.anchor).astype(float)
+    if diff_context.target_diff_order == 1:
+        return (restored.cumsum() + diff_context.target_anchor).astype(float)
+    if diff_context.target_diff_order == 2:
+        if diff_context.target_first_diff_anchor is None:
+            raise ValueError(
+                "second-order diff target restoration requires a first-diff anchor"
+            )
+        level = float(diff_context.target_anchor)
+        first_diff = float(diff_context.target_first_diff_anchor)
+        restored_levels: list[float] = []
+        for second_diff in restored:
+            first_diff += float(second_diff)
+            level += first_diff
+            restored_levels.append(level)
+        return pd.Series(restored_levels, dtype=float)
+    raise ValueError(
+        "Unsupported runtime target diff order: "
+        f"{diff_context.target_diff_order}"
+    )
 
 
 def _restore_target_predictions(
@@ -2559,10 +2634,21 @@ def _trajectory_frame(nf: Any) -> pd.DataFrame:
 
 def _loss_curve_series(
     curve_frame: pd.DataFrame,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     train_series = (
         curve_frame[["global_step", "train_loss"]]
         .dropna(subset=["train_loss"])
+        .reset_index(drop=True)
+    )
+    train_smoothed_column = (
+        "train_loss_smoothed"
+        if "train_loss_smoothed" in curve_frame.columns
+        else "train_loss"
+    )
+    train_smoothed_series = (
+        curve_frame[["global_step", train_smoothed_column]]
+        .dropna(subset=[train_smoothed_column])
+        .rename(columns={train_smoothed_column: "train_loss_smoothed"})
         .reset_index(drop=True)
     )
     val_series = (
@@ -2570,7 +2656,25 @@ def _loss_curve_series(
         .dropna(subset=["val_loss"])
         .reset_index(drop=True)
     )
-    return train_series, val_series
+    return train_series, train_smoothed_series, val_series
+
+
+def _curve_frame_with_smoothed_train(
+    curve_frame: pd.DataFrame,
+    *,
+    smoothing_window: int = LOSS_CURVE_TRAIN_SMOOTHING_WINDOW,
+) -> pd.DataFrame:
+    normalized = _normalize_curve_frame(curve_frame)
+    if normalized.empty:
+        return normalized.assign(train_loss_smoothed=pd.Series(dtype=float))
+    window = max(1, int(smoothing_window))
+    enriched = normalized.copy()
+    enriched["train_loss_smoothed"] = (
+        enriched["train_loss"].rolling(window=window, min_periods=1).mean()
+    )
+    return enriched[
+        ["global_step", "train_loss", "train_loss_smoothed", "val_loss"]
+    ].reset_index(drop=True)
 
 
 def _sample_loss_curve_frame(
@@ -2586,6 +2690,16 @@ def _sample_loss_curve_frame(
     sampled["global_step"] = sampled["global_step"].astype(int)
     sampled = sampled[sampled["global_step"] % every_n_steps == 0].reset_index(drop=True)
     return sampled
+
+
+def _validation_aligned_curve_frame(curve_frame: pd.DataFrame) -> pd.DataFrame:
+    if curve_frame.empty:
+        return curve_frame.copy()
+    aligned = curve_frame[curve_frame["val_loss"].notna()].copy()
+    columns = ["global_step", "train_loss", "val_loss"]
+    if "train_loss_smoothed" in aligned.columns:
+        columns.insert(2, "train_loss_smoothed")
+    return aligned[columns].reset_index(drop=True)
 
 
 def _configure_loss_curve_axis(axis: Any, curve_frame: pd.DataFrame) -> None:
@@ -2610,7 +2724,7 @@ def _write_loss_curve_artifact(
 ) -> Path | None:
     if nf is None:
         return None
-    curve_frame = _trajectory_frame(nf)
+    curve_frame = _curve_frame_with_smoothed_train(_trajectory_frame(nf))
     if curve_frame.empty:
         return None
 
@@ -2623,14 +2737,32 @@ def _write_loss_curve_artifact(
     fold_root.mkdir(parents=True, exist_ok=True)
     figure_path = fold_root / LOSS_CURVE_PLOT_FILENAME
     sampled_curve_path = fold_root / LOSS_CURVE_SAMPLE_FILENAME
-    _sample_loss_curve_frame(curve_frame).to_csv(sampled_curve_path, index=False)
-    train_series, val_series = _loss_curve_series(curve_frame)
+    smoothed_curve_path = fold_root / LOSS_CURVE_SMOOTHED_SAMPLE_FILENAME
+    validation_curve_path = fold_root / LOSS_CURVE_VALIDATION_FILENAME
+    sampled_curve = _sample_loss_curve_frame(curve_frame)
+    sampled_curve[["global_step", "train_loss", "val_loss"]].to_csv(
+        sampled_curve_path, index=False
+    )
+    sampled_curve[
+        ["global_step", "train_loss", "train_loss_smoothed", "val_loss"]
+    ].to_csv(smoothed_curve_path, index=False)
+    _validation_aligned_curve_frame(curve_frame).to_csv(validation_curve_path, index=False)
+    train_series, train_smoothed_series, val_series = _loss_curve_series(curve_frame)
     figure, axis = plt.subplots(figsize=(10, 5))
+    if not train_series.empty:
+        axis.plot(
+            train_series["global_step"],
+            train_series["train_loss"],
+            label="train_loss_raw",
+            linewidth=1.0,
+            alpha=0.3,
+        )
     axis.plot(
-        train_series["global_step"],
-        train_series["train_loss"],
-        label="train_loss",
-        linewidth=1.8,
+        train_smoothed_series["global_step"],
+        train_smoothed_series["train_loss_smoothed"],
+        label=f"train_loss_smoothed_w{LOSS_CURVE_TRAIN_SMOOTHING_WINDOW}",
+        linewidth=2.0,
+        zorder=2,
     )
     axis.plot(
         val_series["global_step"],
@@ -2719,32 +2851,57 @@ def _build_summary_artifacts(run_root: Path) -> dict[str, str]:
 
 def _load_loss_artifacts_for_summary(run_root: Path) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
+    artifact_specs = (
+        {
+            "curve_variant": "raw_sampled",
+            "filename": LOSS_CURVE_SAMPLE_FILENAME,
+            "source_granularity": "step_sampled",
+            "sample_every_n_steps": LOSS_CURVE_SAMPLE_EVERY_N_STEPS,
+            "smoothing_window": None,
+        },
+        {
+            "curve_variant": "smoothed_sampled",
+            "filename": LOSS_CURVE_SMOOTHED_SAMPLE_FILENAME,
+            "source_granularity": "step_sampled",
+            "sample_every_n_steps": LOSS_CURVE_SAMPLE_EVERY_N_STEPS,
+            "smoothing_window": LOSS_CURVE_TRAIN_SMOOTHING_WINDOW,
+        },
+        {
+            "curve_variant": "validation_aligned",
+            "filename": LOSS_CURVE_VALIDATION_FILENAME,
+            "source_granularity": "validation",
+            "sample_every_n_steps": None,
+            "smoothing_window": LOSS_CURVE_TRAIN_SMOOTHING_WINDOW,
+        },
+    )
     for root in _summary_job_roots(run_root):
-        for csv_path in sorted(
-            root.glob(f"models/*/folds/fold_*/{LOSS_CURVE_SAMPLE_FILENAME}")
-        ):
-            sampled = pd.read_csv(csv_path)
-            if "global_step" in sampled.columns:
-                valid_steps = pd.to_numeric(
-                    sampled["global_step"], errors="coerce"
-                ).dropna()
-            else:
-                valid_steps = pd.Series(dtype=float)
-            rows.append(
-                {
-                    "model": csv_path.parents[2].name,
-                    "fold_idx": int(csv_path.parent.name.removeprefix("fold_")),
-                    "sample_every_n_steps": LOSS_CURVE_SAMPLE_EVERY_N_STEPS,
-                    "sample_count": int(len(sampled)),
-                    "first_global_step": (
-                        int(valid_steps.iloc[0]) if not valid_steps.empty else None
-                    ),
-                    "last_global_step": (
-                        int(valid_steps.iloc[-1]) if not valid_steps.empty else None
-                    ),
-                    "loss_csv_path": str(csv_path.relative_to(run_root)),
-                }
-            )
+        for spec in artifact_specs:
+            for csv_path in sorted(root.glob(f"models/*/folds/fold_*/{spec['filename']}")):
+                sampled = pd.read_csv(csv_path)
+                if "global_step" in sampled.columns:
+                    valid_steps = pd.to_numeric(
+                        sampled["global_step"], errors="coerce"
+                    ).dropna()
+                else:
+                    valid_steps = pd.Series(dtype=float)
+                rows.append(
+                    {
+                        "model": csv_path.parents[2].name,
+                        "fold_idx": int(csv_path.parent.name.removeprefix("fold_")),
+                        "curve_variant": spec["curve_variant"],
+                        "source_granularity": spec["source_granularity"],
+                        "sample_every_n_steps": spec["sample_every_n_steps"],
+                        "smoothing_window": spec["smoothing_window"],
+                        "sample_count": int(len(sampled)),
+                        "first_global_step": (
+                            int(valid_steps.iloc[0]) if not valid_steps.empty else None
+                        ),
+                        "last_global_step": (
+                            int(valid_steps.iloc[-1]) if not valid_steps.empty else None
+                        ),
+                        "loss_csv_path": str(csv_path.relative_to(run_root)),
+                    }
+                )
     return pd.DataFrame(rows)
 
 

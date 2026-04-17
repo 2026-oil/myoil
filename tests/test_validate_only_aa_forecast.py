@@ -273,18 +273,18 @@ def _build_aaforecast_plugin_model(*, training_scaler_type: str | None):
     return loaded, model
 
 
-def test_aaforecast_plugin_ignores_shared_robust_scaler() -> None:
+def test_aaforecast_plugin_keeps_shared_robust_scaler() -> None:
     loaded, model = _build_aaforecast_plugin_model(training_scaler_type="robust")
 
-    assert loaded.config.training.scaler_type is None
-    assert model.hparams.scaler_type is None
+    assert loaded.config.training.scaler_type == "robust"
+    assert model.hparams.scaler_type == "robust"
 
 
-def test_aaforecast_plugin_forces_null_scaler_for_any_shared_scaler() -> None:
+def test_aaforecast_plugin_respects_explicit_shared_scaler() -> None:
     loaded, model = _build_aaforecast_plugin_model(training_scaler_type="standard")
 
-    assert loaded.config.training.scaler_type is None
-    assert model.hparams.scaler_type is None
+    assert loaded.config.training.scaler_type == "standard"
+    assert model.hparams.scaler_type == "standard"
 
 
 def test_aaforecast_plugin_uses_shared_setting_adamw_optimizer() -> None:
@@ -355,6 +355,54 @@ def test_runtime_validate_only_accepts_aaforecast_fixed_path_with_shared_diff_se
     assert loaded.config.runtime.transformations_target == "diff"
 
     output_root = tmp_path / "validate-only-aa-forecast-fixed-shared-diff"
+    code = runtime.main(
+        [
+            "--config",
+            str(FIXED_CONFIG),
+            "--setting",
+            str(shared_settings_path),
+            "--output-root",
+            str(output_root),
+            "--validate-only",
+        ]
+    )
+
+    assert code == 0
+    manifest = json.loads((output_root / "manifest" / "run_manifest.json").read_text())
+    assert manifest["jobs"][0]["model"] == "AAForecast"
+    assert manifest["shared_settings_path"] == str(shared_settings_path.resolve())
+
+
+def test_runtime_validate_only_accepts_aaforecast_fixed_path_with_shared_second_order_diff_setting(
+    tmp_path: Path,
+    monkeypatch,
+):
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+
+    shared_settings_path = tmp_path / "setting.yaml"
+    shared_settings_path.write_text(
+        yaml.safe_dump(
+            {
+                "runtime": {
+                    "transformations_target": "diff-diff",
+                    "transformations_exog": "diff-diff",
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = load_app_config(
+        Path.cwd(),
+        config_path=str(FIXED_CONFIG),
+        shared_settings_path=shared_settings_path,
+    )
+
+    assert loaded.config.runtime.transformations_target == "diff-diff"
+    assert loaded.config.runtime.transformations_exog == "diff-diff"
+
+    output_root = tmp_path / "validate-only-aa-forecast-fixed-shared-diff-diff"
     code = runtime.main(
         [
             "--config",

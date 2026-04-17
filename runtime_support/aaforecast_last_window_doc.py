@@ -254,7 +254,11 @@ def _add_raw_and_transformed_records(bundle: ReplayBundle, trace: TraceBuilder) 
     input_size = int(bundle.model.input_size)
     hist_cols = list(loaded.config.dataset.hist_exog_cols)
 
-    raw_support_window = bundle.train_df.tail(input_size + 1).reset_index(drop=True)
+    diff_order = 0 if bundle.diff_context is None else max(
+        int(getattr(bundle.diff_context, "target_diff_order", 0)),
+        int(getattr(bundle.diff_context, "hist_exog_diff_order", 0)),
+    )
+    raw_support_window = bundle.train_df.tail(input_size + diff_order).reset_index(drop=True)
     transformed_input_window = bundle.transformed_train_df.tail(input_size).reset_index(drop=True)
     future_window = bundle.future_df.reset_index(drop=True)
 
@@ -262,7 +266,10 @@ def _add_raw_and_transformed_records(bundle: ReplayBundle, trace: TraceBuilder) 
         "raw_rows",
         "raw_support_window_rows",
         raw_support_window,
-        "All raw rows needed to compute the final diff-transformed input window. Because runtime.transformations_target/exog=diff, the 64 transformed input steps depend on 65 raw training rows.",
+        "All raw rows needed to compute the final diff-transformed input window. "
+        f"Because the configured runtime diff order is {diff_order}, the "
+        f"{input_size} transformed input steps depend on {input_size + diff_order} "
+        "raw training rows.",
     )
     trace.add(
         "raw_rows",

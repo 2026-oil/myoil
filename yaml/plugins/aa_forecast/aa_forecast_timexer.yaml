@@ -9,14 +9,14 @@ aa_forecast:
     sample_count: 50
   model_params:
     hidden_size: 128
-    n_heads: 8
+    n_heads: 2
     e_layers: 2
     dropout: 0.1
-    d_ff: 256
-    patch_len: 8
+    d_ff: 128
+    patch_len: 4
     use_norm: true
-    decoder_hidden_size: 256
-    decoder_layers: 4
+    decoder_hidden_size: 128
+    decoder_layers: 2
     season_length: 4
   star_anomaly_tails:
     upward:

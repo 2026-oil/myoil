@@ -96,7 +96,6 @@ def materialize_aa_forecast_stage(
 def _aa_params_override(loaded: Any) -> dict[str, Any]:
     config = getattr(loaded, "config", loaded)
     stage_cfg = config.stage_plugin_config
-    scaler_type = None
     return {
         "backbone": stage_cfg.model,
         "thresh": stage_cfg.thresh,
@@ -110,7 +109,7 @@ def _aa_params_override(loaded: Any) -> dict[str, Any]:
             stage_cfg.uncertainty.dropout_candidates
         ),
         "uncertainty_sample_count": stage_cfg.uncertainty.sample_count,
-        "scaler_type": scaler_type,
+        "scaler_type": config.training.scaler_type,
     }
 
 

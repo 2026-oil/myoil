@@ -38,7 +38,7 @@
 - `cv.n_windows = 4`
 - `training.max_steps = 800`
 - `training.val_size = 16`
-- `training.scaler_type = null`
+- `training.scaler_type = robust`
 
 ### AA stage config
 - `model = gru`
@@ -71,7 +71,7 @@
 
 - target 입력: 최근 24주 `Brent level`
 - exogenous 입력: 같은 24주 동안의 hist exogenous level들
-- scaler: `null` 이므로, 이 설정 설명에서는 raw scale 관점으로 읽어도 된다
+- scaler: `robust` 이므로, 이 설정 설명에서는 raw level을 입력으로 보되 window scaling이 함께 적용된다고 읽어야 한다
 
 즉 이 config의 AAForecast+GRU는
 **"최근 24주 raw level 시계열 + exogenous level" 을 직접 받아 STAR feature를 만들고 예측하는 경로** 다.

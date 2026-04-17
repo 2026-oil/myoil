@@ -393,6 +393,53 @@ def test_load_app_config_rejects_duplicate_shared_runtime_transformation(
         )
 
 
+def test_load_app_config_accepts_second_order_runtime_transformations(
+    tmp_path: Path,
+) -> None:
+    payload = _minimal_app_config_payload()
+    payload['runtime'] = {
+        'transformations_target': 'diff-diff',
+        'transformations_exog': 'diff-diff',
+    }
+    config_path = _write_yaml(tmp_path / 'config.yaml', payload)
+
+    loaded = load_app_config(tmp_path, config_path=config_path)
+
+    assert loaded.config.runtime.transformations_target == 'diff-diff'
+    assert loaded.config.runtime.transformations_exog == 'diff-diff'
+    assert loaded.config.to_dict()['runtime'] == {
+        'random_seed': 1,
+        'opt_n_trial': None,
+        'opt_study_count': 1,
+        'transformations_target': 'diff-diff',
+        'transformations_exog': 'diff-diff',
+    }
+
+
+@pytest.mark.parametrize(
+    ('field', 'value'),
+    [
+        ('transformations_target', 'diffdiff'),
+        ('transformations_target', 'diff-diff-diff'),
+        ('transformations_exog', 'diff- diff'),
+    ],
+)
+def test_load_app_config_rejects_unknown_runtime_transformation_values(
+    tmp_path: Path,
+    field: str,
+    value: str,
+) -> None:
+    payload = _minimal_app_config_payload()
+    payload['runtime'] = {field: value}
+    config_path = _write_yaml(tmp_path / 'config.yaml', payload)
+
+    with pytest.raises(
+        ValueError,
+        match=rf"runtime\.{field} must be one of 'diff' or 'diff-diff'",
+    ):
+        load_app_config(tmp_path, config_path=config_path)
+
+
 def test_load_app_config_defaults_opt_study_count_and_omits_unset_selected_study(
     tmp_path: Path,
 ) -> None:

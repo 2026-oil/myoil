@@ -130,7 +130,7 @@ SUPPORTED_DATALOADER_KWARGS = {
     "persistent_workers",
     "prefetch_factor",
 }
-RuntimeTransformationMode = Literal["diff"]
+RuntimeTransformationMode = Literal["diff", "diff-diff"]
 
 
 @dataclass(frozen=True)
@@ -268,7 +268,7 @@ class TrainingConfig:
     early_stop_patience_steps: int = DEFAULT_TRAINING_PARAMS[
         "early_stop_patience_steps"
     ]
-    loss: str = "mse"
+    loss: str = "mae"
     loss_params: TrainingLossParams | None = None
     optimizer: TrainingOptimizerConfig = field(default_factory=TrainingOptimizerConfig)
     accelerator: str | None = None
@@ -396,14 +396,9 @@ def _resolve_aa_forecast_stage_plugin_config(config: AppConfig) -> AppConfig:
         stage_config,
         hist_exog_cols=config.dataset.hist_exog_cols,
     )
-    next_training = config.training
-    if next_training.scaler_type is not None:
-        # AAForecast always owns scaler semantics internally.
-        next_training = replace(next_training, scaler_type=None)
-
-    if resolved == stage_config and next_training == config.training:
+    if resolved == stage_config:
         return config
-    return replace(config, stage_plugin_config=resolved, training=next_training)
+    return replace(config, stage_plugin_config=resolved)
 
 
 @dataclass(frozen=True)
@@ -1313,14 +1308,18 @@ def _normalize_payload(
         if value is None:
             runtime.pop(key, None)
         elif not isinstance(value, str):
-            raise ValueError(f"runtime.{key} must be the string 'diff'")
+            raise ValueError(
+                f"runtime.{key} must be one of 'diff' or 'diff-diff'"
+            )
         else:
             normalized_transformation = value.strip().lower()
-            if normalized_transformation != "diff":
-                raise ValueError(f"runtime.{key} must be the string 'diff'")
+            if normalized_transformation not in {"diff", "diff-diff"}:
+                raise ValueError(
+                    f"runtime.{key} must be one of 'diff' or 'diff-diff'"
+                )
             runtime[key] = normalized_transformation
 
-    training.setdefault("loss", "mse")
+    training.setdefault("loss", "mae")
     loss = str(training["loss"]).lower()
     if loss not in SUPPORTED_LOSSES:
         raise ValueError(f"Unsupported common loss: {loss}")

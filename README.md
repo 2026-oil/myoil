@@ -211,7 +211,7 @@ Python 패키지 구현은 `plugins/bs_preforcast/` 아래에 있으며, 코드 
 | `val_size` | int | no | 각 fit에서 내부 validation 길이 |
 | `val_check_steps` | int | no | validation check 주기 |
 | `early_stop_patience_steps` | int | no | early stopping patience |
-| `loss` | string | no | 공통 loss. 현재 `mse`만 지원 |
+| `loss` | string | no | 공통 loss. 기본값은 `mae`, 지원값은 `mae`, `mse`, `exloss`, `latehorizonweightedmape`, `huberlatemape`, `quantilelatemape` |
 
 ### 4.4 `cv`
 
@@ -296,7 +296,7 @@ training:
   val_size: 12
   val_check_steps: 100
   early_stop_patience_steps: -1
-  loss: mse
+  loss: mae
 
 cv:
   horizon: 12
@@ -341,7 +341,8 @@ jobs:
 
 - 실행 진입점: `main.py`
 - 설정 중심: 명시적 `--config` / `--config-path` / `--config-toml`
-- 공통 loss: `training.loss = mse`
+- 공통 loss 기본값: `training.loss = mae`
+- loss curve plot: raw step loss는 보조선으로 유지하고, 기본 train 라인은 smoothed curve를 사용
 - CV 방식: **expanding-window TS-CV**
 - multi-job 실행: scheduler가 GPU lane 분배
 - 각 worker는 `devices=1`만 사용

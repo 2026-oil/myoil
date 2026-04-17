@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$repo_root"
 
-TARGET_CASE="${TARGET_CASE:-brent}"
+TARGET_CASE="${TARGET_CASE:-wti}"
 
 case "$TARGET_CASE" in
   dubai|wti|brent)
