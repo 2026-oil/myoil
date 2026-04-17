@@ -7,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import optuna
 import pandas as pd
 
 from app_config import load_app_config
@@ -593,3 +594,47 @@ def test_final_find_timexer_dry_run_reports_filtered_input_sizes(tmp_path: Path)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "filtered input_sizes for backbone constraints (timexer): [16]" in proc.stderr
     assert "input_sizes=[16]" in proc.stdout
+
+
+
+def test_select_required_column_uses_stable_optuna_distribution(tmp_path: Path) -> None:
+    final_find = _load_final_find_script()
+    storage_path = tmp_path / "required_selector.sqlite3"
+    storage = f"sqlite:///{storage_path.resolve()}"
+
+    study = optuna.create_study(
+        direction="minimize",
+        study_name="required-selector-test",
+        storage=storage,
+        load_if_exists=True,
+    )
+
+    def objective_two_columns(trial: optuna.Trial) -> float:
+        picked = final_find._select_required_column(
+            trial,
+            prefix="use_upward",
+            allowed_columns=["event", "gprd"],
+        )
+        assert picked in {"event", "gprd"}
+        return 0.0
+
+    study.optimize(objective_two_columns, n_trials=1)
+
+    study = optuna.create_study(
+        direction="minimize",
+        study_name="required-selector-test",
+        storage=storage,
+        load_if_exists=True,
+    )
+
+    def objective_three_columns(trial: optuna.Trial) -> float:
+        picked = final_find._select_required_column(
+            trial,
+            prefix="use_upward",
+            allowed_columns=["event", "gprd", "ovx"],
+        )
+        assert picked in {"event", "gprd", "ovx"}
+        return 0.0
+
+    study.optimize(objective_three_columns, n_trials=1)
+    assert len(study.trials) == 2

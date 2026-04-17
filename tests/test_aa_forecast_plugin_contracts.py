@@ -1630,9 +1630,19 @@ def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(
     long_csvs = list(fold_retrieval.glob("*_windows_long.csv"))
     pngs = list(fold_retrieval.glob("*_neighbor_comparison.png"))
     windows_jsons = list(fold_retrieval.glob("*_windows.json"))
+    similarity_raw_pngs = list(fold_retrieval.glob("*_similarity_raw_overlay.png"))
+    similarity_transformed_pngs = list(
+        fold_retrieval.glob("*_similarity_transformed_overlay.png")
+    )
+    similarity_summary_pngs = list(
+        fold_retrieval.glob("*_similarity_summary.png")
+    )
     assert len(long_csvs) == 1
     assert len(pngs) == 1
     assert len(windows_jsons) == 1
+    assert len(similarity_raw_pngs) == 1
+    assert len(similarity_transformed_pngs) == 1
+    assert len(similarity_summary_pngs) == 1
     windows_payload = json.loads(windows_jsons[0].read_text(encoding="utf-8"))
     assert windows_payload["fold_idx"] == 0
     assert len(windows_payload["query"]["y_raw"]) == 2

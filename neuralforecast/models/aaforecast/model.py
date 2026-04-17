@@ -23,7 +23,6 @@ from ...losses.pytorch import MAE
 from .backbones import AA_SUPPORTED_BACKBONES, build_aaforecast_backbone
 from .gru import _align_horizon, _apply_stochastic_dropout
 from .models.base import AATimeXerTokenStates
-from ..timexer import FlattenHead
 
 
 class InformerHorizonAwareHead(nn.Module):
@@ -1208,6 +1207,7 @@ class AAForecast(BaseModel):
             self.backbone,
             feature_size=feature_size,
             input_size=self.input_size,
+            target_token_indices=self.target_token_indices,
             hidden_size=self.hidden_size,
             encoder_hidden_size=encoder_hidden_size,
             encoder_n_layers=encoder_n_layers,
@@ -1243,25 +1243,7 @@ class AAForecast(BaseModel):
         self.sequence_adapter = (
             nn.Linear(self.input_size, self.h) if self.h > self.input_size else None
         )
-        if self.backbone == "timexer":
-            self.timexer_decoder = FlattenHead(
-                feature_size,
-                (self.encoder.patch_num + 1) * (2 * self.encoder_hidden_size),
-                self.h * self.loss.outputsize_multiplier,
-                head_dropout=self.encoder_dropout,
-            )
-            self.decoder = None
-            self.itransformer_decoder = None
-            self.informer_decoder = None
-            self.event_summary_projector = None
-            self.regime_time_projector = None
-            self.memory_query_projector = None
-            self.memory_key_projector = None
-            self.memory_value_projector = None
-            self.memory_token_shock_head = None
-            self.memory_token_shock_gate = None
-            self.event_trajectory_projector = None
-        elif self.backbone == "itransformer":
+        if self.backbone == "itransformer":
             self.itransformer_decoder = nn.Linear(
                 2 * self.encoder_hidden_size,
                 self.h * self.loss.outputsize_multiplier,
@@ -1297,6 +1279,7 @@ class AAForecast(BaseModel):
             self.memory_token_shock_head = None
             self.memory_token_shock_gate = None
             self.event_trajectory_projector = None
+        self.timexer_decoder = None
 
         self.transformer_anomaly_projection = None
 
@@ -2197,42 +2180,6 @@ class AAForecast(BaseModel):
             "token_activity": token_activity.unsqueeze(-1),
         }
 
-    def _decode_timexer_forecast(
-        self,
-        *,
-        raw_states: AATimeXerTokenStates,
-        attended_states: AATimeXerTokenStates,
-    ) -> torch.Tensor:
-        if self.timexer_decoder is None:
-            raise ValueError("TimeXer decoder is not initialized")
-        raw_tokens = raw_states.combined()
-        attended_tokens = attended_states.combined()
-        raw_tokens = _apply_stochastic_dropout(
-            raw_tokens,
-            training=self.training,
-            stochastic_inference_enabled=self._stochastic_inference_enabled,
-            train_dropout_p=self.encoder_dropout,
-            inference_dropout_p=self._stochastic_dropout_p,
-        )
-        attended_tokens = _apply_stochastic_dropout(
-            attended_tokens,
-            training=self.training,
-            stochastic_inference_enabled=self._stochastic_inference_enabled,
-            train_dropout_p=self.encoder_dropout,
-            inference_dropout_p=self._stochastic_dropout_p,
-        )
-        decoder_input = torch.cat([raw_tokens, attended_tokens], dim=-1).permute(0, 1, 3, 2)
-        decoder_input = _apply_stochastic_dropout(
-            decoder_input,
-            training=self.training,
-            stochastic_inference_enabled=self._stochastic_inference_enabled,
-            train_dropout_p=self.encoder_dropout,
-            inference_dropout_p=self._stochastic_dropout_p,
-        )
-        decoded = self.timexer_decoder(decoder_input)
-        target_forecast = decoded[:, :1, :]
-        return target_forecast.transpose(1, 2).reshape(raw_tokens.shape[0], self.h, -1)
-
     def _decode_itransformer_forecast(
         self,
         *,
@@ -2631,11 +2578,9 @@ class AAForecast(BaseModel):
                 patch_states=attended_patch,
                 global_states=attended_global,
             )
-            return self._decode_timexer_forecast(
-                raw_states=backbone_states,
-                attended_states=attended_states,
-            )
-        if self.backbone == "itransformer":
+            hidden_states = self.encoder.project_to_time_states(backbone_states)
+            attended_states = self.encoder.project_to_time_states(attended_states)
+        elif self.backbone == "itransformer":
             token_signals = self._aggregate_itransformer_attention_signals(
                 star_payload={
                     "target_activity": star_payload["target_activity"].to(
@@ -2665,8 +2610,8 @@ class AAForecast(BaseModel):
                 raw_tokens=backbone_states,
                 attended_tokens=attended_tokens,
             )
-
-        hidden_states = self.encoder.project_to_time_states(backbone_states)
+        else:
+            hidden_states = self.encoder.project_to_time_states(backbone_states)
         if self.backbone == "informer" and bool(
             getattr(self, "_capture_encoding_export", False)
         ):
@@ -2734,12 +2679,13 @@ class AAForecast(BaseModel):
                 device=hidden_states.device,
                 dtype=hidden_states.dtype,
             )
-        attended_states, _ = self.attention(
-            hidden_states,
-            critical_mask,
-            count_active_channels,
-            channel_activity,
-        )
+        if self.backbone != "timexer":
+            attended_states, _ = self.attention(
+                hidden_states,
+                critical_mask,
+                count_active_channels,
+                channel_activity,
+            )
         if self.decoder is None:
             raise ValueError("Shared decoder is not initialized")
         decoder_input = self._build_time_decoder_input(

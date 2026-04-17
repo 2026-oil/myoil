@@ -14,6 +14,7 @@ from neuralforecast import NeuralForecast
 from plugins.retrieval.event_score_distribution_plot import (
     write_event_score_distribution_plot,
 )
+from plugins.retrieval.similarity_window_plot import write_similarity_plot_set
 from plugins.retrieval.runtime import (
     _blend_prediction as _shared_blend_prediction,
     _effective_event_threshold as _shared_effective_event_threshold,
@@ -1769,6 +1770,12 @@ def _write_retrieval_artifacts(
         input_size=input_size,
         target_col=target_col,
     )
+    similarity_plot_paths = write_similarity_plot_set(
+        json_payload,
+        windows_payload,
+        out_dir=retrieval_disk,
+        stem=slug,
+    )
 
     rel_run = run_root.resolve()
 
@@ -1787,6 +1794,7 @@ def _write_retrieval_artifacts(
             run_root / relative_windows_long_csv,
             run_root / relative_comparison_png,
             plot_path,
+            *similarity_plot_paths.values(),
         )
     ]
     logger.info(

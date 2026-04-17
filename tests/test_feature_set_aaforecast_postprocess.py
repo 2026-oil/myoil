@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pandas as pd
+
 from scripts import feature_set_aaforecast_postprocess as postprocess
 
 
@@ -70,6 +72,7 @@ def test_iter_passed_run_entries_expands_fanout_and_groups_configs(
             "jobs_route": "gru_informer",
             "canonical_run_root": "/tmp/feature_set_aaforecast_brentoil_baseline-ret_gru_informer",
             "run_name": "feature_set_aaforecast_brentoil_baseline-ret_gru_informer",
+            "derived": False,
         },
         {
             "config": "yaml/experiment/feature_set_aaforecast/aaforecast-gru.yaml",
@@ -77,6 +80,7 @@ def test_iter_passed_run_entries_expands_fanout_and_groups_configs(
             "jobs_route": None,
             "canonical_run_root": "/tmp/feature_set_aaforecast_aaforecast_gru",
             "run_name": "feature_set_aaforecast_aaforecast_gru",
+            "derived": False,
         },
     ]
 
@@ -125,14 +129,46 @@ def test_main_links_runs_writes_manifest_and_calls_both_group_plots(
         lambda _repo_root, _summary_payload: entries,
     )
 
-    def fake_write_group_plot(*, raw_batch_root, entries, group, x_start, x_end):
+    def fake_write_group_plot(*, raw_batch_root, run_reports, group, x_start, x_end):
         plot_calls.append((group, x_start, x_end))
+        assert len(run_reports) == 2
         plot_path = raw_batch_root / "plots" / group / "all_folds_continuous_overlay.png"
         plot_path.parent.mkdir(parents=True, exist_ok=True)
         plot_path.write_text(group, encoding="utf-8")
-        return plot_path
+        folds_dir = raw_batch_root / "plots" / group / "folds"
+        (folds_dir / "regular").mkdir(parents=True, exist_ok=True)
+        (folds_dir / "regular" / "fold_000_predictions_overlay.png").write_text(
+            "fold", encoding="utf-8"
+        )
+        return plot_path, folds_dir
 
     monkeypatch.setattr(postprocess, "_write_group_plot", fake_write_group_plot)
+
+    def fake_write_result_markdown(
+        *,
+        raw_batch_root,
+        run_reports,
+        ret_plot,
+        ret_folds_dir,
+        nonret_plot,
+        nonret_folds_dir,
+    ):
+        assert len(run_reports) == 2
+        output = raw_batch_root / "result.md"
+        output.write_text("ok", encoding="utf-8")
+        return output
+
+    monkeypatch.setattr(postprocess, "_write_result_markdown", fake_write_result_markdown)
+    monkeypatch.setattr(
+        postprocess,
+        "_read_run_report",
+        lambda entry: {"run_name": entry["run_name"], "resolved": {}, "leaderboard": pd.DataFrame()},
+    )
+    monkeypatch.setattr(
+        postprocess,
+        "_augment_with_derived_aaforecast_nonret_reports",
+        lambda entries, run_reports: (entries, run_reports),
+    )
 
     raw_batch_root = tmp_path / "raw_feature_set_aaforecast" / "20260417T000000Z"
     assert (
@@ -161,3 +197,799 @@ def test_main_links_runs_writes_manifest_and_calls_both_group_plots(
         ("ret", "2025-08-15", "2026-03-09"),
         ("nonret", "2025-08-15", "2026-03-09"),
     ]
+    assert (raw_batch_root / "result.md").read_text(encoding="utf-8") == "ok"
+
+
+def _write_run_fixture(
+    *,
+    run_root: Path,
+    resolved_payload: dict[str, object],
+    leaderboard_rows: list[dict[str, object]],
+    metrics_rows: list[dict[str, object]],
+    prediction_rows: list[dict[str, object]],
+    stage_config: dict[str, object] | None = None,
+    retrieval_payloads: list[tuple[str, dict[str, object]]] | None = None,
+) -> None:
+    (run_root / "config").mkdir(parents=True, exist_ok=True)
+    (run_root / "summary" / "folds" / "fold_000").mkdir(parents=True, exist_ok=True)
+    (run_root / "summary").mkdir(parents=True, exist_ok=True)
+    (run_root / "aa_forecast" / "config").mkdir(parents=True, exist_ok=True)
+
+    (run_root / "config" / "config.resolved.json").write_text(
+        json.dumps(resolved_payload, indent=2), encoding="utf-8"
+    )
+    pd.DataFrame(leaderboard_rows).to_csv(run_root / "summary" / "leaderboard.csv", index=False)
+    pd.DataFrame(prediction_rows).to_csv(run_root / "summary" / "result.csv", index=False)
+    pd.DataFrame(metrics_rows).to_csv(
+        run_root / "summary" / "folds" / "fold_000" / "metrics.csv", index=False
+    )
+    pd.DataFrame(prediction_rows).to_csv(
+        run_root / "summary" / "folds" / "fold_000" / "predictions.csv", index=False
+    )
+    if stage_config is not None:
+        (run_root / "aa_forecast" / "config" / "stage_config.json").write_text(
+            json.dumps(stage_config, indent=2), encoding="utf-8"
+        )
+    if retrieval_payloads:
+        for relative, payload in retrieval_payloads:
+            target = run_root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def test_write_result_markdown_uses_actual_run_artifacts(tmp_path: Path) -> None:
+    raw_batch_root = tmp_path / "raw" / "20260417T000000Z"
+    raw_batch_root.mkdir(parents=True)
+
+    resolved_payload = {
+        "dataset": {
+            "target_col": "Com_CrudeOil",
+            "hist_exog_cols": ["GPRD_THREAT", "GPRD"],
+            "transformations_target": "diff",
+            "transformations_exog": "diff",
+        },
+        "training": {
+            "input_size": 64,
+            "max_steps": 400,
+            "val_size": 4,
+            "loss": "mse",
+        },
+        "cv": {
+            "horizon": 2,
+            "step_size": 1,
+            "n_windows": 1,
+            "gap": 0,
+            "overlap_eval_policy": "by_cutoff_mean",
+        },
+    }
+    stage_config = {
+        "star_hist_exog_cols_resolved": ["GPRD_THREAT"],
+        "non_star_hist_exog_cols_resolved": ["GPRD"],
+        "lowess_frac": 0.35,
+        "lowess_delta": 0.01,
+        "uncertainty": {"enabled": True, "sample_count": 50},
+    }
+
+    baseline_off = tmp_path / "baseline-off"
+    _write_run_fixture(
+        run_root=baseline_off,
+        resolved_payload=resolved_payload,
+        leaderboard_rows=[
+            {
+                "rank": 1,
+                "model": "GRU",
+                "mean_fold_mae": 5.8,
+                "mean_fold_mse": 40.0,
+                "mean_fold_rmse": 6.3,
+                "fold_count": 1,
+                "mean_fold_mape": 0.10,
+                "mean_fold_nrmse": 1.10,
+                "mean_fold_r2": -1.0,
+            },
+            {
+                "rank": 2,
+                "model": "Informer",
+                "mean_fold_mae": 5.0,
+                "mean_fold_mse": 38.0,
+                "mean_fold_rmse": 6.1,
+                "fold_count": 1,
+                "mean_fold_mape": 0.09,
+                "mean_fold_nrmse": 1.00,
+                "mean_fold_r2": -0.8,
+            },
+        ],
+        metrics_rows=[
+            {
+                "model": "GRU",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "MAE": 5.8,
+                "MSE": 40.0,
+                "RMSE": 6.3,
+                "MAPE": 0.10,
+                "NRMSE": 1.10,
+                "R2": -1.0,
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+            },
+            {
+                "model": "Informer",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "MAE": 5.0,
+                "MSE": 38.0,
+                "RMSE": 6.1,
+                "MAPE": 0.09,
+                "NRMSE": 1.00,
+                "R2": -0.8,
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+            },
+        ],
+        prediction_rows=[
+            {
+                "model": "GRU",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-02 00:00:00",
+                "horizon_step": 1,
+                "y": 80.0,
+                "y_hat": 75.0,
+            },
+            {
+                "model": "GRU",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-09 00:00:00",
+                "horizon_step": 2,
+                "y": 92.0,
+                "y_hat": 78.0,
+            },
+            {
+                "model": "Informer",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-02 00:00:00",
+                "horizon_step": 1,
+                "y": 80.0,
+                "y_hat": 76.0,
+            },
+            {
+                "model": "Informer",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-09 00:00:00",
+                "horizon_step": 2,
+                "y": 92.0,
+                "y_hat": 79.0,
+            },
+        ],
+    )
+
+    baseline_on = tmp_path / "baseline-on"
+    _write_run_fixture(
+        run_root=baseline_on,
+        resolved_payload=resolved_payload,
+        leaderboard_rows=[
+            {
+                "rank": 1,
+                "model": "GRU",
+                "mean_fold_mae": 5.5,
+                "mean_fold_mse": 39.0,
+                "mean_fold_rmse": 6.2,
+                "fold_count": 1,
+                "mean_fold_mape": 0.08,
+                "mean_fold_nrmse": 1.05,
+                "mean_fold_r2": -0.9,
+            },
+            {
+                "rank": 2,
+                "model": "Informer",
+                "mean_fold_mae": 4.7,
+                "mean_fold_mse": 37.0,
+                "mean_fold_rmse": 6.0,
+                "fold_count": 1,
+                "mean_fold_mape": 0.07,
+                "mean_fold_nrmse": 0.95,
+                "mean_fold_r2": -0.7,
+            },
+        ],
+        metrics_rows=[
+            {
+                "model": "GRU",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "MAE": 5.5,
+                "MSE": 39.0,
+                "RMSE": 6.2,
+                "MAPE": 0.08,
+                "NRMSE": 1.05,
+                "R2": -0.9,
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+            },
+            {
+                "model": "Informer",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "MAE": 4.7,
+                "MSE": 37.0,
+                "RMSE": 6.0,
+                "MAPE": 0.07,
+                "NRMSE": 0.95,
+                "R2": -0.7,
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+            },
+        ],
+        prediction_rows=[
+            {
+                "model": "GRU",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-02 00:00:00",
+                "horizon_step": 1,
+                "y": 80.0,
+                "y_hat": 77.0,
+            },
+            {
+                "model": "GRU",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-09 00:00:00",
+                "horizon_step": 2,
+                "y": 92.0,
+                "y_hat": 81.0,
+            },
+            {
+                "model": "Informer",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-02 00:00:00",
+                "horizon_step": 1,
+                "y": 80.0,
+                "y_hat": 78.0,
+            },
+            {
+                "model": "Informer",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-09 00:00:00",
+                "horizon_step": 2,
+                "y": 92.0,
+                "y_hat": 82.0,
+            },
+        ],
+    )
+
+    aa_off = tmp_path / "aa-off"
+    _write_run_fixture(
+        run_root=aa_off,
+        resolved_payload=resolved_payload,
+        leaderboard_rows=[
+            {
+                "rank": 1,
+                "model": "AAForecast",
+                "mean_fold_mae": 4.9,
+                "mean_fold_mse": 35.0,
+                "mean_fold_rmse": 5.9,
+                "fold_count": 1,
+                "mean_fold_mape": 0.06,
+                "mean_fold_nrmse": 0.90,
+                "mean_fold_r2": -0.5,
+            }
+        ],
+        metrics_rows=[
+            {
+                "model": "AAForecast",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "MAE": 4.9,
+                "MSE": 35.0,
+                "RMSE": 5.9,
+                "MAPE": 0.06,
+                "NRMSE": 0.90,
+                "R2": -0.5,
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+            }
+        ],
+        prediction_rows=[
+            {
+                "model": "AAForecast",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-02 00:00:00",
+                "horizon_step": 1,
+                "y": 80.0,
+                "y_hat": 79.0,
+                "aaforecast_retrieval_enabled": False,
+                "aaforecast_retrieval_applied": False,
+            },
+            {
+                "model": "AAForecast",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-09 00:00:00",
+                "horizon_step": 2,
+                "y": 92.0,
+                "y_hat": 84.0,
+                "aaforecast_retrieval_enabled": False,
+                "aaforecast_retrieval_applied": False,
+            },
+        ],
+        stage_config=stage_config,
+    )
+
+    aa_on = tmp_path / "aa-on"
+    _write_run_fixture(
+        run_root=aa_on,
+        resolved_payload=resolved_payload,
+        leaderboard_rows=[
+            {
+                "rank": 1,
+                "model": "AAForecast",
+                "mean_fold_mae": 4.5,
+                "mean_fold_mse": 34.0,
+                "mean_fold_rmse": 5.8,
+                "fold_count": 1,
+                "mean_fold_mape": 0.05,
+                "mean_fold_nrmse": 0.85,
+                "mean_fold_r2": -0.4,
+            }
+        ],
+        metrics_rows=[
+            {
+                "model": "AAForecast",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "MAE": 4.5,
+                "MSE": 34.0,
+                "RMSE": 5.8,
+                "MAPE": 0.05,
+                "NRMSE": 0.85,
+                "R2": -0.4,
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+            }
+        ],
+        prediction_rows=[
+            {
+                "model": "AAForecast",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-02 00:00:00",
+                "horizon_step": 1,
+                "y": 80.0,
+                "y_hat": 80.0,
+                "aaforecast_retrieval_enabled": True,
+                "aaforecast_retrieval_applied": True,
+                "aaforecast_retrieval_artifact": "aa_forecast/retrieval/fold_000/20260223T000000.json",
+            },
+            {
+                "model": "AAForecast",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-09 00:00:00",
+                "horizon_step": 2,
+                "y": 92.0,
+                "y_hat": 86.0,
+                "aaforecast_retrieval_enabled": True,
+                "aaforecast_retrieval_applied": True,
+                "aaforecast_retrieval_artifact": "aa_forecast/retrieval/fold_000/20260223T000000.json",
+            },
+        ],
+        stage_config=stage_config,
+        retrieval_payloads=[
+            (
+                "aa_forecast/retrieval/fold_000/20260223T000000.json",
+                {"retrieval_applied": True, "top_k_used": 1},
+            )
+        ],
+    )
+
+    entries = [
+        {
+            "config": "yaml/experiment/feature_set_aaforecast_wti/baseline.yaml",
+            "group": "nonret",
+            "jobs_route": "gru_informer",
+            "canonical_run_root": str(baseline_off),
+            "run_name": baseline_off.name,
+        },
+        {
+            "config": "yaml/experiment/feature_set_aaforecast_wti/baseline-ret.yaml",
+            "group": "ret",
+            "jobs_route": "gru_informer",
+            "canonical_run_root": str(baseline_on),
+            "run_name": baseline_on.name,
+        },
+        {
+            "config": "yaml/experiment/feature_set_aaforecast_wti/aaforecast-gru.yaml",
+            "group": "nonret",
+            "jobs_route": None,
+            "canonical_run_root": str(aa_off),
+            "run_name": aa_off.name,
+        },
+        {
+            "config": "yaml/experiment/feature_set_aaforecast_wti/aaforecast-gru-ret.yaml",
+            "group": "ret",
+            "jobs_route": None,
+            "canonical_run_root": str(aa_on),
+            "run_name": aa_on.name,
+        },
+    ]
+    run_reports = [postprocess._read_run_report(entry) for entry in entries]
+
+    ret_plot = raw_batch_root / "plots" / "ret" / "all_folds_continuous_overlay.png"
+    ret_plot.parent.mkdir(parents=True, exist_ok=True)
+    ret_plot.write_text("ret", encoding="utf-8")
+    ret_folds_dir = raw_batch_root / "plots" / "ret" / "folds"
+    (ret_folds_dir / "regular").mkdir(parents=True, exist_ok=True)
+    (ret_folds_dir / "regular" / "fold_000_predictions_overlay.png").write_text(
+        "ret-fold", encoding="utf-8"
+    )
+
+    nonret_plot = raw_batch_root / "plots" / "nonret" / "all_folds_continuous_overlay.png"
+    nonret_plot.parent.mkdir(parents=True, exist_ok=True)
+    nonret_plot.write_text("nonret", encoding="utf-8")
+    nonret_folds_dir = raw_batch_root / "plots" / "nonret" / "folds"
+    (nonret_folds_dir / "regular").mkdir(parents=True, exist_ok=True)
+    (nonret_folds_dir / "regular" / "fold_000_predictions_overlay.png").write_text(
+        "nonret-fold", encoding="utf-8"
+    )
+
+    output_path = postprocess._write_result_markdown(
+        raw_batch_root=raw_batch_root,
+        run_reports=run_reports,
+        ret_plot=ret_plot,
+        ret_folds_dir=ret_folds_dir,
+        nonret_plot=nonret_plot,
+        nonret_folds_dir=nonret_folds_dir,
+    )
+
+    markdown = output_path.read_text(encoding="utf-8")
+    assert "# 01. 핵심쟁점" in markdown
+    assert "- **예측 타깃:** Com_CrudeOil" in markdown
+    assert "- **예측 단위:** 주간 예측" in markdown
+    assert "- **max_steps:** `400`" in markdown
+    assert "AAForecast retrieval on run은 총 1개 fold artifact" in markdown
+    assert "baseline과 직접 비교 가능한 2개 조건 중 **2개 조건에서 AAForecast가 평균 MAPE를 개선**했다." in markdown
+    assert "retrieval on은 직접 비교 가능한 3개 backbone 조건 중 **3개 조건에서 평균 MAPE를 낮췄다**." in markdown
+    assert "| Rank | 실험군" in markdown
+    assert "![ret continuous overlay](plots/ret/all_folds_continuous_overlay.png)" in markdown
+    assert "![nonret fold overlay](plots/nonret/folds/regular/fold_000_predictions_overlay.png)" in markdown
+
+
+def test_augment_with_derived_aaforecast_nonret_reports_reuses_base_prediction(
+    tmp_path: Path,
+) -> None:
+    resolved_payload = {
+        "dataset": {
+            "target_col": "Com_CrudeOil",
+            "hist_exog_cols": ["GPRD_THREAT"],
+            "transformations_target": "diff",
+            "transformations_exog": "diff",
+        },
+        "training": {
+            "input_size": 64,
+            "max_steps": 400,
+            "val_size": 4,
+            "loss": "mse",
+        },
+        "cv": {
+            "horizon": 2,
+            "step_size": 1,
+            "n_windows": 1,
+            "gap": 0,
+            "overlap_eval_policy": "by_cutoff_mean",
+        },
+    }
+    stage_config = {
+        "backbone": "GRU",
+        "star_hist_exog_cols_resolved": ["GPRD_THREAT"],
+        "non_star_hist_exog_cols_resolved": [],
+        "lowess_frac": 0.35,
+        "lowess_delta": 0.01,
+        "uncertainty": {"enabled": True, "sample_count": 50},
+    }
+    aa_on = tmp_path / "aa-on"
+    _write_run_fixture(
+        run_root=aa_on,
+        resolved_payload=resolved_payload,
+        leaderboard_rows=[
+            {
+                "rank": 1,
+                "model": "AAForecast",
+                "mean_fold_mae": 4.5,
+                "mean_fold_mse": 34.0,
+                "mean_fold_rmse": 5.8,
+                "fold_count": 1,
+                "mean_fold_mape": 0.05,
+                "mean_fold_nrmse": 0.85,
+                "mean_fold_r2": -0.4,
+            }
+        ],
+        metrics_rows=[
+            {
+                "model": "AAForecast",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "MAE": 4.5,
+                "MSE": 34.0,
+                "RMSE": 5.8,
+                "MAPE": 0.05,
+                "NRMSE": 0.85,
+                "R2": -0.4,
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+            }
+        ],
+        prediction_rows=[
+            {
+                "model": "AAForecast",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-02 00:00:00",
+                "horizon_step": 1,
+                "y": 80.0,
+                "y_hat": 79.0,
+                "aaforecast_retrieval_enabled": True,
+                "aaforecast_retrieval_applied": True,
+                "aaforecast_retrieval_artifact": "aa_forecast/retrieval/fold_000/20260223T000000.json",
+            },
+            {
+                "model": "AAForecast",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-09 00:00:00",
+                "horizon_step": 2,
+                "y": 92.0,
+                "y_hat": 86.0,
+                "aaforecast_retrieval_enabled": True,
+                "aaforecast_retrieval_applied": True,
+                "aaforecast_retrieval_artifact": "aa_forecast/retrieval/fold_000/20260223T000000.json",
+            },
+        ],
+        stage_config=stage_config,
+        retrieval_payloads=[
+            (
+                "aa_forecast/retrieval/fold_000/20260223T000000.json",
+                {
+                    "cutoff": "2026-02-23 00:00:00",
+                    "base_prediction": [70.0, 74.0],
+                    "final_prediction": [79.0, 86.0],
+                    "memory_prediction": [82.0, 88.0],
+                    "retrieval_applied": True,
+                    "top_k_used": 1,
+                },
+            )
+        ],
+    )
+    entries = [
+        {
+            "config": "yaml/experiment/feature_set_aaforecast_wti/aaforecast-gru-ret.yaml",
+            "group": "ret",
+            "jobs_route": None,
+            "canonical_run_root": str(aa_on),
+            "run_name": aa_on.name,
+            "derived": False,
+        }
+    ]
+    run_reports = [postprocess._read_run_report(entry) for entry in entries]
+
+    augmented_entries, augmented_reports = postprocess._augment_with_derived_aaforecast_nonret_reports(
+        entries, run_reports
+    )
+
+    assert len(augmented_entries) == 2
+    derived_entry = augmented_entries[1]
+    assert derived_entry["derived"] is True
+    assert derived_entry["run_name"] == "aa-on_nonret"
+
+    assert len(augmented_reports) == 2
+    derived_report = augmented_reports[1]
+    assert derived_report["retrieval"] is False
+    assert derived_report["derived"] is True
+    assert derived_report["display_experiment"] == "AAForecast (derived non-ret)"
+    assert derived_report["predictions"]["y_hat"].tolist() == [70.0, 74.0]
+    assert derived_report["leaderboard"]["mean_fold_mape"].iloc[0] == 0.16032608695652173
+    assert derived_report["metrics"]["MAE"].iloc[0] == 14.0
+
+
+def test_write_result_markdown_mentions_derived_nonret_reports(tmp_path: Path) -> None:
+    raw_batch_root = tmp_path / "raw" / "20260417T000000Z"
+    raw_batch_root.mkdir(parents=True)
+    run_reports = [
+        {
+            "experiment": "baseline",
+            "display_experiment": "baseline",
+            "retrieval": False,
+            "backbone": "GRU",
+            "run_name": "baseline",
+            "run_root": tmp_path / "baseline",
+            "config": "yaml/experiment/feature_set_aaforecast_wti/baseline.yaml",
+            "leaderboard": pd.DataFrame(
+                [
+                    {
+                        "model": "GRU",
+                        "mean_fold_mape": 0.20,
+                        "mean_fold_nrmse": 1.0,
+                        "mean_fold_mae": 10.0,
+                        "mean_fold_r2": -1.0,
+                        "fold_count": 1,
+                    }
+                ]
+            ),
+            "metrics": pd.DataFrame(
+                [{"model": "GRU", "fold_idx": 0, "cutoff": "2026-02-23", "MAPE": 0.20, "NRMSE": 1.0, "MAE": 10.0, "R2": -1.0}]
+            ),
+            "predictions": pd.DataFrame(
+                [
+                    {
+                        "model": "GRU",
+                        "fold_idx": 0,
+                        "cutoff": "2026-02-23",
+                        "horizon_step": 1,
+                        "ds": "2026-03-02",
+                        "y": 80.0,
+                        "y_hat": 70.0,
+                    },
+                    {
+                        "model": "GRU",
+                        "fold_idx": 0,
+                        "cutoff": "2026-02-23",
+                        "horizon_step": 2,
+                        "ds": "2026-03-09",
+                        "y": 92.0,
+                        "y_hat": 74.0,
+                    },
+                ]
+            ),
+            "resolved": {
+                "dataset": {
+                    "target_col": "Com_CrudeOil",
+                    "hist_exog_cols": ["GPRD_THREAT"],
+                    "transformations_target": "diff",
+                    "transformations_exog": "diff",
+                },
+                "training": {"input_size": 64, "max_steps": 400, "val_size": 4, "loss": "mse"},
+                "cv": {"horizon": 2, "step_size": 1, "n_windows": 1, "gap": 0, "overlap_eval_policy": "by_cutoff_mean"},
+            },
+            "stage_config": None,
+            "retrieval_payloads": [],
+            "derived": False,
+        },
+        {
+            "experiment": "AAForecast",
+            "display_experiment": "AAForecast (derived non-ret)",
+            "retrieval": False,
+            "backbone": "GRU",
+            "run_name": "aaforecast_gru",
+            "run_root": tmp_path / "aa",
+            "config": "yaml/experiment/feature_set_aaforecast_wti/aaforecast-gru.yaml",
+            "leaderboard": pd.DataFrame(
+                [
+                    {
+                        "model": "AAForecast",
+                        "mean_fold_mape": 0.16,
+                        "mean_fold_nrmse": 0.9,
+                        "mean_fold_mae": 14.0,
+                        "mean_fold_r2": -0.5,
+                        "fold_count": 1,
+                    }
+                ]
+            ),
+            "metrics": pd.DataFrame(
+                [{"model": "AAForecast", "fold_idx": 0, "cutoff": "2026-02-23", "MAPE": 0.16, "NRMSE": 0.9, "MAE": 14.0, "R2": -0.5}]
+            ),
+            "predictions": pd.DataFrame(
+                [
+                    {
+                        "model": "AAForecast",
+                        "fold_idx": 0,
+                        "cutoff": "2026-02-23",
+                        "horizon_step": 1,
+                        "ds": "2026-03-02",
+                        "y": 80.0,
+                        "y_hat": 70.0,
+                    },
+                    {
+                        "model": "AAForecast",
+                        "fold_idx": 0,
+                        "cutoff": "2026-02-23",
+                        "horizon_step": 2,
+                        "ds": "2026-03-09",
+                        "y": 92.0,
+                        "y_hat": 74.0,
+                    },
+                ]
+            ),
+            "resolved": {
+                "dataset": {
+                    "target_col": "Com_CrudeOil",
+                    "hist_exog_cols": ["GPRD_THREAT"],
+                    "transformations_target": "diff",
+                    "transformations_exog": "diff",
+                },
+                "training": {"input_size": 64, "max_steps": 400, "val_size": 4, "loss": "mse"},
+                "cv": {"horizon": 2, "step_size": 1, "n_windows": 1, "gap": 0, "overlap_eval_policy": "by_cutoff_mean"},
+            },
+            "stage_config": {
+                "star_hist_exog_cols_resolved": ["GPRD_THREAT"],
+                "non_star_hist_exog_cols_resolved": [],
+                "lowess_frac": 0.35,
+                "lowess_delta": 0.01,
+                "uncertainty": {"enabled": True, "sample_count": 50},
+            },
+            "retrieval_payloads": [],
+            "derived": True,
+        },
+    ]
+
+    output_path = postprocess._write_result_markdown(
+        raw_batch_root=raw_batch_root,
+        run_reports=run_reports,
+        ret_plot=None,
+        ret_folds_dir=None,
+        nonret_plot=None,
+        nonret_folds_dir=None,
+    )
+    markdown = output_path.read_text(encoding="utf-8")
+    assert "AAForecast retrieval off 중 1개는 **`-ret` run의 base_prediction으로 재구성한 derived 결과**다." in markdown
+    assert "적용후 (`AAForecast (derived non-ret)`)" in markdown

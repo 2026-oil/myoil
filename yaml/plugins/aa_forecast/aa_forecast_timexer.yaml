@@ -15,7 +15,7 @@ aa_forecast:
     d_ff: 256
     patch_len: 8
     use_norm: true
-    decoder_hidden_size: 128
+    decoder_hidden_size: 256
     decoder_layers: 4
     season_length: 4
   star_anomaly_tails:

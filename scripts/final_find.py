@@ -486,23 +486,49 @@ def _pool_from_grid(grid: Sequence[Sequence[str]]) -> list[str]:
     return list(dict.fromkeys(column for row in grid for column in row))
 
 
+def _select_required_column(
+    trial: optuna.Trial,
+    *,
+    prefix: str,
+    allowed_columns: Sequence[str],
+) -> str | None:
+    allowed = [str(column) for column in allowed_columns]
+    if not allowed:
+        return None
+    if len(allowed) == 1:
+        return allowed[0]
+    selector = float(trial.suggest_float(f"{prefix}__required_selector", 0.0, 1.0))
+    index = min(int(selector * len(allowed)), len(allowed) - 1)
+    return allowed[index]
+
+
 def _suggest_non_empty_subset(
     trial: optuna.Trial,
     *,
     columns: Sequence[str],
     prefix: str,
+    allowed_columns: Sequence[str] | None = None,
 ) -> list[str]:
-    if len(columns) == 1:
-        return [str(columns[0])]
-    required = str(trial.suggest_categorical(f"{prefix}__required", list(columns)))
-    selected = [required]
-    selected.extend(
-        str(column)
-        for column in columns
-        if column != required
-        and trial.suggest_categorical(f"{prefix}__{column}", [False, True])
+    universe = [str(column) for column in columns]
+    allowed = set(universe if allowed_columns is None else map(str, allowed_columns))
+    if not allowed:
+        return []
+    if len(universe) == 1:
+        column = universe[0]
+        return [column] if column in allowed else []
+    include_flags = {
+        column: bool(trial.suggest_categorical(f"{prefix}__{column}", [False, True]))
+        for column in universe
+    }
+    selected = [column for column in universe if column in allowed and include_flags[column]]
+    if selected:
+        return selected
+    required = _select_required_column(
+        trial,
+        prefix=prefix,
+        allowed_columns=[column for column in universe if column in allowed],
     )
-    return selected
+    return [required] if required is not None else []
 
 
 def _filter_input_sizes_for_backbone(
@@ -575,7 +601,10 @@ def run_final_find_optuna(
         if not available_upward:
             raise optuna.TrialPruned("no upward candidates remain after exog selection")
         selected_upward = _suggest_non_empty_subset(
-            trial, columns=available_upward, prefix="use_upward"
+            trial,
+            columns=upward_pool,
+            allowed_columns=available_upward,
+            prefix="use_upward",
         )
         if not selected_upward:
             raise optuna.TrialPruned("no upward columns selected")

@@ -1,39 +1,28 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-23 | Updated: 2026-03-23 -->
+<!-- Generated: 2026-03-23 | Updated: 2026-04-17 -->
 
 # yaml experiment matrix
 
 ## Purpose
-This directory holds the curated experiment configurations used by the local wrapper runtime. The layout is case-family oriented rather than package-oriented.
+This directory holds the curated YAML configuration set used by the local wrapper runtime. The layout is organized by shared contracts, plugin-linked YAML, experiment families, and reusable settings/jobs.
 
-## Key Subdirectories
+## Subdirectories
 | Directory | Purpose |
 |-----------|---------|
-| `experiment/feature_set/` | Base Brent/WTI feature-set case configs. |
-| `experiment/feature_set_HPT*/` | Hyperparameter-tuning feature-set case families. |
-| `jobs/` | Shared jobs route files used by case configs. |
-| `setting/` | Shared setting authority files for centralized YAML controls. |
-| `HPO/` | Central Optuna/search-space contracts. |
-| `plugins/` | Plugin-owned linked YAMLs such as `bs_preforcast.yaml`. |
-| `bomb/` | Case3 bomb sweep configs for exloss + transformation variations. |
-| `bomb_trans/` | Transformation-focused case3 bomb sweep configs used by `run_bomb_trans.sh`. |
-| `univar/` | Univariate baseline configs. |
-| `blackswan/` | Black-swan case configs and exploratory variants. |
-| `jaeho_feature_set/` | Researcher-specific exploratory configs retained for local experimentation. |
+| `HPO/` | Central Optuna/search-space contracts (see `HPO/AGENTS.md`). |
+| `experiment/` | Family-oriented Brent/Dubai/WTI experiment configs (see `experiment/AGENTS.md`). |
+| `jobs/` | Shared job-list YAML fragments and routes (see `jobs/AGENTS.md`). |
+| `plugins/` | Plugin-linked YAML payloads and parity configs (see `plugins/AGENTS.md`). |
+| `setting/` | Shared setting authority YAML (see `setting/AGENTS.md`). |
 
 ## For AI Agents
 
 ### Working In This Directory
 - Preserve family naming and Brent/WTI pairing conventions; downstream scripts depend on predictable file paths.
 - Prefer editing the narrowest family affected by the request instead of copying settings across unrelated trees.
-- Keep config semantics aligned with `app_config.py` and `yaml/HPO/search_space.yaml`.
+- Keep config semantics aligned with `app_config.py`, plugin config loaders, and `yaml/HPO/search_space.yaml`.
 - Do not silently add new top-level keys; runtime validation is strict.
 
 ### Testing Requirements
 - Always run `uv run python main.py --validate-only --config <changed-config>` for touched configs.
-- For bomb-family edits, also run `uv run pytest --no-cov tests/test_bomb_yaml_configs.py`.
-- If a shell wrapper hardcodes this directory, run the matching `tests/test_run_*.py` regression.
-
-### Common Patterns
-- `jobs[*].params` carries model-specific knobs; shared training/runtime knobs belong in top-level sections.
-- Case families often encode target, horizon/input-size, and transformation mode directly in the filename.
+- Run any matching YAML or shell-wrapper regression selector when family structure or linked configs change.

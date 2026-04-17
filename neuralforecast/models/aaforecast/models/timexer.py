@@ -8,6 +8,7 @@ from .base import (
     AABackboneAdapter,
     AABackboneEvidence,
     AATimeXerTokenStates,
+    scatter_patch_tokens_to_time_states,
     validate_attention_heads,
 )
 
@@ -45,12 +46,15 @@ class TimeXerBackboneAdapter(AABackboneAdapter):
         factor: int,
         patch_len: int,
         use_norm: bool,
+        target_token_indices: tuple[int, ...] = (0,),
     ) -> None:
         super().__init__()
         validate_attention_heads(hidden_size, n_heads, field_name="n_heads")
         self.hidden_size = hidden_size
+        self.input_size = input_size
         self.patch_len = patch_len
         self.patch_num = input_size // patch_len
+        self.target_token_indices = tuple(target_token_indices or (0,))
         self.encoder_only = TimeXerEncoderOnly(
             input_size=input_size,
             n_series=feature_size,
@@ -76,6 +80,36 @@ class TimeXerBackboneAdapter(AABackboneAdapter):
             global_states=global_states,
         )
 
+    def _select_target_channels(self, token_states: torch.Tensor) -> torch.Tensor:
+        if token_states.ndim != 4:
+            raise ValueError("TimeXer token states must be rank-4 [B, channel, token, hidden]")
+        index_tensor = torch.as_tensor(
+            self.target_token_indices,
+            device=token_states.device,
+            dtype=torch.long,
+        )
+        selected = torch.index_select(token_states, dim=1, index=index_tensor)
+        return selected.mean(dim=1)
+
+    def project_to_time_states(self, states: AATimeXerTokenStates) -> torch.Tensor:
+        if not isinstance(states, AATimeXerTokenStates):
+            raise TypeError("TimeXer adapter expects AATimeXerTokenStates for time projection")
+        patch_tokens = self._select_target_channels(states.patch_states)
+        global_tokens = self._select_target_channels(states.global_states).squeeze(1)
+        template = patch_tokens.new_zeros(
+            patch_tokens.shape[0],
+            self.input_size,
+            self.hidden_size,
+        )
+        return scatter_patch_tokens_to_time_states(
+            patch_tokens,
+            seq_len=self.input_size,
+            patch_len=self.patch_len,
+            stride=self.patch_len,
+            template=template,
+            global_context=global_tokens,
+        )
+
 
 def build_timexer_backbone(
     *,
@@ -89,6 +123,7 @@ def build_timexer_backbone(
     factor: int,
     patch_len: int,
     use_norm: bool,
+    target_token_indices: tuple[int, ...] = (0,),
     **_: object,
 ) -> nn.Module:
     return TimeXerBackboneAdapter(
@@ -102,4 +137,5 @@ def build_timexer_backbone(
         factor=factor,
         patch_len=patch_len,
         use_norm=use_norm,
+        target_token_indices=target_token_indices,
     )

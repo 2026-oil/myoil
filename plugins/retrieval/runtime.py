@@ -17,6 +17,7 @@ import pandas as pd
 
 from . import config as _cfg
 from .event_score_distribution_plot import write_event_score_distribution_plot
+from .similarity_window_plot import write_similarity_plot_set
 from .signatures import (
     _build_star_extractor,
     _resolve_tail_modes,
@@ -287,16 +288,248 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     )
 
 
+def _train_end_index_for_candidate(
+    train_df: pd.DataFrame,
+    dt_col: str,
+    candidate_end_ds: str,
+) -> int | None:
+    cand = pd.Timestamp(candidate_end_ds)
+    series = pd.to_datetime(train_df[dt_col])
+    for i in range(len(series)):
+        if pd.Timestamp(series.iloc[i]) == cand:
+            return i
+    cand_norm = cand.normalize()
+    for i in range(len(series)):
+        if pd.Timestamp(series.iloc[i]).normalize() == cand_norm:
+            return i
+    return None
+
+
+def _window_series_slice(
+    train_df: pd.DataFrame,
+    transformed_train_df: pd.DataFrame,
+    start_idx: int,
+    end_idx: int,
+    target_col: str,
+    dt_col: str,
+) -> dict[str, Any]:
+    sl_train = train_df.iloc[start_idx : end_idx + 1].reset_index(drop=True)
+    sl_tf = transformed_train_df.iloc[start_idx : end_idx + 1].reset_index(drop=True)
+    y_raw = sl_train[target_col].astype(float).tolist()
+    ds = pd.to_datetime(sl_train[dt_col]).astype(str).tolist()
+    if target_col in sl_tf.columns:
+        y_tf = sl_tf[target_col].astype(float).tolist()
+    else:
+        y_tf = [float("nan")] * len(ds)
+    return {"ds": ds, "y_raw": y_raw, "y_transformed": y_tf}
+
+
+def _align_retrieval_window_lists(window: dict[str, Any]) -> dict[str, Any]:
+    ds = list(window["ds"])
+    y_raw = list(window["y_raw"])
+    y_tf = list(window["y_transformed"])
+    L = max(len(ds), len(y_raw), len(y_tf))
+    nan = float("nan")
+    if len(ds) < L:
+        ds = [""] * (L - len(ds)) + ds
+    elif len(ds) > L:
+        ds = ds[-L:]
+    if len(y_raw) < L:
+        y_raw = [nan] * (L - len(y_raw)) + y_raw
+    elif len(y_raw) > L:
+        y_raw = y_raw[-L:]
+    if len(y_tf) < L:
+        y_tf = [nan] * (L - len(y_tf)) + y_tf
+    elif len(y_tf) > L:
+        y_tf = y_tf[-L:]
+    return {"ds": ds, "y_raw": y_raw, "y_transformed": y_tf}
+
+
+def _normalize_retrieval_series_window(
+    window: dict[str, Any], *, input_size: int
+) -> dict[str, Any]:
+    window = _align_retrieval_window_lists(window)
+    ds = list(window["ds"])
+    y_raw = list(window["y_raw"])
+    y_tf = list(window["y_transformed"])
+    n_w = len(ds)
+    if n_w == input_size:
+        return {"ds": ds, "y_raw": y_raw, "y_transformed": y_tf}
+    if n_w > input_size:
+        drop = n_w - input_size
+        return {
+            "ds": ds[drop:],
+            "y_raw": y_raw[drop:],
+            "y_transformed": y_tf[drop:],
+        }
+    pad = input_size - n_w
+    nan = float("nan")
+    return {
+        "ds": [""] * pad + ds,
+        "y_raw": [nan] * pad + y_raw,
+        "y_transformed": [nan] * pad + y_tf,
+    }
+
+
+def _build_retrieval_window_artifacts(
+    *,
+    train_df: pd.DataFrame,
+    transformed_train_df: pd.DataFrame,
+    dt_col: str,
+    target_col: str,
+    input_size: int,
+    horizon: int,
+    neighbors: list[dict[str, Any]],
+    train_end_ds: pd.Timestamp,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    n = len(train_df)
+    q_start = max(0, n - input_size)
+    query_w = _window_series_slice(
+        train_df,
+        transformed_train_df,
+        q_start,
+        n - 1,
+        target_col,
+        dt_col,
+    )
+    query_w = _normalize_retrieval_series_window(query_w, input_size=input_size)
+    long_rows: list[dict[str, Any]] = []
+    for step_ix in range(input_size):
+        long_rows.append(
+            {
+                "role": "query",
+                "rank": "",
+                "step_ix": step_ix,
+                "ds": query_w["ds"][step_ix],
+                "y_raw": query_w["y_raw"][step_ix],
+                "y_transformed": query_w["y_transformed"][step_ix],
+                "similarity": float("nan"),
+                "softmax_weight": float("nan"),
+                "candidate_end_ds": "",
+            }
+        )
+    windows_payload: dict[str, Any] = {
+        "train_end_ds": str(pd.Timestamp(train_end_ds)),
+        "input_size": input_size,
+        "horizon": horizon,
+        "target_col": target_col,
+        "query": query_w,
+        "neighbors": [],
+    }
+    for rank, neighbor in enumerate(neighbors, start=1):
+        end_idx = _train_end_index_for_candidate(
+            train_df, dt_col, str(neighbor["candidate_end_ds"])
+        )
+        if end_idx is None:
+            windows_payload["neighbors"].append(
+                {
+                    "rank": rank,
+                    "candidate_end_ds": neighbor["candidate_end_ds"],
+                    "similarity": neighbor.get("similarity"),
+                    "softmax_weight": neighbor.get("softmax_weight"),
+                    "ds": [],
+                    "y_raw": [],
+                    "y_transformed": [],
+                    "future_ds": [],
+                    "future_y_raw": [],
+                    "match_error": "anchor_not_found",
+                }
+            )
+            continue
+        start_idx = end_idx - input_size + 1
+        if start_idx < 0:
+            windows_payload["neighbors"].append(
+                {
+                    "rank": rank,
+                    "candidate_end_ds": neighbor["candidate_end_ds"],
+                    "similarity": neighbor.get("similarity"),
+                    "softmax_weight": neighbor.get("softmax_weight"),
+                    "ds": [],
+                    "y_raw": [],
+                    "y_transformed": [],
+                    "future_ds": [],
+                    "future_y_raw": [],
+                    "match_error": "window_underflow",
+                }
+            )
+            continue
+        win = _align_retrieval_window_lists(
+            _window_series_slice(
+                train_df,
+                transformed_train_df,
+                start_idx,
+                end_idx,
+                target_col,
+                dt_col,
+            )
+        )
+        fut_slice = train_df.iloc[end_idx + 1 : end_idx + 1 + horizon]
+        fut_ds = pd.to_datetime(fut_slice[dt_col]).astype(str).tolist()
+        fut_y = fut_slice[target_col].astype(float).tolist()
+        sim_v = float(neighbor["similarity"])
+        w_v = float(neighbor["softmax_weight"])
+        for step_ix in range(input_size):
+            long_rows.append(
+                {
+                    "role": "neighbor",
+                    "rank": rank,
+                    "step_ix": step_ix,
+                    "ds": win["ds"][step_ix],
+                    "y_raw": win["y_raw"][step_ix],
+                    "y_transformed": win["y_transformed"][step_ix],
+                    "similarity": sim_v,
+                    "softmax_weight": w_v,
+                    "candidate_end_ds": str(neighbor["candidate_end_ds"]),
+                }
+            )
+        for j, (fds, fy) in enumerate(zip(fut_ds, fut_y)):
+            long_rows.append(
+                {
+                    "role": "neighbor_future",
+                    "rank": rank,
+                    "step_ix": input_size + j,
+                    "ds": fds,
+                    "y_raw": fy,
+                    "y_transformed": float("nan"),
+                    "similarity": sim_v,
+                    "softmax_weight": w_v,
+                    "candidate_end_ds": str(neighbor["candidate_end_ds"]),
+                }
+            )
+        windows_payload["neighbors"].append(
+            {
+                "rank": rank,
+                "candidate_end_ds": neighbor["candidate_end_ds"],
+                "similarity": neighbor.get("similarity"),
+                "softmax_weight": neighbor.get("softmax_weight"),
+                "ds": win["ds"],
+                "y_raw": win["y_raw"],
+                "y_transformed": win["y_transformed"],
+                "future_ds": fut_ds,
+                "future_y_raw": fut_y,
+            }
+        )
+    return windows_payload, long_rows
+
+
 def _write_retrieval_artifacts(
     *,
     run_root: Path,
     train_end_ds: pd.Timestamp,
     retrieval_summary: dict[str, Any],
+    train_df: pd.DataFrame,
+    transformed_train_df: pd.DataFrame,
+    dt_col: str,
+    target_col: str,
+    input_size: int,
+    horizon: int,
 ) -> str:
     stage_root = run_root / "retrieval"
     stage_root.mkdir(parents=True, exist_ok=True)
     cutoff_tag = str(train_end_ds).replace(" ", "_").replace(":", "")
     summary_path = stage_root / f"retrieval_summary_{cutoff_tag}.json"
+    windows_path = stage_root / f"retrieval_summary_{cutoff_tag}_windows.json"
+    windows_long_csv = stage_root / f"retrieval_summary_{cutoff_tag}_windows_long.csv"
 
     serializable_summary = {}
     for key, value in retrieval_summary.items():
@@ -322,6 +555,24 @@ def _write_retrieval_artifacts(
     )
     write_event_score_distribution_plot(
         serializable_summary, out_path=plot_path
+    )
+    windows_payload, long_rows = _build_retrieval_window_artifacts(
+        train_df=train_df.reset_index(drop=True),
+        transformed_train_df=transformed_train_df.reset_index(drop=True),
+        dt_col=dt_col,
+        target_col=target_col,
+        input_size=input_size,
+        horizon=horizon,
+        neighbors=list(retrieval_summary["neighbors"]),
+        train_end_ds=train_end_ds,
+    )
+    _write_json(windows_path, windows_payload)
+    pd.DataFrame(long_rows).to_csv(windows_long_csv, index=False)
+    write_similarity_plot_set(
+        serializable_summary,
+        windows_payload,
+        out_dir=stage_root,
+        stem=summary_path.stem,
     )
     return str(summary_path)
 
@@ -466,6 +717,12 @@ def post_predict_retrieval(
             run_root=run_root,
             train_end_ds=pd.to_datetime(train_df[dt_col].iloc[-1]),
             retrieval_summary=retrieval_summary,
+            train_df=train_df,
+            transformed_train_df=transformed_train_df,
+            dt_col=dt_col,
+            target_col=target_col,
+            input_size=input_size,
+            horizon=horizon,
         )
 
     target_predictions["retrieval_enabled"] = pd.Series(

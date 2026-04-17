@@ -345,6 +345,33 @@ def test_timexer_adapter_preserves_patch_and_global_token_structure() -> None:
     assert torch.allclose(adapter_states.global_states, expected_global, atol=1e-6, rtol=1e-5)
 
 
+def test_timexer_adapter_projects_target_token_states_to_time_axis() -> None:
+    model = _make_model(
+        "timexer",
+        hidden_size=8,
+        n_heads=2,
+        e_layers=1,
+        dropout=0.1,
+        d_ff=16,
+        factor=1,
+        patch_len=2,
+        use_norm=True,
+    )
+    inputs = _encoder_input(model)
+    adapter_states = model.encoder(inputs)
+
+    projected = model.encoder.project_to_time_states(adapter_states)
+
+    assert projected.shape == (inputs.shape[0], model.input_size, model.hidden_size)
+    expected = model.encoder.project_to_time_states(
+        AATimeXerTokenStates(
+            patch_states=adapter_states.patch_states[:, model.target_token_indices],
+            global_states=adapter_states.global_states[:, model.target_token_indices],
+        )
+    )
+    assert torch.allclose(projected, expected, atol=1e-6, rtol=1e-5)
+
+
 def test_timexer_time_signals_are_aggregated_to_patch_and_global_tokens() -> None:
     model = _make_model(
         "timexer",

@@ -1,33 +1,28 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-23 | Updated: 2026-03-29 -->
+<!-- Generated: 2026-03-23 | Updated: 2026-04-17 -->
 
 # tests
 
 ## Purpose
-Runtime wrapper/contract tests for configs, stage plugins, and YAML matrix validation. Upstream package tests (per-model, losses, scalers, backward compat) have been removed — those belong to the neuralforecast package itself.
+This directory contains regression coverage for the wrapper runtime, plugins, YAML/config contracts, runtime helpers, analysis scripts, and selected custom model integrations in this workspace.
 
 ## Key Areas
 | Path | Description |
 |------|-------------|
-| `test_legacy_residual_rejection.py` | Legacy residual-config rejection coverage. |
 | `test_main_runtime_bootstrap.py` | Runtime entrypoint/bootstrap and validate-only behavior coverage. |
-| `test_bs_preforcast_*.py` | Stage plugin config, runtime, registry, search space, and contract tests. |
-| `test_optimizer_plugins.py` | Optimizer plugin registry coverage. |
-| `test_top_level_direct_models.py` | Direct stage model support. |
-| `test_validate_only_*.py` | Validate-only smoke tests for specific model/exog combinations. |
-| `test_bomb_yaml_configs.py` | Bomb-family YAML contract checks. |
-| `test_yaml_timexer_contract.py` | YAML matrix-wide TimeXer/PatchTST constraints. |
-| `fixtures/` | Runtime smoke configs and small data fixtures. |
-| `dummy/` | Dummy models registered via conftest.py for lightweight runtime tests. |
+| `test_runner_parallel_tuning.py` | Parallel tuning and scheduler/runtime orchestration coverage. |
+| `test_aa_forecast_plugin_contracts.py` | AA-Forecast plugin config and contract tests. |
+| `test_retrieval_plugin_contracts.py` | Retrieval plugin contract tests. |
+| `test_optimizer_plugins.py` | Optimizer registry coverage. |
+| `test_validate_only_*.py` | Validate-only smoke tests for representative models and plugin routes. |
+| `test_run_*.py` | Shell-wrapper and experiment-matrix regression coverage. |
+| `dummy/` | Lightweight dummy model implementations used through `conftest.py` (see `dummy/AGENTS.md`). |
+| `fixtures/` | Small YAML/CSV/JSON fixtures for runtime and validate-only tests (see `fixtures/AGENTS.md`). |
 
 ## For AI Agents
 
 ### Working In This Directory
 - Add or update regression coverage in the smallest relevant area whenever behavior changes.
-- Prefer targeted `--no-cov` selectors while iterating; save full coverage runs for broader confidence passes.
-- Reuse fixtures/dummy models instead of introducing large new test harnesses.
-- DummyUnivariate/DummyMultivariate are registered into MODEL_CLASSES via `conftest.py`, not via runtime code.
-
-### Common Patterns
-- Wrapper-runtime tests only — no upstream package model/loss/core tests in this tree.
-- Lightweight smoke configs belong in `fixtures/` and should stay fast enough for validate-only runs.
+- Prefer targeted `--no-cov` selectors while iterating; save broad runs for final confidence.
+- Reuse fixtures and dummy models instead of building large new harnesses.
+- Keep fixture configs representative but small enough for fast validate-only and smoke tests.

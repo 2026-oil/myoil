@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -415,6 +416,103 @@ def test_retrieve_neighbors_ignores_neighbor_min_event_ratio() -> None:
 
     assert result["retrieval_applied"] is True
     assert result["top_neighbors"][0]["candidate_end_ds"] == "anchor-like"
+
+
+def test_post_predict_retrieval_writes_similarity_artifacts_even_without_neighbors(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    cfg = RetrievalPluginConfig(
+        enabled=True,
+        retrieval=RetrievalConfig(
+            enabled=True,
+            top_k=1,
+            trigger_quantile=0.5,
+            min_similarity=0.0,
+            use_event_key=True,
+        ),
+    )
+    train_df = pd.DataFrame(
+        {
+            "ds": pd.date_range("2024-01-01", periods=4, freq="D"),
+            "target": [1.0, 2.0, 3.0, 4.0],
+        }
+    )
+    transformed_train_df = train_df.copy()
+    future_df = pd.DataFrame({"ds": pd.date_range("2024-01-05", periods=1, freq="D")})
+    target_predictions = pd.DataFrame({"prediction": [10.0]})
+
+    monkeypatch.setattr(
+        retrieval_runtime,
+        "_build_star_extractor",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        retrieval_runtime,
+        "_build_memory_bank",
+        lambda **_kwargs: ([], 0),
+    )
+    monkeypatch.setattr(
+        retrieval_runtime,
+        "_build_query",
+        lambda **_kwargs: {
+            "event_vector": np.asarray([1.0], dtype=float),
+            "event_score": 0.1,
+        },
+    )
+    monkeypatch.setattr(
+        retrieval_runtime,
+        "_retrieve_neighbors",
+        lambda **_kwargs: {
+            "retrieval_attempted": True,
+            "retrieval_applied": False,
+            "skip_reason": "below_event_threshold",
+            "top_neighbors": [],
+            "mean_similarity": 0.0,
+            "max_similarity": 0.0,
+        },
+    )
+
+    output = retrieval_runtime.post_predict_retrieval(
+        plugin_cfg=cfg,
+        target_predictions=target_predictions,
+        train_df=train_df,
+        transformed_train_df=transformed_train_df,
+        future_df=future_df,
+        target_col="target",
+        dt_col="ds",
+        hist_exog_cols=(),
+        prediction_col="prediction",
+        input_size=4,
+        horizon=1,
+        run_root=tmp_path,
+    )
+
+    retrieval_root = tmp_path / "retrieval"
+    summary_files = [
+        path
+        for path in retrieval_root.glob("retrieval_summary_*.json")
+        if not path.name.endswith("_windows.json")
+    ]
+    windows_jsons = list(retrieval_root.glob("retrieval_summary_*_windows.json"))
+    windows_csvs = list(retrieval_root.glob("retrieval_summary_*_windows_long.csv"))
+    raw_pngs = list(retrieval_root.glob("retrieval_summary_*_similarity_raw_overlay.png"))
+    transformed_pngs = list(
+        retrieval_root.glob("retrieval_summary_*_similarity_transformed_overlay.png")
+    )
+    summary_pngs = list(retrieval_root.glob("retrieval_summary_*_similarity_summary.png"))
+
+    assert len(summary_files) == 1
+    assert len(windows_jsons) == 1
+    assert len(windows_csvs) == 1
+    assert len(raw_pngs) == 1
+    assert len(transformed_pngs) == 1
+    assert len(summary_pngs) == 1
+    summary_payload = json.loads(summary_files[0].read_text(encoding="utf-8"))
+    windows_payload = json.loads(windows_jsons[0].read_text(encoding="utf-8"))
+    assert summary_payload["skip_reason"] == "below_event_threshold"
+    assert windows_payload["neighbors"] == []
+    assert output["retrieval_applied"].tolist() == [False]
 
 
 # ------------------------------------------------------------------

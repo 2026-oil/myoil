@@ -1,10 +1,10 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-23 | Updated: 2026-03-23 -->
+<!-- Generated: 2026-03-23 | Updated: 2026-04-17 -->
 
 # neuralforecast package
 
 ## Purpose
-This directory contains the forecasting library code: model classes, auto wrappers, shared modules, losses, dataset helpers, and core orchestration consumed by the local runtime.
+This directory contains the forecasting library code: public package exports, orchestration surfaces, shared modules, losses, preprocessing hooks, and concrete model implementations consumed by the local runtime.
 
 ## Key Files
 | File | Description |
@@ -19,22 +19,18 @@ This directory contains the forecasting library code: model classes, auto wrappe
 ## Subdirectories
 | Directory | Purpose |
 |-----------|---------|
-| `common/` | Base model/auto abstractions and shared modules. |
-| `losses/` | Loss definitions (`numpy.py`, `pytorch.py`). |
-| `models/` | Concrete forecasting model implementations. |
+| `common/` | Base model/auto abstractions and shared modules (see `common/AGENTS.md`). |
+| `losses/` | Loss definitions including wrapper-added research losses (see `losses/AGENTS.md`). |
+| `models/` | Concrete forecasting model implementations and export registry (see `models/AGENTS.md`). |
+| `preprocessing/` | Package preprocessing hooks and namespace scaffolding (see `preprocessing/AGENTS.md`). |
 
 ## For AI Agents
 
 ### Working In This Directory
 - Keep package exports, auto wrappers, and core orchestration in sync when model support changes.
-- Prefer matching existing model file patterns instead of introducing new abstractions.
+- Prefer matching existing model-file patterns instead of introducing new abstractions.
 - Check capability flags and constructor signatures before wiring new models into runtime code.
 
 ### Testing Requirements
-- Model registry/export changes: `uv run pytest --no-cov tests/test_common/test_model_registry_new_models.py tests/test_common/test_base_auto.py tests/test_core.py`.
-- Model-specific edits: run the matching `tests/test_models/test_<model>.py` selector when it exists.
-- Loss changes: run the relevant `tests/test_losses/` selectors.
-
-### Common Patterns
-- Model files are one-class-per-file under `models/` with exports re-collected in `models/__init__.py`.
-- Shared building blocks belong under `common/`; public wrapper surfaces belong in `core.py` / `auto.py`.
+- Model registry/export changes: run targeted package/runtime selectors that cover the touched surface.
+- Loss changes: run the relevant selectors plus any wrapper tests that depend on the modified loss behavior.

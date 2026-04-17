@@ -7,7 +7,10 @@ from neuralforecast.models.aaforecast.backbones import (
     AA_SUPPORTED_BACKBONES,
     build_aaforecast_backbone,
 )
-from neuralforecast.models.aaforecast.models.base import AATimeXerTokenStates
+from neuralforecast.models.aaforecast.models.base import (
+    AATimeXerTokenStates,
+    scatter_patch_tokens_to_time_states,
+)
 from plugins.aa_forecast.modules import (
     ITransformerTokenSparseAttention,
     TimeXerTokenSparseAttention,
@@ -161,6 +164,67 @@ def test_timexer_adapter_exposes_patch_and_global_token_contract() -> None:
     )
 
 
+def test_timexer_adapter_projects_target_tokens_into_shared_time_states() -> None:
+    backbone = build_aaforecast_backbone(
+        "timexer",
+        feature_size=5,
+        input_size=4,
+        target_token_indices=(0, 2),
+        encoder_hidden_size=8,
+        encoder_n_layers=2,
+        encoder_dropout=0.1,
+        hidden_size=2,
+        n_head=2,
+        n_heads=1,
+        encoder_layers=1,
+        dropout=0.1,
+        linear_hidden_size=16,
+        factor=1,
+        attn_dropout=0.0,
+        patch_len=2,
+        stride=1,
+        e_layers=1,
+        d_ff=16,
+        use_norm=True,
+    )
+    states = AATimeXerTokenStates(
+        patch_states=torch.tensor(
+            [
+                [
+                    [[1.0, 10.0], [2.0, 20.0]],
+                    [[100.0, 1000.0], [200.0, 2000.0]],
+                    [[3.0, 30.0], [4.0, 40.0]],
+                ]
+            ]
+        ),
+        global_states=torch.tensor(
+            [
+                [
+                    [[10.0, 100.0]],
+                    [[1000.0, 10000.0]],
+                    [[30.0, 300.0]],
+                ]
+            ]
+        ),
+    )
+
+    projected = backbone.project_to_time_states(states)
+    expected_patch = torch.tensor([[[2.0, 20.0], [3.0, 30.0]]])
+    expected_global = torch.tensor([[20.0, 200.0]])
+    template = torch.zeros(1, 4, 2)
+    expected = scatter_patch_tokens_to_time_states(
+        expected_patch,
+        seq_len=4,
+        patch_len=2,
+        stride=2,
+        template=template,
+        global_context=expected_global,
+    )
+
+    assert projected.shape == (1, 4, 2)
+    assert torch.allclose(projected, expected)
+
+
 def test_timexer_token_sparse_attention_preserves_hidden_states_when_no_token_is_active() -> None:
     attention = TimeXerTokenSparseAttention(hidden_size=4)
     patch_states = torch.tensor(
@@ -258,4 +322,14 @@ def test_informer_now_uses_the_shared_decoder_like_gru_paths() -> None:
 
     assert patchtst.informer_decoder is None
     assert patchtst.decoder is not None
-    assert patchtst.decoder.layers[0].in_features == 2 * patchtst.encoder_hidden_size
+
+
+def test_timexer_now_uses_the_shared_decoder_like_gru_paths() -> None:
+    timexer = _make_aaforecast("timexer")
+
+    assert timexer.decoder is not None
+    assert timexer.timexer_decoder is None
+    assert timexer.itransformer_decoder is None
+    assert timexer.informer_decoder is None
+    assert timexer.decoder.layers[0].in_features == 2 * timexer.encoder_hidden_size
+    assert timexer.decoder.layers[-1].out_features == timexer.loss.outputsize_multiplier

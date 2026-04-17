@@ -12,7 +12,7 @@ aa_forecast:
     encoder_n_layers: 2
     encoder_dropout: 0.1
     decoder_hidden_size: 256
-    decoder_layers: 3
+    decoder_layers: 4
     season_length: 4
   star_anomaly_tails:
     upward:

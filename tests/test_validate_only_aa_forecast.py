@@ -1300,6 +1300,15 @@ def test_runtime_aaforecast_plugin_uncertainty_smoke(
     retrieval_dir = output_root / "aa_forecast" / "retrieval"
     retrieval_summary_files = sorted(retrieval_dir.glob("*.json"))
     retrieval_plot_files = sorted(retrieval_dir.glob("*_event_score_dist.png"))
+    retrieval_similarity_raw_files = sorted(
+        retrieval_dir.glob("*_similarity_raw_overlay.png")
+    )
+    retrieval_similarity_transformed_files = sorted(
+        retrieval_dir.glob("*_similarity_transformed_overlay.png")
+    )
+    retrieval_similarity_summary_files = sorted(
+        retrieval_dir.glob("*_similarity_summary.png")
+    )
     retrieval_neighbor_files = sorted(retrieval_dir.glob("*.neighbors.csv"))
     assert distribution_files
     assert uncertainty_csv_files
@@ -1310,6 +1319,9 @@ def test_runtime_aaforecast_plugin_uncertainty_smoke(
     assert retrieval_summary_files
     assert retrieval_plot_files
     assert len(retrieval_plot_files) == len(retrieval_summary_files)
+    assert len(retrieval_similarity_raw_files) == len(retrieval_summary_files)
+    assert len(retrieval_similarity_transformed_files) == len(retrieval_summary_files)
+    assert len(retrieval_similarity_summary_files) == len(retrieval_summary_files)
     assert retrieval_neighbor_files
     payload = json.loads(distribution_files[0].read_text())
     uncertainty_frame = pd.read_csv(uncertainty_csv_files[0])
@@ -1484,6 +1496,15 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     )
     retrieval_summary_files = sorted(retrieval_fold_root.glob("*.json"))
     retrieval_plot_files = sorted(retrieval_fold_root.glob("*_event_score_dist.png"))
+    retrieval_similarity_raw_files = sorted(
+        retrieval_fold_root.glob("*_similarity_raw_overlay.png")
+    )
+    retrieval_similarity_transformed_files = sorted(
+        retrieval_fold_root.glob("*_similarity_transformed_overlay.png")
+    )
+    retrieval_similarity_summary_files = sorted(
+        retrieval_fold_root.glob("*_similarity_summary.png")
+    )
     retrieval_neighbor_files = sorted(retrieval_fold_root.glob("*.neighbors.csv"))
     metrics_payload = json.loads(
         (common_fold_root / "metrics.json").read_text(encoding="utf-8")
@@ -1506,6 +1527,9 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     assert retrieval_summary_files
     assert retrieval_plot_files
     assert len(retrieval_plot_files) == len(retrieval_summary_files)
+    assert len(retrieval_similarity_raw_files) == len(retrieval_summary_files)
+    assert len(retrieval_similarity_transformed_files) == len(retrieval_summary_files)
+    assert len(retrieval_similarity_summary_files) == len(retrieval_summary_files)
     assert retrieval_neighbor_files
 
     candidate_stats = pd.read_csv(candidate_stats_files[0])
