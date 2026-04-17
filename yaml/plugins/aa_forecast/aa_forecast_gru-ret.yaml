@@ -5,7 +5,7 @@ aa_forecast:
   lowess_delta: 0.008
   uncertainty:
     enabled: true
-    sample_count: 50
+    sample_count: 30
   model_params:
     encoder_hidden_size: 128
     encoder_n_layers: 2
@@ -16,9 +16,6 @@ aa_forecast:
   star_anomaly_tails:
     upward:
     - GPRD
-    - GPRD_ACT
-    - GPRD_THREAT
-    - Idx_OVX
     two_sided: []
   thresh: 3.08
   retrieval:

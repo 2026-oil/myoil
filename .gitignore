@@ -10,6 +10,7 @@ dist
 *.gif
 *.parquet
 tmp
+runs_1/
 _docs/
 sidebar.yml
 .DS_Store
@@ -63,3 +64,7 @@ CLAUDE.md
 # generated sweep configs
 yaml/plugins/aa_forecast/sweep/
 yaml/experiment/sweep_retrieval/
+
+# external tool checkout + local outputs for architecture illustration workflow
+/tools/PaperBanana/
+/artifacts/paperbanana_outputs/

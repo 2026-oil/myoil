@@ -213,18 +213,20 @@ def _experiment_sort_key(experiment: str) -> tuple[int, str]:
     return (0, experiment) if experiment == "baseline" else (1, experiment)
 
 
+def _derive_nonret_config_path(config_path: str) -> str:
+    path = Path(config_path)
+    name = path.name
+    for suffix in (".yaml", ".yml", ".toml"):
+        token = f"-ret{suffix}"
+        if name.endswith(token):
+            return str(path.with_name(name.replace(token, suffix)))
+    raise ValueError(f"Cannot derive non-ret config path from {config_path!r}")
+
+
 def _derive_nonret_run_name(run_name: str) -> str:
     if "-ret" in run_name:
         return run_name.replace("-ret", "", 1)
     return f"{run_name}_nonret"
-
-
-def _is_aaforecast_entry(entry: dict[str, Any]) -> bool:
-    return "aaforecast" in str(entry.get("config", "")).lower()
-
-
-def _is_aaforecast_ret_entry(entry: dict[str, Any]) -> bool:
-    return _is_aaforecast_entry(entry) and str(entry.get("group")) == "ret"
 
 
 def _recompute_metrics_frame(predictions: pd.DataFrame) -> pd.DataFrame:
@@ -274,7 +276,7 @@ def _build_derived_nonret_predictions(report: dict[str, Any]) -> pd.DataFrame:
     payload_by_cutoff = _retrieval_payload_by_cutoff(report)
     if not payload_by_cutoff:
         raise ValueError(
-            f"Cannot derive non-ret AAForecast report without retrieval payloads: {report['run_name']}"
+            f"Cannot derive non-ret report without retrieval payloads: {report['run_name']}"
         )
 
     derived = predictions.copy()
@@ -297,6 +299,14 @@ def _build_derived_nonret_predictions(report: dict[str, Any]) -> pd.DataFrame:
                 f"payload={len(base_prediction)} rows={len(group)}"
             )
         derived.loc[group.index, "y_hat"] = [float(value) for value in base_prediction]
+        if "retrieval_enabled" in derived.columns:
+            derived.loc[group.index, "retrieval_enabled"] = False
+        if "retrieval_applied" in derived.columns:
+            derived.loc[group.index, "retrieval_applied"] = False
+        if "retrieval_skip_reason" in derived.columns:
+            derived.loc[group.index, "retrieval_skip_reason"] = "derived_nonret_from_ret"
+        if "retrieval_artifact" in derived.columns:
+            derived.loc[group.index, "retrieval_artifact"] = ""
         if "aaforecast_retrieval_enabled" in derived.columns:
             derived.loc[group.index, "aaforecast_retrieval_enabled"] = False
         if "aaforecast_retrieval_applied" in derived.columns:
@@ -308,13 +318,22 @@ def _build_derived_nonret_predictions(report: dict[str, Any]) -> pd.DataFrame:
     return derived
 
 
-def _derive_aaforecast_nonret_report(report: dict[str, Any]) -> dict[str, Any]:
+def _derive_nonret_display_experiment(report: dict[str, Any]) -> str:
+    experiment = str(report["experiment"])
+    if experiment == "AAForecast":
+        return "AAForecast (derived non-ret)"
+    if experiment == "baseline":
+        return "baseline (derived non-ret)"
+    return f"{experiment} (derived non-ret)"
+
+
+def _derive_nonret_report(report: dict[str, Any]) -> dict[str, Any]:
     derived_predictions = _build_derived_nonret_predictions(report)
     derived_metrics = _recompute_metrics_frame(derived_predictions)
     derived_leaderboard = runtime._build_leaderboard(derived_metrics)
     run_name = _derive_nonret_run_name(str(report["run_name"]))
     entry = {
-        "config": str(report["config"]).replace("-ret.yaml", ".yaml"),
+        "config": _derive_nonret_config_path(str(report["config"])),
         "group": "nonret",
         "jobs_route": report.get("jobs_route"),
         "canonical_run_root": str(report["run_root"]),
@@ -334,32 +353,47 @@ def _derive_aaforecast_nonret_report(report: dict[str, Any]) -> dict[str, Any]:
         "retrieval_payloads": [],
         "derived": True,
         "derived_from_run_name": report["run_name"],
-        "display_experiment": "AAForecast (derived non-ret)",
+        "display_experiment": _derive_nonret_display_experiment(report),
         "plot_run_id": run_name,
     }
 
 
-def _augment_with_derived_aaforecast_nonret_reports(
+def _augment_with_derived_nonret_reports(
     entries: list[dict[str, Any]],
     run_reports: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    existing_nonret = {
-        (report["experiment"], str(report.get("backbone") or ""))
+    existing_nonret_configs = {
+        str(report["config"])
         for report in run_reports
-        if report["experiment"] == "AAForecast" and not report["retrieval"]
+        if not report["retrieval"]
     }
     derived_entries: list[dict[str, Any]] = []
     derived_reports: list[dict[str, Any]] = []
     for report in run_reports:
-        if report["experiment"] != "AAForecast" or not report["retrieval"]:
+        if not report["retrieval"]:
             continue
-        backbone = str(report.get("backbone") or "")
-        if ("AAForecast", backbone) in existing_nonret:
+        derived_config = _derive_nonret_config_path(str(report["config"]))
+        if derived_config in existing_nonret_configs:
             continue
-        derived = _derive_aaforecast_nonret_report(report)
+        derived = _derive_nonret_report(report)
         derived_entries.append(derived["entry"])
         derived_reports.append(derived)
     return entries + derived_entries, run_reports + derived_reports
+
+
+def _load_retrieval_payloads(run_root: Path) -> list[dict[str, Any]]:
+    payloads: list[dict[str, Any]] = []
+    aa_retrieval_root = run_root / "aa_forecast" / "retrieval"
+    if aa_retrieval_root.exists():
+        for payload_path in sorted(aa_retrieval_root.glob("fold_*/*.json")):
+            payloads.append(_load_json(payload_path))
+    standalone_retrieval_root = run_root / "retrieval"
+    if standalone_retrieval_root.exists():
+        for payload_path in sorted(standalone_retrieval_root.glob("retrieval_summary_*.json")):
+            if payload_path.stem.endswith("_windows"):
+                continue
+            payloads.append(_load_json(payload_path))
+    return payloads
 
 
 def _read_run_report(entry: dict[str, Any]) -> dict[str, Any]:
@@ -391,11 +425,7 @@ def _read_run_report(entry: dict[str, Any]) -> dict[str, Any]:
     stage_config_path = run_root / "aa_forecast" / "config" / "stage_config.json"
     stage_config = _load_json(stage_config_path) if stage_config_path.exists() else None
 
-    retrieval_payloads: list[dict[str, Any]] = []
-    retrieval_root = run_root / "aa_forecast" / "retrieval"
-    if retrieval_root.exists():
-        for payload_path in sorted(retrieval_root.glob("fold_*/*.json")):
-            retrieval_payloads.append(_load_json(payload_path))
+    retrieval_payloads = _load_retrieval_payloads(run_root)
 
     experiment = "baseline" if "baseline" in str(entry["config"]) else "AAForecast"
     retrieval = entry["group"] == "ret"
@@ -585,8 +615,19 @@ def _render_result_markdown(
         (report["stage_config"] for report in run_reports if report["stage_config"] is not None),
         None,
     )
+    retrieval_payloads_by_experiment = {
+        experiment: [
+            payload
+            for report in run_reports
+            if report["experiment"] == experiment and report["retrieval"]
+            for payload in report.get("retrieval_payloads", [])
+        ]
+        for experiment in ("baseline", "AAForecast")
+    }
     retrieval_payloads = [
-        payload for report in run_reports for payload in report.get("retrieval_payloads", [])
+        payload
+        for payloads in retrieval_payloads_by_experiment.values()
+        for payload in payloads
     ]
 
     overall_best = experiment_rows.sort_values("mean_mape", ascending=True).iloc[0]
@@ -835,23 +876,39 @@ def _render_result_markdown(
     lines.append("- 모든 run은 동일 타깃, 동일 데이터, 동일 CV 설정 위에서 비교했다.")
     lines.append("- baseline은 **순수 backbone 성능 비교용**이고, retrieval on 조건에서는 retrieval 설정이 활성화됐다.")
     lines.append("- AAForecast는 **STAR → anomaly-aware forecasting → uncertainty optimization** 경로를 포함한다.")
-    derived_nonret_count = sum(
-        1
-        for report in run_reports
-        if report["experiment"] == "AAForecast" and not report["retrieval"] and bool(report.get("derived"))
-    )
-    if derived_nonret_count:
+    derived_nonret_counts = {
+        experiment: sum(
+            1
+            for report in run_reports
+            if report["experiment"] == experiment
+            and not report["retrieval"]
+            and bool(report.get("derived"))
+        )
+        for experiment in ("baseline", "AAForecast")
+    }
+    if derived_nonret_counts["baseline"]:
         lines.append(
-            f"- AAForecast retrieval off 중 {derived_nonret_count}개는 **`-ret` run의 base_prediction으로 재구성한 derived 결과**다."
+            f"- baseline retrieval off 중 {derived_nonret_counts['baseline']}개는 **`-ret` run의 base_prediction으로 재구성한 derived 결과**다."
+        )
+    if derived_nonret_counts["AAForecast"]:
+        lines.append(
+            f"- AAForecast retrieval off 중 {derived_nonret_counts['AAForecast']}개는 **`-ret` run의 base_prediction으로 재구성한 derived 결과**다."
         )
     if retrieval_payloads:
-        lines.append(
-            f"- AAForecast retrieval on run은 총 {len(retrieval_payloads)}개 fold artifact를 남겼고, **retrieval_applied=true {retrieval_applied_count}건**이었다."
-        )
+        for experiment in ("baseline", "AAForecast"):
+            experiment_payloads = retrieval_payloads_by_experiment[experiment]
+            if not experiment_payloads:
+                continue
+            experiment_applied_count = sum(
+                1 for payload in experiment_payloads if payload.get("retrieval_applied")
+            )
+            lines.append(
+                f"- {experiment} retrieval on run은 총 {len(experiment_payloads)}개 fold artifact를 남겼고, **retrieval_applied=true {experiment_applied_count}건**이었다."
+            )
         if retrieval_topk_all_one:
             lines.append("- 확인된 retrieval artifact 기준으로 **모든 fold에서 `top_k_used=1`**이었다.")
     else:
-        lines.append("- 이번 실행에서는 AAForecast retrieval artifact가 없어 retrieval 상세 추적은 생략했다.")
+        lines.append("- 이번 실행에서는 retrieval artifact가 없어 retrieval 상세 추적은 생략했다.")
     lines.append("- 본문의 평균 성능은 각 run의 `summary/leaderboard.csv` 기준 fold 평균값을 사용했다.")
     lines.append("")
     lines.append("# 04. 실험(모델링) 결과")
@@ -1046,19 +1103,16 @@ def _reports_for_group(run_reports: list[dict[str, Any]], *, group: str) -> list
     selected = [report for report in run_reports if ("ret" if report["retrieval"] else "nonret") == group]
     if group != "nonret":
         return selected
-    baseline_reports = [report for report in selected if report["experiment"] == "baseline"]
-    aa_reports = [report for report in selected if report["experiment"] == "AAForecast"]
-    actual_backbones = {
-        str(report.get("backbone") or "")
-        for report in aa_reports
+    actual_configs = {
+        str(report["config"])
+        for report in selected
         if not bool(report.get("derived"))
     }
-    filtered_aa = [
+    return [
         report
-        for report in aa_reports
-        if (not bool(report.get("derived"))) or str(report.get("backbone") or "") not in actual_backbones
+        for report in selected
+        if (not bool(report.get("derived"))) or str(report["config"]) not in actual_configs
     ]
-    return baseline_reports + filtered_aa
 
 
 def _write_group_plot(
@@ -1251,7 +1305,7 @@ def main(argv: list[str] | None = None) -> int:
         entries=entries,
     )
     run_reports = [_read_run_report(entry) for entry in entries]
-    entries, run_reports = _augment_with_derived_aaforecast_nonret_reports(entries, run_reports)
+    entries, run_reports = _augment_with_derived_nonret_reports(entries, run_reports)
     manifest_path = _build_manifest(
         raw_batch_root=raw_batch_root,
         summary_json=summary_json,

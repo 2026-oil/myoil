@@ -337,6 +337,7 @@ def test_final_find_cli_writes_csv_and_summary(tmp_path: Path) -> None:
             "4",
             "--top-k-values",
             "2",
+            "--serial",
             "--output-csv",
             str(out_csv),
             "--summary-json",
@@ -450,6 +451,7 @@ def test_final_find_optuna_mode_writes_summary(tmp_path: Path) -> None:
     )
     out_csv = tmp_path / "optuna_results.csv"
     summary_json = tmp_path / "optuna_summary.json"
+    storage_path = tmp_path / "optuna_parallel.sqlite3"
     proc = subprocess.run(
         [
             sys.executable,
@@ -472,6 +474,10 @@ def test_final_find_optuna_mode_writes_summary(tmp_path: Path) -> None:
             "4",
             "--optuna-seed",
             "7",
+            "--workers",
+            "2",
+            "--optuna-storage-path",
+            str(storage_path),
             "--output-csv",
             str(out_csv),
             "--summary-json",
@@ -517,6 +523,8 @@ def test_final_find_optuna_resume_accumulates_trials(tmp_path: Path) -> None:
         "event",
         "--optuna-seed",
         "7",
+        "--workers",
+        "2",
         "--optuna-storage-path",
         str(storage_path),
         "--study-name",
@@ -638,3 +646,60 @@ def test_select_required_column_uses_stable_optuna_distribution(tmp_path: Path) 
 
     study.optimize(objective_three_columns, n_trials=1)
     assert len(study.trials) == 2
+
+
+def test_run_final_find_parallel_matches_serial(tmp_path: Path) -> None:
+    final_find = _load_final_find_script()
+    main_path = _write_aaforecast_exog_only_fixture(
+        tmp_path, insample_y_included=False
+    )
+    loaded = load_app_config(REPO_ROOT, config_path=main_path)
+    source_df = pd.read_csv(REPO_ROOT / "tests" / "fixtures" / "aa_forecast_runtime_smoke.csv")
+    source_df["dt"] = pd.to_datetime(source_df["dt"])
+    train_df, future_df = final_find.resolve_train_future_frames(
+        loaded, source_df, eval_slice="last_cv_fold"
+    )
+    stats = final_find.evaluate_exact_combo(
+        loaded=loaded,
+        train_df=train_df,
+        future_df=future_df,
+        input_size=4,
+        hist_exog_cols=("event",),
+        upward_cols=("event",),
+        top_k=2,
+    )
+    target = final_find.TargetWindow(
+        label="known-top-neighbor",
+        candidate_end_ds=stats["neighbors"][0]["candidate_end_ds"],
+        normalized_candidate_end_ds=final_find._normalize_candidate_end_ds(
+            stats["neighbors"][0]["candidate_end_ds"]
+        ),
+    )
+    serial_rows, serial_global = final_find.run_final_find(
+        loaded=loaded,
+        train_df=train_df,
+        future_df=future_df,
+        targets=[target],
+        input_sizes=[4],
+        exog_grid=[["event"]],
+        upward_grid=[["event"]],
+        top_k_values=[2],
+        eval_slice="last_cv_fold",
+        workers=1,
+        chunksize=1,
+    )
+    parallel_rows, parallel_global = final_find.run_final_find(
+        loaded=loaded,
+        train_df=train_df,
+        future_df=future_df,
+        targets=[target],
+        input_sizes=[4],
+        exog_grid=[["event"]],
+        upward_grid=[["event"]],
+        top_k_values=[2],
+        eval_slice="last_cv_fold",
+        workers=2,
+        chunksize=1,
+    )
+    assert serial_rows == parallel_rows
+    assert serial_global == parallel_global

@@ -1,0 +1,1 @@
+Figure: Brent AAForecast-GRU-Retrieval execution flow from `main.py` configuration loading through stage-plugin resolution, fold-wise training, STAR-based retrieval blending, and run artifact materialization.

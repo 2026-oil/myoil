@@ -4,13 +4,6 @@ dataset:
   path: data/df.csv
   target_col: Com_DubaiOil
   dt_col: dt
-  hist_exog_cols:
-  - GPRD_THREAT
-  - GPRD
-  - GPRD_ACT
-  - Idx_OVX
-  - Com_LMEX
-  - Com_BloombergCommodity_BCOM
   futr_exog_cols: []
   static_exog_cols: []
 retrieval:

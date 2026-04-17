@@ -18,7 +18,6 @@ case "$TARGET_CASE" in
 esac
 
 configs=(
-  "${config_dir}/baseline.yaml"
   "${config_dir}/baseline-ret.yaml"
   "${config_dir}/aaforecast-informer-ret.yaml"
   "${config_dir}/aaforecast-gru-ret.yaml"

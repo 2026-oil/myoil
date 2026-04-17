@@ -5,7 +5,7 @@ aa_forecast:
   lowess_delta: 0.008
   uncertainty:
     enabled: true
-    sample_count: 50
+    sample_count: 30
   model_params:
     hidden_size: 128
     n_head: 2

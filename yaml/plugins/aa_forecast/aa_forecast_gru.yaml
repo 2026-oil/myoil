@@ -6,7 +6,7 @@ aa_forecast:
   thresh: 3.08
   uncertainty:
     enabled: true
-    sample_count: 50
+    sample_count: 30
   model_params:
     encoder_hidden_size: 128
     encoder_n_layers: 2
@@ -19,7 +19,6 @@ aa_forecast:
     - GPRD
     - GPRD_ACT
     - GPRD_THREAT
-    - Idx_OVX
     two_sided: []
   retrieval:
     enabled: false

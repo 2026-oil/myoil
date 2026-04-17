@@ -1,0 +1,8 @@
+{
+  "task_name": "aaforecast_gru-ret",
+  "config_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/yaml/experiment/feature_set_aaforecast_brent/aaforecast-gru-ret.yaml",
+  "run_root": "/home/sonet/.openclaw/workspace/research/neuralforecast/runs/brent/feature_set_aaforecast_brent_aaforecast_gru-ret",
+  "methodology_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/docs/paperbanana/brent_aaforecast_gru_ret/methodology.md",
+  "caption_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/docs/paperbanana/brent_aaforecast_gru_ret/caption.txt",
+  "paperbanana_prompt_path": "/home/sonet/.openclaw/workspace/research/neuralforecast/docs/paperbanana/brent_aaforecast_gru_ret/paperbanana_prompt.md"
+}

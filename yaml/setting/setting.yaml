@@ -5,13 +5,13 @@ runtime:
   transformations_target: diff
   transformations_exog: diff
 training:
-  input_size: 64
+  input_size: 48
   batch_size: 32
   valid_batch_size: 8
   windows_batch_size: 64
   inference_windows_batch_size: 64
-  max_steps: 400
-  val_size: 32
+  max_steps: 300
+  val_size: 16
   scaler_type: robust
   val_check_steps: 4
   min_steps_before_early_stop: 100
@@ -36,7 +36,7 @@ cv:
   gap: 0
   horizon: 2
   step_size: 1
-  n_windows: 14
+  n_windows: 12
   max_train_size: null
   overlap_eval_policy: by_cutoff_mean
 scheduler:

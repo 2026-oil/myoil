@@ -1,0 +1,12 @@
+dataset:
+  hist_exog_cols:
+  - GPRD_THREAT
+  - GPRD
+  - Com_LMEX
+  - Com_BloombergCommodity_BCOM
+retrieval:
+  star:
+    anomaly_tails:
+      upward:
+      - GPRD
+      two_sided: []

@@ -166,7 +166,7 @@ def test_main_links_runs_writes_manifest_and_calls_both_group_plots(
     )
     monkeypatch.setattr(
         postprocess,
-        "_augment_with_derived_aaforecast_nonret_reports",
+        "_augment_with_derived_nonret_reports",
         lambda entries, run_reports: (entries, run_reports),
     )
 
@@ -708,7 +708,7 @@ def test_write_result_markdown_uses_actual_run_artifacts(tmp_path: Path) -> None
     assert "![nonret fold overlay](plots/nonret/folds/regular/fold_000_predictions_overlay.png)" in markdown
 
 
-def test_augment_with_derived_aaforecast_nonret_reports_reuses_base_prediction(
+def test_augment_with_derived_nonret_reports_reuses_base_prediction_for_aaforecast(
     tmp_path: Path,
 ) -> None:
     resolved_payload = {
@@ -833,7 +833,7 @@ def test_augment_with_derived_aaforecast_nonret_reports_reuses_base_prediction(
     ]
     run_reports = [postprocess._read_run_report(entry) for entry in entries]
 
-    augmented_entries, augmented_reports = postprocess._augment_with_derived_aaforecast_nonret_reports(
+    augmented_entries, augmented_reports = postprocess._augment_with_derived_nonret_reports(
         entries, run_reports
     )
 
@@ -852,16 +852,155 @@ def test_augment_with_derived_aaforecast_nonret_reports_reuses_base_prediction(
     assert derived_report["metrics"]["MAE"].iloc[0] == 14.0
 
 
+def test_augment_with_derived_nonret_reports_reuses_base_prediction_for_baseline(
+    tmp_path: Path,
+) -> None:
+    resolved_payload = {
+        "dataset": {
+            "target_col": "Com_CrudeOil",
+            "hist_exog_cols": ["GPRD_THREAT"],
+            "transformations_target": "diff",
+            "transformations_exog": "diff",
+        },
+        "training": {
+            "input_size": 64,
+            "max_steps": 400,
+            "val_size": 4,
+            "loss": "mse",
+        },
+        "cv": {
+            "horizon": 2,
+            "step_size": 1,
+            "n_windows": 1,
+            "gap": 0,
+            "overlap_eval_policy": "by_cutoff_mean",
+        },
+    }
+    baseline_on = tmp_path / "baseline-on"
+    _write_run_fixture(
+        run_root=baseline_on,
+        resolved_payload=resolved_payload,
+        leaderboard_rows=[
+            {
+                "rank": 1,
+                "model": "GRU",
+                "mean_fold_mae": 4.5,
+                "mean_fold_mse": 34.0,
+                "mean_fold_rmse": 5.8,
+                "fold_count": 1,
+                "mean_fold_mape": 0.05,
+                "mean_fold_nrmse": 0.85,
+                "mean_fold_r2": -0.4,
+            }
+        ],
+        metrics_rows=[
+            {
+                "model": "GRU",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "MAE": 4.5,
+                "MSE": 34.0,
+                "RMSE": 5.8,
+                "MAPE": 0.05,
+                "NRMSE": 0.85,
+                "R2": -0.4,
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+            }
+        ],
+        prediction_rows=[
+            {
+                "model": "GRU",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-02 00:00:00",
+                "horizon_step": 1,
+                "y": 80.0,
+                "y_hat": 79.0,
+                "retrieval_enabled": True,
+                "retrieval_applied": True,
+                "retrieval_artifact": "retrieval/retrieval_summary_2026-02-23_000000.json",
+            },
+            {
+                "model": "GRU",
+                "requested_mode": "learned_fixed",
+                "validated_mode": "learned_fixed",
+                "fold_idx": 0,
+                "cutoff": "2026-02-23 00:00:00",
+                "train_end_ds": "2026-02-23 00:00:00",
+                "unique_id": "Com_CrudeOil",
+                "ds": "2026-03-09 00:00:00",
+                "horizon_step": 2,
+                "y": 92.0,
+                "y_hat": 86.0,
+                "retrieval_enabled": True,
+                "retrieval_applied": True,
+                "retrieval_artifact": "retrieval/retrieval_summary_2026-02-23_000000.json",
+            },
+        ],
+        retrieval_payloads=[
+            (
+                "retrieval/retrieval_summary_2026-02-23_000000.json",
+                {
+                    "cutoff": "2026-02-23 00:00:00",
+                    "base_prediction": [70.0, 74.0],
+                    "final_prediction": [79.0, 86.0],
+                    "memory_prediction": [82.0, 88.0],
+                    "retrieval_applied": True,
+                    "top_k_used": 1,
+                },
+            )
+        ],
+    )
+    entries = [
+        {
+            "config": "yaml/experiment/feature_set_aaforecast_wti/baseline-ret.yaml",
+            "group": "ret",
+            "jobs_route": "gru_informer",
+            "canonical_run_root": str(baseline_on),
+            "run_name": baseline_on.name,
+            "derived": False,
+        }
+    ]
+    run_reports = [postprocess._read_run_report(entry) for entry in entries]
+
+    augmented_entries, augmented_reports = postprocess._augment_with_derived_nonret_reports(
+        entries, run_reports
+    )
+
+    assert len(augmented_entries) == 2
+    derived_entry = augmented_entries[1]
+    assert derived_entry["derived"] is True
+    assert derived_entry["run_name"] == "baseline-on_nonret"
+    assert derived_entry["config"] == "yaml/experiment/feature_set_aaforecast_wti/baseline.yaml"
+
+    assert len(augmented_reports) == 2
+    derived_report = augmented_reports[1]
+    assert derived_report["experiment"] == "baseline"
+    assert derived_report["retrieval"] is False
+    assert derived_report["derived"] is True
+    assert derived_report["display_experiment"] == "baseline (derived non-ret)"
+    assert derived_report["predictions"]["y_hat"].tolist() == [70.0, 74.0]
+    assert derived_report["predictions"]["retrieval_enabled"].tolist() == [False, False]
+    assert derived_report["predictions"]["retrieval_applied"].tolist() == [False, False]
+    assert derived_report["leaderboard"]["mean_fold_mape"].iloc[0] == 0.16032608695652173
+    assert derived_report["metrics"]["MAE"].iloc[0] == 14.0
+
+
 def test_write_result_markdown_mentions_derived_nonret_reports(tmp_path: Path) -> None:
     raw_batch_root = tmp_path / "raw" / "20260417T000000Z"
     raw_batch_root.mkdir(parents=True)
     run_reports = [
         {
             "experiment": "baseline",
-            "display_experiment": "baseline",
+            "display_experiment": "baseline (derived non-ret)",
             "retrieval": False,
             "backbone": "GRU",
-            "run_name": "baseline",
+            "run_name": "baseline_nonret",
             "run_root": tmp_path / "baseline",
             "config": "yaml/experiment/feature_set_aaforecast_wti/baseline.yaml",
             "leaderboard": pd.DataFrame(
@@ -913,7 +1052,7 @@ def test_write_result_markdown_mentions_derived_nonret_reports(tmp_path: Path) -
             },
             "stage_config": None,
             "retrieval_payloads": [],
-            "derived": False,
+            "derived": True,
         },
         {
             "experiment": "AAForecast",
@@ -991,5 +1130,6 @@ def test_write_result_markdown_mentions_derived_nonret_reports(tmp_path: Path) -
         nonret_folds_dir=None,
     )
     markdown = output_path.read_text(encoding="utf-8")
+    assert "baseline retrieval off 중 1개는 **`-ret` run의 base_prediction으로 재구성한 derived 결과**다." in markdown
     assert "AAForecast retrieval off 중 1개는 **`-ret` run의 base_prediction으로 재구성한 derived 결과**다." in markdown
     assert "적용후 (`AAForecast (derived non-ret)`)" in markdown

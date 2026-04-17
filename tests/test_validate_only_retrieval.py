@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+import yaml
 
 from app_config import load_app_config
 from plugins.retrieval.config import RetrievalPluginConfig
@@ -87,6 +88,41 @@ def test_load_baseline_ret_linked_config_path() -> None:
     assert cfg.stage_plugin_config.retrieval.blend_max == pytest.approx(1.0)
     assert cfg.stage_plugin_config.retrieval.use_uncertainty_gate is True
     assert cfg.stage_plugin_config.retrieval.insample_y_included is False
+    assert cfg.stage_plugin_config.star.anomaly_tails["upward"] == ("GPRD",)
+    assert cfg.stage_plugin_config.star.anomaly_tails["two_sided"] == ()
+
+
+def test_repo_var_yaml_supplies_retrieval_anomaly_tails() -> None:
+    loaded = load_app_config(
+        REPO_ROOT,
+        config_path=Path("yaml/experiment/feature_set_aaforecast_brent/baseline-ret.yaml"),
+    )
+    cfg = loaded.config
+    assert isinstance(cfg.stage_plugin_config, RetrievalPluginConfig)
+    assert cfg.stage_plugin_config.star.anomaly_tails == {
+        "upward": ("GPRD",),
+        "two_sided": (),
+    }
+
+
+def test_repo_var_yaml_duplicate_retrieval_tail_fails_fast() -> None:
+    plugin_dir = REPO_ROOT / "yaml/plugins/retrieval"
+    config_path = plugin_dir / ".tmp-duplicate-var-retrieval.yaml"
+    payload = yaml.safe_load(
+        (REPO_ROOT / "yaml/plugins/retrieval/baseline_retrieval.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    payload["retrieval"]["star"]["anomaly_tails"] = {"upward": ["GPRD"], "two_sided": []}
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    try:
+        with pytest.raises(
+            ValueError, match=r"config repeats shared var path\(s\): retrieval.star.anomaly_tails"
+        ):
+            load_app_config(REPO_ROOT, config_path=config_path.relative_to(REPO_ROOT))
+    finally:
+        config_path.unlink(missing_ok=True)
 
 
 def test_baseline_hist_exog_columns_exist_in_df() -> None:

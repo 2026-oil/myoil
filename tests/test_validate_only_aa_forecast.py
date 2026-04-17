@@ -421,6 +421,43 @@ def test_runtime_validate_only_accepts_aaforecast_fixed_path_with_shared_second_
     assert manifest["shared_settings_path"] == str(shared_settings_path.resolve())
 
 
+def test_repo_var_yaml_supplies_feature_set_hist_exog_columns() -> None:
+    loaded = load_app_config(
+        Path.cwd(),
+        config_path="yaml/experiment/feature_set_aaforecast_brent/aaforecast-gru.yaml",
+    )
+
+    assert loaded.config.dataset.hist_exog_cols == (
+        "GPRD_THREAT",
+        "GPRD",
+        "GPRD_ACT",
+        "Idx_OVX",
+        "Com_LMEX",
+        "Com_BloombergCommodity_BCOM",
+    )
+
+
+def test_repo_var_yaml_duplicate_hist_exog_fails_fast() -> None:
+    config_dir = Path.cwd() / "yaml/experiment/feature_set_aaforecast_brent"
+    config_path = config_dir / ".tmp-duplicate-var-main.yaml"
+    payload = yaml.safe_load(
+        (
+            Path.cwd()
+            / "yaml/experiment/feature_set_aaforecast_brent/aaforecast-gru.yaml"
+        ).read_text(encoding="utf-8")
+    )
+    payload["dataset"]["hist_exog_cols"] = ["GPRD"]
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    try:
+        with pytest.raises(
+            ValueError, match=r"config repeats shared var path\(s\): dataset.hist_exog_cols"
+        ):
+            load_app_config(Path.cwd(), config_path=config_path)
+    finally:
+        config_path.unlink(missing_ok=True)
+
+
 def test_runtime_validate_only_accepts_aaforecast_auto_path(
     tmp_path: Path,
     monkeypatch,

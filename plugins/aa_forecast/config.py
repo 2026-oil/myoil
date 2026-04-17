@@ -524,7 +524,11 @@ def _normalize_retrieval_config(
             raise ValueError(
                 f"{section}.config_path must be .yaml/.yml/.toml, got {suffix!r}"
             )
-        detail_payload = _load_document(resolved_path, detail_source_type)
+        detail_payload = _load_document(
+            resolved_path,
+            detail_source_type,
+            repo_root=repo_root,
+        )
         if not isinstance(detail_payload, dict):
             raise ValueError(f"{section}.config_path must resolve to a mapping")
         retrieval_section = detail_payload.get("retrieval")
@@ -1097,7 +1101,7 @@ def load_aa_forecast_stage1(
         )
     stage_source_type = aa_forecast_stage_document_type(stage_source_path)
     raw_text = stage_source_path.read_text(encoding="utf-8")
-    payload = _load_document(stage_source_path, stage_source_type)
+    payload = _load_document(stage_source_path, stage_source_type, repo_root=repo_root)
     if not isinstance(payload, dict):
         raise ValueError(
             "aa_forecast config_path must resolve to a mapping with a top-level aa_forecast block"

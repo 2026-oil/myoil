@@ -126,7 +126,7 @@ class RetrievalStagePlugin:
         )
         suffix = resolved.suffix.lower()
         doc_type = "yaml" if suffix in {".yaml", ".yml"} else "toml"
-        detail_payload = _load_document(resolved, doc_type)
+        detail_payload = _load_document(resolved, doc_type, repo_root=repo_root)
         return _cfg.normalize_retrieval_detail_payload(
             detail_payload,
             unknown_keys=_unknown_keys,

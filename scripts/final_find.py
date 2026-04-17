@@ -35,10 +35,13 @@ import csv
 import json
 import itertools
 import math
+import os
 import sys
+import time
+from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Iterator, Sequence
 
 import numpy as np
 import optuna
@@ -71,6 +74,19 @@ class TargetWindow:
     candidate_end_ds: str
     normalized_candidate_end_ds: str
     notes: str | None = None
+
+
+@dataclass(frozen=True)
+class ComboSpec:
+    input_size: int
+    hist_exog_cols: tuple[str, ...]
+    upward_cols: tuple[str, ...]
+    top_k: int
+
+
+_WORKER_LOADED: LoadedConfig | None = None
+_WORKER_TRAIN_DF: pd.DataFrame | None = None
+_WORKER_FUTURE_DF: pd.DataFrame | None = None
 
 
 def _parse_int_list(raw: str) -> list[int]:
@@ -403,6 +419,38 @@ def evaluate_exact_combo(
     }
 
 
+def _init_combo_worker(
+    loaded: LoadedConfig,
+    train_df: pd.DataFrame,
+    future_df: pd.DataFrame,
+) -> None:
+    global _WORKER_LOADED, _WORKER_TRAIN_DF, _WORKER_FUTURE_DF
+    _WORKER_LOADED = loaded
+    _WORKER_TRAIN_DF = train_df
+    _WORKER_FUTURE_DF = future_df
+
+
+def _evaluate_combo_worker(spec: ComboSpec) -> tuple[ComboSpec, dict[str, Any]]:
+    if _WORKER_LOADED is None or _WORKER_TRAIN_DF is None or _WORKER_FUTURE_DF is None:
+        raise RuntimeError("final_find worker state was not initialized")
+    stats = evaluate_exact_combo(
+        loaded=_WORKER_LOADED,
+        train_df=_WORKER_TRAIN_DF,
+        future_df=_WORKER_FUTURE_DF,
+        input_size=spec.input_size,
+        hist_exog_cols=spec.hist_exog_cols,
+        upward_cols=spec.upward_cols,
+        top_k=spec.top_k,
+    )
+    return spec, stats
+
+
+def _evaluate_combo_batch_worker(
+    specs: Sequence[ComboSpec],
+) -> list[tuple[ComboSpec, dict[str, Any]]]:
+    return [_evaluate_combo_worker(spec) for spec in specs]
+
+
 def _combo_sort_key(row: dict[str, Any]) -> tuple[Any, ...]:
     return (
         int(bool(row["match_found"])),
@@ -461,6 +509,48 @@ def _trial_summary_row(rows: Sequence[dict[str, Any]], *, trial_number: int) -> 
     }
 
 
+def _rows_for_combo(
+    *,
+    spec: ComboSpec,
+    stats: dict[str, Any],
+    targets: Sequence[TargetWindow],
+    eval_slice: str,
+    trial_number: int | None = None,
+) -> list[dict[str, Any]]:
+    common: dict[str, Any] = {
+        "eval_slice": eval_slice,
+        "input_size": spec.input_size,
+        "hist_exog_cols": json.dumps(list(spec.hist_exog_cols)),
+        "upward_tail_cols": json.dumps(list(spec.upward_cols)),
+        "error": stats["error"],
+        "bank_size": stats.get("bank_size", float("nan")),
+        "candidate_count": stats.get("candidate_count", float("nan")),
+        "eligible_count": stats.get("eligible_count", float("nan")),
+        "query_event_score": stats.get("query_event_score", float("nan")),
+        "effective_event_threshold": stats.get("effective_event_threshold", float("nan")),
+        "skip_reason": stats.get("skip_reason", ""),
+        "retrieval_applied": stats.get("retrieval_applied", False),
+        "top_k_requested": spec.top_k,
+        "top_k_used": stats.get("top_k_used", 0),
+        "mean_similarity": stats.get("mean_similarity", float("nan")),
+        "max_similarity": stats.get("max_similarity", float("nan")),
+    }
+    if trial_number is not None:
+        common["trial_number"] = trial_number
+    neighbors = stats.get("neighbors", [])
+    rows: list[dict[str, Any]] = []
+    for target in targets:
+        row = {
+            **common,
+            "target_label": target.label,
+            "target_candidate_end_ds": target.candidate_end_ds,
+            "target_notes": target.notes or "",
+        }
+        row.update(_target_match_payload(target, neighbors))
+        rows.append(row)
+    return rows
+
+
 def _json_ready(value: Any) -> Any:
     if isinstance(value, dict):
         return {str(key): _json_ready(val) for key, val in value.items()}
@@ -480,6 +570,64 @@ def _json_ready(value: Any) -> Any:
     if isinstance(value, (bool, int, str)) or value is None:
         return value
     return str(value)
+
+
+def _resolve_workers(raw: str) -> int:
+    text = str(raw).strip().lower()
+    if text in {"", "auto"}:
+        return max(1, os.cpu_count() or 1)
+    workers = int(text)
+    if workers <= 0:
+        raise ValueError("--workers must be a positive integer or 'auto'")
+    return workers
+
+
+def _iter_combo_specs(
+    *,
+    input_sizes: Sequence[int],
+    exog_grid: list[list[str]],
+    upward_grid: list[list[str]],
+    top_k_values: Sequence[int],
+    base_dataset_cols: set[str],
+) -> Iterator[ComboSpec]:
+    for top_k in top_k_values:
+        for input_size, exog_t, upward_t in iter_combos(
+            input_sizes=input_sizes,
+            exog_grid=exog_grid,
+            upward_grid=upward_grid,
+            base_dataset_cols=base_dataset_cols,
+        ):
+            yield ComboSpec(
+                input_size=input_size,
+                hist_exog_cols=exog_t,
+                upward_cols=upward_t,
+                top_k=top_k,
+            )
+
+
+def _iter_chunks(items: Iterable[ComboSpec], *, size: int) -> Iterator[list[ComboSpec]]:
+    if size <= 0:
+        raise ValueError("chunk size must be positive")
+    batch: list[ComboSpec] = []
+    for item in items:
+        batch.append(item)
+        if len(batch) >= size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
+
+
+def _progress_line(*, label: str, completed: int, total: int, started_at: float) -> str:
+    elapsed = max(time.monotonic() - started_at, 1e-9)
+    rate = completed / elapsed
+    remaining = max(total - completed, 0)
+    eta_seconds = (remaining / rate) if rate > 0 else float("inf")
+    eta_text = "inf" if not math.isfinite(eta_seconds) else f"{eta_seconds:.1f}s"
+    return (
+        f"final_find[{label}] completed={completed}/{total} "
+        f"rate={rate:.2f}/s eta={eta_text}"
+    )
 
 
 def _pool_from_grid(grid: Sequence[Sequence[str]]) -> list[str]:
@@ -558,6 +706,7 @@ def run_final_find_optuna(
     eval_slice: str,
     n_trials: int,
     seed: int,
+    workers: int,
     storage_path: Path | None = None,
     study_name: str | None = None,
     resume: bool = False,
@@ -579,6 +728,8 @@ def run_final_find_optuna(
     effective_study_name = study_name or "final-find-optuna"
     if resume and storage is None:
         raise ValueError("--resume requires --optuna-storage-path")
+    if workers > 1 and storage is None:
+        raise ValueError("optuna mode with --workers > 1 requires --optuna-storage-path")
     if storage_path is not None:
         storage_path.parent.mkdir(parents=True, exist_ok=True)
     study = optuna.create_study(
@@ -588,8 +739,12 @@ def run_final_find_optuna(
         storage=storage,
         load_if_exists=bool(resume or storage is not None),
     )
+    started_at = time.monotonic()
+    launched = 0
+    completed = 0
+    progress_interval = max(1, workers)
 
-    def objective(trial: optuna.Trial) -> float:
+    def _suggest_spec(trial: optuna.Trial) -> ComboSpec:
         input_size = int(trial.suggest_categorical("input_size", list(input_sizes)))
         top_k = int(trial.suggest_categorical("top_k", list(top_k_values)))
         selected_exog = _suggest_non_empty_subset(
@@ -608,62 +763,171 @@ def run_final_find_optuna(
         )
         if not selected_upward:
             raise optuna.TrialPruned("no upward columns selected")
-        try:
-            stats = evaluate_exact_combo(
-                loaded=loaded,
-                train_df=train_df,
-                future_df=future_df,
-                input_size=input_size,
-                hist_exog_cols=tuple(selected_exog),
-                upward_cols=tuple(selected_upward),
-                top_k=top_k,
-            )
-        except ValueError as exc:
-            raise optuna.TrialPruned(str(exc)) from exc
-        if stats["error"]:
-            raise optuna.TrialPruned(stats["error"])
-        common = {
-            "eval_slice": eval_slice,
-            "trial_number": trial.number,
-            "input_size": input_size,
-            "hist_exog_cols": json.dumps(selected_exog),
-            "upward_tail_cols": json.dumps(selected_upward),
-            "error": stats["error"],
-            "bank_size": stats.get("bank_size", float("nan")),
-            "candidate_count": stats.get("candidate_count", float("nan")),
-            "eligible_count": stats.get("eligible_count", float("nan")),
-            "query_event_score": stats.get("query_event_score", float("nan")),
-            "effective_event_threshold": stats.get("effective_event_threshold", float("nan")),
-            "skip_reason": stats.get("skip_reason", ""),
-            "retrieval_applied": stats.get("retrieval_applied", False),
-            "top_k_requested": top_k,
-            "top_k_used": stats.get("top_k_used", 0),
-            "mean_similarity": stats.get("mean_similarity", float("nan")),
-            "max_similarity": stats.get("max_similarity", float("nan")),
-        }
-        neighbors = stats.get("neighbors", [])
-        rows: list[dict[str, Any]] = []
-        for target in targets:
-            row = {
-                **common,
-                "target_label": target.label,
-                "target_candidate_end_ds": target.candidate_end_ds,
-                "target_notes": target.notes or "",
-            }
-            row.update(_target_match_payload(target, neighbors))
-            rows.append(row)
-        loss = _trial_loss_from_rows(rows, top_k_requested=top_k)
-        trial.set_user_attr("matched_target_count", sum(1 for row in rows if row["match_found"]))
-        trial.set_user_attr("hist_exog_cols", selected_exog)
-        trial.set_user_attr("upward_tail_cols", selected_upward)
-        trial.set_user_attr("target_rows", _json_ready(rows))
-        trial.set_user_attr(
-            "summary_row",
-            _json_ready(_trial_summary_row(rows, trial_number=trial.number)),
+        return ComboSpec(
+            input_size=input_size,
+            hist_exog_cols=tuple(selected_exog),
+            upward_cols=tuple(selected_upward),
+            top_k=top_k,
         )
-        return loss
 
-    study.optimize(objective, n_trials=n_trials)
+    if workers == 1:
+        for _ in range(n_trials):
+            trial = study.ask()
+            try:
+                spec = _suggest_spec(trial)
+                stats = evaluate_exact_combo(
+                    loaded=loaded,
+                    train_df=train_df,
+                    future_df=future_df,
+                    input_size=spec.input_size,
+                    hist_exog_cols=spec.hist_exog_cols,
+                    upward_cols=spec.upward_cols,
+                    top_k=spec.top_k,
+                )
+            except optuna.TrialPruned as exc:
+                trial.set_user_attr("prune_reason", str(exc))
+                study.tell(trial, state=optuna.trial.TrialState.PRUNED)
+                launched += 1
+                completed += 1
+                if completed == n_trials or completed % progress_interval == 0:
+                    print(
+                        _progress_line(
+                            label="optuna",
+                            completed=completed,
+                            total=n_trials,
+                            started_at=started_at,
+                        ),
+                        file=sys.stderr,
+                    )
+                continue
+            except ValueError as exc:
+                trial.set_user_attr("prune_reason", str(exc))
+                study.tell(trial, state=optuna.trial.TrialState.PRUNED)
+                launched += 1
+                completed += 1
+                if completed == n_trials or completed % progress_interval == 0:
+                    print(
+                        _progress_line(
+                            label="optuna",
+                            completed=completed,
+                            total=n_trials,
+                            started_at=started_at,
+                        ),
+                        file=sys.stderr,
+                    )
+                continue
+            rows = _rows_for_combo(
+                spec=spec,
+                stats=stats,
+                targets=targets,
+                eval_slice=eval_slice,
+                trial_number=trial.number,
+            )
+            if stats["error"]:
+                trial.set_user_attr("prune_reason", stats["error"])
+                study.tell(trial, state=optuna.trial.TrialState.PRUNED)
+            else:
+                loss = _trial_loss_from_rows(rows, top_k_requested=spec.top_k)
+                trial.set_user_attr(
+                    "matched_target_count",
+                    sum(1 for row in rows if row["match_found"]),
+                )
+                trial.set_user_attr("hist_exog_cols", list(spec.hist_exog_cols))
+                trial.set_user_attr("upward_tail_cols", list(spec.upward_cols))
+                trial.set_user_attr("target_rows", _json_ready(rows))
+                trial.set_user_attr(
+                    "summary_row",
+                    _json_ready(_trial_summary_row(rows, trial_number=trial.number)),
+                )
+                study.tell(trial, loss)
+            launched += 1
+            completed += 1
+            if completed == n_trials or completed % progress_interval == 0:
+                print(
+                    _progress_line(
+                        label="optuna",
+                        completed=completed,
+                        total=n_trials,
+                        started_at=started_at,
+                    ),
+                    file=sys.stderr,
+                )
+    else:
+        pending: dict[Future[tuple[ComboSpec, dict[str, Any]]], tuple[optuna.Trial, ComboSpec]] = {}
+        with ProcessPoolExecutor(
+            max_workers=workers,
+            initializer=_init_combo_worker,
+            initargs=(loaded, train_df, future_df),
+        ) as executor:
+            while launched < n_trials or pending:
+                while launched < n_trials and len(pending) < workers:
+                    trial = study.ask()
+                    try:
+                        spec = _suggest_spec(trial)
+                    except optuna.TrialPruned as exc:
+                        trial.set_user_attr("prune_reason", str(exc))
+                        study.tell(trial, state=optuna.trial.TrialState.PRUNED)
+                        launched += 1
+                        completed += 1
+                        if completed == n_trials or completed % progress_interval == 0:
+                            print(
+                                _progress_line(
+                                    label="optuna",
+                                    completed=completed,
+                                    total=n_trials,
+                                    started_at=started_at,
+                                ),
+                                file=sys.stderr,
+                            )
+                        continue
+                    pending[executor.submit(_evaluate_combo_worker, spec)] = (trial, spec)
+                    launched += 1
+                if not pending:
+                    continue
+                done, _ = wait(tuple(pending), return_when=FIRST_COMPLETED)
+                for future in done:
+                    trial, spec = pending.pop(future)
+                    try:
+                        _completed_spec, stats = future.result()
+                    except ValueError as exc:
+                        trial.set_user_attr("prune_reason", str(exc))
+                        study.tell(trial, state=optuna.trial.TrialState.PRUNED)
+                    else:
+                        rows = _rows_for_combo(
+                            spec=spec,
+                            stats=stats,
+                            targets=targets,
+                            eval_slice=eval_slice,
+                            trial_number=trial.number,
+                        )
+                        if stats["error"]:
+                            trial.set_user_attr("prune_reason", stats["error"])
+                            study.tell(trial, state=optuna.trial.TrialState.PRUNED)
+                        else:
+                            loss = _trial_loss_from_rows(rows, top_k_requested=spec.top_k)
+                            trial.set_user_attr(
+                                "matched_target_count",
+                                sum(1 for row in rows if row["match_found"]),
+                            )
+                            trial.set_user_attr("hist_exog_cols", list(spec.hist_exog_cols))
+                            trial.set_user_attr("upward_tail_cols", list(spec.upward_cols))
+                            trial.set_user_attr("target_rows", _json_ready(rows))
+                            trial.set_user_attr(
+                                "summary_row",
+                                _json_ready(_trial_summary_row(rows, trial_number=trial.number)),
+                            )
+                            study.tell(trial, loss)
+                    completed += 1
+                    if completed == n_trials or completed % progress_interval == 0:
+                        print(
+                            _progress_line(
+                                label="optuna",
+                                completed=completed,
+                                total=n_trials,
+                                started_at=started_at,
+                            ),
+                            file=sys.stderr,
+                        )
     completed_trials = [
         trial for trial in study.trials if trial.state == optuna.trial.TrialState.COMPLETE
     ]
@@ -712,55 +976,106 @@ def run_final_find(
     upward_grid: list[list[str]],
     top_k_values: Sequence[int],
     eval_slice: str,
+    workers: int,
+    chunksize: int,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     base_cols = set(train_df.columns)
     combo_rows: list[dict[str, Any]] = []
-    for top_k in top_k_values:
-        for input_size, exog_t, upward_t in iter_combos(
+    combo_specs = _iter_combo_specs(
+        input_sizes=input_sizes,
+        exog_grid=exog_grid,
+        upward_grid=upward_grid,
+        top_k_values=top_k_values,
+        base_dataset_cols=base_cols,
+    )
+    total_specs = sum(
+        1
+        for _ in _iter_combo_specs(
             input_sizes=input_sizes,
             exog_grid=exog_grid,
             upward_grid=upward_grid,
+            top_k_values=top_k_values,
             base_dataset_cols=base_cols,
-        ):
+        )
+    )
+    started_at = time.monotonic()
+    progress_interval = max(1, workers)
+    completed = 0
+
+    if workers == 1:
+        for spec in combo_specs:
             stats = evaluate_exact_combo(
                 loaded=loaded,
                 train_df=train_df,
                 future_df=future_df,
-                input_size=input_size,
-                hist_exog_cols=exog_t,
-                upward_cols=upward_t,
-                top_k=top_k,
+                input_size=spec.input_size,
+                hist_exog_cols=spec.hist_exog_cols,
+                upward_cols=spec.upward_cols,
+                top_k=spec.top_k,
             )
-            common = {
-                "eval_slice": eval_slice,
-                "input_size": input_size,
-                "hist_exog_cols": json.dumps(list(exog_t)),
-                "upward_tail_cols": json.dumps(list(upward_t)),
-                "error": stats["error"],
-                "bank_size": stats.get("bank_size", float("nan")),
-                "candidate_count": stats.get("candidate_count", float("nan")),
-                "eligible_count": stats.get("eligible_count", float("nan")),
-                "query_event_score": stats.get("query_event_score", float("nan")),
-                "effective_event_threshold": stats.get(
-                    "effective_event_threshold", float("nan")
-                ),
-                "skip_reason": stats.get("skip_reason", ""),
-                "retrieval_applied": stats.get("retrieval_applied", False),
-                "top_k_requested": top_k,
-                "top_k_used": stats.get("top_k_used", 0),
-                "mean_similarity": stats.get("mean_similarity", float("nan")),
-                "max_similarity": stats.get("max_similarity", float("nan")),
-            }
-            neighbors = stats.get("neighbors", [])
-            for target in targets:
-                row = {
-                    **common,
-                    "target_label": target.label,
-                    "target_candidate_end_ds": target.candidate_end_ds,
-                    "target_notes": target.notes or "",
-                }
-                row.update(_target_match_payload(target, neighbors))
-                combo_rows.append(row)
+            combo_rows.extend(
+                _rows_for_combo(
+                    spec=spec,
+                    stats=stats,
+                    targets=targets,
+                    eval_slice=eval_slice,
+                )
+            )
+            completed += 1
+            if completed == total_specs or completed % progress_interval == 0:
+                print(
+                    _progress_line(
+                        label="exhaustive",
+                        completed=completed,
+                        total=total_specs,
+                        started_at=started_at,
+                    ),
+                    file=sys.stderr,
+                )
+    else:
+        chunked_specs = _iter_chunks(combo_specs, size=chunksize)
+        pending: dict[
+            Future[list[tuple[ComboSpec, dict[str, Any]]]],
+            int,
+        ] = {}
+        max_pending = max(workers * 2, 1)
+        with ProcessPoolExecutor(
+            max_workers=workers,
+            initializer=_init_combo_worker,
+            initargs=(loaded, train_df, future_df),
+        ) as executor:
+            while True:
+                while len(pending) < max_pending:
+                    try:
+                        chunk = next(chunked_specs)
+                    except StopIteration:
+                        break
+                    pending[executor.submit(_evaluate_combo_batch_worker, chunk)] = len(chunk)
+                if not pending:
+                    break
+                done, _ = wait(tuple(pending), return_when=FIRST_COMPLETED)
+                for future in done:
+                    chunk_size = pending.pop(future)
+                    for spec, stats in future.result():
+                        combo_rows.extend(
+                            _rows_for_combo(
+                                spec=spec,
+                                stats=stats,
+                                targets=targets,
+                                eval_slice=eval_slice,
+                            )
+                        )
+                    completed += chunk_size
+                    if completed == total_specs or completed % progress_interval == 0:
+                        print(
+                            _progress_line(
+                                label="exhaustive",
+                                completed=completed,
+                                total=total_specs,
+                                started_at=started_at,
+                            ),
+                            file=sys.stderr,
+                        )
 
     combo_rows.sort(key=_combo_sort_key, reverse=True)
 
@@ -913,6 +1228,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--summary-json", type=Path, default=None)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
+        "--workers",
+        type=str,
+        default="auto",
+        help="Worker count for combo evaluation ('auto' uses all logical CPUs).",
+    )
+    parser.add_argument(
+        "--chunksize",
+        type=int,
+        default=8,
+        help="Number of combos per worker task in exhaustive mode.",
+    )
+    parser.add_argument(
+        "--serial",
+        action="store_true",
+        help="Force single-process execution for debugging/repro comparisons.",
+    )
+    parser.add_argument(
         "--optuna-n-trials",
         type=int,
         default=200,
@@ -1018,6 +1350,9 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--top-k-values must contain at least one integer")
     if any(value <= 0 for value in top_k_values):
         raise ValueError("--top-k-values must contain only positive integers")
+    workers = 1 if args.serial else _resolve_workers(args.workers)
+    if args.chunksize <= 0:
+        raise ValueError("--chunksize must be positive")
     combo_count_per_topk = sum(
         1
         for _ in iter_combos(
@@ -1037,7 +1372,7 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"eval_slice={args.eval_slice} train_rows={len(train_df)} test_rows={len(future_df)} "
         f"targets={len(targets)} input_sizes={input_sizes} top_k_values={top_k_values} "
-        f"combos={combo_count}"
+        f"combos={combo_count} workers={workers} chunksize={args.chunksize}"
     )
     if skipped_incompatible:
         print(
@@ -1071,6 +1406,7 @@ def main(argv: list[str] | None = None) -> int:
                 if args.optuna_seed is not None
                 else optuna_seed(loaded.config.runtime.random_seed)
             ),
+            workers=workers,
             storage_path=args.optuna_storage_path,
             study_name=args.study_name,
             resume=bool(args.resume),
@@ -1086,6 +1422,8 @@ def main(argv: list[str] | None = None) -> int:
             upward_grid=upward_grid,
             top_k_values=top_k_values,
             eval_slice=args.eval_slice,
+            workers=workers,
+            chunksize=int(args.chunksize),
         )
 
     if args.output_csv:

@@ -30,6 +30,7 @@ from tuning.search_space import (
 )
 
 SHARED_SETTINGS_RELATIVE_PATH = Path("yaml/setting/setting.yaml")
+VAR_SETTINGS_RELATIVE_PATH = Path("yaml/var.yaml")
 DEFAULT_MANIFEST_VERSION = "1"
 DEFAULT_ARTIFACT_SCHEMA_VERSION = "1"
 DEFAULT_EVALUATION_PROTOCOL_VERSION = "2"
@@ -123,6 +124,17 @@ SHARED_SETTINGS_OWNED_DOTTED_PATHS = (
 SHARED_SETTINGS_MAPPING_DOTTED_PATHS = frozenset(
     {"training.lr_scheduler", "training.optimizer"}
 )
+VAR_SETTINGS_OWNED_DOTTED_PATHS = (
+    "dataset.hist_exog_cols",
+    "retrieval.star.anomaly_tails",
+)
+VAR_SETTINGS_MAPPING_DOTTED_PATHS = frozenset({"retrieval.star.anomaly_tails"})
+VAR_EXPERIMENT_RELATIVE_DIRS = (
+    Path("yaml/experiment/feature_set_aaforecast_brent"),
+    Path("yaml/experiment/feature_set_aaforecast_dubai"),
+    Path("yaml/experiment/feature_set_aaforecast_wti"),
+)
+VAR_PLUGIN_RETRIEVAL_RELATIVE_DIR = Path("yaml/plugins/retrieval")
 SUPPORTED_TRAINER_ACCELERATORS = {"auto", "cpu", "gpu"}
 SUPPORTED_DATALOADER_KWARGS = {
     "num_workers",
@@ -461,9 +473,9 @@ def _validate_shared_settings_fragment(
     *,
     owned_paths: tuple[str, ...],
     section_label: str,
+    mapping_roots: frozenset[str] = SHARED_SETTINGS_MAPPING_DOTTED_PATHS,
 ) -> None:
     owned = set(owned_paths)
-    mapping_roots = SHARED_SETTINGS_MAPPING_DOTTED_PATHS
 
     def _walk(node: dict[str, Any], prefix: str = "") -> None:
         for key, value in node.items():
@@ -515,6 +527,38 @@ def _load_shared_settings_for_yaml_app_config(
     return _load_shared_settings_from_path(repo_root / SHARED_SETTINGS_RELATIVE_PATH)
 
 
+def _validate_var_settings_payload(payload: Any) -> dict[str, Any]:
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        raise ValueError("yaml/var.yaml must be a mapping")
+    _validate_shared_settings_fragment(
+        dict(payload),
+        owned_paths=VAR_SETTINGS_OWNED_DOTTED_PATHS,
+        section_label="yaml/var.yaml",
+        mapping_roots=VAR_SETTINGS_MAPPING_DOTTED_PATHS,
+    )
+    return dict(payload)
+
+
+def _load_var_settings_from_path(
+    path: Path,
+) -> tuple[dict[str, Any] | None, Path | None, str | None]:
+    path = path.resolve()
+    if not path.exists():
+        return None, None, None
+    text = path.read_text(encoding="utf-8")
+    payload = yaml.safe_load(text)
+    validated = _validate_var_settings_payload(payload)
+    return validated, path, _hash_text(text)
+
+
+def _load_var_settings_for_repo(
+    repo_root: Path,
+) -> tuple[dict[str, Any] | None, Path | None, str | None]:
+    return _load_var_settings_from_path(repo_root / VAR_SETTINGS_RELATIVE_PATH)
+
+
 def _resolve_shared_settings_reference(
     repo_root: Path,
     shared_settings_path: str | Path,
@@ -531,6 +575,46 @@ def _uses_repo_shared_settings(repo_root: Path, source_path: Path) -> bool:
     except ValueError:
         return False
     return bool(relative_path.parts) and relative_path.parts[0] == "yaml"
+
+
+def _var_owned_paths_for_source(
+    repo_root: Path,
+    source_path: Path,
+) -> tuple[str, ...]:
+    try:
+        relative_path = source_path.resolve().relative_to(repo_root.resolve())
+    except ValueError:
+        return ()
+    relative_posix = relative_path.as_posix()
+    for experiment_dir in VAR_EXPERIMENT_RELATIVE_DIRS:
+        prefix = f"{experiment_dir.as_posix()}/"
+        if relative_posix.startswith(prefix):
+            return ("dataset.hist_exog_cols",)
+    if relative_posix.startswith(f"{VAR_PLUGIN_RETRIEVAL_RELATIVE_DIR.as_posix()}/"):
+        return ("retrieval.star.anomaly_tails",)
+    return ()
+
+
+def _merge_repo_var_settings_into_payload(
+    payload: Any,
+    *,
+    repo_root: Path | None,
+    source_path: Path,
+) -> Any:
+    if repo_root is None or not isinstance(payload, dict):
+        return payload
+    owned_paths = _var_owned_paths_for_source(repo_root, source_path)
+    if not owned_paths:
+        return payload
+    var_settings_payload, _, _ = _load_var_settings_for_repo(repo_root)
+    if var_settings_payload is None:
+        return payload
+    return _merge_shared_settings_into_payload(
+        payload,
+        var_settings_payload,
+        owned_paths=owned_paths,
+        duplicate_label="shared var",
+    )
 
 
 def _overlay_shared_fragment(
@@ -571,6 +655,7 @@ def _merge_shared_settings_into_payload(
     shared_settings: dict[str, Any],
     *,
     owned_paths: tuple[str, ...] = SHARED_SETTINGS_OWNED_DOTTED_PATHS,
+    duplicate_label: str = "shared setting",
 ) -> dict[str, Any]:
     merged = deepcopy(payload)
     duplicates: list[str] = []
@@ -584,7 +669,8 @@ def _merge_shared_settings_into_payload(
         _set_dotted_path(merged, dotted_path, deepcopy(shared_value))
     if duplicates:
         raise ValueError(
-            "config repeats shared setting path(s): " + ", ".join(sorted(duplicates))
+            f"config repeats {duplicate_label} path(s): "
+            + ", ".join(sorted(duplicates))
         )
     return merged
 
@@ -1079,12 +1165,23 @@ def resolve_config_path(
     )
 
 
-def _load_document(path: Path, source_type: str) -> Any:
+def _load_document(
+    path: Path,
+    source_type: str,
+    *,
+    repo_root: Path | None = None,
+) -> Any:
     text = path.read_text(encoding="utf-8")
     if source_type == "toml":
         return tomllib.loads(text)
     payload = yaml.safe_load(text)
-    return {} if payload is None else payload
+    if payload is None:
+        payload = {}
+    return _merge_repo_var_settings_into_payload(
+        payload,
+        repo_root=repo_root,
+        source_path=path,
+    )
 
 
 def _requested_job_mode(
@@ -1766,7 +1863,7 @@ def load_app_config(
         config_toml_path=config_toml_path,
     )
     raw_text = source_path.read_text(encoding="utf-8")
-    payload = _load_document(source_path, source_type)
+    payload = _load_document(source_path, source_type, repo_root=repo_root)
     _reject_direct_linked_aa_forecast_config(
         payload,
         repo_root=repo_root,
@@ -1833,7 +1930,11 @@ def load_app_config(
                 repo_root,
                 source_path,
                 raw_stage_config,
-                load_document=_load_document,
+                load_document=lambda path, doc_type: _load_document(
+                    path,
+                    doc_type,
+                    repo_root=repo_root,
+                ),
                 unknown_keys=_unknown_keys,
                 coerce_bool=_coerce_bool,
                 coerce_name_tuple=_coerce_name_tuple,
