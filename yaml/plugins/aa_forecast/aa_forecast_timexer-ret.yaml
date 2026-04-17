@@ -1,11 +1,13 @@
 aa_forecast:
   model: timexer
   tune_training: false
-  lowess_frac: 0.35
-  lowess_delta: 0.01
+  lowess_frac: 0.359
+  lowess_delta: 0.008
+  thresh: 3.08
   uncertainty:
     enabled: true
     sample_count: 50
+
   model_params:
     hidden_size: 128
     n_heads: 8
@@ -19,9 +21,10 @@ aa_forecast:
     season_length: 4
   star_anomaly_tails:
     upward:
+    - GPRD
+    - GPRD_ACT
     - GPRD_THREAT
     two_sided: []
-  thresh: 3.5
   retrieval:
     enabled: true
     config_path: ../retrieval/baseline_retrieval.yaml

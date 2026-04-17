@@ -1690,7 +1690,7 @@ def test_normalize_retrieval_series_window_aligns_mismatched_series() -> None:
     assert len(out["ds"]) == 3
     assert len(out["y_raw"]) == 3
     assert len(out["y_transformed"]) == 3
-    assert out["y_transformed"][0:2] == [float("nan"), float("nan")]
+    assert all(np.isnan(v) for v in out["y_transformed"][0:2])
     assert out["y_transformed"][2] == 99.0
 
 

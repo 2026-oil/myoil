@@ -342,7 +342,19 @@ def _build_aa_forecast_doc(
     star_tails = aa.setdefault("star_anomaly_tails", {})
     if not isinstance(star_tails, dict):
         raise ValueError("aa_forecast.star_anomaly_tails must be a mapping")
-    star_tails["upward"] = list(params["star_anomaly_tails_upward"])
+    # Optuna persists only suggested params in trial.params. The upward tails list is a
+    # derived value, so rebuild it from the persisted selector key when needed.
+    upward = params.get("star_anomaly_tails_upward")
+    if upward is None:
+        choice_key = params.get("star_anomaly_tails_upward_key")
+        if isinstance(choice_key, str) and choice_key in TAIL_CHOICE_MAP:
+            upward = list(TAIL_CHOICE_MAP[choice_key])
+        else:
+            raise KeyError(
+                "star_anomaly_tails_upward (or star_anomaly_tails_upward_key) is required "
+                "to build the aa_forecast STAR tails recommendation"
+            )
+    star_tails["upward"] = list(upward)
     star_tails.setdefault("two_sided", [])
     retrieval = aa.get("retrieval")
     if not isinstance(retrieval, dict):

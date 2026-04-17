@@ -2,28 +2,26 @@ retrieval:
   enabled: true
   star:
     season_length: 4
-    lowess_frac: 0.35
-    lowess_delta: 0.01
-    thresh: 3.5
+    lowess_frac: 0.359
+    lowess_delta: 0.008
+    thresh: 3.08
     anomaly_tails:
       upward:
-      - GPRD_THREAT
       - GPRD
       - GPRD_ACT
-      - Idx_OVX
+      - GPRD_THREAT
       two_sided: []
   mode: posthoc_blend
-  top_k: 2
-  recency_gap_steps: 8
-  trigger_quantile: 0.01
-  min_similarity: 0.0
+  top_k: 1
+  recency_gap_steps: 16
+  trigger_quantile: 0.0126
+  min_similarity: 0.10669873083660895
   similarity: cosine
-  temperature: 0.01
-  blend_floor: 0.0
-  blend_max: 1.0
-  use_uncertainty_gate: true
+  temperature: 0.0126
+  blend_floor: 0.088
+  blend_max: 0.894
+  use_uncertainty_gate: false
   insample_y_included: false
   use_event_key: true
-  event_score_log_bonus_alpha: 0.0
-  event_score_log_bonus_cap: 0.0
-
+  event_score_log_bonus_alpha: 0.522
+  event_score_log_bonus_cap: 1.87
