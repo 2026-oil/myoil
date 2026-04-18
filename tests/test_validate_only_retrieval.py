@@ -100,7 +100,7 @@ def test_repo_var_yaml_supplies_retrieval_anomaly_tails() -> None:
     cfg = loaded.config
     assert isinstance(cfg.stage_plugin_config, RetrievalPluginConfig)
     assert cfg.stage_plugin_config.star.anomaly_tails == {
-        "upward": ("GPRD",),
+        "upward": ("GPRD_THREAT",),
         "two_sided": (),
     }
 

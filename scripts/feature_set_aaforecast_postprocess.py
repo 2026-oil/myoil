@@ -94,7 +94,7 @@ def _link_batch_artifacts(
     for entry in entries:
         if bool(entry.get("derived")):
             continue
-        target = Path(str(entry["canonical_run_root"])).resolve()
+        target = _resolve_existing_run_root(Path(str(entry["canonical_run_root"])))
         if not target.exists():
             continue
         _replace_symlink(runs_dir / str(entry["run_name"]), target)
@@ -109,7 +109,7 @@ def _build_manifest(
 ) -> Path:
     manifest_entries: list[dict[str, Any]] = []
     for entry in entries:
-        canonical_root = Path(str(entry["canonical_run_root"])).resolve()
+        canonical_root = _resolve_existing_run_root(Path(str(entry["canonical_run_root"])))
         linked_path = None if bool(entry.get("derived")) else raw_batch_root / "runs" / str(entry["run_name"])
         manifest_entries.append(
             {
@@ -181,6 +181,37 @@ def _relpath(path: Path, *, start: Path) -> str:
         return str(path.resolve().relative_to(start.resolve()))
     except ValueError:
         return str(path.resolve())
+
+
+def _is_complete_report_root(path: Path) -> bool:
+    return (
+        (path / "config" / "config.resolved.json").exists()
+        and (path / "summary" / "leaderboard.csv").exists()
+        and (path / "summary" / "result.csv").exists()
+    )
+
+
+def _resolve_existing_run_root(run_root: Path) -> Path:
+    run_root = run_root.resolve()
+    if _is_complete_report_root(run_root):
+        return run_root
+
+    candidates: list[Path] = []
+    for root in sorted(REPO_ROOT.glob("runs*")):
+        if not root.is_dir():
+            continue
+        direct = root / run_root.name
+        if _is_complete_report_root(direct):
+            candidates.append(direct.resolve())
+        for nested in sorted(root.glob(f"*/{run_root.name}")):
+            if _is_complete_report_root(nested):
+                candidates.append(nested.resolve())
+    if not candidates:
+        return run_root
+    return max(
+        candidates,
+        key=lambda candidate: (candidate / "config" / "config.resolved.json").stat().st_mtime,
+    )
 
 
 def _infer_prediction_unit(run_reports: list[dict[str, Any]]) -> str:
@@ -258,13 +289,76 @@ def _recompute_metrics_frame(predictions: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _retrieval_payload_by_cutoff(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    payloads: dict[str, dict[str, Any]] = {}
+def _retrieval_payload_indexes(
+    report: dict[str, Any],
+) -> tuple[
+    dict[str, dict[str, Any]],
+    dict[tuple[str, str], dict[str, Any]],
+    dict[str, dict[str, Any]],
+]:
+    payload_by_artifact: dict[str, dict[str, Any]] = {}
+    payload_by_model_cutoff: dict[tuple[str, str], dict[str, Any]] = {}
+    payload_by_cutoff: dict[str, dict[str, Any]] = {}
+    ambiguous_cutoffs: set[str] = set()
     for payload in report.get("retrieval_payloads", []):
+        artifact = str(payload.get("_artifact_path", "")).strip()
+        if artifact:
+            payload_by_artifact[artifact] = payload
         cutoff = str(payload.get("cutoff", "")).strip()
+        model = str(payload.get("_payload_model", "")).strip()
+        if cutoff and model:
+            payload_by_model_cutoff[(model, cutoff)] = payload
         if cutoff:
-            payloads[cutoff] = payload
-    return payloads
+            if cutoff in payload_by_cutoff and payload_by_cutoff[cutoff] is not payload:
+                ambiguous_cutoffs.add(cutoff)
+            else:
+                payload_by_cutoff[cutoff] = payload
+    for cutoff in ambiguous_cutoffs:
+        payload_by_cutoff.pop(cutoff, None)
+    return payload_by_artifact, payload_by_model_cutoff, payload_by_cutoff
+
+
+def _resolve_group_retrieval_payload(
+    report: dict[str, Any],
+    group: pd.DataFrame,
+    payload_by_artifact: dict[str, dict[str, Any]],
+    payload_by_model_cutoff: dict[tuple[str, str], dict[str, Any]],
+    payload_by_cutoff: dict[str, dict[str, Any]],
+) -> dict[str, Any] | None:
+    artifact_columns = (
+        "retrieval_artifact",
+        "aaforecast_retrieval_artifact",
+    )
+    for column in artifact_columns:
+        if column not in group.columns:
+            continue
+        values = [
+            str(value).strip()
+            for value in group[column].tolist()
+            if str(value).strip() and str(value).strip().lower() != "nan"
+        ]
+        if not values:
+            continue
+        artifact = values[0]
+        payload = payload_by_artifact.get(artifact)
+        if payload is not None:
+            return payload
+        for candidate_path, candidate_payload in payload_by_artifact.items():
+            if candidate_path.endswith(artifact) or artifact.endswith(candidate_path):
+                return candidate_payload
+
+    cutoff = str(group["cutoff"].iloc[0]).strip()
+    if "model" in group.columns:
+        model = str(group["model"].iloc[0]).strip()
+        payload = payload_by_model_cutoff.get((model, cutoff))
+        if payload is not None:
+            return payload
+    return payload_by_cutoff.get(cutoff)
+
+
+def _ensure_object_column(frame: pd.DataFrame, column: str) -> None:
+    if column in frame.columns and frame[column].dtype != object:
+        frame[column] = frame[column].astype("object")
 
 
 def _build_derived_nonret_predictions(report: dict[str, Any]) -> pd.DataFrame:
@@ -273,29 +367,46 @@ def _build_derived_nonret_predictions(report: dict[str, Any]) -> pd.DataFrame:
         raise ValueError(f"Cannot derive non-ret report from empty predictions: {report['run_name']}")
     if "cutoff" not in predictions.columns:
         raise ValueError(f"Cannot derive non-ret report without cutoff column: {report['run_name']}")
-    payload_by_cutoff = _retrieval_payload_by_cutoff(report)
-    if not payload_by_cutoff:
+    payload_by_artifact, payload_by_model_cutoff, payload_by_cutoff = _retrieval_payload_indexes(
+        report
+    )
+    if not payload_by_artifact and not payload_by_model_cutoff and not payload_by_cutoff:
         raise ValueError(
             f"Cannot derive non-ret report without retrieval payloads: {report['run_name']}"
         )
 
     derived = predictions.copy()
-    for cutoff, indices in derived.groupby("cutoff", sort=False).groups.items():
-        payload = payload_by_cutoff.get(str(cutoff))
+    group_columns = ["cutoff"]
+    if "model" in derived.columns:
+        group_columns = ["model", "cutoff"]
+    for group_key, indices in derived.groupby(group_columns, sort=False).groups.items():
+        group = derived.loc[list(indices)].sort_values(["horizon_step", "ds"])
+        payload = _resolve_group_retrieval_payload(
+            report,
+            group,
+            payload_by_artifact,
+            payload_by_model_cutoff,
+            payload_by_cutoff,
+        )
         if payload is None:
+            group_desc = (
+                f"model={group['model'].iloc[0]!r} cutoff={group['cutoff'].iloc[0]!r}"
+                if "model" in group.columns
+                else f"cutoff={group['cutoff'].iloc[0]!r}"
+            )
             raise ValueError(
-                f"Missing retrieval payload for derived non-ret cutoff={cutoff!r} run={report['run_name']}"
+                f"Missing retrieval payload for derived non-ret {group_desc} run={report['run_name']}"
             )
         base_prediction = payload.get("base_prediction")
         if not isinstance(base_prediction, list):
             raise ValueError(
-                f"Retrieval payload missing base_prediction list for run={report['run_name']} cutoff={cutoff!r}"
+                "Retrieval payload missing base_prediction list "
+                f"for run={report['run_name']} cutoff={group['cutoff'].iloc[0]!r}"
             )
-        group = derived.loc[list(indices)].sort_values(["horizon_step", "ds"])
         if len(base_prediction) != len(group):
             raise ValueError(
                 "Derived non-ret base_prediction length mismatch "
-                f"for run={report['run_name']} cutoff={cutoff!r}: "
+                f"for run={report['run_name']} cutoff={group['cutoff'].iloc[0]!r}: "
                 f"payload={len(base_prediction)} rows={len(group)}"
             )
         derived.loc[group.index, "y_hat"] = [float(value) for value in base_prediction]
@@ -304,16 +415,20 @@ def _build_derived_nonret_predictions(report: dict[str, Any]) -> pd.DataFrame:
         if "retrieval_applied" in derived.columns:
             derived.loc[group.index, "retrieval_applied"] = False
         if "retrieval_skip_reason" in derived.columns:
+            _ensure_object_column(derived, "retrieval_skip_reason")
             derived.loc[group.index, "retrieval_skip_reason"] = "derived_nonret_from_ret"
         if "retrieval_artifact" in derived.columns:
+            _ensure_object_column(derived, "retrieval_artifact")
             derived.loc[group.index, "retrieval_artifact"] = ""
         if "aaforecast_retrieval_enabled" in derived.columns:
             derived.loc[group.index, "aaforecast_retrieval_enabled"] = False
         if "aaforecast_retrieval_applied" in derived.columns:
             derived.loc[group.index, "aaforecast_retrieval_applied"] = False
         if "aaforecast_retrieval_skip_reason" in derived.columns:
+            _ensure_object_column(derived, "aaforecast_retrieval_skip_reason")
             derived.loc[group.index, "aaforecast_retrieval_skip_reason"] = "derived_nonret_from_ret"
         if "aaforecast_retrieval_artifact" in derived.columns:
+            _ensure_object_column(derived, "aaforecast_retrieval_artifact")
             derived.loc[group.index, "aaforecast_retrieval_artifact"] = ""
     return derived
 
@@ -386,18 +501,35 @@ def _load_retrieval_payloads(run_root: Path) -> list[dict[str, Any]]:
     aa_retrieval_root = run_root / "aa_forecast" / "retrieval"
     if aa_retrieval_root.exists():
         for payload_path in sorted(aa_retrieval_root.glob("fold_*/*.json")):
-            payloads.append(_load_json(payload_path))
+            payload = _load_json(payload_path)
+            payload["_artifact_path"] = str(payload_path.relative_to(run_root))
+            payloads.append(payload)
     standalone_retrieval_root = run_root / "retrieval"
     if standalone_retrieval_root.exists():
         for payload_path in sorted(standalone_retrieval_root.glob("retrieval_summary_*.json")):
             if payload_path.stem.endswith("_windows"):
                 continue
-            payloads.append(_load_json(payload_path))
+            payload = _load_json(payload_path)
+            payload["_artifact_path"] = str(payload_path.relative_to(run_root))
+            payloads.append(payload)
+    scheduler_workers_root = run_root / "scheduler" / "workers"
+    if scheduler_workers_root.exists():
+        for worker_root in sorted(path for path in scheduler_workers_root.iterdir() if path.is_dir()):
+            worker_retrieval_root = worker_root / "retrieval"
+            if not worker_retrieval_root.exists():
+                continue
+            for payload_path in sorted(worker_retrieval_root.glob("retrieval_summary_*.json")):
+                if payload_path.stem.endswith("_windows"):
+                    continue
+                payload = _load_json(payload_path)
+                payload["_artifact_path"] = str(payload_path.relative_to(run_root))
+                payload["_payload_model"] = worker_root.name
+                payloads.append(payload)
     return payloads
 
 
 def _read_run_report(entry: dict[str, Any]) -> dict[str, Any]:
-    run_root = Path(str(entry["canonical_run_root"])).resolve()
+    run_root = _resolve_existing_run_root(Path(str(entry["canonical_run_root"])))
     config_path = run_root / "config" / "config.resolved.json"
     leaderboard_path = run_root / "summary" / "leaderboard.csv"
     result_path = run_root / "summary" / "result.csv"
@@ -1099,6 +1231,22 @@ def _build_combined_frame(run_roots: list[Path]) -> pd.DataFrame:
     return combined
 
 
+def _normalize_combined_fold_idx_by_train_end_ds(combined: pd.DataFrame) -> pd.DataFrame:
+    if combined.empty or "train_end_ds" not in combined.columns:
+        return combined
+    normalized = combined.copy()
+    train_end = pd.to_datetime(normalized["train_end_ds"], errors="coerce")
+    if train_end.notna().sum() == 0:
+        return normalized
+    normalized["train_end_ds"] = train_end
+    ordered_values = sorted(pd.Series(train_end).dropna().drop_duplicates().tolist())
+    fold_mapping = {value: idx for idx, value in enumerate(ordered_values)}
+    remapped = train_end.map(fold_mapping)
+    normalized.loc[remapped.notna(), "fold_idx"] = remapped.loc[remapped.notna()].astype(int)
+    normalized["fold_idx"] = pd.to_numeric(normalized["fold_idx"], errors="coerce").astype("Int64")
+    return normalized
+
+
 def _reports_for_group(run_reports: list[dict[str, Any]], *, group: str) -> list[dict[str, Any]]:
     selected = [report for report in run_reports if ("ret" if report["retrieval"] else "nonret") == group]
     if group != "nonret":
@@ -1131,6 +1279,7 @@ def _write_group_plot(
     if not frames:
         return None, None
     combined = pd.concat(frames, ignore_index=True)
+    combined = _normalize_combined_fold_idx_by_train_end_ds(combined)
     if combined.empty:
         return None, None
     run_roots = [Path(str(report["run_root"])).resolve() for report in selected_reports]
@@ -1138,15 +1287,19 @@ def _write_group_plot(
     # 1. Continuous overlay
     plot_dir = raw_batch_root / "plots" / group
     output_path = plot_dir / "all_folds_continuous_overlay.png"
-    overlay.plot_continuous_series(
-        combined,
-        run_roots=run_roots,
-        output_path=output_path,
-        show_mean_band=False,
-        alpha_per_run=0.9,
-        x_start=x_start,
-        x_end=x_end,
-    )
+    try:
+        overlay.plot_continuous_series(
+            combined,
+            run_roots=run_roots,
+            output_path=output_path,
+            show_mean_band=False,
+            alpha_per_run=0.9,
+            x_start=x_start,
+            x_end=x_end,
+        )
+    except ValueError as exc:
+        print(f"warning: skipping {group} continuous overlay: {exc}", file=sys.stderr)
+        return None, None
 
     # 2. Fold overlay plots (regular + window_16)
     fold_dir = plot_dir / "folds"
@@ -1156,13 +1309,17 @@ def _write_group_plot(
     regular_dir.mkdir(exist_ok=True)
     window_dir.mkdir(exist_ok=True)
 
-    fold_paths = overlay.plot_folds(
-        combined,
-        fold_dir,
-        show_mean_band=False,
-        alpha_per_run=0.9,
-        window_history_steps=16,
-    )
+    try:
+        fold_paths = overlay.plot_folds(
+            combined,
+            fold_dir,
+            show_mean_band=False,
+            alpha_per_run=0.9,
+            window_history_steps=16,
+        )
+    except ValueError as exc:
+        print(f"warning: skipping {group} fold overlays: {exc}", file=sys.stderr)
+        return output_path, None
 
     # Separate window_16 and regular plots
     for fp in fold_paths:

@@ -13,10 +13,6 @@ aa_forecast:
     decoder_hidden_size: 128
     decoder_layers: 2
     season_length: 4
-  star_anomaly_tails:
-    upward:
-    - GPRD
-    two_sided: []
   thresh: 3.08
   retrieval:
     enabled: true

@@ -1659,6 +1659,7 @@ def test_predict_aa_forecast_fold_applies_retrieval_after_uncertainty_mean(
     assert captured["retrieval_cfg_enabled"] is True
     assert captured["mean_similarity"] == pytest.approx(0.86)
     assert predictions[job.model].tolist() == [12.0]
+    assert predictions["aaforecast_base_prediction"].tolist() == [10.0]
     assert predictions["aaforecast_retrieval_applied"].tolist() == [True]
 
 
@@ -1918,6 +1919,7 @@ def test_predict_aa_forecast_fold_records_retrieval_skip_without_error(
     )
 
     assert predictions[job.model].tolist() == [10.0]
+    assert predictions["aaforecast_base_prediction"].tolist() == [10.0]
     assert predictions["aaforecast_retrieval_applied"].tolist() == [False]
     assert predictions["aaforecast_retrieval_skip_reason"].tolist() == ["empty_bank"]
 

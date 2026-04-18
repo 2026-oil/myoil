@@ -2031,6 +2031,10 @@ def predict_aa_forecast_fold(
             effective_event_threshold=effective_event_threshold,
         )
         base_prediction = np.asarray(target_predictions[job.model], dtype=float)
+        target_predictions["aaforecast_base_prediction"] = pd.Series(
+            base_prediction,
+            dtype=float,
+        )
         current_last_y = float(train_df[target_col].iloc[-1])
         bank_event_scores = [float(entry["event_score"]) for entry in bank]
         retrieval_summary = {

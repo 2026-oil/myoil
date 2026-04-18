@@ -126,14 +126,18 @@ SHARED_SETTINGS_MAPPING_DOTTED_PATHS = frozenset(
 )
 VAR_SETTINGS_OWNED_DOTTED_PATHS = (
     "dataset.hist_exog_cols",
+    "aa_forecast.star_anomaly_tails",
     "retrieval.star.anomaly_tails",
 )
-VAR_SETTINGS_MAPPING_DOTTED_PATHS = frozenset({"retrieval.star.anomaly_tails"})
+VAR_SETTINGS_MAPPING_DOTTED_PATHS = frozenset(
+    {"aa_forecast.star_anomaly_tails", "retrieval.star.anomaly_tails"}
+)
 VAR_EXPERIMENT_RELATIVE_DIRS = (
     Path("yaml/experiment/feature_set_aaforecast_brent"),
     Path("yaml/experiment/feature_set_aaforecast_dubai"),
     Path("yaml/experiment/feature_set_aaforecast_wti"),
 )
+VAR_PLUGIN_AA_FORECAST_RELATIVE_DIR = Path("yaml/plugins/aa_forecast")
 VAR_PLUGIN_RETRIEVAL_RELATIVE_DIR = Path("yaml/plugins/retrieval")
 SUPPORTED_TRAINER_ACCELERATORS = {"auto", "cpu", "gpu"}
 SUPPORTED_DATALOADER_KWARGS = {
@@ -590,6 +594,8 @@ def _var_owned_paths_for_source(
         prefix = f"{experiment_dir.as_posix()}/"
         if relative_posix.startswith(prefix):
             return ("dataset.hist_exog_cols",)
+    if relative_posix.startswith(f"{VAR_PLUGIN_AA_FORECAST_RELATIVE_DIR.as_posix()}/"):
+        return ("aa_forecast.star_anomaly_tails",)
     if relative_posix.startswith(f"{VAR_PLUGIN_RETRIEVAL_RELATIVE_DIR.as_posix()}/"):
         return ("retrieval.star.anomaly_tails",)
     return ()

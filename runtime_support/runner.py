@@ -767,7 +767,7 @@ def _restore_target_predictions(
     return restored
 
 
-def _compute_metrics(actual: pd.Series, predicted: pd.Series) -> dict[str, float]:
+def compute_metrics(actual: pd.Series, predicted: pd.Series) -> dict[str, float]:
     actual = actual.reset_index(drop=True)
     predicted = predicted.reset_index(drop=True)
     err = actual - predicted
@@ -791,6 +791,9 @@ def _compute_metrics(actual: pd.Series, predicted: pd.Series) -> dict[str, float
         "NRMSE": nrmse,
         "R2": r2,
     }
+
+
+_compute_metrics = compute_metrics
 
 
 def _maybe_post_predict_fold(

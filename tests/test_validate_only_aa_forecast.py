@@ -16,6 +16,7 @@ import plugins.aa_forecast.runtime as aa_runtime
 from plugins.aa_forecast.runtime import _aa_params_override
 from runtime_support.forecast_models import build_model
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 FIXED_CONFIG = Path("tests/fixtures/aa_forecast_runtime_smoke.yaml")
 AUTO_CONFIG = Path("tests/fixtures/aa_forecast_runtime_auto_smoke.yaml")
@@ -184,6 +185,78 @@ EXPECTED_AA_DROPOUT_CANDIDATES = [round(step * 0.05, 2) for step in range(1, 20)
 DIRECT_TARGET_CONFIG = Path(
     "yaml/experiment/feature_set_aaforecast/brentoil-case1.yaml"
 )
+WTI_VAR_ONLY_VARIANTS = {
+    "gru": {
+        "config_path": Path("yaml/experiment/feature_set_aaforecast_wti/aaforecast-gru.yaml"),
+        "model": "gru",
+        "star_anomaly_tails": {
+            "upward": ["GPRD_THREAT"],
+            "two_sided": [],
+        },
+        "star_hist_exog_cols_resolved": ["GPRD_THREAT"],
+        "non_star_hist_exog_cols_resolved": ["Com_LMEX"],
+    },
+    "gru_ret": {
+        "config_path": Path(
+            "yaml/experiment/feature_set_aaforecast_wti/aaforecast-gru-ret.yaml"
+        ),
+        "model": "gru",
+        "star_anomaly_tails": {
+            "upward": ["GPRD_THREAT"],
+            "two_sided": [],
+        },
+        "star_hist_exog_cols_resolved": ["GPRD_THREAT"],
+        "non_star_hist_exog_cols_resolved": ["Com_LMEX"],
+    },
+    "informer": {
+        "config_path": Path(
+            "yaml/experiment/feature_set_aaforecast_wti/aaforecast-informer.yaml"
+        ),
+        "model": "informer",
+        "star_anomaly_tails": {
+            "upward": ["GPRD_THREAT"],
+            "two_sided": [],
+        },
+        "star_hist_exog_cols_resolved": ["GPRD_THREAT"],
+        "non_star_hist_exog_cols_resolved": ["Com_LMEX"],
+    },
+    "informer_ret": {
+        "config_path": Path(
+            "yaml/experiment/feature_set_aaforecast_wti/aaforecast-informer-ret.yaml"
+        ),
+        "model": "informer",
+        "star_anomaly_tails": {
+            "upward": ["GPRD_THREAT"],
+            "two_sided": [],
+        },
+        "star_hist_exog_cols_resolved": ["GPRD_THREAT"],
+        "non_star_hist_exog_cols_resolved": ["Com_LMEX"],
+    },
+    "timexer": {
+        "config_path": Path(
+            "yaml/experiment/feature_set_aaforecast_wti/aaforecast-timexer.yaml"
+        ),
+        "model": "timexer",
+        "star_anomaly_tails": {
+            "upward": ["GPRD_THREAT"],
+            "two_sided": [],
+        },
+        "star_hist_exog_cols_resolved": ["GPRD_THREAT"],
+        "non_star_hist_exog_cols_resolved": ["Com_LMEX"],
+    },
+    "timexer_ret": {
+        "config_path": Path(
+            "yaml/experiment/feature_set_aaforecast_wti/aaforecast-timexer-ret.yaml"
+        ),
+        "model": "timexer",
+        "star_anomaly_tails": {
+            "upward": ["GPRD_THREAT"],
+            "two_sided": [],
+        },
+        "star_hist_exog_cols_resolved": ["GPRD_THREAT"],
+        "non_star_hist_exog_cols_resolved": ["Com_LMEX"],
+    },
+}
 
 
 def _assert_no_event_column(payload: dict[str, object]) -> None:
@@ -927,6 +1000,95 @@ def test_feature_set_aaforecast_best_validate_only(
         )
 
 
+@pytest.mark.parametrize(
+    ("variant", "expected"),
+    list(WTI_VAR_ONLY_VARIANTS.items()),
+)
+def test_feature_set_aaforecast_wti_variants_use_var_yaml_hist_exog_only(
+    tmp_path: Path,
+    variant: str,
+    expected: dict[str, object],
+) -> None:
+    output_root = tmp_path / f"validate-only-aa-forecast-wti-{variant}"
+    code = runtime.main(
+        [
+            "--config",
+            str(expected["config_path"]),
+            "--output-root",
+            str(output_root),
+            "--validate-only",
+        ]
+    )
+
+    assert code == 0
+    resolved = json.loads((output_root / "config" / "config.resolved.json").read_text())
+    payload = resolved["aa_forecast"]
+    assert resolved["dataset"]["hist_exog_cols"] == [
+        "GPRD_THREAT",
+        "Com_LMEX",
+    ]
+    assert payload["model"] == expected["model"]
+    assert payload["star_anomaly_tails"] == expected["star_anomaly_tails"]
+    assert payload["star_hist_exog_cols_resolved"] == expected["star_hist_exog_cols_resolved"]
+    assert payload["non_star_hist_exog_cols_resolved"] == expected[
+        "non_star_hist_exog_cols_resolved"
+    ]
+
+
+def test_repo_var_yaml_supplies_aa_forecast_star_anomaly_tails() -> None:
+    loaded = load_app_config(
+        REPO_ROOT,
+        config_path=Path("yaml/experiment/feature_set_aaforecast_wti/aaforecast-gru.yaml"),
+    )
+    cfg = loaded.config
+    assert cfg.stage_plugin_config.star_anomaly_tails == {
+        "upward": ("GPRD_THREAT",),
+        "two_sided": (),
+    }
+
+
+def test_repo_var_yaml_duplicate_aa_forecast_tail_fails_fast() -> None:
+    plugin_dir = REPO_ROOT / "yaml/plugins/aa_forecast"
+    experiment_dir = REPO_ROOT / "yaml/experiment/feature_set_aaforecast_wti"
+    plugin_path = plugin_dir / ".tmp-duplicate-var-aa-forecast.yaml"
+    config_path = experiment_dir / ".tmp-duplicate-var-aa-forecast-main.yaml"
+    plugin_payload = yaml.safe_load(
+        (REPO_ROOT / "yaml/plugins/aa_forecast/aa_forecast_gru.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    plugin_payload["aa_forecast"]["star_anomaly_tails"] = {
+        "upward": ["GPRD_THREAT"],
+        "two_sided": [],
+    }
+    plugin_path.write_text(
+        yaml.safe_dump(plugin_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+    config_payload = yaml.safe_load(
+        (
+            REPO_ROOT / "yaml/experiment/feature_set_aaforecast_wti/aaforecast-gru.yaml"
+        ).read_text(encoding="utf-8")
+    )
+    config_payload["aa_forecast"]["config_path"] = str(
+        plugin_path.relative_to(REPO_ROOT)
+    )
+    config_path.write_text(
+        yaml.safe_dump(config_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match=r"config repeats shared var path\(s\): aa_forecast.star_anomaly_tails",
+        ):
+            load_app_config(REPO_ROOT, config_path=config_path.relative_to(REPO_ROOT))
+    finally:
+        config_path.unlink(missing_ok=True)
+        plugin_path.unlink(missing_ok=True)
+
+
 def test_validate_only_accepts_plugin_grouped_tails(
     tmp_path: Path,
 ) -> None:
@@ -1596,9 +1758,13 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     )
 
     assert code == 0
-    assert {"y", "y_hat", "y_hat_uncertainty_std", "y_hat_selected_dropout"}.issubset(
-        prediction_frame.columns
-    )
+    assert {
+        "y",
+        "y_hat",
+        "y_hat_uncertainty_std",
+        "y_hat_selected_dropout",
+        "aaforecast_base_prediction",
+    }.issubset(prediction_frame.columns)
     assert (common_fold_root / "predictions.csv").exists()
     assert (common_fold_root / "plot.png").exists()
     assert (common_fold_root / "checkpoint.pt").exists()
@@ -1668,6 +1834,9 @@ def test_runtime_aaforecast_trial_artifacts_include_predictions_and_mc_dropout(
     assert retrieval_summary["retrieval_attempted"] is True
     assert retrieval_summary["retrieval_applied"] is False
     assert retrieval_summary["skip_reason"] == "below_event_threshold"
+    assert prediction_frame["aaforecast_base_prediction"].tolist() == pytest.approx(
+        retrieval_summary["base_prediction"]
+    )
     assert "bank_event_scores" in retrieval_summary
     assert isinstance(retrieval_summary["bank_event_scores"], list)
     assert retrieval_neighbors.empty
